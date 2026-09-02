@@ -58,7 +58,7 @@ apps/web/
     hooks/             shortcuts, file drop, breakpoints
     i18n/              Korean/English messages and locale store
     export/            WebCodecs export, audio DSP, presets
-    media/             ingest, probe, proxy, thumbnail, waveform
+    media/             ingest, probe, proxy, thumbnail, waveform, capture-day grouping
     music/             reference library, recommendation, free-music import
     persistence/       live Yjs document, Dexie, OPFS, import/export, snapshots, GC
     preview/           viewport, scopes, audio engine, guides

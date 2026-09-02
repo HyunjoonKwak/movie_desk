@@ -493,6 +493,14 @@ export const ko = {
     "media.rangeClear": "전체 사용",
     "media.close": "닫기",
     "media.importBusy": "이미 가져오기가 진행 중입니다",
+    "media.sort": "정렬",
+    "media.sortCaptured": "촬영 시간순",
+    "media.sortImported": "가져온 순",
+    "media.groupByDay": "날짜별",
+    "media.groupUndated": "촬영 시각 없음",
+    "media.groupAudio": "오디오 · 음악",
+    "media.groupCount": "{n}개",
+    "media.selectGroup": "이 그룹 전체 선택 / 해제",
 
     // Music library
     "music.tab": "음악",

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  CalendarDays,
   FolderUp,
   Music,
   Image as ImageIcon,
@@ -23,24 +24,21 @@ import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useMediaImport } from "@/media/hooks";
 import { useImportProgressStore } from "@/media/import-progress-store";
 import { useAutoEditStore } from "@/autoedit/autoedit-store";
+import { reverseGeocode } from "@/autoedit/geocode";
+import { groupByDay, sortAssets } from "@/media/organize";
+import { useViewStore } from "@/stores/view-store";
+import { MediaGroupHeader } from "./media-group-header";
 import type { ID } from "@cut/core";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type { MediaAsset, MediaKind } from "@cut/core";
 import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
+import { fmtSec, formatBytes } from "@/media/format";
+import { RangeEditor } from "./range-editor";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
-
-const formatBytes = (b: number): string => {
-  if (b < 1024) return `${b} B`;
-  if (b < 1_048_576) return `${(b / 1024).toFixed(1)} KB`;
-  if (b < 1_073_741_824) return `${(b / 1_048_576).toFixed(1)} MB`;
-  return `${(b / 1_073_741_824).toFixed(2)} GB`;
-};
-
-const fmtSec = (ms: number): string => `${(ms / 1000).toFixed(1)}s`;
 
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -112,7 +110,9 @@ export function MediaBin() {
 
   const onMarqueeDown = useCallback(
     (e: React.PointerEvent) => {
-      if ((e.target as HTMLElement).closest("[data-asset-card]")) return; // 카드 위에서는 드래그-투-타임라인 유지
+      // Cards keep drag-to-timeline; group headers keep their click (pointer
+      // capture would otherwise retarget the click to this container).
+      if ((e.target as HTMLElement).closest("[data-asset-card], [data-group-header]")) return;
       if (e.button !== 0) return;
       marqueeStart.current = toLocal(e);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -208,6 +208,26 @@ export function MediaBin() {
     );
   }, [media, query, filter]);
 
+  // "던져 놓으면 정리된다": capture order and day groups are the default view.
+  const mediaOrder = useViewStore((s) => s.mediaOrder);
+  const groupDays = useViewStore((s) => s.mediaGroupByDay);
+  const ordered = useMemo(() => sortAssets(filtered, mediaOrder), [filtered, mediaOrder]);
+  const groups = useMemo(
+    () => (groupDays ? groupByDay(ordered, reverseGeocode) : null),
+    [ordered, groupDays],
+  );
+  const toggleGroupSelect = useCallback((ids: readonly ID[]) => {
+    setSelected((prev) => {
+      const all = ids.every((id) => prev.has(id));
+      const next = new Set(prev);
+      for (const id of ids) {
+        if (all) next.delete(id);
+        else next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="panel-header">
@@ -265,6 +285,29 @@ export function MediaBin() {
               <ZoomIn className="size-3 text-ink-3" />
             </div>
           </div>
+          <div className="flex items-center gap-1">
+            <select
+              value={mediaOrder}
+              onChange={(e) => useViewStore.getState().setMediaOrder(e.target.value === "imported" ? "imported" : "captured")}
+              aria-label={t("media.sort")}
+              className="rounded bg-white/5 px-1 py-0.5 text-3xs text-ink-2 outline-none focus:bg-white/10"
+            >
+              <option value="captured">{t("media.sortCaptured")}</option>
+              <option value="imported">{t("media.sortImported")}</option>
+            </select>
+            <button
+              type="button"
+              onClick={() => useViewStore.getState().toggleMediaGroupByDay()}
+              aria-pressed={groupDays}
+              className={cn(
+                "flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs",
+                groupDays ? "bg-accent text-accent-fg" : "text-ink-3 hover:text-ink-1",
+              )}
+            >
+              <CalendarDays className="size-3" />
+              {t("media.groupByDay")}
+            </button>
+          </div>
         </div>
       )}
 
@@ -320,152 +363,165 @@ export function MediaBin() {
             thumbSize === 0 ? "grid-cols-3" : thumbSize === 2 ? "grid-cols-1" : "grid-cols-2",
           )}
         >
-          {filtered.map((asset) => {
-            const Icon = KIND_ICON[asset.kind];
-            const isSelected = selected.has(asset.id);
-            const isActive = activeAssetId === asset.id;
-            const isPinned = pinned.includes(asset.id);
-            const isExcluded = excluded.includes(asset.id);
-            const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
-            return (
-              <li key={asset.id} className="group relative" data-asset-card={asset.id}>
-                <button
-                  type="button"
-                  aria-current={isActive ? "true" : undefined}
-                  onClick={(e) => {
-                    // Any interaction makes this the E/W/D/Q source asset.
-                    useMediaUiStore.getState().setActiveAssetId(asset.id);
-                    if (e.metaKey || e.ctrlKey || e.shiftKey) {
-                      toggleSelect(asset.id);
-                      return;
-                    }
-                    if (selected.size > 0) {
-                      // 선택 모드 중에는 클릭이 선택 토글로 동작 (실수로 타임라인 추가 방지)
-                      toggleSelect(asset.id);
-                      return;
-                    }
-                    addToTimeline(asset);
-                  }}
-                  draggable
-                  onDragStart={(e) => {
-                    // Tracks read the dragged asset from the UI store —
-                    // dataTransfer is set too for completeness.
-                    e.dataTransfer.setData("application/x-cut-asset", asset.id);
-                    e.dataTransfer.effectAllowed = "copy";
-                    useTimelineUiStore.getState().setDragAssetId(asset.id);
-                    useMediaUiStore.getState().setActiveAssetId(asset.id);
-                  }}
-                  onDragEnd={() => useTimelineUiStore.getState().setDragAssetId(null)}
-                  className={cn(
-                    "w-full overflow-hidden rounded-md border text-left transition",
-                    isSelected
-                      ? "border-accent ring-2 ring-accent/60"
-                      : isActive
-                        ? "border-accent/50 ring-1 ring-accent/30"
-                        : "border-white/5 hover:border-accent",
-                    isExcluded ? "opacity-45" : "bg-panel-2",
-                  )}
-                  title={t("media.clickToAdd")}
-                >
-                  <div className="relative aspect-video bg-black">
-                    {asset.thumbDataUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={asset.thumbDataUrl}
-                        alt={asset.name}
-                        className="size-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex size-full items-center justify-center text-ink-3">
-                        <Icon className="size-6" />
-                      </div>
-                    )}
-                    {asset.width && asset.height && (
-                      <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
-                        {asset.width}×{asset.height}
-                      </span>
-                    )}
-                    {asset.proxyPath && (
-                      <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
-                        PROXY
-                      </span>
-                    )}
-                    <div className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
-                      {isPinned && (
-                        <span className="flex items-center gap-0.5 rounded bg-accent/90 px-1 py-0.5 text-3xs font-medium text-accent-fg">
-                          <Pin className="size-2.5" />
-                          {t("media.markUse")}
-                        </span>
-                      )}
-                      {isExcluded && (
-                        <span className="flex items-center gap-0.5 rounded bg-red-500/85 px-1 py-0.5 text-3xs font-medium text-white">
-                          <X className="size-2.5" />
-                          {t("media.markSkip")}
-                        </span>
-                      )}
-                      {hasRange && (
-                        <span className="flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-amber-300">
-                          <Scissors className="size-2.5" />
-                          {fmtSec(asset.useInMs ?? 0)}–{fmtSec(asset.useOutMs ?? asset.durationMs)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-2 py-1.5">
-                    <Icon className="size-3 shrink-0 text-ink-3" />
-                    <span className="truncate text-xs text-ink-1">{asset.name}</span>
-                  </div>
-                </button>
-                <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
-                  {asset.kind !== "image" && (
+          {(groups ?? [{ key: "all", dayStart: null, places: [], assets: ordered }]).map(
+            (group) => (
+              <Fragment key={group.key}>
+                {groups && (
+                  <MediaGroupHeader
+                    group={group}
+                    allSelected={group.assets.every((a) => selected.has(a.id))}
+                    onToggle={() => toggleGroupSelect(group.assets.map((a) => a.id))}
+                  />
+                )}
+                {group.assets.map((asset) => {
+                const Icon = KIND_ICON[asset.kind];
+                const isSelected = selected.has(asset.id);
+                const isActive = activeAssetId === asset.id;
+                const isPinned = pinned.includes(asset.id);
+                const isExcluded = excluded.includes(asset.id);
+                const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
+                return (
+                  <li key={asset.id} className="group relative" data-asset-card={asset.id}>
                     <button
                       type="button"
+                      aria-current={isActive ? "true" : undefined}
                       onClick={(e) => {
-                        e.stopPropagation();
-                        setRangeEditing(rangeEditing === asset.id ? null : asset.id);
+                        // Any interaction makes this the E/W/D/Q source asset.
+                        useMediaUiStore.getState().setActiveAssetId(asset.id);
+                        if (e.metaKey || e.ctrlKey || e.shiftKey) {
+                          toggleSelect(asset.id);
+                          return;
+                        }
+                        if (selected.size > 0) {
+                          // 선택 모드 중에는 클릭이 선택 토글로 동작 (실수로 타임라인 추가 방지)
+                          toggleSelect(asset.id);
+                          return;
+                        }
+                        addToTimeline(asset);
                       }}
+                      draggable
+                      onDragStart={(e) => {
+                        // Tracks read the dragged asset from the UI store —
+                        // dataTransfer is set too for completeness.
+                        e.dataTransfer.setData("application/x-cut-asset", asset.id);
+                        e.dataTransfer.effectAllowed = "copy";
+                        useTimelineUiStore.getState().setDragAssetId(asset.id);
+                        useMediaUiStore.getState().setActiveAssetId(asset.id);
+                      }}
+                      onDragEnd={() => useTimelineUiStore.getState().setDragAssetId(null)}
                       className={cn(
-                        "rounded bg-black/60 p-1 hover:bg-amber-500/40 hover:text-white",
-                        hasRange ? "text-amber-300" : "text-ink-1",
+                        "w-full overflow-hidden rounded-md border text-left transition",
+                        isSelected
+                          ? "border-accent ring-2 ring-accent/60"
+                          : isActive
+                            ? "border-accent/50 ring-1 ring-accent/30"
+                            : "border-white/5 hover:border-accent",
+                        isExcluded ? "opacity-45" : "bg-panel-2",
                       )}
-                      title={t("media.range")}
+                      title={t("media.clickToAdd")}
                     >
-                      <Scissors className="size-3" />
+                      <div className="relative aspect-video bg-black">
+                        {asset.thumbDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={asset.thumbDataUrl}
+                            alt={asset.name}
+                            className="size-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex size-full items-center justify-center text-ink-3">
+                            <Icon className="size-6" />
+                          </div>
+                        )}
+                        {asset.width && asset.height && (
+                          <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
+                            {asset.width}×{asset.height}
+                          </span>
+                        )}
+                        {asset.proxyPath && (
+                          <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
+                            PROXY
+                          </span>
+                        )}
+                        <div className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
+                          {isPinned && (
+                            <span className="flex items-center gap-0.5 rounded bg-accent/90 px-1 py-0.5 text-3xs font-medium text-accent-fg">
+                              <Pin className="size-2.5" />
+                              {t("media.markUse")}
+                            </span>
+                          )}
+                          {isExcluded && (
+                            <span className="flex items-center gap-0.5 rounded bg-red-500/85 px-1 py-0.5 text-3xs font-medium text-white">
+                              <X className="size-2.5" />
+                              {t("media.markSkip")}
+                            </span>
+                          )}
+                          {hasRange && (
+                            <span className="flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-amber-300">
+                              <Scissors className="size-2.5" />
+                              {fmtSec(asset.useInMs ?? 0)}–{fmtSec(asset.useOutMs ?? asset.durationMs)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 px-2 py-1.5">
+                        <Icon className="size-3 shrink-0 text-ink-3" />
+                        <span className="truncate text-xs text-ink-1">{asset.name}</span>
+                      </div>
                     </button>
-                  )}
-                  {asset.kind === "video" && !asset.proxyPath && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void makeProxy(asset);
-                      }}
-                      disabled={proxying !== null}
-                      className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40 hover:text-white disabled:opacity-50"
-                      title={t("media.proxy")}
-                    >
-                      {proxying === asset.id ? (
-                        <Loader2 className="size-3 animate-spin" />
-                      ) : (
-                        <Layers className="size-3" />
+                    <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
+                      {asset.kind !== "image" && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRangeEditing(rangeEditing === asset.id ? null : asset.id);
+                          }}
+                          className={cn(
+                            "rounded bg-black/60 p-1 hover:bg-amber-500/40 hover:text-white",
+                            hasRange ? "text-amber-300" : "text-ink-1",
+                          )}
+                          title={t("media.range")}
+                        >
+                          <Scissors className="size-3" />
+                        </button>
                       )}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void handleDelete(asset);
-                    }}
-                    className="rounded bg-black/60 p-1 text-ink-1 hover:bg-red-500/40 hover:text-red-200"
-                    title={t("media.delete")}
-                  >
-                    <Trash2 className="size-3" />
-                  </button>
-                </div>
-              </li>
-            );
-          })}
+                      {asset.kind === "video" && !asset.proxyPath && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            void makeProxy(asset);
+                          }}
+                          disabled={proxying !== null}
+                          className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40 hover:text-white disabled:opacity-50"
+                          title={t("media.proxy")}
+                        >
+                          {proxying === asset.id ? (
+                            <Loader2 className="size-3 animate-spin" />
+                          ) : (
+                            <Layers className="size-3" />
+                          )}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void handleDelete(asset);
+                        }}
+                        className="rounded bg-black/60 p-1 text-ink-1 hover:bg-red-500/40 hover:text-red-200"
+                        title={t("media.delete")}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </div>
+                  </li>
+                );
+                })}
+              </Fragment>
+            ),
+          )}
         </ul>
 
         <input
@@ -593,144 +649,3 @@ function BulkBar(props: {
 
 // 사용 구간 편집 드로어 — 필름스트립(영상) 또는 파형(오디오) 위를 드래그해
 // in/out을 지정한다. 드래그가 끝날 때 한 번만 커밋해 undo 1회로 남긴다.
-function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: () => void }) {
-  const t = useT();
-  const setAssetUseRange = useProjectStore((s) => s.setAssetUseRange);
-  const stripRef = useRef<HTMLDivElement>(null);
-  const dragging = useRef<{ anchorMs: number } | null>(null);
-  const [inMs, setInMs] = useState(asset.useInMs ?? 0);
-  const [outMs, setOutMs] = useState(asset.useOutMs ?? asset.durationMs);
-
-  // 카드 배지에서 다른 자산으로 전환하면 로컬 상태 재초기화
-  useEffect(() => {
-    setInMs(asset.useInMs ?? 0);
-    setOutMs(asset.useOutMs ?? asset.durationMs);
-  }, [asset.useInMs, asset.useOutMs, asset.durationMs]);
-
-  const msAt = (clientX: number): number => {
-    const el = stripRef.current;
-    if (!el) return 0;
-    const r = el.getBoundingClientRect();
-    const f = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
-    return Math.round(f * asset.durationMs);
-  };
-
-  const commit = (a: number, b: number) => {
-    const lo = Math.max(0, Math.min(a, b));
-    const hi = Math.min(asset.durationMs, Math.max(a, b));
-    if (lo <= 0 && hi >= asset.durationMs) {
-      setAssetUseRange(asset.id, undefined); // 전체 구간 = 지정 해제
-    } else if (hi - lo >= 200) {
-      setAssetUseRange(asset.id, { inMs: lo, outMs: hi });
-    }
-  };
-
-  const onDown = (e: React.PointerEvent) => {
-    const ms = msAt(e.clientX);
-    dragging.current = { anchorMs: ms };
-    setInMs(ms);
-    setOutMs(ms);
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onMove = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const ms = msAt(e.clientX);
-    const { anchorMs } = dragging.current;
-    setInMs(Math.min(anchorMs, ms));
-    setOutMs(Math.max(anchorMs, ms));
-  };
-  const onUp = (e: React.PointerEvent) => {
-    if (!dragging.current) return;
-    const ms = msAt(e.clientX);
-    const { anchorMs } = dragging.current;
-    dragging.current = null;
-    commit(Math.min(anchorMs, ms), Math.max(anchorMs, ms));
-  };
-
-  const leftPct = (Math.min(inMs, outMs) / Math.max(1, asset.durationMs)) * 100;
-  const rightPct = 100 - (Math.max(inMs, outMs) / Math.max(1, asset.durationMs)) * 100;
-
-  return (
-    <div className="border-t border-white/10 bg-panel-2 p-2">
-      <div className="mb-1.5 flex items-center gap-1.5 text-2xs">
-        <Scissors className="size-3 text-amber-300" />
-        <span className="truncate font-medium text-ink-1">{asset.name}</span>
-        <span className="ml-auto font-mono text-ink-3">
-          {fmtSec(inMs)} – {fmtSec(outMs)}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded p-0.5 text-ink-3 hover:text-ink-1"
-          title={t("media.close")}
-        >
-          <X className="size-3" />
-        </button>
-      </div>
-
-      <div
-        ref={stripRef}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        className="relative h-12 cursor-crosshair touch-none select-none overflow-hidden rounded bg-black"
-      >
-        {asset.filmstripDataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={asset.filmstripDataUrl}
-            alt=""
-            draggable={false}
-            className="pointer-events-none size-full object-cover"
-          />
-        ) : asset.waveformPeaks && asset.waveformPeaks.length > 0 ? (
-          <div className="pointer-events-none flex size-full items-center gap-px px-0.5">
-            {asset.waveformPeaks.slice(0, 160).map((p, i) => (
-              <div
-                // 파형 막대는 정적 스냅샷 — 순서가 바뀌지 않으므로 인덱스 키가 안전
-                // biome-ignore lint/suspicious/noArrayIndexKey: static waveform bars never reorder
-                key={i}
-                className="flex-1 rounded-sm bg-accent/60"
-                style={{ height: `${Math.max(6, p * 100)}%` }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="pointer-events-none size-full bg-gradient-to-r from-accent/20 to-accent/40" />
-        )}
-        {/* 구간 밖 마스크 + 경계 핸들 */}
-        <div
-          className="pointer-events-none absolute inset-y-0 left-0 bg-black/70"
-          style={{ width: `${leftPct}%` }}
-        />
-        <div
-          className="pointer-events-none absolute inset-y-0 right-0 bg-black/70"
-          style={{ width: `${rightPct}%` }}
-        />
-        <div
-          className="pointer-events-none absolute inset-y-0 w-0.5 bg-amber-300"
-          style={{ left: `${leftPct}%` }}
-        />
-        <div
-          className="pointer-events-none absolute inset-y-0 w-0.5 bg-amber-300"
-          style={{ right: `${rightPct}%` }}
-        />
-      </div>
-
-      <div className="mt-1.5 flex items-center gap-2 text-3xs text-ink-3">
-        <span>{t("media.rangeHint")}</span>
-        <button
-          type="button"
-          onClick={() => {
-            setInMs(0);
-            setOutMs(asset.durationMs);
-            setAssetUseRange(asset.id, undefined);
-          }}
-          className="ml-auto whitespace-nowrap rounded border border-white/15 px-1.5 py-0.5 text-ink-1 hover:border-white/40"
-        >
-          {t("media.rangeClear")}
-        </button>
-      </div>
-    </div>
-  );
-}

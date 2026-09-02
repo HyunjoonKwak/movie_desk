@@ -493,6 +493,14 @@ export const en = {
     "media.rangeClear": "Use all",
     "media.close": "Close",
     "media.importBusy": "An import is already in progress",
+    "media.sort": "Sort",
+    "media.sortCaptured": "By capture time",
+    "media.sortImported": "By import order",
+    "media.groupByDay": "By day",
+    "media.groupUndated": "No capture time",
+    "media.groupAudio": "Audio & music",
+    "media.groupCount": "{n} items",
+    "media.selectGroup": "Select or deselect this group",
 
     // Music library
     "music.tab": "Music",

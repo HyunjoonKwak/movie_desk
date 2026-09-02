@@ -39,7 +39,7 @@ technical plan.
 | Renderer | WebGL2 compositor, ping-pong FBOs, multi-pass effect chain, keyframe interpolation |
 | Effects | 24 built-in GPU/audio effects, 1D/3D `.cube` LUTs, vector masks, blend modes, and background removal |
 | Text | Canvas2D-rendered text clips with size/color/bg controls + a dedicated subtitles track |
-| Media | OPFS-backed assets, thumbnail/filmstrip/waveform probe, drag-drop ingest with progress + cancel, proxies, thumbnail sizing, marquee multi-select, use/skip marks, per-asset usable-range trim |
+| Media | OPFS-backed assets, thumbnail/filmstrip/waveform probe, drag-drop ingest with progress + cancel, capture-time ordering with day/place groups (offline geocoded), proxies, thumbnail sizing, marquee multi-select, use/skip marks, per-asset usable-range trim |
 | AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie), Smile detection (FaceLandmarker), opt-in semantic tags/dedup (MobileCLIP) |
 | Auto-edit | 6-step wizard for travel/landscape footage: junk filter (blur/exposure/shake), interest scoring, beat-grid assembly with photo stacks + Ken Burns, GPS/date story chapters with offline geocoding, rendered map-transition clips, YouTube Audio Library / Suno music flow, beat-snap re-conform when music changes — applied as one undo step on dedicated AUTO tracks |
 | Export | WebCodecs H.264/VP9/AV1 + chunked stereo AAC mixer, streaming LUFS normalization, work ranges, four presets |
