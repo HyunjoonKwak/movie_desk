@@ -1,7 +1,8 @@
 // MP4 → encoded chunk → WebCodecs VideoDecoder pipeline. mp4box parses the
 // container incrementally; only samples around the requested playhead are read
-// from the Blob and decoded. This avoids copying and decoding the whole asset.
+// from the source and decoded. This avoids copying and decoding the whole asset.
 
+import type { RandomAccessMediaSource } from "@/media/source/media-source";
 import type { VideoFrameCache } from "./video-frame-cache";
 
 interface MP4Sample {
@@ -80,11 +81,32 @@ export const frameDecodeWindow = (timestampUs: number): FrameDecodeWindow => ({
 
 const isMp4Available = (): boolean => typeof window !== "undefined" && "VideoDecoder" in window;
 
-const readChunk = async (blob: Blob, start: number, length: number): Promise<MP4ArrayBuffer> => {
-  const end = Math.min(blob.size, start + length);
-  const buffer = (await blob.slice(start, end).arrayBuffer()) as MP4ArrayBuffer;
-  buffer.fileStart = start;
-  return buffer;
+// mp4box reads through this so a legacy OPFS Blob and a D1 media source
+// (referenced file behind a ranged protocol) look the same to the demuxer.
+export interface ByteSource {
+  readonly size: number;
+  read(start: number, length: number): Promise<MP4ArrayBuffer>;
+}
+
+const stamp = (buffer: ArrayBuffer, start: number): MP4ArrayBuffer => {
+  const chunk = buffer as MP4ArrayBuffer;
+  chunk.fileStart = start;
+  return chunk;
+};
+
+export const toByteSource = (input: Blob | RandomAccessMediaSource): ByteSource => {
+  if (input instanceof Blob) {
+    return {
+      size: input.size,
+      read: async (start, length) =>
+        stamp(await input.slice(start, Math.min(input.size, start + length)).arrayBuffer(), start),
+    };
+  }
+  return {
+    size: input.sizeBytes,
+    read: async (start, length) =>
+      stamp(await input.read(start, Math.max(0, Math.min(length, input.sizeBytes - start))), start),
+  };
 };
 
 const advanceOffset = (
@@ -127,9 +149,9 @@ const description = (file: MP4File, trackId: number): Uint8Array | undefined => 
 const findVideoTrack = (info: MP4Info): MP4TrackInfo | null =>
   info.tracks.find((track) => track.type === "video" || track.video !== undefined) ?? null;
 
-// Parse only enough of the Blob to discover `moov`. appendBuffer's suggested
+// Parse only enough of the source to discover `moov`. appendBuffer's suggested
 // offset lets us jump over a large mdat box directly to a trailing moov.
-const parseMetadata = async (blob: Blob, file: MP4File): Promise<MP4Info | null> => {
+const parseMetadata = async (source: ByteSource, file: MP4File): Promise<MP4Info | null> => {
   let info: MP4Info | null = null;
   let failure: Error | null = null;
   file.onReady = (ready) => {
@@ -140,10 +162,10 @@ const parseMetadata = async (blob: Blob, file: MP4File): Promise<MP4Info | null>
   };
 
   let offset = 0;
-  while (!info && !failure && offset < blob.size) {
-    const chunk = await readChunk(blob, offset, METADATA_CHUNK_BYTES);
-    const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= blob.size);
-    offset = advanceOffset(offset, chunk.byteLength, suggested, blob.size);
+  while (!info && !failure && offset < source.size) {
+    const chunk = await source.read(offset, METADATA_CHUNK_BYTES);
+    const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);
+    offset = advanceOffset(offset, chunk.byteLength, suggested, source.size);
   }
   if (!info && !failure) file.flush();
   if (failure) throw failure;
@@ -151,18 +173,19 @@ const parseMetadata = async (blob: Blob, file: MP4File): Promise<MP4Info | null>
 };
 
 export const decodeMp4ToCache = async (
-  blob: Blob,
+  input: Blob | RandomAccessMediaSource,
   assetId: string,
   cache: VideoFrameCache,
 ): Promise<DecoderHandle | null> => {
-  if (!isMp4Available() || blob.size === 0) return null;
+  const source = toByteSource(input);
+  if (!isMp4Available() || source.size === 0) return null;
 
   const MP4Box = await import("mp4box");
   // keepMdatData=false: mp4box discards media payload after sample extraction.
   const file = (
     MP4Box as unknown as { createFile: (keepMdatData?: boolean) => MP4File }
   ).createFile(false);
-  const info = await parseMetadata(blob, file);
+  const info = await parseMetadata(source, file);
   const track = info ? findVideoTrack(info) : null;
   if (!info || !track?.video) return null;
 
@@ -256,11 +279,11 @@ export const decodeMp4ToCache = async (
     let offset = Math.max(0, Math.floor(seek.offset));
     file.start();
 
-    while (!closed && requestGeneration === generation && !reachedWindowEnd && offset < blob.size) {
-      const chunk = await readChunk(blob, offset, SAMPLE_CHUNK_BYTES);
+    while (!closed && requestGeneration === generation && !reachedWindowEnd && offset < source.size) {
+      const chunk = await source.read(offset, SAMPLE_CHUNK_BYTES);
       if (closed || requestGeneration !== generation) break;
-      const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= blob.size);
-      offset = advanceOffset(offset, chunk.byteLength, suggested, blob.size);
+      const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);
+      offset = advanceOffset(offset, chunk.byteLength, suggested, source.size);
     }
     file.stop();
     file.unsetExtractionOptions(track.id);

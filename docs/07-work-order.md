@@ -233,3 +233,6 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B23 muxer 교체 | Claude | 대기 | |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
 | B25 v0.4.0 | 사용자 | 대기 | |
+| A1-a MediaSource 계약 | Claude | 진행 중 | `claude/a1-a-media-source` · core 타입·fingerprint·cacheKey, zod 스키마, OPFS adapter, resolver, 디코더 ByteSource, 컴포지터 연결 |
+| A1-b 데스크톱 adapter | Codex | 대기 | node:sqlite worker 카탈로그, `media://` Range, `registerMediaSourceAdapter("disk", …)` |
+| A1-c helper 계약 | Codex | 대기 | inspect·preview·fingerprint JSON 프로토콜, 1차 sips |

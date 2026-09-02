@@ -97,6 +97,40 @@ const trackSchema = z
   })
   .passthrough();
 
+const rootSnapshotSchema = z
+  .object({
+    volumeUuid: z.string().optional(),
+    volumeRelativePath: z.string().optional(),
+    lastKnownAbsolutePath: z.string().optional(),
+  })
+  .passthrough();
+
+// D1 source reference. Additive: assets without it are legacy OPFS copies.
+const sourceRefSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("disk"),
+      version: z.literal(1),
+      rootId: z.string().min(1),
+      rootSnapshot: rootSnapshotSchema,
+      relativePath: z.string().min(1),
+      sizeBytes: nonNegative,
+      modifiedAtMs: finite,
+      inode: z.string().optional(),
+      quickHash: z.string().optional(),
+      fullHash: z.string().optional(),
+    })
+    .passthrough(),
+  z
+    .object({
+      kind: z.literal("opfs"),
+      version: z.literal(1),
+      key: z.string().min(1),
+      sizeBytes: nonNegative.optional(),
+    })
+    .passthrough(),
+]);
+
 const mediaAssetSchema = z
   .object({
     id: z.string(),
@@ -105,6 +139,7 @@ const mediaAssetSchema = z
     mime: z.string(),
     durationMs: nonNegative,
     opfsPath: z.string().min(1),
+    sourceRef: sourceRefSchema.optional(),
     importedAt: z.number().int().nonnegative(),
   })
   .passthrough();

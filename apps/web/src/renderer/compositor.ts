@@ -22,7 +22,7 @@ import {
 import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@movie-desk/core";
 import { getEffect } from "@/effects/registry";
 import { getSegmenter } from "@/ai/bg-remove";
-import { readMediaFile } from "@/persistence/opfs";
+import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import { createGL, createQuad, createTexture, uploadSource, type GL } from "./gl";
 import { ShaderRegistry, type Program } from "./shader-registry";
 import { PingPong } from "./ping-pong";
@@ -505,8 +505,10 @@ export class Compositor {
         this.decodePreparing.add(asset.id);
         void (async () => {
           try {
-            const blob = await readMediaFile(asset.opfsPath);
-            if (blob && (await provider.prepare(asset.id, blob))) {
+            // Offline/missing sources resolve to null and retry later, like a
+            // missing OPFS copy did before D1.
+            const source = await resolveMediaSource(asset).catch(() => null);
+            if (source && (await provider.prepare(asset.id, source))) {
               if (this.retainedAssetIds.has(asset.id)) {
                 this.decodePrepared.add(asset.id);
                 this.decodeRetryAt.delete(asset.id);

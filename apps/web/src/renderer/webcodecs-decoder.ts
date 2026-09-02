@@ -2,6 +2,7 @@
 // requests a small window around the playhead; callers use the <video> fallback
 // while that asynchronous range is being decoded.
 
+import type { RandomAccessMediaSource } from "@/media/source/media-source";
 import { type DecoderHandle, decodeMp4ToCache } from "./mp4-decoder";
 import { VideoFrameCache } from "./video-frame-cache";
 
@@ -15,7 +16,7 @@ const FRAME_TOLERANCE_US = 100_000; // 100ms
 
 export interface FrameProvider {
   framesFor(assetId: string, atMs: number): VideoFrame | null;
-  prepare(assetId: string, blob: Blob): Promise<boolean>;
+  prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean>;
   retain(assetIds: ReadonlySet<string>): void;
   forget(assetId: string): void;
   dispose(): void;
@@ -34,7 +35,7 @@ class CachingFrameProvider implements FrameProvider {
     return f ? f.frame : null;
   }
 
-  async prepare(assetId: string, blob: Blob): Promise<boolean> {
+  async prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean> {
     if (this.disposed || !isWebCodecsAvailable()) return false;
     if (this.handles.has(assetId)) return true;
     const inflight = this.pending.get(assetId);
@@ -43,7 +44,7 @@ class CachingFrameProvider implements FrameProvider {
     const epoch = this.epochs.get(assetId) ?? 0;
     const job = (async (): Promise<boolean> => {
       try {
-        const handle = await decodeMp4ToCache(blob, assetId, this.cache);
+        const handle = await decodeMp4ToCache(source, assetId, this.cache);
         if (!handle) return false;
         if (this.disposed || (this.epochs.get(assetId) ?? 0) !== epoch) {
           handle.close();
