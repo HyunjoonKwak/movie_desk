@@ -9,9 +9,8 @@ export const uniqueSequence = (values: readonly string[]): string[] => {
   });
 };
 
-// Reconcile a Y.Array without replacing the whole sequence. Insertions from
-// disconnected peers therefore remain independent CRDT operations and merge
-// when updates meet, instead of one serialized snapshot winning wholesale.
+// Reconcile a Y.Array without replacing the whole sequence, so each edit is
+// a small positional operation instead of a full rewrite of the array.
 export const reconcileSequence = (sequence: Y.Array<string>, desiredValues: readonly string[]) => {
   const desired = uniqueSequence(desiredValues);
   const desiredSet = new Set(desired);

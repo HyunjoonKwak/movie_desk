@@ -1,6 +1,6 @@
 import type { ID } from "@cut/core";
 import { describe, expect, it } from "vitest";
-import { projectPersistenceName } from "../yjs-bridge";
+import { projectPersistenceName } from "../live-doc";
 
 describe("projectPersistenceName", () => {
   it("isolates each local project in its own IndexedDB document", () => {

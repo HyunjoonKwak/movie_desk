@@ -55,8 +55,8 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     setJsonValue(metaMap, "createdAt", project.createdAt);
     setJsonValue(metaMap, "framerate", project.framerate);
     setJsonValue(metaMap, "resolution", project.resolution);
-    // Wire-compat shim: `magnetic` left the model (it never drove behavior)
-    // but older peers require a boolean here to accept the snapshot.
+    // Schema-compat shim: `magnetic` left the model (it never drove behavior)
+    // but documents written by older builds require a boolean here.
     setJsonValue(metaMap, "magnetic", true);
     setJsonValue(metaMap, "markers", project.timeline.markers ?? []);
 
@@ -144,9 +144,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       },
     };
     try {
-      // Yjs values come from remote peers and do not retain their TypeScript
-      // types at runtime. Reuse the persistence boundary schema before any
-      // collaborative state reaches the renderer or project store.
+      // Yjs values are read back from IndexedDB and do not retain their
+      // TypeScript types at runtime. Reuse the persistence boundary schema
+      // before any stored state reaches the renderer or project store.
       return parseStoredProject(candidate);
     } catch {
       return null;

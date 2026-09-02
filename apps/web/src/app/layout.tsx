@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Reelog — AI-native video editor",
   description:
-    "Open-source, collaborative, AI-native video editor for web, desktop, and mobile.",
+    "Open-source, local-first, AI-native video editor for web and desktop.",
   applicationName: "Reelog",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, statusBarStyle: "black", title: "Reelog" },

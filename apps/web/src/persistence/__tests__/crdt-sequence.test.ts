@@ -12,7 +12,7 @@ describe("CRDT sequence reconciliation", () => {
     expect(sequence.toArray()).toEqual(["b", "c", "a"]);
   });
 
-  it("preserves concurrent insertions from disconnected peers", () => {
+  it("preserves concurrent insertions from two documents", () => {
     const left = new Y.Doc();
     const leftTracks = left.getArray<string>("tracks");
     leftTracks.push(["base"]);

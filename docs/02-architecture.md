@@ -9,7 +9,7 @@ as if it were already implemented.
 1. **Web source of truth.** The Next.js editor owns product behavior. Electron
    wraps the static web build and adds native menus, save dialogs, and updates.
 2. **Local-first storage.** Project state lives in Yjs/IndexedDB, library and
-   snapshot records in Dexie, and binary media in OPFS. Collaboration is opt-in.
+   snapshot records in Dexie, and binary media in OPFS. Nothing leaves the device.
 3. **Immutable editing core.** `packages/core` contains the project model,
    command history, and pure timeline algorithms. Zustand integrates them into
    the UI without mutating projects in place.
@@ -37,10 +37,6 @@ Next.js / React editor
   │    ├─ Yjs + y-indexeddb (live document)
   │    ├─ Dexie (project library and snapshots)
   │    └─ OPFS (source media and proxies)
-  ├─ collaboration
-  │    ├─ configurable y-websocket provider + awareness
-  │    ├─ native Yjs project CRDT structures
-  │    └─ chunked, integrity-checked peer media transfer
   └─ local AI
        ├─ HuggingFace Whisper transcription
        ├─ MediaPipe segmentation
@@ -51,17 +47,20 @@ Next.js / React editor
 
 ```text
 apps/web/
-  e2e/                 Playwright persistence and two-browser collaboration
-  scripts/             model preparation and test relay entry points
+  e2e/                 Playwright navigation, persistence, and timeline flows
+  scripts/             model preparation
   src/
     ai/                local analysis and model-backed tools
     app/               Next.js routes and error boundaries
-    collab/            Yjs bridge, awareness, and media transfer
+    autoedit/          analysis, scoring, assembly, story, and the wizard
     editor/            shell and inspector panels
-    effects/           effect definitions, plugin registry, LUT persistence
+    effects/           effect definitions and LUT persistence
+    hooks/             shortcuts, file drop, breakpoints
+    i18n/              Korean/English messages and locale store
     export/            WebCodecs export, audio DSP, presets
     media/             ingest, probe, proxy, thumbnail, waveform
-    persistence/       Dexie, OPFS, import/export, snapshots, GC
+    music/             reference library, recommendation, free-music import
+    persistence/       live Yjs document, Dexie, OPFS, import/export, snapshots, GC
     preview/           viewport, scopes, audio engine, guides
     renderer/          compositor, shaders, decode and resource caches
     stores/            project and UI state
@@ -83,18 +82,13 @@ GPU and browser resources are deterministic: LRU caches dispose evicted
 textures/elements/frames, and every compositor is explicitly disposed after
 preview replacement or export.
 
-## State, persistence, and collaboration
+## State and persistence
 
 `useProjectStore` is the UI-facing project state. Local content changes are
 written synchronously into native Yjs maps/arrays. `y-indexeddb` restores the
 active document, while Dexie keeps the multi-project picker and named
 snapshots. Stored JSON is validated before loading; a damaged record falls
 back safely and suspends destructive media GC.
-
-When a collaboration relay is configured, `WebsocketProvider` attaches the
-same Y.Doc to a room. Connection state comes from provider events. Project
-metadata travels in the CRDT; missing media is requested over awareness in
-bounded chunks with SHA-256 validation and retry/resume behavior.
 
 ## Export
 
@@ -119,7 +113,7 @@ pnpm test:e2e
 pnpm --filter @cut/web knip
 ```
 
-Unit tests cover the core timeline, CRDT structures and media transfer,
-persistence validation/GC, renderer caches/decoding, LUT parsing, subtitles,
-and audio DSP. Playwright covers reload persistence plus real CRDT and binary
-media synchronization between isolated browser contexts.
+Unit tests cover the core timeline, the Yjs document schema, persistence
+validation/GC, renderer caches/decoding, LUT parsing, subtitles, auto-edit
+scoring and assembly, music recommendation, and audio DSP. Playwright covers
+navigation, reload persistence, and timeline marquee selection.

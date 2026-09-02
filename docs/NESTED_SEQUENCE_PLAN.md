@@ -53,16 +53,16 @@ README의 "2~3일 MVP" 견적을 코드 조사로 재검증한 결과다. **그 
 
 ## 가장 위험한 지점: CRDT가 프로젝트를 재조립한다
 
-`collab/project-crdt.ts:130-145`의 `candidate` 리터럴은 Yjs에서 프로젝트를 **처음부터 다시 만든다.**
+`persistence/project-crdt.ts:130-145`의 `candidate` 리터럴은 Yjs에서 프로젝트를 **처음부터 다시 만든다.**
 반면 `persistence/project-export.ts:121-144`의 zod는 `.passthrough()`라 모르는 필드를 **통과시킨다.**
 
 이 비대칭 때문에 `timelines` 필드는 "저장은 되지만 CRDT 왕복에서 사라지는" 상태가 된다.
-`yjs-bridge.ts:104`가 재조립본으로 `loadProject()`를 호출하고,
+`live-doc.ts:104`가 재조립본으로 `loadProject()`를 호출하고,
 `project-menu.tsx:43`의 디바운스 `upsertProject`가 그 손실본을 IndexedDB에 덮어쓴다.
 
 **원격 편집 1회 또는 새로고침 1회면 서브 시퀀스가 경고 없이 증발한다.**
 
-게다가 `yjs-bridge.ts:116-134`의 변경 감지가 6개 필드만 참조 비교하므로,
+게다가 `live-doc.ts:116-134`의 변경 감지가 6개 필드만 참조 비교하므로,
 **비활성 타임라인에서 한 편집은 flush 자체가 안 된다** — 사용자는 저장된 줄 알고 실제로는 아무것도 저장되지 않는다.
 
 > **철칙: zod(Phase 1)와 CRDT(Phase 7)를 같은 커밋에 넣는다. 절대 zod만 먼저 열지 않는다.**
@@ -151,14 +151,17 @@ README의 "2~3일 MVP" 견적을 코드 조사로 재검증한 결과다. **그 
 28. `timeline-clip.tsx:109-118` 드롭 호환성(현재 시퀀스는 "not media"로 분류되어
     text/overlay 트랙에만 놓인다), `:152-158` 색상, `:185` 라벨
 
-## Phase 7 — 협업 (Phase 1과 같은 커밋)
+## Phase 7 — 영속화 문서 스키마 (Phase 1과 같은 커밋)
+
+(2026-09-02: 실시간 협업은 제거됐고 `yjs-bridge.ts`는 `persistence/live-doc.ts`로
+옮겨졌다. 아래 줄 번호는 옮기기 전 기준이다.)
 
 29. `project-crdt.ts:43-50` 루트 핸들을 타임라인별 네임스페이스로
     (`clipOrderFor:50`의 동적 루트 네이밍이 템플릿)
 30. `PROJECT_CRDT_SCHEMA_VERSION`을 3으로 + v2→v3 마이그레이션
-    (`yjs-bridge.ts:150-165`가 유일한 선례)
+    (`live-doc.ts:150-165`가 유일한 선례)
 31. `read()`의 `candidate` 리터럴(`:130-145`)이 `timelines`를 내보내도록
-32. **`yjs-bridge.ts:116-134`와 `project-menu.tsx:53-61`의 6-필드 참조 비교 확장**
+32. **`live-doc.ts:116-134`와 `project-menu.tsx:53-61`의 6-필드 참조 비교 확장**
 33. `clipsMap` 키 충돌 방지 — 타임라인 스코프 프리픽스
 
 ---

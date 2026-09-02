@@ -19,28 +19,11 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
     },
   ],
-  webServer: [
-    {
-      command: "node scripts/e2e-collab-server.mjs",
-      url: "http://127.0.0.1:32120",
-      reuseExistingServer: false,
-      timeout: 30_000,
-      env: {
-        ...process.env,
-        HOST: "127.0.0.1",
-        PORT: "32120",
-      },
-    },
-    {
-      command: "pnpm exec next dev --turbopack -H 127.0.0.1 -p 32119",
-      url: "http://127.0.0.1:32119",
-      // Never attach to an unrelated local service that happens to own the port.
-      reuseExistingServer: false,
-      timeout: 120_000,
-      env: {
-        ...process.env,
-        NEXT_PUBLIC_COLLAB_WS_URL: "ws://127.0.0.1:32120",
-      },
-    },
-  ],
+  webServer: {
+    command: "pnpm exec next dev --turbopack -H 127.0.0.1 -p 32119",
+    url: "http://127.0.0.1:32119",
+    // Never attach to an unrelated local service that happens to own the port.
+    reuseExistingServer: false,
+    timeout: 120_000,
+  },
 });

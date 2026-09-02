@@ -63,7 +63,8 @@ export class FrameSourcePool {
         loaded = null;
       }
     } else {
-      // Remote collaboration metadata can arrive before its binary file.
+      // Asset metadata can be restored before its file is readable (an import
+      // still writing to OPFS).
       // Retry with a small backoff instead of permanently caching the miss or
       // probing OPFS on every animation frame.
       this.retryAt.set(asset.id, Date.now() + 1000);

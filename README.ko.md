@@ -2,8 +2,8 @@
 
 [English](README.md) · **한국어**
 
-웹용 오픈소스 AI 기반 협업 비디오 에디터 — Final Cut Pro의 완성도와 CapCut의
-접근성을 모두 잡되, 두 도구 어디에도 없는 협업·로컬 AI 기능까지 함께 제공합니다.
+웹용 오픈소스 로컬 우선 AI 비디오 에디터 — Final Cut Pro의 완성도와 CapCut의
+접근성을 모두 잡되, 두 도구 어디에도 없는 온디바이스 AI 기능까지 함께 제공합니다.
 macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 있습니다.
 
 > 이전 이름은 `cut_editor`입니다 (저장소와 디스크 데이터 식별자는 호환을 위해
@@ -20,15 +20,12 @@ macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 
 | AI: 자막 + 장면 + 묵음 | 일부 | ✅ | 일부 | ✅ |
 | 로컬 AI (Whisper, MediaPipe) | ❌ | ❌ | 일부 | ✅ |
 | 온디바이스 자동 편집 (여행/풍경) | ❌ | 클라우드 | ❌ | ✅ |
-| 실시간 협업 편집 | ❌ | 일부 | ❌ | ✅ |
-| 플러그인 SDK | ✅ | ❌ | ❌ | ✅ |
 | 마그네틱 타임라인 + 리플 | ✅ | ❌ | 일부 | ✅ |
 | 모바일 우선 제스처 | n/a | ✅ | ❌ | ✅ |
 | 로컬 우선 영속화 | 일부 | ❌ | 일부 | ✅ |
 
 전체 매트릭스는 [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md),
-기술 설계는 [`docs/02-architecture.md`](docs/02-architecture.md), 플러그인
-SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
+기술 설계는 [`docs/02-architecture.md`](docs/02-architecture.md)를 참고하세요.
 
 ## 현재 동작하는 기능
 
@@ -44,8 +41,6 @@ SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
 | 자동 편집 | 여행/풍경 영상용 6단계 마법사: 불량 컷 필터(흐림/노출/흔들림), 흥미도 스코어링, 비트 그리드 조립 + 포토 스택/Ken Burns, GPS·날짜 기반 스토리 챕터(오프라인 지오코딩), 지도 이동 클립 렌더링, YouTube 오디오 라이브러리/Suno 음악 플로우, 음악 교체 시 비트-스냅 재정렬 — 전용 AUTO 트랙에 실행취소 1회로 적용 |
 | 내보내기 | WebCodecs H.264/VP9/AV1 + 스테레오 AAC, LUFS 정규화, 작업 구간, 4종 프리셋 |
 | 영속화 | 검증된 프로젝트 라이브러리·스냅샷, Yjs/IndexedDB 상태, OPFS 미디어, 손상 복구 |
-| 협업 | 설정 가능한 y-websocket 룸, 연결 상태, CRDT 편집, awareness, 피어 미디어 전송 |
-| 플러그인 SDK | 네트워크 격리 샌드박스 iframe에서 URL 로드되는 v2 이펙트, 선언형 uniform |
 | 모바일 | 반응형 셸 + 드로어 패널 + 투핑거 핀치 줌 |
 
 ## 저장소 구조
@@ -54,7 +49,7 @@ SDK는 [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md)를 참고하세요.
 apps/web/         Next.js 15 앱 (에디터 UI)
 apps/desktop/     Electron 셸 (macOS .app/.dmg 패키징)
 packages/core/    프레임워크 독립 프로젝트 모델, 편집 명령, 타임라인 알고리즘
-docs/             설계 문서 + 플러그인 SDK
+docs/             정체성·아키텍처·설계 문서
 reference/        학습용 OpenCut 클론 (gitignored)
 ```
 
@@ -65,17 +60,6 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
-실시간 협업은 릴레이 서버를 설정하기 전까지 비활성화됩니다.
-`apps/web/.env.example`을 `apps/web/.env.local`로 복사하고
-`NEXT_PUBLIC_COLLAB_WS_URL`에 자체 릴레이 주소를 설정하세요. 원격 서버는
-`wss://`가 필수이며 `NEXT_PUBLIC_COLLAB_TICKET_URL`도 함께 필요합니다. 로컬
-개발에서는 티켓 없이 `ws://localhost:1234`를 사용할 수 있습니다. 동봉된
-프로덕션 릴레이는 단기 룸 티켓을 검증하고 Origin/페이로드/속도 제한을
-적용합니다. 자세한 내용은
-[`docs/05-collaboration-deployment.md`](docs/05-collaboration-deployment.md)
-참고. 데스크톱 릴리스 빌드는 GitHub Actions 저장소 변수 `COLLAB_WS_URL`과
-`COLLAB_TICKET_URL`에서 같은 주소를 읽습니다.
-
 요구사항: Node 20+, pnpm 9+.
 
 ### 브라우저 E2E 테스트
@@ -85,9 +69,8 @@ pnpm --filter @cut/web exec playwright install chromium  # 최초 1회
 pnpm test:e2e
 ```
 
-테스트는 격리된 에디터와 Yjs 릴레이 서버를 실행해 화면 진입, 새로고침 후
-IndexedDB 프로젝트 복원, 두 브라우저 간 CRDT 편집과 수신 브라우저 OPFS의
-미디어 바이트 일치까지 검증합니다.
+테스트는 격리된 에디터 서버를 실행해 화면 진입, 새로고침 후 IndexedDB
+프로젝트 복원, 타임라인 마퀴 선택을 검증합니다.
 
 ## macOS 앱으로 설치하기
 
@@ -183,19 +166,18 @@ Developer Secret 5개 (`CSC_LINK`, `CSC_KEY_PASSWORD`, `APPLE_ID`,
 
 ## 로드맵 (v0.2 이후)
 
-- WebGPU 렌더러 (wgsl 셰이더, 플러그인 SDK v2)
+- WebGPU 렌더러 (WGSL 셰이더)
 - 컴파운드/네스티드 시퀀스
 - 백그라운드 렌더 큐
 - 언어별 자막 트랙과 번역 워크플로
 - 이펙트 미리보기 썸네일과 GIF/이미지 시퀀스 내보내기
 - Capacitor 모바일 네이티브 셸
-- 플러그인 마켓플레이스 + 샌드박스 iframe
 
 ### 보류 항목 (평가 완료, 미출시)
 
 - **컴파운드/네스티드 시퀀스**. 클립 묶음을 재사용 가능한 서브-타임라인으로
   감싸는 기능. 재귀 렌더링(내부 시퀀스를 오프스크린 FBO로 렌더 후 부모
-  클립의 소스로 샘플)과 `kind: "compound"` 신규 추가, 직렬화·실행취소·협업
+  클립의 소스로 샘플)과 `kind: "compound"` 신규 추가, 직렬화·실행취소
   처리가 필요. MVP(재생+편집)에 2~3일, 키프레임 전파 완전 지원까지는 더
   소요 예상.
 - **백그라운드 렌더 큐**. 내보내기 파이프라인을 별도 Electron

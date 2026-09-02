@@ -1,19 +1,20 @@
 "use client";
 
 import { t } from "@/i18n/use-t";
-import { getActiveProjectId, loadStoredProject } from "@/persistence/project-library";
 import { useProjectStore } from "@/stores/project-store";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useCollabSessionStore } from "./collab-session-store";
-import { disposeBridge, getBridge } from "./yjs-bridge";
+import { disposeLiveDoc, getLiveDoc } from "./live-doc";
+import { getActiveProjectId, loadStoredProject } from "./project-library";
 
 let started = false;
+const WELCOME_KEY = "cut.persistence.welcomed";
 
-// Mount once at the editor root. Starts Yjs IDB persistence so the project
-// survives page reloads. Realtime peers ship in 7.1 via y-websocket.
-export const useCollab = (): boolean => {
-  const hydrated = useCollabSessionStore((state) => state.hydrated);
+// Mount once at the editor root. Restores the active project from the library,
+// then opens its live document so edits persist to IndexedDB. Returns true
+// once the project is ready to edit.
+export const useLocalPersistence = (): boolean => {
+  const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
     if (started) return;
@@ -32,14 +33,14 @@ export const useCollab = (): boolean => {
           toast.error(t("project.activeCorrupt"));
         }
 
-        getBridge();
+        getLiveDoc();
         unsubscribeProject = useProjectStore.subscribe(
           (state) => state.project.id,
           () => {
-            // getBridge disposes the previous project's provider/document and
-            // creates the correctly namespaced one for the new active id.
+            // getLiveDoc disposes the previous project's document and opens
+            // the correctly namespaced one for the new active id.
             try {
-              getBridge();
+              getLiveDoc();
             } catch {
               toast.error("Could not open local persistence for this project.");
             }
@@ -47,16 +48,15 @@ export const useCollab = (): boolean => {
         );
 
         // No noisy toast on every reload — only the first time.
-        const seenKey = "cut.collab.welcomed";
-        if (!localStorage.getItem(seenKey)) {
+        if (!localStorage.getItem(WELCOME_KEY)) {
           toast.success("Local-first persistence on (IndexedDB)");
-          localStorage.setItem(seenKey, "1");
+          localStorage.setItem(WELCOME_KEY, "1");
         }
       } catch {
         // Persistence failure should not make the editor unusable.
         toast.error("Local project persistence is unavailable for this session.");
       } finally {
-        if (!cancelled) useCollabSessionStore.getState().setHydrated(true);
+        if (!cancelled) setHydrated(true);
       }
     };
 
@@ -64,8 +64,8 @@ export const useCollab = (): boolean => {
     return () => {
       cancelled = true;
       unsubscribeProject?.();
-      disposeBridge();
-      useCollabSessionStore.getState().setHydrated(false);
+      disposeLiveDoc();
+      setHydrated(false);
       started = false;
     };
   }, []);

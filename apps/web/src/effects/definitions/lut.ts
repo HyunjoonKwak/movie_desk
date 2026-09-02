@@ -4,7 +4,7 @@ import type { EffectDefinition } from "../types";
 // `intensity` blends the LUT-mapped colour with the original.
 // `lutId` is a stored LUT id (see lut-store); the compositor reads its raw
 // `.cube` text, parses it, and uploads the data into a 2D RGB texture on
-// demand. We expose `lutId` as a string param so plugins / scripting can
+// demand. We expose `lutId` as a string param so scripting can
 // still set it programmatically; the inspector UI will get its own picker.
 export const lut: EffectDefinition = {
   type: "lut",

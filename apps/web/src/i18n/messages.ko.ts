@@ -15,28 +15,6 @@ export const ko = {
     "topbar.language": "언어",
 
     // Collab bar
-    "collab.share": "공유",
-    "collab.panelTitle": "실시간 공동 편집",
-    "collab.panelDesc": "아래 방 코드를 함께 편집할 사람에게 보내세요. 서로 같은 코드로 참가하면 이 프로젝트를 실시간으로 같이 편집합니다.",
-    "collab.join": "참가",
-    "collab.copy": "방 코드 복사",
-    "collab.copied": "방 코드를 복사했습니다",
-    "collab.copyFailed": "복사에 실패했습니다 — 코드를 직접 선택해 복사하세요",
-    "collab.leave": "나가기",
-    "collab.room": "방 코드",
-    "collab.connecting": "연결 중…",
-    "collab.connected": "연결됨",
-    "collab.disconnected": "재연결 중…",
-    "collab.joined": "\"{room}\" 방에 참여했습니다",
-    "collab.left": "방에서 나왔습니다",
-    "collab.joinFailed": "참여 실패: {msg}",
-    "collab.receiving": "{name} 받는 중",
-    "collab.syncFailed": "미디어 동기화 실패",
-    "collab.serverMissing": "협업을 사용하려면 NEXT_PUBLIC_COLLAB_WS_URL을 설정하세요",
-    "collab.serverInvalid": "협업 서버 URL이 올바르지 않습니다",
-    "collab.serverInsecure": "원격 협업 서버는 wss://를 사용해야 합니다",
-    "collab.ticketMissing": "인증된 원격 협업을 위해 NEXT_PUBLIC_COLLAB_TICKET_URL을 설정하세요",
-    "collab.roomInvalid": "방 코드는 8–128자의 영문, 숫자, -, _만 사용할 수 있습니다",
 
     // Media bin
     "media.title": "미디어",

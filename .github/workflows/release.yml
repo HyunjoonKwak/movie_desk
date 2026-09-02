@@ -47,6 +47,4 @@ jobs:
       - name: Build and publish macOS .dmg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NEXT_PUBLIC_COLLAB_WS_URL: ${{ vars.COLLAB_WS_URL }}
-          NEXT_PUBLIC_COLLAB_TICKET_URL: ${{ vars.COLLAB_TICKET_URL }}
         run: pnpm --filter @cut/desktop release:mac

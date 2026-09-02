@@ -5,10 +5,9 @@ import Link from "next/link";
 import { Check, Cloud, Download, Film, Loader2, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
-import { useSaveStateStore } from "@/collab/save-state-store";
+import { useSaveStateStore } from "@/persistence/save-state-store";
 import { saveSnapshot } from "@/persistence/snapshots";
 import { ExportDialog } from "@/export/export-dialog";
-import { CollabBar } from "@/collab/collab-bar";
 import { ProjectMenu } from "./project-menu";
 import { SnapshotMenu } from "./snapshot-menu";
 import { useT } from "@/i18n/use-t";
@@ -117,8 +116,6 @@ export function TopBar() {
         <div className="mx-2 h-5 w-px bg-white/10" />
         <ProjectMenu />
         <SnapshotMenu />
-        <div className="mx-2 h-5 w-px bg-white/10" />
-        <CollabBar />
         <div className="mx-2 h-5 w-px bg-white/10" />
         <LanguageToggle />
         <div className="mx-2 h-5 w-px bg-white/10" />

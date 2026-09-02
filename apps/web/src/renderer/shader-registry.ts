@@ -1,6 +1,5 @@
 import { VS_QUAD } from "./shaders/vertex";
 import { linkProgram, type GL } from "./gl";
-import { getPluginShader } from "@/effects/plugin-registry";
 
 import { fs as blitFs } from "./shaders/blit";
 import { fs as brightnessFs } from "./shaders/brightness";
@@ -26,7 +25,7 @@ import { fs as blendModesFs } from "./shaders/blend-modes";
 import { fs as fitFs } from "./shaders/fit";
 
 // Built-in fragment shaders. Each name maps to the GLSL source from a single
-// dedicated file under shaders/. Plugin shaders are looked up separately.
+// dedicated file under shaders/.
 const SHADERS: Readonly<Record<string, string>> = {
   blit: blitFs,
   brightness: brightnessFs,
@@ -81,7 +80,7 @@ export class ShaderRegistry {
   get(name: string): Program {
     const cached = this.cache.get(name);
     if (cached) return cached;
-    const fs = SHADERS[name] ?? getPluginShader(name)?.fs;
+    const fs = SHADERS[name];
     if (!fs) throw new Error(`Unknown shader: ${name}`);
     const handle = linkProgram(this.gl, VS_QUAD, fs);
     const prog = new Program(this.gl, handle);

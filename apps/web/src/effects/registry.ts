@@ -23,7 +23,6 @@ import { whiteBalance } from "./definitions/white-balance";
 import { levels } from "./definitions/levels";
 import { vibrance } from "./definitions/vibrance";
 import { splitTone } from "./definitions/split-tone";
-import { getPluginEffects } from "./plugin-registry";
 
 const builtin: readonly EffectDefinition[] = [
   // Color
@@ -56,8 +55,6 @@ const builtin: readonly EffectDefinition[] = [
   audioSpectralDenoise,
 ];
 
-const all = (): readonly EffectDefinition[] => [...builtin, ...getPluginEffects()];
-
-export const listEffects = (): readonly EffectDefinition[] => all();
+export const listEffects = (): readonly EffectDefinition[] => builtin;
 export const getEffect = (type: string): EffectDefinition | undefined =>
-  all().find((e) => e.type === type);
+  builtin.find((e) => e.type === type);

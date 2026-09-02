@@ -29,8 +29,8 @@ export interface MediaFileWriter {
   abort: () => Promise<void>;
 }
 
-// Opens a media file for incremental, positional writes. Collaboration uses
-// this instead of assembling a complete remote asset in memory first.
+// Opens a media file for incremental, positional writes, so a large asset
+// never has to be assembled in memory first.
 export const createMediaFileWriter = async (
   key: string,
   mimeType: string,

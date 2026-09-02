@@ -17,7 +17,7 @@ interface State {
 }
 
 // Isolates a subtree so a throw inside it — WebGL context loss, a decoder
-// failure, a misbehaving third-party plugin effect — degrades that one panel
+// failure, a misbehaving effect — degrades that one panel
 // instead of blanking the whole editor. State updates stay immutable.
 export class ErrorBoundary extends Component<Props, State> {
   override state: State = { error: null };

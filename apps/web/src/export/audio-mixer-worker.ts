@@ -69,7 +69,7 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
 // Worker entry. Guarded to a REAL worker scope: `"onmessage" in self` is also
 // true on the main thread (window), where importing this module for
 // combineInlineStateful used to hijack window.onmessage — every unrelated
-// window message (e.g. the plugin sandbox's postMessage) then crashed into
+// window message (e.g. a postMessage from another window) then crashed into
 // combine(). `typeof window === "undefined"` is only true off the main thread.
 if (typeof self !== "undefined" && typeof window === "undefined" && "onmessage" in self) {
   (self as unknown as Worker).onmessage = (e: MessageEvent<MixerWorkerRequest>) => {

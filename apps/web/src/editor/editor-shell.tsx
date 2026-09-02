@@ -1,6 +1,5 @@
 "use client";
 
-import { useCollab } from "@/collab/use-collab";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
@@ -9,7 +8,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { cn } from "@/lib/cn";
 import { MediaBin } from "@/media/components/media-bin";
 import { collectMediaGarbage } from "@/persistence/media-gc";
-import { usePluginHost } from "@/plugins/use-plugin-host";
+import { useLocalPersistence } from "@/persistence/use-local-persistence";
 import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
@@ -28,8 +27,7 @@ import { TopBar } from "./top-bar";
 export function EditorShell() {
   useKeyboardShortcuts();
   useGlobalFileDrop();
-  const persistenceReady = useCollab();
-  usePluginHost();
+  const persistenceReady = useLocalPersistence();
   useAudioPlayback();
   useAutoAnalysis();
   const isMobile = useIsBelow(900);

@@ -29,8 +29,6 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 | Text, subtitle, and shape clips | ✅ | ✅ | ✅ | ✅ |
 | Sticker/template catalog | ✅ | ✅ | 🟡 | ❌ |
 | Transitions | ✅ | ✅ | ✅ | ✅ |
-| Runtime effect/plugin SDK | ❌ | ❌ | ✅ | ✅ ⭐ |
-| Sandboxed plugin marketplace | ❌ | ❌ | ✅ | ❌ |
 
 ## Local AI and automation
 
@@ -47,14 +45,10 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 | Voice/stem isolation | 🟡 | ✅ | 🟡 | ❌ |
 | Automatic B-roll suggestions | ❌ | 🟡 | ❌ | ❌ |
 
-## Collaboration and persistence
+## Persistence
 
 | Capability | OpenCut | CapCut | FCP | cut_editor current |
 | --- | :---: | :---: | :---: | :---: |
-| Realtime project co-edit | ❌ | 🟡 | ❌ | ✅ ⭐ CRDT |
-| Peer media transfer | ❌ | ✅ | ❌ | ✅ ⭐ |
-| Presence / playhead awareness | ❌ | 🟡 | ❌ | ✅ |
-| Comment threads | ❌ | 🟡 | ❌ | ❌ |
 | Named local snapshots | 🟡 | ✅ | ✅ | ✅ |
 | Offline-first project/media storage | 🟡 | ❌ | n/a | ✅ ⭐ |
 | Hosted cloud project service | ✅ | ✅ | 🟡 | ❌ |
@@ -79,5 +73,5 @@ The differentiating combination remains:
 
 1. open and self-hostable;
 2. useful local AI without uploading source media;
-3. Figma-style realtime project and media collaboration;
+3. an AI rough cut the user reviews and overrides, never a black box;
 4. one web codebase shared by PWA and desktop packaging.

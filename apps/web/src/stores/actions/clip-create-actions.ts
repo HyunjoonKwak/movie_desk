@@ -48,7 +48,7 @@ export type TitleTemplate = "title" | "subtitle" | "lowerThird";
 // Text / shape / adjustment clip creation plus inline text & shape editing.
 // Extracted from project-store so that file stays focused on timeline editing,
 // drag sessions, and history. All actions route through `runWith`, so undo /
-// redo and collaboration stay free.
+// redo stays free.
 export interface ClipCreateActions {
   addTextClipAtPlayhead: (text?: string) => void;
   addTitleTemplate: (kind: TitleTemplate) => void;

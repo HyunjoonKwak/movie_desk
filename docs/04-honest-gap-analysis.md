@@ -93,7 +93,7 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 The load-bearing reliability backlog identified in the earlier audit is closed:
 CI runs lint/typecheck/unit/build/browser tests plus an OSV production dependency
 audit; persistence is validated and corruption-safe; renderer caches are bounded;
-collaboration has real two-browser CRDT and binary-transfer coverage; and export
+and export
 preserves stereo. The final OSV pass checked 179 production packages with zero
 known vulnerabilities.
 
@@ -108,14 +108,10 @@ The remaining items are product expansion, maintenance, or performance polish:
    thread; an OffscreenCanvas worker or WebGPU backend is future work.
 4. **Feature expansion.** Per-language subtitle tracks/translation, effect
    preview thumbnails, GIF/image-sequence export, and compound sequences.
-5. **Identity integration.** The repository now includes a ticket-authenticated,
-   rate-limited production relay and the client fails closed without a ticket
-   endpoint. A deployment still has to connect ticket issuance to its own user
-   identity and room authorization policy.
-6. **Dependency maintenance.** `mp4-muxer` is deprecated upstream and should
+5. **Dependency maintenance.** `mp4-muxer` is deprecated upstream and should
    eventually move to its maintained successor. MediaPipe also emits a dynamic
    dependency warning during bundling. Both current paths build and package
    successfully; neither is a present runtime blocker.
 
-Everything flows through the same immutable command pipeline, so undo/redo and
-collaboration stay free as these land.
+Everything flows through the same immutable command pipeline, so undo/redo
+stays free as these land.

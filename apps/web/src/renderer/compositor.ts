@@ -401,7 +401,7 @@ export class Compositor {
         try {
           prog = this.shaders.get(pass.shader);
         } catch {
-          // A plugin shader that failed to compile/link (or is missing)
+          // A shader that failed to compile/link (or is missing)
           // degrades this one effect to a no-op instead of throwing out of the
           // whole chain and dropping the entire composited frame — mirrors the
           // LUT guard above.

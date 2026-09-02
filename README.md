@@ -2,9 +2,9 @@
 
 **English** · [한국어](README.ko.md)
 
-An open-source, AI-native, collaborative video editor for the web — built to
-match Final Cut Pro's craft and CapCut's accessibility, with collaboration
-and AI features neither of them ships. Prebuilt macOS apps are on the
+An open-source, AI-native, local-first video editor for the web — built to
+match Final Cut Pro's craft and CapCut's accessibility, with on-device
+AI features neither of them ships. Prebuilt macOS apps are on the
 [Releases page](../../releases/latest).
 
 > Formerly `cut_editor` (the repo and on-disk data identifiers keep that name
@@ -22,16 +22,13 @@ and AI features neither of them ships. Prebuilt macOS apps are on the
 | AI: subtitles + scene + silence | partial | ✅ | partial | ✅ |
 | Local AI (Whisper, MediaPipe) | ❌ | ❌ | partial | ✅ |
 | On-device auto-edit (travel/landscape) | ❌ | cloud | ❌ | ✅ |
-| Realtime co-edit | ❌ | partial | ❌ | ✅ |
-| Plugin SDK | ✅ | ❌ | ❌ | ✅ |
 | Magnetic timeline + ripple | ✅ | ❌ | partial | ✅ |
 | Mobile-first gestures | n/a | ✅ | ❌ | ✅ |
 | Local-first persistence | partial | ❌ | partial | ✅ |
 
 See [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md) for the full
 matrix and [`docs/02-architecture.md`](docs/02-architecture.md) for the
-technical plan. [`docs/03-plugin-sdk.md`](docs/03-plugin-sdk.md) covers the
-plugin SDK.
+technical plan.
 
 ## What ships today
 
@@ -47,8 +44,6 @@ plugin SDK.
 | Auto-edit | 6-step wizard for travel/landscape footage: junk filter (blur/exposure/shake), interest scoring, beat-grid assembly with photo stacks + Ken Burns, GPS/date story chapters with offline geocoding, rendered map-transition clips, YouTube Audio Library / Suno music flow, beat-snap re-conform when music changes — applied as one undo step on dedicated AUTO tracks |
 | Export | WebCodecs H.264/VP9/AV1 + chunked stereo AAC mixer, streaming LUFS normalization, work ranges, four presets |
 | Persistence | Validated project library + snapshots, Yjs/IndexedDB state, OPFS media, corruption-safe recovery |
-| Collaboration | Ticket-authenticated y-websocket rooms, validated CRDT edits, awareness, peer media transfer |
-| Plugin SDK | URL-loaded v2 effects in network-isolated sandbox iframes with declarative uniforms |
 | Mobile | Reactive shell with drawer panels + two-finger pinch zoom |
 
 ## Repo layout
@@ -57,7 +52,7 @@ plugin SDK.
 apps/web/         Next.js 15 app (editor UI)
 apps/desktop/     Electron wrapper (macOS .app/.dmg packaging)
 packages/core/    Framework-agnostic project model, edit commands, and timeline algorithms
-docs/             Design notes + plugin SDK
+docs/             Identity, architecture, and design notes
 reference/        OpenCut clone for study (gitignored)
 ```
 
@@ -68,16 +63,6 @@ pnpm install
 pnpm dev          # http://localhost:3000
 ```
 
-Realtime collaboration is intentionally disabled until a relay is configured.
-Copy `apps/web/.env.example` to `apps/web/.env.local` and set
-`NEXT_PUBLIC_COLLAB_WS_URL` to your relay. Remote endpoints must use `wss://`
-and also require `NEXT_PUBLIC_COLLAB_TICKET_URL`; local development may use
-`ws://localhost:1234` without tickets. The included production relay verifies
-short-lived room tickets and applies Origin/payload/rate limits. See
-[`docs/05-collaboration-deployment.md`](docs/05-collaboration-deployment.md).
-Desktop releases read the relay and ticket URLs from the GitHub Actions
-repository variables `COLLAB_WS_URL` and `COLLAB_TICKET_URL`.
-
 Requirements: Node 20+, pnpm 9+.
 
 ### Browser E2E tests
@@ -87,9 +72,8 @@ pnpm --filter @cut/web exec playwright install chromium  # first run only
 pnpm test:e2e
 ```
 
-The suite starts isolated editor and Yjs relay servers. It verifies navigation,
-IndexedDB project recovery after reload, two-browser CRDT edits, and byte-exact
-peer media transfer into the receiving browser's OPFS.
+The suite starts an isolated editor server. It verifies navigation, IndexedDB
+project recovery after reload, and timeline marquee selection.
 
 ## Install as an app on macOS
 
@@ -192,7 +176,6 @@ required.
 - Per-language subtitle tracks and translation workflow
 - Effect preview thumbnails and GIF / image-sequence export
 - Mobile native shells (Capacitor)
-- Signed plugin registry / marketplace
 
 ### Deferred (assessed, not yet shipped)
 
@@ -200,7 +183,7 @@ required.
   sub-timeline. Requires recursive rendering (render the inner sequence
   to an offscreen FBO, sample that as the parent clip's source) and a
   new `kind: "compound"` in the discriminated union with non-trivial
-  serialisation / undo / collab considerations. Estimated 2–3 days for an
+  serialisation / undo considerations. Estimated 2–3 days for an
   MVP that covers playback + edit, longer for full keyframe propagation.
 - **Background render queue.** Running the export pipeline in a separate
   Electron `BrowserWindow` / `utilityProcess` so the user keeps editing

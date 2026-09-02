@@ -15,28 +15,6 @@ export const en = {
     "topbar.language": "Language",
 
     // Collab bar
-    "collab.share": "Share",
-    "collab.panelTitle": "Realtime co-editing",
-    "collab.panelDesc": "Send this room code to whoever you want to edit with. When you both join with the same code, you edit this project together in real time.",
-    "collab.join": "Join",
-    "collab.copy": "Copy room code",
-    "collab.copied": "Room code copied",
-    "collab.copyFailed": "Copy failed — select the code and copy it manually",
-    "collab.leave": "Leave",
-    "collab.room": "Room code",
-    "collab.connecting": "Connecting…",
-    "collab.connected": "Connected",
-    "collab.disconnected": "Reconnecting…",
-    "collab.joined": "Joined room \"{room}\"",
-    "collab.left": "Left room",
-    "collab.joinFailed": "Join failed: {msg}",
-    "collab.receiving": "Receiving {name}",
-    "collab.syncFailed": "Media sync failed",
-    "collab.serverMissing": "Set NEXT_PUBLIC_COLLAB_WS_URL to enable collaboration",
-    "collab.serverInvalid": "The collaboration server URL is invalid",
-    "collab.serverInsecure": "Remote collaboration servers must use wss://",
-    "collab.ticketMissing": "Set NEXT_PUBLIC_COLLAB_TICKET_URL for authenticated remote collaboration",
-    "collab.roomInvalid": "Room codes must be 8–128 letters, numbers, - or _",
 
     // Media bin
     "media.title": "Media",

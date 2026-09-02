@@ -5,10 +5,8 @@
       "entry": [
         "src/app/**/{page,layout,loading,error,not-found,route}.tsx",
         "next.config.{js,mjs,ts}",
-        "scripts/e2e-collab-server.mjs",
         "src/**/*.test.{ts,tsx}",
-        "public/sw.js",
-        "public/plugins/*.js"
+        "public/sw.js"
       ],
       "project": ["src/**/*.{ts,tsx}"]
     },

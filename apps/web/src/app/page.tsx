@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Film, Sparkles, Users, Wand2 } from "lucide-react";
+import { ArrowRight, Film, HardDrive, Sparkles, Wand2 } from "lucide-react";
 
 const features = [
   {
@@ -8,9 +8,9 @@ const features = [
     body: "Auto subtitles, silence removal, scene detection, and background removal run locally.",
   },
   {
-    icon: Users,
-    title: "Realtime co-edit",
-    body: "Edit with your team like Figma — CRDT-backed, offline-first.",
+    icon: HardDrive,
+    title: "Local-first",
+    body: "Your footage never leaves your device — analysis, models, and storage stay local.",
   },
   {
     icon: Wand2,
@@ -32,12 +32,11 @@ export default function HomePage() {
           <h1 className="text-balance text-5xl font-semibold leading-tight text-ink-1 md:text-6xl">
             The video editor that's <span className="text-accent">open</span>,{" "}
             <span className="text-accent">AI-native</span>, and{" "}
-            <span className="text-accent">collaborative</span>.
+            <span className="text-accent">local-first</span>.
           </h1>
           <p className="mt-6 text-lg text-ink-2">
-            Beat Final Cut Pro and CapCut on the four things neither can compete on at
-            once: open source, AI-first workflow, realtime collaboration, and web-first
-            reach.
+            Beat Final Cut Pro and CapCut on the three things neither can compete on at
+            once: open source, on-device AI workflow, and web-first reach.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link href="/editor" className="btn-primary text-base">
@@ -66,7 +65,7 @@ export default function HomePage() {
         </section>
 
         <footer className="mt-24 text-xs text-ink-3">
-          Local-first editing, AI tools, and realtime collaboration — source and
+          Local-first editing and on-device AI tools — source and
           architecture notes live in <code className="text-ink-2">docs/</code>.
         </footer>
       </div>

@@ -13,7 +13,6 @@ import { TimelineTrack } from "./timeline-track";
 import { Playhead } from "./playhead";
 import { TimelineZoom } from "./timeline-zoom";
 import { MarkerStrip } from "./marker-strip";
-import { PeerCursors } from "./peer-cursors";
 import { RangeBand } from "./range-band";
 import { SnapGuide } from "./snap-guide";
 import { SkimLine } from "./skim-line";
@@ -350,7 +349,6 @@ export function TimelinePanel() {
           <Playhead containerWidth={minWidth} />
           <SnapGuide />
           <SkimLine />
-          <PeerCursors />
           {marquee && (
             <div
               data-testid="tl-marquee"

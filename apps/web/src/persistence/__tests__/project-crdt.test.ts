@@ -125,7 +125,7 @@ describe("project CRDT", () => {
     expect(rebuilt?.timeline.zoom).toBe(0.25);
   });
 
-  it("rejects malformed values received from a remote peer", () => {
+  it("rejects malformed values in a stored document", () => {
     const base = createEmptyProject();
     const firstTrack = base.timeline.tracks[0];
     expect(firstTrack).toBeDefined();

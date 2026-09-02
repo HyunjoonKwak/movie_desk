@@ -16,7 +16,7 @@ const RULER_Y = 14;
 const configurePage = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "en" }, version: 0 }));
-    localStorage.setItem("cut.collab.welcomed", "1");
+    localStorage.setItem("cut.persistence.welcomed", "1");
   });
 };
 
