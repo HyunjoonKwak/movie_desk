@@ -22,10 +22,12 @@
     "comment": "Transitive pins that carry a published advisory. Each entry is the lowest version OSV reports as fixed or newer; drop an entry once the parent package ships a range that already satisfies it (scripts/osv-audit.mjs is the gate).",
     "overrides": {
       "js-yaml": "4.2.0",
-      "postcss": "8.5.19",
+      "postcss": "8.5.23",
       "protobufjs": "7.6.5",
       "sharp": "0.35.3",
-      "adm-zip": "0.6.0"
+      "adm-zip": "0.6.0",
+      "nanoid@<4": "3.3.18",
+      "nanoid@>=4": "5.1.16"
     }
   },
   "devDependencies": {

@@ -54,6 +54,7 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 사용자: 이 앱은 전적으로 Photo Desk 같은 macOS 로컬 앱이다. 저장 위치는 큰 문제가 아니다. → D1·D3 결정, 문서 반영.
 - 2026-09-03 Claude: `feat/identity`는 통합 대상이다. B1을 마친 뒤 main에 fast-forward
   한다. 그 뒤로 Codex는 `git checkout main && git pull --ff-only`로 옮겨 오면 된다.
 
@@ -77,9 +78,9 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 | 결정 | 내용 | 권장안 | 막히는 배치 |
 | --- | --- | --- | --- |
-| D1 저장 모델 | 복사(OPFS) 유지 / 참조(디스크 경로 + 인덱스) 도입 / 데스크톱 우선 여부 / Photo Desk 생태계의 NAS 경로 계약에 합류할지 | 웹은 "프로젝트 캐시"로 OPFS 유지, 데스크톱은 참조 라이브러리(파일 경로 + SQLite 인덱스). 영상 생애주기는 Photo Desk와 같은 NAS 경로 계약을 따른다 | B9 이후 전부, Track A |
+| D1 저장 모델 | **결정(사용자, 2026-09-03): Movie Desk는 Photo Desk처럼 macOS 기반 로컬 앱이다.** 편집 결과물을 어디에 저장하느냐는 큰 문제가 아니다. 따라서 브라우저 OPFS 한계에 맞춰 설계하지 않는다. 남은 세부: 라이브러리 원본을 디스크 참조 + 인덱스로 둘지(권장), 웹 빌드는 개발·미리보기용으로만 유지할지 | 데스크톱(Electron) 우선. 라이브러리는 디스크 원본 참조 + SQLite 인덱스, 프로젝트 캐시(프록시·썸네일)만 앱 저장소에 둔다. Photo Desk의 NAS 경로 계약에 합류 | Track A |
 | D2 버전 정책 | root/web/core 0.1.0과 desktop 0.3.1의 분리 | desktop `package.json`을 단일 기준으로 삼고 릴리스 스크립트가 나머지를 맞춘다 | B2, B5 |
-| D3 HEIC·HEVC 처리 위치 | 데스크톱 내장(macOS `sips`, VideoToolbox) 먼저 / 웹 wasm(libheif) 먼저 | 데스크톱 먼저. 주 사용 환경이 macOS 앱이고 의존성이 0이다. 웹은 안내 문구로 시작 | B10, B11 |
+| D3 HEIC·HEVC 처리 위치 | **D1에 따라 사실상 결정: 데스크톱 먼저.** macOS `sips`(HEIC)와 VideoToolbox(HEVC)를 Electron 메인 프로세스에서 쓴다. 웹 빌드는 안내 문구로 시작 | 데스크톱 먼저 | B10, B11 |
 | D4 이름 | Movie Desk 유지 여부 | CLAUDE.md대로 개인 단계에서는 유지, 공개 전 정식 조사 | Phase 7 |
 
 ## M1 — 안전한 기준선 (Phase 0, 합계 S~M)
@@ -176,10 +177,10 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
-| D1~D4 | 사용자 | 대기 | D4는 CLAUDE.md로 사실상 결정 |
-| B1 CI 복구 | Claude | 진행 중 | |
+| D1~D4 | 사용자 | D1·D3·D4 결정, D2 대기 | D1: macOS 로컬 앱 확정(2026-09-03) |
+| B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 대기 | D2 필요 |
-| B3 통합 | Claude | 대기 | B1 뒤 |
+| B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
 | B4 첫 실행 오프라인 | Codex | 대기 | |
 | B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
 | B6 도그푸딩 템플릿 | Codex | 대기 | |
