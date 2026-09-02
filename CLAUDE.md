@@ -83,6 +83,7 @@ without first updating the product decision with the user.
 - `CLAUDE.md`: mandatory working constraints and product guardrails.
 - `docs/00-identity.md`: full product identity and product-boundary explanation.
 - `docs/06-master-plan.md`: phased execution plan and current priorities.
+- `docs/07-work-order.md`: ordered implementation batches and completion gates.
 - `docs/01-feature-matrix.md`: capability coverage and competitive reference.
 - `docs/02-architecture.md`: technical architecture.
 
