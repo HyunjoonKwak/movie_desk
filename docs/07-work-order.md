@@ -59,6 +59,8 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 통합: 사용자 승인으로 e3b7c7d → B2 → HEIC 스파이크 → D1 원문 → D1 검토를
+  main에 순서대로 올리고 푸시했다. 다음은 새 기준선에서 A1-a(Claude)·A1-b/c(Codex).
 - 2026-09-03 Claude: Electron `nativeImage`도 HEIC를 못 읽는다(`isEmpty`). Codex의 ImageIO
   경계 결론이 유효하다. D1 보충안 검토: `read(start,length)`는 현재 `mp4-decoder.ts`의
   `readChunk(blob.slice)`와 1:1이라 충돌 없음. 오디오 엔진은 전체 파일을 `decodeAudioData`에
@@ -209,9 +211,9 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
-| D1~D4 | 사용자 | D1·D3·D4 결정, D2 적용(확인 대기) | D1 세부: `docs/decisions/2026-09-03-local-media-storage.md` (Codex, Claude 검토 중) |
+| D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
-| B2 정책·포맷 | Claude | 완료, 통합 대기 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
+| B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
 | B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
 | B4 첫 실행 오프라인 | Codex | 구현·번들 스모크 완료 | arm64/x64 DMG에 MediaPipe·Whisper 포함, DNS 차단 새 프로필 기동 확인. RC 수동 기능 검증은 B5에서 반복 |
 | B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
@@ -219,13 +221,13 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
 | B9 실패 안내 | Codex | 대기 | |
-| B10 HEIC | Codex | 대기 | 스파이크(Codex) 뒤, Claude와 설계 교환 |
-| B11 HEVC·.mov·회전 | Claude | 스파이크 완료, 설계 교환 대기 | `claude/spike-hevc` · `docs/spikes/2026-09-03-hevc-mov.md`: Electron·Chrome ✅(미디어 요소·capability), CI Chromium ❌, 실제 iPhone·WebCodecs demux/회전은 미확정 |
+| B10 HEIC | Codex | 스파이크 완료(`docs/spikes/2026-09-03-heic.md`), A1 뒤 착수 | Electron·nativeImage는 HEIC 불가, ImageIO 경계로 확정 |
+| B11 HEVC·.mov·회전 | Claude | 스파이크 완료, A1 뒤 착수 | `claude/spike-hevc` · `docs/spikes/2026-09-03-hevc-mov.md`: Electron·Chrome ✅(미디어 요소·capability), CI Chromium ❌, 실제 iPhone·WebCodecs demux/회전은 미확정 |
 | B12 Live Photo·폴더 | Codex | 대기 | |
 | B13~B14 리포트·컷 이유 | Codex | 대기 | |
 | B15 분석 디코더 공유 | Claude | 대기 | |
 | B16 시나리오 | Codex | 대기 | |
-| B17 자동 편집 E2E | Claude | 완료, 통합 대기 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
+| B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
 | B22 회귀 자동화 | Claude | 대기 | |
 | B23 muxer 교체 | Claude | 대기 | |
