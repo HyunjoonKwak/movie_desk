@@ -14,6 +14,49 @@
 - **M#** = 마일스톤. 마스터플랜의 Phase와 1:1로 대응한다.
 - 도그푸딩에서 나온 P0(완주 불가·손실)는 어떤 배치보다 먼저 처리한다.
 
+## 역할 분담 (Claude · Codex · 사용자)
+
+두 에이전트가 같은 저장소에서 일한다. 충돌을 피하는 규칙은 세 가지다. **영역으로
+나누고, 서로 다른 작업 트리에서 일하고, main에는 게이트를 통과한 것만 fast-forward로
+넣는다.**
+
+### 담당
+
+| 담당 | 배치 | 소유 영역 |
+| --- | --- | --- |
+| **Claude** (파이프라인·신뢰성·통합) | B1 CI 복구, B2 버전 정책·포맷 게이트, B3 통합, B5 RC 빌드 준비, B11 HEVC·.mov·회전, B15 분석 디코더 공유, B17 자동 편집 E2E, B22 회귀 자동화, B23 muxer 교체, B24 체크리스트 자동화 | `apps/web/src/renderer/`, `export/`, `persistence/`, `media/import.ts` `probe.ts` `organize.ts`, `apps/web/e2e/`, `.github/`, `scripts/`, 루트 `package.json`·`pnpm-lock.yaml`·`knip.json`·`biome.json`, `packages/core/` |
+| **Codex** (제품 UI·안내·문서·데스크톱 셸) | B4 첫 실행 오프라인, B6 도그푸딩 템플릿, B9 실패 안내 UI, B10 HEIC(데스크톱 변환 + UI), B12 Live Photo·폴더, B13 리포트 문구, B14 컷 이유, B16 시나리오·가중, B18 카드 템플릿, B19 한국어 Whisper 평가, B20 공유 프리셋, B21 내보내기 이후 화면 | `apps/web/src/autoedit/`, `music/`, `editor/`, `app/`, `i18n/`, `subtitles/`, `preview/`, `timeline/components/`, `apps/web/src/app/globals.css`·`tailwind.config.ts`, `apps/desktop/src/`, `docs/00` `01` `06`, README 두 언어, 랜딩 |
+| **사용자** | D1~D4 결정, B7 도그푸딩 실행, B8 P0 배정, 릴리스 태그·푸시 승인 | |
+
+knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집·음악 쪽 8건은 Codex,
+`stores/` 1건은 Claude.
+
+### 함께 쓰는 파일의 규칙
+
+- `i18n/messages.ko.ts`·`messages.en.ts`: 추가만 한다. 자기 배치의 키를 한 블록으로
+  붙이고 남의 키를 옮기지 않는다.
+- `media/components/media-bin.tsx`: 정렬·묶기 로직은 Claude, 스타일·문구는 Codex.
+  구조를 바꾸기 전에 아래 인계 메모에 한 줄 남긴다.
+- `apps/web/package.json` 의존성: Claude가 관리한다. Codex가 의존성을 더해야 하면
+  인계 메모에 이유를 적고 진행한다.
+- `docs/07-work-order.md`: 상태 표에서 자기 행만 고친다.
+
+### 작업 트리와 통합
+
+- Codex는 `code_work/movie_desk`(기존 체크아웃)에서 `codex/<배치>` 브랜치로 일한다.
+- Claude는 `code_work/movie_desk-claude` 워크트리에서 `claude/<배치>` 브랜치로 일한다.
+  같은 `.git`을 공유하므로 서로의 커밋이 바로 보인다.
+- 배치를 닫을 때: `git fetch` → `origin/main` 위로 rebase → `pnpm lint && pnpm typecheck
+  && pnpm test && pnpm test:e2e && pnpm audit:prod` 통과 → main에 fast-forward → 푸시.
+  merge 커밋은 만들지 않는다.
+- 상대 체크아웃의 작업 트리는 건드리지 않는다. `git add -A`는 자기 워크트리에서만.
+- 배치 시작 전 `git pull --ff-only origin main`으로 최신 main을 가져온다.
+
+### 인계 메모
+
+- 2026-09-03 Claude: `feat/identity`는 통합 대상이다. B1을 마친 뒤 main에 fast-forward
+  한다. 그 뒤로 Codex는 `git checkout main && git pull --ff-only`로 옮겨 오면 된다.
+
 ## 마스터플랜 검토에서 나온 조정 사항
 
 마스터플랜은 방향·게이트·지표가 분명하다. 배치로 쪼개면서 아래 네 가지를 보탰다.
@@ -131,12 +174,27 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 ## 상태
 
-| 배치 | 상태 | 비고 |
-| --- | --- | --- |
-| D1~D4 | 대기 | D4는 CLAUDE.md로 사실상 결정 |
-| B1~B5 (M1) | 대기 | |
-| B6~B8 (M2) | 대기 | |
-| B9~B12 (M3) | 대기 | D1·D3 이후 |
-| B13~B17 (M4) | 대기 | |
-| B18~B21 (M5) | 대기 | |
-| B22~B25 (M6) | 대기 | |
+| 배치 | 담당 | 상태 | 비고 |
+| --- | --- | --- | --- |
+| D1~D4 | 사용자 | 대기 | D4는 CLAUDE.md로 사실상 결정 |
+| B1 CI 복구 | Claude | 진행 중 | |
+| B2 정책·포맷 | Claude | 대기 | D2 필요 |
+| B3 통합 | Claude | 대기 | B1 뒤 |
+| B4 첫 실행 오프라인 | Codex | 대기 | |
+| B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
+| B6 도그푸딩 템플릿 | Codex | 대기 | |
+| B7 도그푸딩 1회차 | 사용자 | 대기 | |
+| B8 P0 수정 | 배정 | 대기 | 영역별 |
+| B9 실패 안내 | Codex | 대기 | |
+| B10 HEIC | Codex | 대기 | D3 필요 |
+| B11 HEVC·.mov·회전 | Claude | 대기 | D3 필요 |
+| B12 Live Photo·폴더 | Codex | 대기 | |
+| B13~B14 리포트·컷 이유 | Codex | 대기 | |
+| B15 분석 디코더 공유 | Claude | 대기 | |
+| B16 시나리오 | Codex | 대기 | |
+| B17 자동 편집 E2E | Claude | 대기 | |
+| B18~B21 마무리·공유 | Codex | 대기 | |
+| B22 회귀 자동화 | Claude | 대기 | |
+| B23 muxer 교체 | Claude | 대기 | |
+| B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
+| B25 v0.4.0 | 사용자 | 대기 | |
