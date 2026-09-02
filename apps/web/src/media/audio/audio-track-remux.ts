@@ -1,4 +1,5 @@
 import type { ByteSource } from "@/renderer/mp4-decoder";
+import { quietMp4BoxLogs } from "@/renderer/mp4box-log";
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 // Pulls the AAC track out of an MP4/MOV and writes it back as an audio-only
@@ -119,6 +120,9 @@ const readMetadata = async (
 export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio | null> => {
   if (source.size === 0) return null;
   const MP4Box = await import("mp4box");
+  quietMp4BoxLogs(
+    (MP4Box as unknown as { Log: Parameters<typeof quietMp4BoxLogs>[0] }).Log,
+  );
   const file = (MP4Box as unknown as { createFile: (keepMdat?: boolean) => Mp4File }).createFile(
     false,
   );

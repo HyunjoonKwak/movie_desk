@@ -46,6 +46,33 @@ describe("audio variant", () => {
     expect(builds).toBe(1);
   });
 
+  it("coalesces concurrent requests for the same source", async () => {
+    const asset = await stored("aac-video.mp4", `orig-${counter}.mp4`);
+    let builds = 0;
+    const deps = { onBuild: () => builds++ };
+    const [first, second] = await Promise.all([
+      ensureAudioVariant(asset, deps),
+      ensureAudioVariant(asset, deps),
+    ]);
+    expect(first?.size).toBeGreaterThan(0);
+    expect(second?.size).toBe(first?.size);
+    expect(builds).toBe(1);
+  });
+
+  it("treats a cache write failure as a rebuildable miss", async () => {
+    const asset = await stored("aac-video.mp4", `orig-${counter}.mp4`);
+    const result = await ensureAudioVariant(asset, {
+      writeVariant: async () => {
+        throw new DOMException("Quota exceeded", "QuotaExceededError");
+      },
+    });
+    expect(result).toBeNull();
+    expect(await readMediaFile(audioVariantKey(asset))).toBeNull();
+
+    // A failed write does not poison the key; a later attempt can rebuild it.
+    expect((await ensureAudioVariant(asset))?.size).toBeGreaterThan(0);
+  });
+
   it("falls back to the original when no audio track can be extracted", async () => {
     const asset = await stored("video-only.mp4", `orig-${counter}.mp4`);
     expect(await ensureAudioVariant(asset)).toBeNull();

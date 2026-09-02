@@ -28,7 +28,10 @@ export const audioVariantKey = (asset: AudioVariantAsset): string =>
 
 interface Deps {
   readonly onBuild?: () => void;
+  readonly writeVariant?: (key: string, file: File) => Promise<unknown>;
 }
+
+const pendingBuilds = new Map<string, Promise<Blob | null>>();
 
 const originalBlob = async (asset: AudioVariantAsset): Promise<Blob | null> => {
   if (asset.sourceRef && asset.sourceRef.kind !== "opfs") {
@@ -56,15 +59,11 @@ const originalBlob = async (asset: AudioVariantAsset): Promise<Blob | null> => {
 // Returns the cached audio-only file, building it on first use. Null when
 // the source has no AAC track (silent video, WebM, unsupported codec) or is
 // unreachable; callers then fall back to the original.
-export const ensureAudioVariant = async (
+const buildAudioVariant = async (
   asset: AudioVariantAsset,
+  key: string,
   deps: Deps = {},
 ): Promise<Blob | null> => {
-  if (asset.kind === "image") return null;
-  const key = audioVariantKey(asset);
-  const cached = await readMediaFile(key);
-  if (cached) return cached;
-
   let input: Blob | Awaited<ReturnType<typeof resolveMediaSource>> | null;
   try {
     input =
@@ -86,10 +85,39 @@ export const ensureAudioVariant = async (
 
   deps.onBuild?.();
   const byteSource = toByteSource(input);
-  const remuxed = await remuxAudioTrack(byteSource);
+  const remuxed = await remuxAudioTrack(byteSource).catch(() => null);
   if (!remuxed) return null;
-  await writeMediaFile(key, new File([remuxed.blob], key, { type: "audio/mp4" }));
+  try {
+    await (deps.writeVariant ?? writeMediaFile)(
+      key,
+      new File([remuxed.blob], key, { type: "audio/mp4" }),
+    );
+  } catch {
+    // This is a rebuildable cache, not the user's source. Quota pressure or a
+    // transient cache write failure must not reject import, preview or export;
+    // callers will decode the original and can retry the cache later.
+    return null;
+  }
   return remuxed.blob;
+};
+
+export const ensureAudioVariant = async (
+  asset: AudioVariantAsset,
+  deps: Deps = {},
+): Promise<Blob | null> => {
+  if (asset.kind === "image") return null;
+  const key = audioVariantKey(asset);
+  const cached = await readMediaFile(key);
+  if (cached) return cached;
+
+  const pending = pendingBuilds.get(key);
+  if (pending) return pending;
+
+  const build = buildAudioVariant(asset, key, deps).finally(() => {
+    if (pendingBuilds.get(key) === build) pendingBuilds.delete(key);
+  });
+  pendingBuilds.set(key, build);
+  return build;
 };
 
 // What audio consumers decode: the variant when one exists, else the original.
