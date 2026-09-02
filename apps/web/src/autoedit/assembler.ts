@@ -2,7 +2,15 @@ import type { ID, MediaAsset, Ms } from "@movie-desk/core";
 import { bestWindow } from "./interest";
 import { MODE_PRESETS } from "./modes";
 import { cosine } from "./semantic";
-import type { AssetAnalysis, EditMode, EditPlan, MusicAnalysis, PlanConstraints, PlanItem } from "./types";
+import type {
+  AssetAnalysis,
+  CutReason,
+  EditMode,
+  EditPlan,
+  MusicAnalysis,
+  PlanConstraints,
+  PlanItem,
+} from "./types";
 
 // One selectable moment. Videos may contribute up to two windows; photos one.
 export interface Candidate {
@@ -16,6 +24,11 @@ export interface Candidate {
   readonly pinned: boolean;
   readonly embedding?: Float32Array;
   readonly tags?: readonly string[];
+  readonly faceArea?: number;
+  readonly smile?: number;
+  readonly golden?: boolean;
+  readonly storyDay?: number;
+  readonly storyPlace?: string;
 }
 
 export interface ChapterBreak {
@@ -25,34 +38,47 @@ export interface ChapterBreak {
 
 const DEDUP_COSINE = 0.8;
 
+type RejectedCandidate = EditPlan["rejected"][number];
+
+const sampleSignals = (
+  analysis: AssetAnalysis | undefined,
+  startMs: number,
+  durationMs: number,
+): Pick<Candidate, "faceArea" | "smile"> => {
+  if (!analysis || analysis.samples.length === 0) return {};
+  const inWindow = analysis.samples.filter(
+    (sample) => sample.atMs >= startMs && sample.atMs <= startMs + durationMs,
+  );
+  const samples = inWindow.length > 0 ? inWindow : analysis.samples;
+  const faceArea = Math.max(...samples.map((sample) => sample.faceArea ?? 0));
+  const smile = Math.max(...samples.map((sample) => sample.smile ?? 0));
+  return {
+    ...(faceArea > 0 ? { faceArea } : {}),
+    ...(smile > 0 ? { smile } : {}),
+  };
+};
+
 // Build the chronological candidate pool + the rejected list (with reasons).
 export const buildCandidates = (
   assets: readonly MediaAsset[],
   analyses: ReadonlyMap<ID, AssetAnalysis>,
   constraints: PlanConstraints,
   minWindowMs: number,
-): { candidates: Candidate[]; rejected: { assetId: ID; atMs: Ms; reason: string }[] } => {
-  const rejected: { assetId: ID; atMs: Ms; reason: string }[] = [];
+): { candidates: Candidate[]; rejected: RejectedCandidate[] } => {
+  const rejected: RejectedCandidate[] = [];
   const candidates: Candidate[] = [];
-  const junkLabel: Record<string, string> = {
-    blur: "초점이 흐림",
-    underexposed: "너무 어두움",
-    overexposed: "노출 과다",
-    flat: "화면 정보 없음(가림/단색)",
-    "too-short": "너무 짧음",
-    shake: "심한 흔들림",
-  };
 
   for (const asset of assets) {
     if (asset.kind === "audio") continue;
     if (constraints.excluded.includes(asset.id)) {
-      rejected.push({ assetId: asset.id, atMs: 0, reason: "사용자 제외" });
+      rejected.push({ assetId: asset.id, atMs: 0, reasons: [{ code: "user-excluded" }] });
       continue;
     }
     const pinned = constraints.pinned.includes(asset.id);
     const a = analyses.get(asset.id);
     if (!a) {
-      if (!pinned) rejected.push({ assetId: asset.id, atMs: 0, reason: "분석 대기 중" });
+      if (!pinned)
+        rejected.push({ assetId: asset.id, atMs: 0, reasons: [{ code: "analysis-pending" }] });
       if (!pinned) continue;
     }
     const capturedAt = asset.capturedAt ?? asset.importedAt;
@@ -61,7 +87,7 @@ export const buildCandidates = (
       rejected.push({
         assetId: asset.id,
         atMs: 0,
-        reason: junk.map((j) => junkLabel[j] ?? j).join(", "),
+        reasons: junk.map((code) => ({ code })),
       });
       continue;
     }
@@ -80,6 +106,7 @@ export const buildCandidates = (
         srcStartMs: 0,
         maxDurMs: 0,
         score: a ? Math.max(...a.interest, 0) : 0.5,
+        ...sampleSignals(a, 0, minWindowMs),
       });
       continue;
     }
@@ -89,14 +116,25 @@ export const buildCandidates = (
     const rout = asset.useOutMs ?? asset.durationMs;
     const rangeMs = Math.max(0, rout - rin);
     if (!a || a.samples.length === 0) {
-      candidates.push({ ...base, isPhoto: false, srcStartMs: rin, maxDurMs: Math.max(500, rangeMs), score: 0.4 });
+      candidates.push({
+        ...base,
+        isPhoto: false,
+        srcStartMs: rin,
+        maxDurMs: Math.max(500, rangeMs),
+        score: 0.4,
+      });
       continue;
     }
     const inRange = a.samples
       .map((s, i) => ({ s, interest: a.interest[i] ?? 0 }))
       .filter(({ s }) => s.atMs >= rin && s.atMs <= rout);
-    const pool2 = inRange.length > 0 ? inRange : a.samples.map((s, i) => ({ s, interest: a.interest[i] ?? 0 }));
-    const w1 = bestWindow(pool2.map((x) => x.s), pool2.map((x) => x.interest), minWindowMs);
+    const pool2 =
+      inRange.length > 0 ? inRange : a.samples.map((s, i) => ({ s, interest: a.interest[i] ?? 0 }));
+    const w1 = bestWindow(
+      pool2.map((x) => x.s),
+      pool2.map((x) => x.interest),
+      minWindowMs,
+    );
     const start1 = Math.max(rin, Math.min(w1.startMs, Math.max(rin, rout - minWindowMs)));
     candidates.push({
       ...base,
@@ -104,11 +142,16 @@ export const buildCandidates = (
       srcStartMs: start1,
       maxDurMs: Math.max(500, rout - start1),
       score: w1.score,
+      ...sampleSignals(a, start1, minWindowMs),
     });
     if (rangeMs > 20_000) {
       const subSamples = pool2.filter(({ s }) => Math.abs(s.atMs - start1) > rangeMs * 0.3);
       if (subSamples.length > 0) {
-        const w2 = bestWindow(subSamples.map((x) => x.s), subSamples.map((x) => x.interest), minWindowMs);
+        const w2 = bestWindow(
+          subSamples.map((x) => x.s),
+          subSamples.map((x) => x.interest),
+          minWindowMs,
+        );
         const start2 = Math.max(rin, Math.min(w2.startMs, Math.max(rin, rout - minWindowMs)));
         candidates.push({
           ...base,
@@ -116,6 +159,7 @@ export const buildCandidates = (
           srcStartMs: start2,
           maxDurMs: Math.max(500, rout - start2),
           score: w2.score * 0.9, // slight discount for second helpings
+          ...sampleSignals(a, start2, minWindowMs),
         });
       }
     }
@@ -125,11 +169,7 @@ export const buildCandidates = (
 };
 
 // Beats-per-cut from local music energy (design: 에너지 높은 구간 = 빠른 컷).
-const beatsForSlot = (
-  energy: number,
-  hi: number,
-  mode: ReturnType<typeof presetOf>,
-): number => {
+const beatsForSlot = (energy: number, hi: number, mode: ReturnType<typeof presetOf>): number => {
   if (energy > hi * 0.75) return mode.beatsHigh;
   if (energy > hi * 0.35) return mode.beatsMid;
   return mode.beatsLow;
@@ -141,7 +181,7 @@ export interface AssembleInput {
   readonly mode: EditMode;
   readonly targetMs: Ms;
   readonly candidates: readonly Candidate[];
-  readonly rejected: readonly { assetId: ID; atMs: Ms; reason: string }[];
+  readonly rejected: readonly RejectedCandidate[];
   readonly music?: MusicAnalysis;
   readonly chapters?: readonly ChapterBreak[];
 }
@@ -184,13 +224,21 @@ export const assemble = (input: AssembleInput): EditPlan => {
     if (usedWindows.has(key)) continue;
 
     if (!next.pinned && tooSimilar(next)) {
-      rejected.push({ assetId: next.assetId, atMs: next.srcStartMs, reason: "비슷한 장면이 이미 선택됨" });
+      rejected.push({
+        assetId: next.assetId,
+        atMs: next.srcStartMs,
+        reasons: [{ code: "duplicate" }],
+      });
       continue;
     }
 
     // Chapter break?
     let chapter: string | undefined;
-    if (preset.chapters && chapterIdx < chapters.length && next.capturedAt >= chapters[chapterIdx]!.fromCapturedAt) {
+    if (
+      preset.chapters &&
+      chapterIdx < chapters.length &&
+      next.capturedAt >= chapters[chapterIdx]!.fromCapturedAt
+    ) {
       chapter = chapters[chapterIdx]!.label;
       chapterIdx++;
     }
@@ -209,7 +257,8 @@ export const assemble = (input: AssembleInput): EditPlan => {
           } else i++;
         }
       }
-      const holdBeats = stackMates.length > 0 ? Math.max(0.5, preset.photoBeats / 2) : preset.photoBeats;
+      const holdBeats =
+        stackMates.length > 0 ? Math.max(0.5, preset.photoBeats / 2) : preset.photoBeats;
       const holdMs = Math.round(holdBeats * beatMs);
       const run = [next, ...stackMates];
       for (const p of run) {
@@ -219,10 +268,7 @@ export const assemble = (input: AssembleInput): EditPlan => {
           isPhoto: true,
           srcStartMs: 0,
           durationMs: holdMs,
-          reason:
-            run.length > 1
-              ? "에너지 피크 포토 스택"
-              : `사진 · 품질 ${(p.score * 100).toFixed(0)}점${p.pinned ? " · 사용자 지정" : ""}`,
+          reasons: buildReasons(p, energy, maxEnergy, run.length > 1),
           kenBurns: kenCycle[kenIdx++ % kenCycle.length]!,
           ...(chapter ? { chapter } : {}),
         });
@@ -241,7 +287,11 @@ export const assemble = (input: AssembleInput): EditPlan => {
     if (next.shakeTier === "heavy") durMs = Math.min(durMs, 800);
     durMs = Math.min(durMs, next.maxDurMs);
     if (durMs < 400) {
-      rejected.push({ assetId: next.assetId, atMs: next.srcStartMs, reason: "남은 구간이 너무 짧음" });
+      rejected.push({
+        assetId: next.assetId,
+        atMs: next.srcStartMs,
+        reasons: [{ code: "too-short" }],
+      });
       continue;
     }
     usedWindows.add(key);
@@ -250,12 +300,20 @@ export const assemble = (input: AssembleInput): EditPlan => {
       isPhoto: false,
       srcStartMs: next.srcStartMs,
       durationMs: durMs,
-      reason: buildReason(next, energy, maxEnergy),
+      reasons: buildReasons(next, energy, maxEnergy),
       ...(chapter ? { chapter } : {}),
     });
     filledMs += durMs;
     beatIdx += nBeats;
     if (next.embedding) chosenEmbeddings.push(next.embedding);
+  }
+
+  for (const remaining of pool) {
+    rejected.push({
+      assetId: remaining.assetId,
+      atMs: remaining.srcStartMs,
+      reasons: [{ code: "target-filled" }],
+    });
   }
 
   return {
@@ -267,13 +325,31 @@ export const assemble = (input: AssembleInput): EditPlan => {
   };
 };
 
-const buildReason = (c: Candidate, energy: number, maxEnergy: number): string => {
-  const bits: string[] = [];
-  if (c.pinned) bits.push("사용자 지정");
-  bits.push(`흥미도 ${(c.score * 100).toFixed(0)}점`);
-  if (c.tags && c.tags.length > 0) bits.push(c.tags.slice(0, 2).join("·"));
-  if (energy > maxEnergy * 0.75) bits.push("고에너지 구간 배치");
-  if (c.shakeTier === "heavy") bits.push("흔들림 → 짧은 전환용");
-  if (c.shakeTier === "mild") bits.push("약한 흔들림(안정화 권장)");
-  return bits.join(" · ");
+const buildReasons = (
+  candidate: Candidate,
+  energy: number,
+  maxEnergy: number,
+  photoStack = false,
+): CutReason[] => {
+  const reasons: CutReason[] = [];
+  if (candidate.pinned) reasons.push({ code: "user-pinned" });
+  if ((candidate.smile ?? 0) > 0.4) reasons.push({ code: "smile" });
+  else if ((candidate.faceArea ?? 0) > 0.03) reasons.push({ code: "face" });
+  if (candidate.golden) reasons.push({ code: "golden-hour" });
+  if (candidate.storyDay) {
+    reasons.push({
+      code: "story-position",
+      day: candidate.storyDay,
+      ...(candidate.storyPlace ? { detail: candidate.storyPlace } : {}),
+    });
+  }
+  if (candidate.tags && candidate.tags.length > 0) {
+    reasons.push({ code: "semantic", detail: candidate.tags.slice(0, 2).join(" · ") });
+  }
+  if (photoStack) reasons.push({ code: "photo-stack" });
+  if (energy > maxEnergy * 0.75) reasons.push({ code: "music-energy" });
+  if (candidate.shakeTier === "heavy") reasons.push({ code: "heavy-shake-transition" });
+  if (candidate.shakeTier === "mild") reasons.push({ code: "mild-shake" });
+  reasons.push({ code: "interest", score: candidate.score * 100 });
+  return reasons;
 };

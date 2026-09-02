@@ -58,7 +58,7 @@ describe("auto-edit track layering", () => {
             isPhoto: false,
             srcStartMs: 0,
             durationMs: 2000,
-            reason: "test",
+            reasons: [{ code: "interest", score: 80 }],
             chapter: "Day 1",
           },
         ],

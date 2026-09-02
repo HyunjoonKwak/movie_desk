@@ -7,7 +7,12 @@ import { applyPlanToProject } from "../apply";
 import { createEmptyProject } from "@movie-desk/core";
 import type { AssetAnalysis, MusicAnalysis } from "../types";
 
-const asset = (id: string, kind: "video" | "image", capturedAt: number, durationMs = 10000): MediaAsset =>
+const asset = (
+  id: string,
+  kind: "video" | "image",
+  capturedAt: number,
+  durationMs = 10000,
+): MediaAsset =>
   ({
     id: id as ID,
     name: `${id}.mp4`,
@@ -66,7 +71,7 @@ describe("music helpers", () => {
 });
 
 describe("buildCandidates", () => {
-  it("rejects junk with Korean reasons, keeps pinned junk", () => {
+  it("rejects junk with stable reason codes, keeps pinned junk", () => {
     const assets = [asset("a", "video", 100), asset("b", "video", 200)];
     const analyses = new Map<ID, AssetAnalysis>([
       ["a" as ID, analysis("a", { junk: ["blur"] })],
@@ -78,7 +83,11 @@ describe("buildCandidates", () => {
       { pinned: ["b" as ID], excluded: [] },
       2000,
     );
-    expect(rejected.some((r) => r.assetId === ("a" as ID) && r.reason.includes("초점"))).toBe(true);
+    expect(
+      rejected.some(
+        (r) => r.assetId === ("a" as ID) && r.reasons.some((reason) => reason.code === "blur"),
+      ),
+    ).toBe(true);
     expect(candidates.some((c) => c.assetId === ("b" as ID) && c.pinned)).toBe(true);
   });
 
@@ -90,7 +99,7 @@ describe("buildCandidates", () => {
       2000,
     );
     expect(candidates).toHaveLength(0);
-    expect(rejected[0]!.reason).toBe("사용자 제외");
+    expect(rejected[0]!.reasons).toEqual([{ code: "user-excluded" }]);
   });
 
   it("respects the user-marked usable range (useInMs/useOutMs)", () => {
@@ -150,12 +159,25 @@ describe("assemble", () => {
   });
 
   it("fills to target on the beat grid, chronologically", () => {
-    const cands = [mkCandidate("a", 1), mkCandidate("b", 2), mkCandidate("c", 3), mkCandidate("d", 4)];
-    const plan = assemble({ mode: "highlight", targetMs: 6000, candidates: cands, rejected: [], music });
+    const cands = [
+      mkCandidate("a", 1),
+      mkCandidate("b", 2),
+      mkCandidate("c", 3),
+      mkCandidate("d", 4),
+    ];
+    const plan = assemble({
+      mode: "highlight",
+      targetMs: 6000,
+      candidates: cands,
+      rejected: [],
+      music,
+    });
     const total = plan.items.reduce((s, i) => s + i.durationMs, 0);
     expect(total).toBeGreaterThanOrEqual(6000);
     expect(plan.items.map((i) => i.assetId)).toEqual(
-      [...plan.items.map((i) => i.assetId)].sort((x, y) => cands.findIndex((c) => c.assetId === x) - cands.findIndex((c) => c.assetId === y)),
+      [...plan.items.map((i) => i.assetId)].sort(
+        (x, y) => cands.findIndex((c) => c.assetId === x) - cands.findIndex((c) => c.assetId === y),
+      ),
     );
   });
 
@@ -165,7 +187,13 @@ describe("assemble", () => {
     );
     // beatIdx starts at 0 → energy 0.3 low; force peak by making energy all high
     const hot: MusicAnalysis = { ...music, energyPerBeat: music.energyPerBeat.map(() => 1) };
-    const plan = assemble({ mode: "highlight", targetMs: 4000, candidates: photos, rejected: [], music: hot });
+    const plan = assemble({
+      mode: "highlight",
+      targetMs: 4000,
+      candidates: photos,
+      rejected: [],
+      music: hot,
+    });
     expect(plan.items.every((i) => i.isPhoto && i.kenBurns)).toBe(true);
     // photoStacks: first photo pulls up to 4 mates captured within 60s
     expect(plan.items.length).toBeGreaterThanOrEqual(4);
@@ -178,15 +206,54 @@ describe("assemble", () => {
       mkCandidate("b", 2, { embedding: Float32Array.from([0.99, 0.05, 0]) }),
       mkCandidate("c", 3, { embedding: Float32Array.from([0, 1, 0]) }),
     ];
-    const plan = assemble({ mode: "highlight", targetMs: 3000, candidates: cands, rejected: [], music });
-    expect(plan.rejected.some((r) => r.assetId === ("b" as ID) && r.reason.includes("비슷한"))).toBe(true);
+    const plan = assemble({
+      mode: "highlight",
+      targetMs: 3000,
+      candidates: cands,
+      rejected: [],
+      music,
+    });
+    expect(
+      plan.rejected.some(
+        (r) => r.assetId === ("b" as ID) && r.reasons.some((reason) => reason.code === "duplicate"),
+      ),
+    ).toBe(true);
     expect(plan.items.some((i) => i.assetId === ("c" as ID))).toBe(true);
   });
 
   it("heavy shake becomes a short transition", () => {
     const cands = [mkCandidate("a", 1, { shakeTier: "heavy" })];
-    const plan = assemble({ mode: "record", targetMs: 2000, candidates: cands, rejected: [], music });
+    const plan = assemble({
+      mode: "record",
+      targetMs: 2000,
+      candidates: cands,
+      rejected: [],
+      music,
+    });
     expect(plan.items[0]!.durationMs).toBeLessThanOrEqual(800);
+    expect(plan.items[0]!.reasons).toContainEqual({ code: "heavy-shake-transition" });
+  });
+
+  it("explains people, golden hour, story position, and candidates held after the target", () => {
+    const cands = [
+      mkCandidate("a", 1, {
+        faceArea: 0.2,
+        smile: 0.8,
+        golden: true,
+        storyDay: 1,
+        storyPlace: "강릉",
+      }),
+      mkCandidate("b", 2),
+    ];
+    const plan = assemble({ mode: "highlight", targetMs: 1000, candidates: cands, rejected: [] });
+    expect(plan.items[0]!.reasons).toEqual(
+      expect.arrayContaining([
+        { code: "smile" },
+        { code: "golden-hour" },
+        { code: "story-position", day: 1, detail: "강릉" },
+      ]),
+    );
+    expect(plan.rejected[0]!.reasons).toEqual([{ code: "target-filled" }]);
   });
 
   it("chapter breaks land on the first item at/after the boundary", () => {
@@ -248,8 +315,22 @@ describe("applyPlanToProject", () => {
       mode: "record" as const,
       targetMs: 4000,
       items: [
-        { assetId: "v1" as ID, isPhoto: false, srcStartMs: 2000, durationMs: 2000, reason: "r1", chapter: "Day 1 — 강릉" },
-        { assetId: "p1" as ID, isPhoto: true, srcStartMs: 0, durationMs: 1000, reason: "r2", kenBurns: "in" as const },
+        {
+          assetId: "v1" as ID,
+          isPhoto: false,
+          srcStartMs: 2000,
+          durationMs: 2000,
+          reasons: [{ code: "interest" as const, score: 80 }],
+          chapter: "Day 1 — 강릉",
+        },
+        {
+          assetId: "p1" as ID,
+          isPhoto: true,
+          srcStartMs: 0,
+          durationMs: 1000,
+          reasons: [{ code: "photo-stack" as const }],
+          kenBurns: "in" as const,
+        },
       ],
       rejected: [],
     };
@@ -257,12 +338,14 @@ describe("applyPlanToProject", () => {
       plan,
       assets,
       music: { ...music, opfsAssetId: "m" as ID },
+      formatReasons: (reasons) => reasons.map((reason) => reason.code).join(" · "),
     });
 
     const autoV = out.timeline.tracks.find((t) => t.name === "AUTO V")!;
     expect(autoV.clips).toHaveLength(2);
     expect(autoV.clips[0]!.start).toBe(0);
     expect(autoV.clips[1]!.start).toBe(2000);
+    expect(autoV.clips[0]!.label).toBe("interest");
     // photo has ken burns keyframes
     expect(autoV.clips[1]!.keyframes.some((k) => k.target === "transform.scale")).toBe(true);
     // chapter marker + title clip

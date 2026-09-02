@@ -69,13 +69,46 @@ export type EditMode =
   | "growth" // 성장 기록 (인물 중심)
   | "scenic"; // 풍경 시네마틱
 
+// Stable, locale-independent explanation of an automatic cut decision.
+// UI copy is derived from these codes so a saved plan never mixes languages.
+export type CutReasonCode =
+  | "user-pinned"
+  | "interest"
+  | "semantic"
+  | "face"
+  | "smile"
+  | "golden-hour"
+  | "music-energy"
+  | "heavy-shake-transition"
+  | "mild-shake"
+  | "photo-stack"
+  | "story-position"
+  | "map-transition"
+  | "user-excluded"
+  | "analysis-pending"
+  | "blur"
+  | "underexposed"
+  | "overexposed"
+  | "flat"
+  | "too-short"
+  | "shake"
+  | "duplicate"
+  | "target-filled";
+
+export interface CutReason {
+  readonly code: CutReasonCode;
+  readonly score?: number;
+  readonly day?: number;
+  readonly detail?: string;
+}
+
 // A concrete cut decision in the generated plan.
 export interface PlanItem {
   readonly assetId: ID;
   readonly isPhoto: boolean;
   readonly srcStartMs: Ms; // trim-in within the source (0 for photos)
   readonly durationMs: Ms; // timeline duration
-  readonly reason: string; // human-readable why-selected (설명 가능한 초안)
+  readonly reasons: readonly CutReason[]; // explainable, localizable draft decision
   readonly kenBurns?: "in" | "out" | "pan-l" | "pan-r"; // photos only
   readonly chapter?: string; // starts a new chapter (place/day label)
 }
@@ -86,7 +119,7 @@ export interface EditPlan {
   readonly musicAssetId?: ID;
   readonly items: readonly PlanItem[];
   // Candidates that lost — shown in the 탈락 후보 브라우저 with reasons.
-  readonly rejected: readonly { assetId: ID; atMs: Ms; reason: string }[];
+  readonly rejected: readonly { assetId: ID; atMs: Ms; reasons: readonly CutReason[] }[];
 }
 
 // User constraints gathered in the review step (⑤).

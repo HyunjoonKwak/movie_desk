@@ -5,7 +5,15 @@ import { analyzeMusic } from "./music";
 import { applyPlanToProject } from "./apply";
 import { generateMapTransitionAsset } from "./map-transition";
 import { buildStory, chapterBreaks, goldenAssetIds, type StoryArc } from "./story";
-import type { AssetAnalysis, EditMode, EditPlan, MusicAnalysis, PlanConstraints, PlanItem } from "./types";
+import type {
+  AssetAnalysis,
+  CutReason,
+  EditMode,
+  EditPlan,
+  MusicAnalysis,
+  PlanConstraints,
+  PlanItem,
+} from "./types";
 
 // ④ 1차 가편집 / ⑤ 재조립 orchestration: story → candidates(+golden boost) →
 // chapters → assemble → optional map-transition assets → a builder the store
@@ -25,7 +33,13 @@ export interface GenerateResult {
   readonly music?: MusicAnalysis;
   readonly mapAssets: readonly MediaAsset[];
   // Applies plan+assets to a project — hand to the store's applyGenerated.
-  readonly build: (p: Project) => Project;
+  readonly build: (
+    p: Project,
+    formatting?: {
+      readonly formatReasons: (reasons: readonly CutReason[]) => string;
+      readonly storySummary?: string;
+    },
+  ) => Project;
 }
 
 const GOLDEN_BOOST = 0.15;
@@ -53,11 +67,21 @@ export const generate = async (
 
   // 골든아워 우선 배치 — 부스트 + 사유 태깅 (P3).
   const golden = goldenAssetIds(assets);
-  const boosted: Candidate[] = candidates.map((c) =>
-    golden.has(c.assetId)
-      ? { ...c, score: Math.min(1, c.score + GOLDEN_BOOST), tags: [...(c.tags ?? []), "골든아워"] }
-      : c,
+  const storyEvents = new Map(
+    story.events.flatMap((event) => event.assetIds.map((assetId) => [assetId, event] as const)),
   );
+  const boosted: Candidate[] = candidates.map((candidate) => {
+    const isGolden = golden.has(candidate.assetId);
+    const storyEvent = storyEvents.get(candidate.assetId);
+    const storyPlace = storyEvent?.label.split("— ")[1];
+    return {
+      ...candidate,
+      score: isGolden ? Math.min(1, candidate.score + GOLDEN_BOOST) : candidate.score,
+      ...(isGolden ? { golden: true } : {}),
+      ...(storyEvent ? { storyDay: storyEvent.dayIndex + 1 } : {}),
+      ...(storyPlace ? { storyPlace } : {}),
+    };
+  });
 
   const chapters: readonly ChapterBreak[] = preset.chapters ? chapterBreaks(story) : [];
   const plan = assemble({
@@ -84,7 +108,7 @@ export const generate = async (
         isPhoto: false,
         srcStartMs: 0,
         durationMs: asset.durationMs,
-        reason: `이동 · ${move.label}`,
+        reasons: [{ code: "map-transition", detail: move.label }],
       };
       items = [...items.slice(0, target), mapItem, ...items.slice(target)];
     }
@@ -97,7 +121,13 @@ export const generate = async (
   ]);
   const musicAsset = opts.musicAssetId ? assets.find((a) => a.id === opts.musicAssetId) : undefined;
 
-  const build = (p: Project): Project => {
+  const build = (
+    p: Project,
+    formatting?: {
+      readonly formatReasons: (reasons: readonly CutReason[]) => string;
+      readonly storySummary?: string;
+    },
+  ): Project => {
     const withMapAssets =
       mapAssets.length > 0 ? { ...p, mediaLibrary: [...p.mediaLibrary, ...mapAssets] } : p;
     return applyPlanToProject(withMapAssets, {
@@ -105,7 +135,12 @@ export const generate = async (
       assets: assetMap,
       analyses,
       ...(music && musicAsset ? { music: { ...music, opfsAssetId: musicAsset.id } } : {}),
-      ...(story.summary ? { summary: story.summary } : {}),
+      ...(formatting?.storySummary
+        ? { summary: formatting.storySummary }
+        : story.summary
+          ? { summary: story.summary }
+          : {}),
+      ...(formatting ? { formatReasons: formatting.formatReasons } : {}),
     });
   };
 

@@ -13,7 +13,7 @@ import {
 import { MODE_PRESETS } from "./modes";
 import { beatSnap, timelineBeats } from "./reconform";
 import { planReframe } from "./reframe";
-import type { AssetAnalysis, EditPlan, MusicAnalysis } from "./types";
+import type { AssetAnalysis, CutReason, EditPlan, MusicAnalysis } from "./types";
 
 const AUTO_MARKER_COLOR = "#38d0c4";
 
@@ -86,7 +86,14 @@ export const applyBeatSnapToProject = (
     ? { ...project, timeline: { ...project.timeline, tracks } }
     : (() => {
         let p2: Project = { ...project, timeline: { ...project.timeline, tracks } };
-        p2 = addTrack(p2, { kind: "audio", name: "AUTO M", height: 44, muted: false, solo: false, locked: false });
+        p2 = addTrack(p2, {
+          kind: "audio",
+          name: "AUTO M",
+          height: 44,
+          muted: false,
+          solo: false,
+          locked: false,
+        });
         const mt = p2.timeline.tracks.at(-1)!;
         return addClip(p2, mt.id, musicClip);
       })();
@@ -104,7 +111,10 @@ const PAN_X = 0.045;
 const kenBurnsKeyframes = (
   kind: NonNullable<EditPlan["items"][number]["kenBurns"]>,
   durMs: number,
-): { transform: { x: number; y: number; scale: number; rotation: number; opacity: number }; tracks: KeyframeTrack[] } => {
+): {
+  transform: { x: number; y: number; scale: number; rotation: number; opacity: number };
+  tracks: KeyframeTrack[];
+} => {
   const base = { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 };
   const lin = "linear" as const;
   switch (kind) {
@@ -112,20 +122,26 @@ const kenBurnsKeyframes = (
       return {
         transform: base,
         tracks: [
-          { target: "transform.scale", keyframes: [
-            { at: 0, value: 1, easing: lin },
-            { at: durMs, value: KEN_SCALE, easing: lin },
-          ] },
+          {
+            target: "transform.scale",
+            keyframes: [
+              { at: 0, value: 1, easing: lin },
+              { at: durMs, value: KEN_SCALE, easing: lin },
+            ],
+          },
         ],
       };
     case "out":
       return {
         transform: base,
         tracks: [
-          { target: "transform.scale", keyframes: [
-            { at: 0, value: KEN_SCALE, easing: lin },
-            { at: durMs, value: 1, easing: lin },
-          ] },
+          {
+            target: "transform.scale",
+            keyframes: [
+              { at: 0, value: KEN_SCALE, easing: lin },
+              { at: durMs, value: 1, easing: lin },
+            ],
+          },
         ],
       };
     case "pan-l":
@@ -134,10 +150,13 @@ const kenBurnsKeyframes = (
       return {
         transform: { ...base, scale: 1.08 },
         tracks: [
-          { target: "transform.x", keyframes: [
-            { at: 0, value: PAN_X * dir, easing: lin },
-            { at: durMs, value: -PAN_X * dir, easing: lin },
-          ] },
+          {
+            target: "transform.x",
+            keyframes: [
+              { at: 0, value: PAN_X * dir, easing: lin },
+              { at: durMs, value: -PAN_X * dir, easing: lin },
+            ],
+          },
         ],
       };
     }
@@ -150,6 +169,7 @@ export interface ApplyOptions {
   readonly music?: MusicAnalysis & { readonly opfsAssetId: ID };
   readonly summary?: string; // 여행 요약 카드 ("3일 · 5곳 · 420km")
   readonly analyses?: ReadonlyMap<ID, AssetAnalysis>; // P6 리프레임 얼굴 경로
+  readonly formatReasons?: (reasons: readonly CutReason[]) => string;
 }
 
 export const applyPlanToProject = (project: Project, opts: ApplyOptions): Project => {
@@ -161,12 +181,20 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
 
   // Fresh AUTO tracks at the top of the stack (earlier index composites on
   // top): titles above the auto video, so chapter cards are never hidden.
-  p = addTrackAt(p, { kind: "video", name: "AUTO V", height: 60, muted: false, solo: false, locked: false }, 0);
+  p = addTrackAt(
+    p,
+    { kind: "video", name: "AUTO V", height: 60, muted: false, solo: false, locked: false },
+    0,
+  );
   const videoTrack = p.timeline.tracks[0]!;
   const wantsTitles = plan.items.some((i) => i.chapter) || Boolean(opts.summary);
   let titleTrackId: ID | null = null;
   if (wantsTitles) {
-    p = addTrackAt(p, { kind: "text", name: "AUTO T", height: 44, muted: false, solo: false, locked: false }, 0);
+    p = addTrackAt(
+      p,
+      { kind: "text", name: "AUTO T", height: 44, muted: false, solo: false, locked: false },
+      0,
+    );
     titleTrackId = p.timeline.tracks[0]!.id;
   }
 
@@ -199,9 +227,10 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
       }
     }
 
-    const ken = item.isPhoto && preset.kenBurns && item.kenBurns
-      ? kenBurnsKeyframes(item.kenBurns, item.durationMs)
-      : null;
+    const ken =
+      item.isPhoto && preset.kenBurns && item.kenBurns
+        ? kenBurnsKeyframes(item.kenBurns, item.durationMs)
+        : null;
     // 9:16 — cover-crop via fit:"fill" + face-following horizontal camera path.
     const reframe =
       vertical && !item.isPhoto
@@ -223,7 +252,8 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
       ...(reframe?.transform ? { transform: reframe.transform } : {}),
       ...(vertical ? { fit: "fill" as const } : {}),
       ...(preset.keepNaturalAudio ? {} : { volume: 0 }),
-      label: item.reason,
+      label:
+        opts.formatReasons?.(item.reasons) ?? item.reasons.map((reason) => reason.code).join(" · "),
     } as Clip);
     cursor += item.durationMs;
   }
@@ -253,7 +283,14 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
 
   // Music bed with a phrase-end fade.
   if (opts.music) {
-    p = addTrack(p, { kind: "audio", name: "AUTO M", height: 44, muted: false, solo: false, locked: false });
+    p = addTrack(p, {
+      kind: "audio",
+      name: "AUTO M",
+      height: 44,
+      muted: false,
+      solo: false,
+      locked: false,
+    });
     const musicTrack = p.timeline.tracks.at(-1)!;
     const dur = Math.min(cursor, opts.music.durationMs);
     const fade: KeyframeTrack = {
