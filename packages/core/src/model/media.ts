@@ -13,6 +13,11 @@ export interface SourceImageMetadata {
   readonly colorProfile?: string;
 }
 
+export interface LivePhotoLink {
+  readonly pairId: ID;
+  readonly role: "still" | "motion";
+}
+
 export interface MediaAsset {
   readonly id: ID;
   readonly name: string;
@@ -37,6 +42,7 @@ export interface MediaAsset {
   readonly gpsLat?: number;        // capture GPS, decimal degrees (EXIF / ISO6709)
   readonly gpsLon?: number;
   readonly sourceImageMetadata?: SourceImageMetadata; // preserved source facts; previews are disposable
+  readonly livePhoto?: LivePhotoLink; // strict same-folder still + MOV pair; both originals remain usable
   readonly useInMs?: Ms;           // user-marked usable range within the source —
   readonly useOutMs?: Ms;          // auto-edit candidates and timeline adds respect it
   readonly filmstripDataUrl?: string; // wide multi-frame strip over full source

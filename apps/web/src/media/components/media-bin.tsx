@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  FolderOpen,
   FolderUp,
   Music,
   Image as ImageIcon,
@@ -36,12 +37,14 @@ import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
 import { fmtSec, formatBytes } from "@/media/format";
 import { RangeEditor } from "./range-editor";
+import { collectDroppedMediaFiles } from "@/media/folder-import";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const activeAssetId = useMediaUiStore((s) => s.activeAssetId);
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
@@ -176,14 +179,19 @@ export function MediaBin() {
   }, [media.length]);
 
   const onChooseFiles = useCallback(() => inputRef.current?.click(), []);
+  const onChooseFolder = useCallback(() => folderInputRef.current?.click(), []);
 
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const files = e.dataTransfer?.files;
-      if (files && files.length > 0) void importFiles(files);
+      void collectDroppedMediaFiles(e.dataTransfer).then((collected) => {
+        if (collected.unreadablePaths.length > 0) {
+          toast.warning(t("media.folderUnreadable", { n: collected.unreadablePaths.length }));
+        }
+        if (collected.candidates.length > 0) void importFiles(collected.candidates);
+      });
     },
-    [importFiles],
+    [importFiles, t],
   );
 
   const addToTimeline = useCallback((asset: MediaAsset) => {
@@ -238,15 +246,26 @@ export function MediaBin() {
     <div className="flex h-full flex-col">
       <div className="panel-header">
         <span>{t("media.title")}</span>
-        <button
-          type="button"
-          className="btn-ghost text-xs"
-          onClick={onChooseFiles}
-          disabled={importing}
-        >
-          <FolderUp className="size-3.5" />
-          {t("media.import")}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            className="btn-ghost text-xs"
+            onClick={onChooseFiles}
+            disabled={importing}
+          >
+            <FolderUp className="size-3.5" />
+            {t("media.import")}
+          </button>
+          <button
+            type="button"
+            className="btn-ghost text-xs"
+            onClick={onChooseFolder}
+            disabled={importing}
+          >
+            <FolderOpen className="size-3.5" />
+            {t("media.importFolder")}
+          </button>
+        </div>
       </div>
 
       <ImportProgress />
@@ -455,6 +474,18 @@ export function MediaBin() {
                               PROXY
                             </span>
                           )}
+                          {asset.livePhoto && (
+                            <span
+                              className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.5 text-3xs font-medium text-white"
+                              title={t(
+                                asset.livePhoto.role === "still"
+                                  ? "media.livePhotoStill"
+                                  : "media.livePhotoMotion",
+                              )}
+                            >
+                              LIVE
+                            </span>
+                          )}
                           <div className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
                             {isPinned && (
                               <span className="flex items-center gap-0.5 rounded bg-accent/90 px-1 py-0.5 text-3xs font-medium text-accent-fg">
@@ -541,6 +572,20 @@ export function MediaBin() {
           ref={inputRef}
           type="file"
           accept="video/*,audio/*,image/*"
+          multiple
+          hidden
+          onChange={(e) => {
+            if (e.target.files) void importFiles(e.target.files);
+            e.target.value = "";
+          }}
+        />
+        <input
+          ref={(element) => {
+            folderInputRef.current = element;
+            element?.setAttribute("webkitdirectory", "");
+          }}
+          type="file"
+          accept="video/*,audio/*,image/*,.heic,.heif"
           multiple
           hidden
           onChange={(e) => {

@@ -2,42 +2,62 @@
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
+import { newId, type MediaAsset } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 import { importMediaFile } from "./import";
 import { useImportProgressStore } from "./import-progress-store";
 import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
+import {
+  type MediaImportCandidate,
+  linkImportedLivePhotos,
+  planLivePhotoLinks,
+  toMediaImportCandidate,
+} from "./folder-import";
+
+export type MediaImportInput = FileList | readonly File[] | readonly MediaImportCandidate[];
 
 export interface ImportState {
   importing: boolean;
-  importFiles: (files: FileList | File[]) => Promise<void>;
+  importFiles: (files: MediaImportInput) => Promise<void>;
 }
+
+const normalizeCandidates = (input: MediaImportInput): readonly MediaImportCandidate[] =>
+  Array.from(input as ArrayLike<File | MediaImportCandidate>).map((value) =>
+    "file" in value ? value : toMediaImportCandidate(value),
+  );
 
 export const useMediaImport = (): ImportState => {
   const [importing, setImporting] = useState(false);
   const addMediaAsset = useProjectStore((s) => s.addMediaAsset);
 
   const importFiles = useCallback(
-    async (input: FileList | File[]) => {
-      const files = Array.from(input);
-      if (files.length === 0) return;
+    async (input: MediaImportInput) => {
+      const candidates = normalizeCandidates(input);
+      if (candidates.length === 0) return;
       const progress = useImportProgressStore.getState();
       if (progress.active) {
         toast.info(t("media.importBusy"));
         return;
       }
       setImporting(true);
-      progress.start(files.length);
+      progress.start(candidates.length);
+      const livePhotoPlan = planLivePhotoLinks(candidates);
+      const imported: Array<{
+        asset: MediaAsset;
+        candidateIndex: number;
+      }> = [];
       let done = 0;
       let failed = 0;
       let desktopRequired = 0;
       let cancelled = false;
       try {
-        for (const file of files) {
+        for (const [candidateIndex, candidate] of candidates.entries()) {
           if (useImportProgressStore.getState().cancelRequested) {
             cancelled = true;
             break;
           }
+          const { file } = candidate;
           useImportProgressStore.getState().beginFile(file.name);
           try {
             // process serially to keep memory bounded
@@ -46,11 +66,11 @@ export const useMediaImport = (): ImportState => {
               const alreadyImported = useProjectStore
                 .getState()
                 .project.mediaLibrary.some((candidate) => candidate.id === asset.id);
-              if (!alreadyImported) addMediaAsset(asset);
+              if (!alreadyImported) imported.push({ asset, candidateIndex });
             } else {
               const { asset, releaseLease } = await importMediaFile(file);
               try {
-                addMediaAsset(asset);
+                imported.push({ asset, candidateIndex });
               } finally {
                 releaseLease();
               }
@@ -66,7 +86,12 @@ export const useMediaImport = (): ImportState => {
             useImportProgressStore.getState().fileFailed();
           }
         }
-        const skipped = files.length - done - failed;
+
+        for (const asset of linkImportedLivePhotos(imported, livePhotoPlan, newId)) {
+          addMediaAsset(asset);
+        }
+
+        const skipped = candidates.length - done - failed;
         if (cancelled) {
           toast.info(t("media.importCancelled", { done, skipped }));
         } else if (desktopRequired === failed && failed > 0) {
