@@ -62,8 +62,8 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 | Stereo AAC and LUFS normalization | 🟡 | ✅ | ✅ | ✅ |
 | Work-range and social presets | 🟡 | ✅ | ✅ | ✅ |
 | GIF / image sequence | 🟡 | ✅ | ✅ | ❌ |
-| Browser / installable PWA | ✅ | ✅ | ❌ | ✅ |
-| Packaged desktop app | 🟡 | ✅ | ✅ | ✅ Electron (macOS release) |
+| Browser / installable PWA | ✅ | ✅ | ❌ | 🟡 development preview, not a product target |
+| Packaged desktop app | 🟡 | ✅ | ✅ | ✅ Electron (macOS product) |
 | Native iOS / Android shell | 🟡 | ✅ | ❌ | ❌ |
 | Open source / self-hostable | ✅ | ❌ | ❌ | ✅ ⭐ |
 

@@ -47,11 +47,10 @@ pnpm --filter @movie-desk/desktop build:mac:x64      # Intel 전용
 2. `electron-builder --mac`으로 `.app` 번들 생성 후 `.dmg`로 래핑. 결과물은
    `apps/desktop/dist/`에 저장.
 
-웹 export에는 `apps/web/public/mediapipe/`에 동봉된 MediaPipe wasm + tflite가
-포함되어 배경 제거 기능이 오프라인 동작합니다. Whisper 자막 모델을 첫 실행
-시점부터 오프라인으로 동작시키려면 루트 README 안내에 따라 모델을
-`apps/web/public/whisper/Xenova/whisper-tiny.en/` 경로에 사전 배치한 뒤
-패키징하세요.
+`build:web`은 먼저 `prebundle:models`를 실행합니다. MediaPipe wasm, Selfie
+Segmenter, 체크섬을 검증한 Face Landmarker, Whisper 자막 모델을 정적 export에
+포함하므로 패키징된 앱의 분석과 자막은 첫 실행부터 오프라인으로 동작합니다.
+`app://` 실행에서는 누락된 모델을 CDN에서 조용히 받지 않습니다.
 
 ## 코드 사이닝 + 공증
 
@@ -102,4 +101,4 @@ electron-builder가 그 숫자로 Release 이름을 결정합니다.
 - Mac App Store용 별도 universal 빌드 (electron-builder 타겟 추가).
 - CI 내 사이닝 + 공증 (`CSC_*` / `APPLE_*` secrets 추가 후 `identity: null`
   제거).
-- Linux / Windows 빌드 (electron-builder 타겟은 존재, 각 OS 러너 필요).
+- 파일 참조형 로컬 라이브러리와 macOS 코덱 처리 경로 검증.

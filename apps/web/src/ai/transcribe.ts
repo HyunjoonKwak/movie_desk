@@ -1,3 +1,4 @@
+import { allowRemoteWhisperModels } from "./model-policy";
 import type { Subtitle } from "./types";
 
 // Lazy Whisper loader. The model is downloaded once and cached by the
@@ -16,7 +17,10 @@ const loadPipeline = async () => {
   // For a fully self-contained desktop bundle, place the model files under
   // `apps/web/public/whisper/Xenova/whisper-tiny.en/` (see README).
   env.allowLocalModels = true;
-  env.allowRemoteModels = true;
+  // Packaged desktop builds include the model. Never hide a broken package by
+  // silently reaching HuggingFace from app://; browser development keeps the
+  // explicit first-use download path for now.
+  env.allowRemoteModels = allowRemoteWhisperModels(globalThis.location?.protocol);
   env.localModelPath = "/whisper/";
   env.useBrowserCache = true;
   const tx = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {

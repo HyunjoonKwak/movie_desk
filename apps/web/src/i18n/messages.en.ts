@@ -141,7 +141,7 @@ export const en = {
     "ai.silence.failed": "Auto-cut failed: {msg}",
     "ai.subtitles": "Auto subtitles (Whisper)",
     "ai.subtitles.hint": "Transcribe and add subtitle clips (Whisper-tiny, local)",
-    "ai.subtitles.loading": "Downloading Whisper model…",
+    "ai.subtitles.loading": "Loading Whisper model…",
     "ai.subtitles.none": "No speech detected",
     "ai.subtitles.added": "Added {n} subtitle clip(s)",
     "ai.subtitles.failed": "Transcribe failed: {msg}",

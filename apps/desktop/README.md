@@ -47,11 +47,10 @@ The script:
 2. Invokes `electron-builder --mac` which assembles a `.app` bundle and
    wraps it in a `.dmg`. Output lands in `apps/desktop/dist/`.
 
-The web export inherits the MediaPipe wasm + tflite already vendored
-under `apps/web/public/mediapipe/`, so background removal works offline.
-For the Whisper transcription model, see the root README — drop the
-model under `apps/web/public/whisper/Xenova/whisper-tiny.en/` before
-packaging if you want offline-from-first-launch transcription.
+`build:web` runs `prebundle:models` first. The static export includes MediaPipe
+wasm, Selfie Segmenter, a checksum-verified Face Landmarker, and the Whisper
+transcription model, so analysis and transcription work offline from first
+launch. Packaged `app://` runs do not silently fetch a missing model from a CDN.
 
 ## Code signing & notarisation
 
@@ -113,5 +112,4 @@ uses that number to name the Release.
 - Universal Mac App Store build (separate target in electron-builder).
 - Signing + notarisation in CI (add `CSC_*` / `APPLE_*` secrets and remove
   `identity: null`).
-- Linux / Windows builds (electron-builder targets exist but need CI
-  runners of each OS).
+- Filesystem-reference local library and validation of the macOS codec path.

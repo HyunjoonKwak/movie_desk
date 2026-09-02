@@ -1,6 +1,6 @@
 # Movie Desk 마스터플랜
 
-갱신 2026-09-02 · 작업 지침 [`../CLAUDE.md`](../CLAUDE.md) · 기준 문서
+갱신 2026-09-03 · 작업 지침 [`../CLAUDE.md`](../CLAUDE.md) · 기준 문서
 [`00-identity.md`](00-identity.md) · 이 문서는 기능
 희망 목록이 아니라 **한 편의 영상을 안전하게 완성하기 위한 실행 순서**다.
 
@@ -33,15 +33,15 @@ Movie Desk를 **대규모 영상 자산 관리, 전문가 수준의 편집, 초�
 
 | 영역 | 확인된 현재 상태 |
 | --- | --- |
-| 제품 | Movie Desk 정체성·이름·저장소·랜딩 정리 완료. Photo Desk와 Pretendard, 색상, 14/13.5/12/11px UI 위계를 공유한다. |
-| 브랜치 | `feat/identity`가 `origin/main`보다 8커밋 앞서며 아직 원격 main에 통합되지 않았다. |
-| CI | 원격 main의 마지막 CI는 2026-08-06 실패. 로컬 `pnpm audit:prod`도 postcss 1건과 nanoid 3건을 탐지한다. |
-| 검증 | web 237 + core 92 + desktop 14 = 343개 테스트와 Playwright 8개가 통과한다. 1024/1440px 실제 콘텐츠 화면도 확인했다. |
+| 제품 | Movie Desk 정체성·이름·저장소·랜딩 정리 완료. 제품 플랫폼은 Photo Desk와 같은 macOS 로컬 앱으로 확정했다. 두 앱은 Pretendard, 색상, 14/13.5/12/11px UI 위계를 공유한다. |
+| 브랜치 | 정체성 작업과 B1 CI 복구가 `main`에 통합됐다. Claude는 `claude/b17-autoedit-e2e`, Codex는 `codex/b4-offline`에서 분리 작업한다. |
+| CI | `main`의 2026-09-03 CI가 성공했다. postcss·nanoid OSV 권고를 해결했고 생산 의존성 164개에서 알려진 취약점 0건이다. |
+| 검증 | B4 브랜치 기준 web 240 + core 92 + desktop 14 = 346개 테스트와 Playwright 8개가 통과한다. 1024/1440px 실제 콘텐츠 화면도 확인했다. |
 | 릴리스 | 최신 공개판은 이름 변경 전의 미서명 `v0.3.1`이다. Movie Desk 이름의 릴리스는 아직 없다. |
 | 입력 | 일반 MP4·이미지·오디오는 동작. HEIC/HEIF, HEVC, `.mov`, 회전 메타, Live Photo는 실사용 검증과 보완이 필요하다. |
 | 핵심 품질 | 자동 정리·분석 리포트·5개 모드·초안·채택/제외·음악 흐름이 구현돼 있지만 실제 대규모 촬영본 도그푸딩 기록이 없다. |
 | 기술 부채 | `mp4-muxer`가 폐기 예정이고 knip가 미사용 export/type 10개를 보고한다. 장면 감지·모션 추적은 순차 seek라 느리다. |
-| 오프라인 | 미디어는 외부로 전송하지 않는다. 다만 FaceLandmarker는 로컬 모델이 없으면 Google에서, Whisper는 첫 사용 시 Hugging Face에서 모델을 받는다. 데스크톱 릴리스의 첫 실행 오프라인성은 별도 검증해야 한다. |
+| 오프라인 | 미디어는 외부로 전송하지 않는다. 데스크톱 빌드는 FaceLandmarker와 Whisper를 사전 포함하고 `app://` 실행의 조용한 원격 폴백을 차단한다. DNS를 차단한 새 프로필에서 앱 기동과 번들 모델 응답을 확인했다. 선택형 MobileCLIP만 사용자 동의 뒤 모델을 내려받는다. |
 
 ## 실행 원칙
 

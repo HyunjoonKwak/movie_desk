@@ -29,6 +29,10 @@ blob-report
 # Whisper model — fetch via `pnpm --filter @movie-desk/web prebundle:whisper`
 apps/web/public/whisper/
 
+# Face Landmarker model — fetched and checksum-verified during desktop builds.
+apps/web/public/mediapipe/models/face_landmarker.task
+apps/web/public/mediapipe/models/face_landmarker.task.download
+
 # OpenCut clone used as study reference only
 reference/
 

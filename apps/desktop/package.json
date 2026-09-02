@@ -7,7 +7,7 @@
   "main": "src/main.cjs",
   "scripts": {
     "dev": "concurrently -k -n web,electron -c blue,green \"pnpm --filter @movie-desk/web dev\" \"wait-on http://localhost:3000/editor && MOVIE_DESK_DEV_URL=http://localhost:3000 electron .\"",
-    "build:web": "pnpm --filter @movie-desk/web exec cross-env NEXT_OUTPUT=export next build",
+    "build:web": "pnpm --filter @movie-desk/web prebundle:models && pnpm --filter @movie-desk/web exec cross-env NEXT_OUTPUT=export next build",
     "build:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml",
     "build:mac:arm64": "pnpm run build:web && electron-builder --mac --arm64 --config electron-builder.yml",
     "build:mac:x64": "pnpm run build:web && electron-builder --mac --x64 --config electron-builder.yml",

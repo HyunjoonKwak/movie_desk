@@ -13,7 +13,9 @@
     "test:e2e": "playwright test",
     "format": "biome format --write src e2e playwright.config.ts",
     "knip": "pnpm --dir ../.. exec knip --workspace apps/web",
-    "prebundle:whisper": "node scripts/download-whisper.mjs"
+    "prebundle:mediapipe": "node scripts/download-mediapipe-models.mjs",
+    "prebundle:whisper": "node scripts/download-whisper.mjs",
+    "prebundle:models": "pnpm run prebundle:mediapipe && pnpm run prebundle:whisper"
   },
   "dependencies": {
     "@movie-desk/core": "workspace:*",

@@ -4,7 +4,7 @@
 
 **Movie Desk는 영상 자산 관리와 전문가 수준의 편집을 하나로 제공하면서도,
 처음 편집하는 사람에게 가져오기부터 완성까지의 길을 안내하는 로컬 우선 영상
-작업대입니다.** 기능을 덜어 내서 쉽게 만드는 대신 좋은 기본값과 단계적 공개로
+작업대인 macOS 앱입니다.** 기능을 덜어 내서 쉽게 만드는 대신 좋은 기본값과 단계적 공개로
 전문 기능을 이해하기 쉽게 만듭니다. 로컬 AI는 분석·검색·자막·추천·선택형 초안을
 돕고, 결정과 정밀한 마무리는 사용자가 맡습니다. 영상은 내 기기를 떠나지 않습니다.
 macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 있습니다.
@@ -56,18 +56,18 @@ Final Cut Pro와 DaVinci Resolve는 편집 깊이·정확도·성능·신뢰성�
 ## 저장소 구조
 
 ```
-apps/web/         Next.js 15 앱 (에디터 UI)
+apps/web/         Next.js 15 기반 에디터 UI·렌더러 (개발 미리보기 포함)
 apps/desktop/     Electron 셸 (macOS .app/.dmg 패키징)
 packages/core/    프레임워크 독립 프로젝트 모델, 편집 명령, 타임라인 알고리즘
 docs/             정체성·아키텍처·설계 문서
 reference/        학습용 OpenCut 클론 (gitignored)
 ```
 
-## 빠른 시작
+## 개발 미리보기
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:3000
+pnpm dev          # 브라우저 개발 미리보기: http://localhost:3000
 ```
 
 요구사항: Node 20+, pnpm 9+.
@@ -84,47 +84,26 @@ pnpm test:e2e
 
 ## macOS 앱으로 설치하기
 
-Movie Desk는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
-데스크톱 윈도우로 설치할 수 있습니다. 네이티브 앱이 필요하면
-[Releases 페이지](../../releases/latest)에서 빌드된 `.dmg`를 받으세요.
-
-**Safari (macOS 권장)**
-
-1. 실행 중인 사이트(예: `https://your-host/editor`)를 Safari 17+에서 엽니다.
-2. **파일 → Dock에 추가…**
-3. 이름과 아이콘을 확인하고 추가를 클릭합니다.
-
-브라우저 크롬 없는 독립 윈도우로 실행되며 별도 dock 항목을 가집니다. 동봉된
-서비스 워커가 앱 셸을 캐시해 짧은 네트워크 단절에도 계속 편집할 수 있습니다.
-
-**Chrome / Edge**
-
-주소창의 설치 아이콘(⊕)을 클릭하거나 **파일 → 설치**를 선택해 Launchpad와
-dock에 앱을 추가합니다.
-
-메뉴·파일 다이얼로그·자동 업데이트를 갖춘 완전한 네이티브 `.app` 번들이
-필요하면 [`apps/desktop/`](apps/desktop/)을 참고하세요.
+Movie Desk의 제품 배포 형태는 macOS 데스크톱 앱입니다. `apps/web`의 브라우저 실행은
+개발과 자동 테스트를 위한 미리보기이며 별도 웹 서비스가 아닙니다. 설치본은
+[Releases 페이지](../../releases/latest)의 `.dmg`를 사용하거나
+[`apps/desktop/`](apps/desktop/) 안내에 따라 로컬에서 빌드합니다.
 
 ### 동봉된 로컬 AI 모델
 
-MediaPipe(배경 제거) wasm 런타임과 Selfie Segmenter 모델은
-`apps/web/public/mediapipe/`에 포함되어 있어 배경 제거 기능은 완전 오프라인
-동작합니다.
-
-Whisper 자막 모델(~40 MB, `Xenova/whisper-tiny.en` q8 양자화)은 첫 사용 시
-HuggingFace에서 다운로드되며, 이후 브라우저 HTTP 캐시에 보관됩니다. 첫 실행
-시점부터 오프라인으로 동작시키려면(데스크톱 번들 등) 아래 스크립트를
-실행하세요:
+데스크톱 빌드는 MediaPipe 런타임, Selfie Segmenter, Face Landmarker와 Whisper
+자막 모델(~41MB, `Xenova/whisper-tiny.en` q8)을 먼저 준비해 앱에 동봉합니다.
+패키징된 `app://` 실행에서는 모델 누락을 숨기기 위한 CDN 폴백을 허용하지 않습니다.
+수동으로 모델만 준비하려면 다음 명령을 사용합니다.
 
 ```bash
-pnpm --filter @movie-desk/web prebundle:whisper
+pnpm --filter @movie-desk/web prebundle:models
 ```
 
-스크립트가 `apps/web/public/whisper/Xenova/whisper-tiny.en/`에 모델 파일 7개
-(약 41 MB)를 채웁니다. 런타임이 `env.localModelPath`로 해당 경로를 먼저
-확인하고, 파일이 없을 때만 HuggingFace로 폴백합니다. 해당 디렉토리는
-gitignore되어 있으므로 새로운 체크아웃마다 또는 데스크톱 빌드 파이프라인 안에서
-재실행하세요.
+이 명령은 Face Landmarker를 체크섬 검증하고 Whisper 모델 파일 7개를 로컬 public
+경로에 채웁니다. 생성 자산은 gitignore되며 `apps/desktop`의 `build:web`과 릴리스
+빌드가 자동으로 명령을 실행합니다. MobileCLIP 시맨틱 분석은 별도 선택 기능으로,
+사용자가 켤 때만 약 55MB 모델 다운로드를 명시적으로 시작합니다.
 
 ## 릴리스 빌드
 

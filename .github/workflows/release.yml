@@ -35,15 +35,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # Downloads the Whisper subtitling model (~40 MB) into
-      # apps/web/public/whisper/ so the bundled .app can transcribe
-      # fully offline from first launch.
-      - name: Prebundle Whisper model
-        run: pnpm --filter @movie-desk/web prebundle:whisper
-
-      # Builds the static web export and packages it as a signed-or-unsigned
-      # .dmg for arm64 + x64, then uploads both to a GitHub Release matching
-      # the version in apps/desktop/package.json.
+      # build:web first downloads and verifies all bundled local AI models,
+      # then the release packages the static export as signed-or-unsigned
+      # arm64 + x64 DMGs. The GitHub Release matches the version in
+      # apps/desktop/package.json.
       - name: Build and publish macOS .dmg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

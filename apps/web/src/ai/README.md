@@ -1,8 +1,9 @@
 # AI subsystem
 
 AI and analysis features run locally and turn their results into ordinary,
-undoable project edits. Model-backed tasks download lazily; media never needs
-to leave the browser.
+undoable project edits. The packaged macOS app bundles Whisper and MediaPipe
+models before release; the optional semantic model is downloaded only after the
+user enables it. Media never leaves the device.
 
 ## Current modules
 
@@ -33,3 +34,5 @@ to leave the browser.
   are product backlog items, not implemented modules.
 - The bundled Whisper model is English (`whisper-tiny.en`); do not describe the
   current transcription path as multilingual.
+- `model-policy.ts` prevents packaged `app://` builds from silently falling back
+  to a remote Whisper model. Face analysis always uses its bundled local path.

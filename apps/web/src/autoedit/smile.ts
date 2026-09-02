@@ -1,3 +1,5 @@
+import { FACE_LANDMARKER_MODEL_PATH } from "@/ai/model-policy";
+
 // P4 — family signals via MediaPipe FaceLandmarker blendshapes.
 // Contract: returns null when the model is unavailable (offline, load failure)
 // so the interest fusion simply proceeds without the smile term.
@@ -22,15 +24,12 @@ const loadLandmarker = async (): Promise<Landmarker | null> => {
   try {
     const vision = await import("@mediapipe/tasks-vision");
     const fileset = await vision.FilesetResolver.forVisionTasks("/mediapipe/wasm");
-    const modelAssetPath = (await headOk("/mediapipe/models/face_landmarker.task"))
-      ? "/mediapipe/models/face_landmarker.task"
-      : "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task";
     const lm = await withMediapipeAsyncLogFilter(() =>
       vision.FaceLandmarker.createFromOptions(fileset, {
         baseOptions: {
-          // Local-first: vendored path checked first; falls back to Google's CDN
-          // so the feature works before `public/mediapipe/models` is populated.
-          modelAssetPath,
+          // Desktop builds prebundle this model. Never fall back to a remote
+          // URL during analysis: imported media must not trigger network work.
+          modelAssetPath: FACE_LANDMARKER_MODEL_PATH,
         },
         runningMode: "IMAGE",
         numFaces: 4,
@@ -40,15 +39,6 @@ const loadLandmarker = async (): Promise<Landmarker | null> => {
     return lm as unknown as Landmarker;
   } catch {
     return null;
-  }
-};
-
-const headOk = async (url: string): Promise<boolean> => {
-  try {
-    const r = await fetch(url, { method: "HEAD" });
-    return r.ok;
-  } catch {
-    return false;
   }
 };
 

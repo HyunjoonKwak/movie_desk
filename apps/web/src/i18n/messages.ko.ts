@@ -141,7 +141,7 @@ export const ko = {
     "ai.silence.failed": "자동 컷 실패: {msg}",
     "ai.subtitles": "자동 자막 (Whisper)",
     "ai.subtitles.hint": "음성을 텍스트로 변환해 자막 클립 추가 (Whisper-tiny, 로컬)",
-    "ai.subtitles.loading": "Whisper 모델 다운로드 중…",
+    "ai.subtitles.loading": "Whisper 모델 불러오는 중…",
     "ai.subtitles.none": "음성이 감지되지 않았습니다",
     "ai.subtitles.added": "{n}개 자막 클립을 추가했습니다",
     "ai.subtitles.failed": "음성 인식 실패: {msg}",

@@ -181,7 +181,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 대기 | D2 필요 |
 | B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
-| B4 첫 실행 오프라인 | Codex | 대기 | |
+| B4 첫 실행 오프라인 | Codex | 구현·번들 스모크 완료 | arm64/x64 DMG에 MediaPipe·Whisper 포함, DNS 차단 새 프로필 기동 확인. RC 수동 기능 검증은 B5에서 반복 |
 | B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
 | B6 도그푸딩 템플릿 | Codex | 대기 | |
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |

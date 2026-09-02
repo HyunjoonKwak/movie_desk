@@ -4,7 +4,7 @@
 
 **Movie Desk is a local-first video workstation that combines a serious media
 library with professional-grade editing while guiding first-time editors from
-import to final export.** It makes powerful tools approachable through good
+import to final export, delivered as a macOS app.** It makes powerful tools approachable through good
 defaults and progressive disclosure instead of removing their depth. Local AI
 assists with analysis, search, transcription, suggestions, and optional rough
 cuts; the user keeps final control and precise finishing. Footage never leaves
@@ -61,18 +61,18 @@ effects, and export against them, and
 ## Repo layout
 
 ```
-apps/web/         Next.js 15 app (editor UI)
+apps/web/         Next.js 15 editor UI/renderer (including the dev preview)
 apps/desktop/     Electron wrapper (macOS .app/.dmg packaging)
 packages/core/    Framework-agnostic project model, edit commands, and timeline algorithms
 docs/             Identity, architecture, and design notes
 reference/        OpenCut clone for study (gitignored)
 ```
 
-## Quick start
+## Development preview
 
 ```bash
 pnpm install
-pnpm dev          # http://localhost:3000
+pnpm dev          # browser development preview: http://localhost:3000
 ```
 
 Requirements: Node 20+, pnpm 9+.
@@ -87,50 +87,29 @@ pnpm test:e2e
 The suite starts an isolated editor server. It verifies navigation, IndexedDB
 project recovery after reload, and timeline marquee selection.
 
-## Install as an app on macOS
+## Install on macOS
 
-Movie Desk ships a PWA manifest + service worker so you can install it as a
-standalone desktop window — no extra tooling required. Prefer a native app?
-Grab the prebuilt `.dmg` from the [Releases page](../../releases/latest).
-
-**Safari (recommended on macOS)**
-
-1. Open the running site (e.g. `https://your-host/editor`) in Safari 17+.
-2. **File → Add to Dock…**
-3. Confirm the name and icon, then click Add.
-
-The app launches in its own window with no browser chrome and gets its own
-dock entry. The bundled service worker caches the app shell so you can keep
-editing through brief network drops.
-
-**Chrome / Edge**
-
-Click the install icon (⊕) in the address bar, or **File → Install** to add
-the app to Launchpad and the dock.
-
-For a fully-native `.app` bundle with menus, file dialogs, and auto-update
-see [`apps/desktop/`](apps/desktop/).
+Movie Desk ships as a macOS desktop application. The browser build under
+`apps/web` is a development and automated-test preview, not a separate hosted
+product. Use the `.dmg` on the [Releases page](../../releases/latest), or follow
+[`apps/desktop/`](apps/desktop/) to build it locally.
 
 ### Bundled local AI models
 
-MediaPipe (background removal) wasm runtime and the Selfie Segmenter model
-are vendored under `apps/web/public/mediapipe/`, so background removal works
-fully offline.
-
-The Whisper transcription model (~40 MB, `Xenova/whisper-tiny.en` quantised
-to `q8`) is downloaded from HuggingFace on first use and cached by the
-browser's HTTP cache thereafter. To make it offline-from-first-launch (e.g.
-for the desktop bundle), run:
+Desktop builds prepare and bundle the MediaPipe runtime, Selfie Segmenter,
+Face Landmarker, and the Whisper transcription model (~41 MB,
+`Xenova/whisper-tiny.en` q8). Packaged `app://` runs do not use a CDN fallback
+to hide a missing model. To prepare only the models manually, run:
 
 ```bash
-pnpm --filter @movie-desk/web prebundle:whisper
+pnpm --filter @movie-desk/web prebundle:models
 ```
 
-The script populates `apps/web/public/whisper/Xenova/whisper-tiny.en/` with
-the 7 model files (~41 MB). The runtime checks that path first via
-`env.localModelPath` and only falls back to HuggingFace if a file is missing.
-The directory is gitignored; rerun the script after each clean checkout or
-inside the desktop build pipeline.
+The command checksum-validates Face Landmarker and populates the local public
+path with seven Whisper files. Generated assets are gitignored, and the
+`apps/desktop` `build:web` and release builds run this command automatically.
+MobileCLIP semantic analysis remains an optional feature: its ~55 MB model is
+downloaded explicitly only when the user enables it.
 
 ## Cutting a release
 

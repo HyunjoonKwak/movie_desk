@@ -32,6 +32,16 @@ None of these pillars may be treated as a disposable add-on. A feature that make
 the app easier must not impose a low ceiling on expert work, and an advanced
 feature must not make the basic path unnecessarily harder to understand.
 
+## Product platform
+
+Movie Desk is a **macOS local desktop application**, like Photo Desk. The
+Next.js code under `apps/web` is the shared renderer/UI implementation and a
+development preview, not a separate cloud or browser product that needs feature
+parity. Product and architecture decisions should prioritise native filesystem
+access, macOS media frameworks, offline operation, and desktop reliability.
+Users may choose any destination for an exported movie; export location is not
+part of the product identity.
+
 ## Non-negotiable product rules
 
 - **Progressive disclosure, not simplification by deletion.** Keep the first path
