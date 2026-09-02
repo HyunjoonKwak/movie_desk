@@ -31,3 +31,6 @@ apps/web/public/whisper/
 
 # OpenCut clone used as study reference only
 reference/
+
+# oh-my-claudecode session state
+.omc/

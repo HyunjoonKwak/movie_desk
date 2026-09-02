@@ -13,23 +13,29 @@ Repository and local folder: `movie_desk`. Started from a study of
 for offline reading; not part of the build). Legacy storage identifiers remain
 unchanged so projects created before the rename still open normally.
 
-## Why another editor?
+## Where it fits
 
-| | Final Cut Pro | CapCut | OpenCut | **Movie Desk** |
-|--|:--:|:--:|:--:|:--:|
-| Open source | ❌ | ❌ | ✅ | ✅ |
-| Free for everything | ❌ | partial | ✅ | ✅ |
-| Browser-native | ❌ | ❌ | ✅ | ✅ |
-| AI: subtitles + scene + silence | partial | ✅ | partial | ✅ |
-| Local AI (Whisper, MediaPipe) | ❌ | ❌ | partial | ✅ |
-| On-device auto-edit (travel/landscape) | ❌ | cloud | ❌ | ✅ |
-| Magnetic timeline + ripple | ✅ | ❌ | partial | ✅ |
-| Mobile-first gestures | n/a | ✅ | ❌ | ✅ |
-| Local-first persistence | partial | ❌ | partial | ✅ |
+Directional, not a benchmark. With a pile of footage, most people reach for
+the auto-memories in their photo app or a template app. Those fail in four
+places: they ignore what you marked, hide why a shot was picked, send footage
+to the cloud, and charge for the parts that matter. Movie Desk is built on the
+opposite of each.
 
-See [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md) for the full
-matrix and [`docs/02-architecture.md`](docs/02-architecture.md) for the
-technical plan.
+| | Photo-app auto memories (Google Photos, Apple Memories) | Template apps (CapCut, GoPro Quik) | **Movie Desk** |
+|--|:--:|:--:|:--:|
+| Footage stays on your device | varies | varies | ✅ analysis, models, storage |
+| Shows why each shot was picked | ❌ | ❌ | ✅ reason per pick |
+| Respects your pins and exclusions, then re-cuts | ❌ | partial | ✅ re-assemble, one undo |
+| Rejected shots are one click from coming back | ❌ | ❌ | ✅ rejected-candidate browser |
+| Story from GPS and dates (days, places, moves) | partial | ❌ | ✅ offline geocoding |
+| Music: find, credit, beat-snap | automatic | library | ✅ guided flow + free-music import |
+| Finish on a real timeline (ripple, keyframes, LUTs, subtitles) | ❌ | partial | ✅ |
+| Free and open source | ❌ | ❌ | ✅ MIT |
+
+Final Cut Pro and CapCut remain the bar for the finishing stage.
+[`docs/01-feature-matrix.md`](docs/01-feature-matrix.md) tracks the timeline,
+effects, and export against them, and
+[`docs/02-architecture.md`](docs/02-architecture.md) covers the technical plan.
 
 ## What ships today
 
