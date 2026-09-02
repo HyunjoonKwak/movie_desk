@@ -10,7 +10,7 @@ Movie Desk는 원본을 임의로 덮어쓰거나 품질을 낮추지 않는다.
 | JPEG, PNG, WebP, AVIF, GIF | 브라우저 디코더로 원본 검사·썸네일 생성 | 손상으로 분류되면 원본을 다시 복사하고 미리보기 앱에서 열리는지 확인 |
 | HEIC, HEIF | macOS 앱에서 원본을 제자리 참조하고 ImageIO로 썸네일·편집 캐시 생성 | 웹 미리보기에서는 macOS 앱 사용 안내. 미지원 변형은 호환 형식 변환 안내 |
 | MP4, M4V, WebM | Chromium이 컨테이너와 코덱을 지원하면 가져오기·재생 | 코덱 미지원이면 H.264/AAC MP4 같은 호환 형식으로 변환 후 다시 선택 |
-| MOV | 파일 자체는 인식. 실제 재생 여부는 내부 코덱에 따름 | HEVC·회전·내보내기는 B11 통합 및 실제 아이폰 검증 전까지 미확정 |
+| MOV | QuickTime 컨테이너의 비디오·오디오 코덱과 회전 정보를 읽는다. HEVC 재생은 macOS 앱의 디코더 지원을 사용하고 WebCodecs 프레임에는 컨테이너 회전을 적용한다 | 열리지 않으면 코덱 미지원으로 안내하고 H.264/AAC MP4 변환본으로 재시도. 실제 iPhone HDR/VFR은 도그푸딩에서 최종 확인 |
 | MP3, WAV, M4A, AAC, FLAC, AIFF | Chromium이 디코딩할 수 있으면 가져오기 | 열리지 않으면 PCM WAV 또는 AAC/M4A 등 호환 오디오로 변환 |
 | TIFF | 파일은 미디어로 인식하지만 Chromium에서 직접 표시되지 않을 수 있음 | PNG/JPEG로 변환 후 다시 선택 |
 | Live Photo | 같은 폴더의 동일 stem HEIC/JPEG+MOV 한 쌍을 연결하고 두 원본을 모두 유지 | 모호한 중복 이름은 자동 연결하지 않음. 두 파일을 같은 폴더에서 함께 선택 |
@@ -27,4 +27,4 @@ Movie Desk는 원본을 임의로 덮어쓰거나 품질을 낮추지 않는다.
 - **원본 없음:** 외장 볼륨을 다시 연결하거나 이동한 원본 위치를 복구한 뒤 재시도한다.
 
 실제 iPhone HEVC MOV, HDR gain map HEIC, embedded identifier가 filename과 다른 Live Photo는
-`docs/dogfood/SET-01.md`와 B11 통합 앱으로 최종 판정한다.
+`docs/dogfood/SET-01.md`의 도그푸딩으로 최종 판정한다.

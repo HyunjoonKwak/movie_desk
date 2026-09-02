@@ -1,6 +1,6 @@
 # Movie Desk 작업 순서
 
-갱신 2026-09-02 · 상위 문서 [`06-master-plan.md`](06-master-plan.md) · 지침
+갱신 2026-09-03 · 상위 문서 [`06-master-plan.md`](06-master-plan.md) · 지침
 [`../CLAUDE.md`](../CLAUDE.md)
 
 이 문서는 마스터플랜의 Phase를 **실제로 착수할 수 있는 배치**로 쪼갠 것이다. 배치는
@@ -59,6 +59,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Codex: B9·B10·B12 위에 Claude B11(`f8d55c2`)을
+  `codex/m3-media-integration`으로 통합했다. lint·typecheck·단위 테스트·Playwright 10개·
+  프로덕션 OSV audit·데스크톱 media smoke가 모두 통과했다. 자동화 밖에 남은 M3 게이트는
+  실제 iPhone HDR/VFR MOV, HDR gain map HEIC, Live Photo pair identifier, 대량 폴더 검증이다.
 - 2026-09-03 Claude: B11 완료. 회전 규약은 "디코드된 프레임을 화면에 맞추려 시계 방향으로 돌릴
   각도"(`SourceRotation` 0/90/180/270). iPhone 세로(matrix [0,1,-1,0]) = 90, ffmpeg
   `-display_rotation 90` = 270. 스파이크 문서의 미확정 항목 중 mp4box `.mov` demux와 WebCodecs
@@ -144,7 +148,7 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 | --- | --- | --- | --- |
 | B9 실패 격리와 안내 | S | 파일별 실패 이유(코덱 미지원·손상·저장 공간)를 구분해 안내, 한 파일 실패가 일괄 가져오기를 멈추지 않게, 호환 표 문서 | 실패 파일이 있어도 나머지가 들어온다 |
 | B10 HEIC/HEIF | M | D3에 따라 썸네일·프레임 디코드, EXIF 촬영 시각·위치 유지, 소형 fixture를 CI에 | 아이폰 HEIC가 변환 없이 들어온다 |
-| B11 HEVC·.mov·회전 | Claude | 완료, 통합 대기 | `claude/b11-hevc-mov` · mp4box가 QuickTime `.mov`를 demux(node 검증), `readMp4ContainerInfo`가 코덱·오디오·`tkhd` 회전을 읽어 `MediaAsset.rotation`에 기록, WebCodecs 경로는 `rotate` 셰이더 패스로 회전, `<video>` 경로는 브라우저가 처리. `isConfigSupported`로 미지원 코덱(CI Chromium의 HEVC 등)은 1회만 실패하고 `<video>` 폴백. 남은 일: 실제 iPhone HDR/VFR 검증(도그푸딩), Chrome 채널 HEVC e2e |
+| B11 HEVC·.mov·회전 | M | 구현 완료, Codex 통합 검증 완료 | `claude/b11-hevc-mov` → `codex/m3-media-integration` · mp4box가 QuickTime `.mov`를 demux(node 검증), `readMp4ContainerInfo`가 코덱·오디오·`tkhd` 회전을 읽어 `MediaAsset.rotation`에 기록, WebCodecs 경로는 `rotate` 셰이더 패스로 회전, `<video>` 경로는 브라우저가 처리. `isConfigSupported`로 미지원 코덱(CI Chromium의 HEVC 등)은 1회만 실패하고 `<video>` 폴백. 남은 일: 실제 iPhone HDR/VFR 검증(도그푸딩), Chrome 채널 HEVC e2e |
 | B12 Live Photo·폴더 | S~M | Live Photo 정지/영상 쌍 처리, 폴더 드래그 재귀, DCIM 구조 | 폴더째 넣어도 빠짐없이 들어온다 |
 
 게이트: 기준 세트 전 파일이 들어오거나 파일별 해결 안내가 나온다.
@@ -227,13 +231,13 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
 | B4 첫 실행 오프라인 | Codex | 구현·번들 스모크 완료 | arm64/x64 DMG에 MediaPipe·Whisper 포함, DNS 차단 새 프로필 기동 확인. RC 수동 기능 검증은 B5에서 반복 |
 | B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
-| B6 도그푸딩 템플릿 | Codex | 대기 | |
+| B6 도그푸딩 템플릿 | Codex | 구현 완료, 통합 대기 | `codex/b6-dogfood` · 실행 템플릿, SET-01 촬영본 구성, 판정 기준과 지표 정의 |
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
 | B9 실패 안내 | Codex | 구현 완료, 실기기 오류 검증 대기 | 지원 불가·손상·저장 공간·권한·원본 없음 분류, 파일별 해결 안내·재시도, 부분 파일 정리, 혼합 성공/실패 E2E, `docs/08-media-compatibility.md` |
 | B10 HEIC | Codex | 구현 완료, 실제 아이폰 검증 대기 | 원본 참조 + ImageIO 썸네일·4096px 캐시, 촬영 시각·GPS·방향·카메라 메타 보존, 실제 HEIC 통합 테스트. HDR gain map·대량 성능은 B7/B12 게이트 |
-| B11 HEVC·.mov·회전 | Claude | 스파이크 완료, A1 뒤 착수 | `claude/spike-hevc` · `docs/spikes/2026-09-03-hevc-mov.md`: Electron·Chrome ✅(미디어 요소·capability), CI Chromium ❌, 실제 iPhone·WebCodecs demux/회전은 미확정 |
-| B12 Live Photo·폴더 | Codex | 1차 구현 완료, B10·B11 통합 및 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
+| B11 HEVC·.mov·회전 | Claude | 구현 완료, Codex 통합 검증 완료 | `claude/b11-hevc-mov` → `codex/m3-media-integration` · MOV 컨테이너 코덱·회전 판독, WebCodecs 회전, 미지원 코덱 폴백. 자동 테스트 통과, 실제 iPhone HDR/VFR 검증 대기 |
+| B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
 | B13~B14 리포트·컷 이유 | Codex | 대기 | |
 | B15 분석 디코더 공유 | Claude | 대기 | |
 | B16 시나리오 | Codex | 대기 | |
