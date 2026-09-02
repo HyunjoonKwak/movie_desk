@@ -75,6 +75,12 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   `.value`를 기대했지만 존재하지 않아 항상 undefined → HEVC·out-of-band AVC가 WebCodecs configure에
   실패하고 조용히 `<video>` 폴백(3881341, Codex 승인). B15는 A2/B11이 main에 통합된 뒤라
   `claude/b15-frame-sampler`를 main에서 새로 시작해 3881341만 재적용했다. 실측 수치는 아래 표.
+- 2026-09-03 Codex: B13 1차 구현. 리포트를 결과 요약 → 추천 시작점·이유 → 상세 수치
+  순서로 바꾸고, 진행·일부 실패·전체 실패 상태마다 다음 행동을 안내한다. 추천 이유와 모드명을
+  양 언어로 분리해 영어 UI에 한국어가 섞이던 문제도 해소했다. fixture 브라우저 여정과 1440×900
+  한국어 화면을 확인했다.
+- 2026-09-03 통합: 사용자 승인으로 B9·B10·B11·B12, B6, A2-a와 Codex 보강을 `main`
+  `d729c13`까지 fast-forward하고 푸시했다. GitHub Actions CI run 33695848117 전체 통과.
 - 2026-09-03 Codex: A2-a를 M3 통합 스택에 합치고, 동일 자산의 동시 cache build를 하나로
   합쳤다. 파생 캐시가 용량 부족·일시 오류로 저장되지 않아도 가져오기·미리보기·내보내기가
   실패하지 않고 원본으로 폴백하며 다음 요청에서 다시 만들 수 있게 보강했다.
@@ -257,12 +263,13 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B6 도그푸딩 템플릿 | Codex | 완료, 통합됨 | `docs/dogfood/TEMPLATE.md` + `SET-01.md`. 세 축 완주 절차, 원본 안전, 지표 계산법, P0/P1/P2 판정 기준 고정 |
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
-| B9 실패 안내 | Codex | 구현 완료, 실기기 오류 검증 대기 | 지원 불가·손상·저장 공간·권한·원본 없음 분류, 파일별 해결 안내·재시도, 부분 파일 정리, 혼합 성공/실패 E2E, `docs/08-media-compatibility.md` |
-| B10 HEIC | Codex | 구현 완료, 실제 아이폰 검증 대기 | 원본 참조 + ImageIO 썸네일·4096px 캐시, 촬영 시각·GPS·방향·카메라 메타 보존, 실제 HEIC 통합 테스트. HDR gain map·대량 성능은 B7/B12 게이트 |
-| B11 HEVC·.mov·회전 | Claude | 구현 완료, Codex 통합 검증 완료 | `claude/b11-hevc-mov` → `codex/m3-media-integration` · MOV 컨테이너 코덱·회전 판독, WebCodecs 회전, 미지원 코덱 폴백. 자동 테스트 통과, 실제 iPhone HDR/VFR 검증 대기 |
-| B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
-| B13~B14 리포트·컷 이유 | Codex | 대기 | |
-| B15 분석 디코더 공유 | Claude | 핵심 구현 완료, Codex 재검토 대기 | `claude/b15-frame-sampler`(main + 3881341 재적용) · `renderer/frame-sampler.ts` `streamFramesAt`/`sampleFramesAt`: 요청 시각을 키프레임 표 기준 구간으로 묶어(GOP 하나를 통째로 건너뛸 수 있을 때만 seek) 디코더 하나로 순차 디코드(`linear-decoder.ts`, `mp4-demux.ts`), 프레임은 스트리밍(장면 감지는 이전 히스토그램만 보관), MP4가 아니거나 디코더 생성·configure 실패·중간 실패 시 남은 시각만 요소 seek 폴백. 각 요청은 그 시각에 화면에 떠 있는 프레임(요소 seek·ffmpeg와 동일 규약)으로 응답, 편집 리스트(elst) 지연 제거. 자동 편집 샘플러(프록시 → 원본 순서 유지)·장면 감지·모션 추적이 사용. 분석 큐 `reset()`이 진행 중 분석을 abort, 재분석은 enqueue. e2e `webcodecs-sampler.spec.ts`가 VP9 MP4로 실제 `VideoDecoder.configure`·프레임 출력을 검증. 실측은 인계 메모 표. 남은 일: 썸네일·프록시 생성도 같은 샘플러로, `sampleAudioRms`는 A2 variant로, AI 패널 취소 버튼 연결(UI, Codex) |
+| B9 실패 안내 | Codex | 구현 완료, main 통합 · 실기기 오류 검증 대기 | 지원 불가·손상·저장 공간·권한·원본 없음 분류, 파일별 해결 안내·재시도, 부분 파일 정리, 혼합 성공/실패 E2E, `docs/08-media-compatibility.md` |
+| B10 HEIC | Codex | 구현 완료, main 통합 · 실제 아이폰 검증 대기 | 원본 참조 + ImageIO 썸네일·4096px 캐시, 촬영 시각·GPS·방향·카메라 메타 보존, 실제 HEIC 통합 테스트. HDR gain map·대량 성능은 B7/B12 게이트 |
+| B11 HEVC·.mov·회전 | Claude + Codex | 구현·통합 검증 완료, main 통합 | MOV 컨테이너 코덱·회전 판독, WebCodecs 회전, 미지원 코덱 폴백. 자동 테스트 통과, 실제 iPhone HDR/VFR 검증 대기 |
+| B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, main 통합 · 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
+| B13 리포트 문구 | Codex | 1차 구현·화면 검증 완료 | 결과와 다음 행동 우선 구조, 진행·일부 실패·전체 실패 안내, 추천 이유·모드명 한국어/영어 분리. 도그푸딩 이해도 검증 대기 |
+| B14 컷 이유 | Codex | 대기 | |
+| B15 분석 디코더 공유 | Claude + Codex | 구현·검토 완료, main 통합 | 공유 WebCodecs 샘플러, 디코더·요소 fallback, 스트리밍 장면 감지, 분석 취소, 실제 디코더 E2E와 ffmpeg 시각 정확도 검증. 장면 감지 35% 단축. 남은 일: AI 패널 취소 버튼 연결 |
 | B16 시나리오 | Codex | 대기 | |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
@@ -274,4 +281,4 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, main 통합 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
 | A1-c helper 계약 | Codex | 완료, main 통합 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
 | A1-d 렌더러 disk adapter | Claude + Codex | 완료, main 통합 | `26e3058` + `4760e18`. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록. `<img>/<video>` fallback도 공통 resolver를 사용하며 오류 응답 CORS·상태 헤더를 노출. 읽기 lease 재사용은 프로파일링 뒤 최적화 |
-| A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료 | `claude/a2-audio-variant` → `codex/m3-media-integration` · AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS `cache__audio-track__v1__<fingerprint>`로 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. GC는 참조 자산의 variant를 보존. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |
+| A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |

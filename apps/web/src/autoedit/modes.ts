@@ -123,28 +123,30 @@ export const MODE_PRESETS: Record<EditMode, ModePreset> = {
 };
 
 // ② 분석 리포트의 추천 모드: 신호 비율에서 규칙 기반 추론.
+export type RecommendationReason = "people" | "scenic" | "long" | "balanced";
+
 export const recommendMode = (stats: {
   readonly smileyRatio: number; // fraction of samples with smile > 0.4
   readonly faceRatio: number; // fraction with a sizeable face
   readonly goldenRatio: number; // fraction captured in golden hour
   readonly usableMs: number;
-}): { mode: EditMode; reason: string } => {
+}): { mode: EditMode; reason: RecommendationReason } => {
   if (stats.smileyRatio > 0.15 || stats.faceRatio > 0.35) {
     return {
       mode: "highlight",
-      reason: `웃는 장면 비율 ${(stats.smileyRatio * 100).toFixed(0)}% · 인물 장면이 풍부해 감성 하이라이트가 어울립니다`,
+      reason: "people",
     };
   }
   if (stats.goldenRatio > 0.25) {
     return {
       mode: "scenic",
-      reason: `골든아워 촬영 비중 ${(stats.goldenRatio * 100).toFixed(0)}% — 풍경 시네마틱을 추천합니다`,
+      reason: "scenic",
     };
   }
   if (stats.usableMs > 12 * 60_000) {
-    return { mode: "record", reason: "사용 가능한 분량이 많아 여행 기록형이 알맞습니다" };
+    return { mode: "record", reason: "long" };
   }
-  return { mode: "highlight", reason: "분량과 신호 균형상 감성 하이라이트를 추천합니다" };
+  return { mode: "highlight", reason: "balanced" };
 };
 
 // 추천 길이: 사용 가능 분량의 ~15%를 모드 범위로 클램프.

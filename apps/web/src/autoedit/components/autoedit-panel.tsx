@@ -1,7 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Check, Copy, ExternalLink, Music, Pin, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  Music,
+  Pin,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  Wand2,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
@@ -43,7 +53,13 @@ export function AutoEditPanel() {
     let facey = 0;
     let sampleCount = 0;
     let junkCount = 0;
+    let failedCount = 0;
+    let progressTotal = 0;
     for (const a of visualAssets) {
+      const entry = entries[a.id];
+      if (entry?.status === "failed") failedCount++;
+      if (entry?.status === "done" || entry?.status === "failed") progressTotal += 1;
+      else progressTotal += entry?.progress ?? 0;
       const r = done.get(a.id);
       if (!r) continue;
       if (r.junk.length > 0) {
@@ -65,6 +81,8 @@ export function AutoEditPanel() {
       total: visualAssets.length,
       usableMs,
       junkCount,
+      failedCount,
+      progress: visualAssets.length > 0 ? progressTotal / visualAssets.length : 0,
       smileyRatio: sampleCount > 0 ? smiley / sampleCount : 0,
       faceRatio: sampleCount > 0 ? facey / sampleCount : 0,
       goldenRatio,
@@ -72,7 +90,8 @@ export function AutoEditPanel() {
     };
   }, [entries, media, visualAssets]);
 
-  const analysisReady = stats.total > 0 && stats.doneCount === stats.total;
+  const analysisSettled = stats.total > 0 && stats.doneCount + stats.failedCount === stats.total;
+  const analysisReady = analysisSettled && stats.doneCount > 0;
   const rec = useMemo(
     () =>
       recommendMode({
@@ -85,6 +104,15 @@ export function AutoEditPanel() {
   );
 
   const preset = MODE_PRESETS[wiz.mode];
+  const modeLabel = (mode: EditMode) => t(`auto.mode.${mode}`);
+  const recommendationReason = t(`auto.recommendReason.${rec.reason}`);
+  const formatDuration = (ms: number) => {
+    const seconds = Math.round(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    return minutes > 0
+      ? `${minutes}:${String(seconds % 60).padStart(2, "0")}`
+      : t("auto.durationSeconds", { n: seconds });
+  };
   const manualEdited = wiz.appliedProject !== null && project !== wiz.appliedProject;
 
   // ── ④ 생성 / ⑤ 재조립 ─────────────────────────────────────────────────
@@ -153,23 +181,59 @@ export function AutoEditPanel() {
           <p className="text-ink-3">{t("auto.noMedia")}</p>
         ) : (
           <>
-            <Row k={t("auto.analyzed")} v={`${stats.doneCount}/${stats.total}`} />
-            <Row k={t("auto.usable")} v={fmtMin(stats.usableMs)} />
-            {stats.junkCount > 0 && <Row k={t("auto.junk")} v={`${stats.junkCount}`} />}
-            {stats.goldenRatio > 0 && (
-              <Row k={t("auto.golden")} v={`${Math.round(stats.goldenRatio * 100)}%`} />
-            )}
-            {stats.story && stats.story.days > 0 && (
-              <Row k={t("auto.trip")} v={stats.story.summary} />
-            )}
+            <div className="rounded-md border border-line bg-panel-2 p-2.5" aria-live="polite">
+              <p className="break-keep font-medium leading-relaxed text-ink-1">
+                {analysisSettled
+                  ? stats.doneCount > 0
+                    ? t("auto.reportReady", { duration: formatDuration(stats.usableMs) })
+                    : t("auto.reportUnavailable")
+                  : t("auto.reportScanning", { total: stats.total })}
+              </p>
+              <p className="mt-1 break-keep text-2xs leading-relaxed text-ink-3">
+                {analysisSettled
+                  ? stats.doneCount > 0
+                    ? t("auto.reportReadyHint", {
+                        done: stats.doneCount,
+                        total: stats.total,
+                      })
+                    : t("auto.reportUnavailableHint")
+                  : t("auto.reportScanningHint", {
+                      done: stats.doneCount,
+                      total: stats.total,
+                    })}
+              </p>
+              {!analysisSettled && (
+                <div
+                  className="mt-2 h-1 overflow-hidden rounded-full bg-panel-3"
+                  role="progressbar"
+                  aria-label={t("auto.analysisProgress")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(stats.progress * 100)}
+                  tabIndex={0}
+                >
+                  <div
+                    className="h-full rounded-full bg-accent transition-[width]"
+                    style={{ width: `${Math.round(stats.progress * 100)}%` }}
+                  />
+                </div>
+              )}
+              {stats.failedCount > 0 && (
+                <p className="mt-2 break-keep text-2xs leading-relaxed text-amber-200">
+                  {t("auto.reportPartial", { failed: stats.failedCount })}
+                </p>
+              )}
+            </div>
             {analysisReady && (
-              <div className="mt-2 rounded border border-accent/30 bg-accent/10 p-2 text-ink-1">
+              <div className="mt-2 rounded-md border border-accent/30 bg-accent/10 p-2.5 text-ink-1">
                 <div className="flex items-center gap-1.5 font-medium">
                   <Sparkles className="size-3.5 text-accent" />
-                  {t("auto.recommend")}: {MODE_PRESETS[rec.mode].label} ·{" "}
-                  {fmtMin(recommendLength(stats.usableMs, rec.mode))}
+                  {t("auto.recommend")}: {modeLabel(rec.mode)} ·{" "}
+                  {formatDuration(recommendLength(stats.usableMs, rec.mode))}
                 </div>
-                <p className="mt-1 text-2xs text-ink-3">{rec.reason}</p>
+                <p className="mt-1 break-keep text-2xs leading-relaxed text-ink-3">
+                  {recommendationReason}
+                </p>
                 <button
                   type="button"
                   className="btn-ghost mt-1.5 px-2 py-0.5 text-2xs"
@@ -182,6 +246,20 @@ export function AutoEditPanel() {
                 </button>
               </div>
             )}
+            <div className="mt-2 border-t border-line pt-1.5">
+              <Row k={t("auto.analyzed")} v={`${stats.doneCount}/${stats.total}`} />
+              <Row k={t("auto.usable")} v={formatDuration(stats.usableMs)} />
+              {stats.junkCount > 0 && <Row k={t("auto.junk")} v={`${stats.junkCount}`} />}
+              {stats.failedCount > 0 && (
+                <Row k={t("auto.analysisFailed")} v={`${stats.failedCount}`} />
+              )}
+              {stats.goldenRatio > 0 && (
+                <Row k={t("auto.golden")} v={`${Math.round(stats.goldenRatio * 100)}%`} />
+              )}
+              {stats.story && stats.story.days > 0 && (
+                <Row k={t("auto.trip")} v={stats.story.summary} />
+              )}
+            </div>
           </>
         )}
       </Section>
@@ -204,7 +282,7 @@ export function AutoEditPanel() {
                   : "border-white/10 text-ink-3 hover:text-ink-1",
               )}
             >
-              {MODE_PRESETS[m].label}
+              {modeLabel(m)}
             </button>
           ))}
         </div>
@@ -218,7 +296,9 @@ export function AutoEditPanel() {
             onChange={(e) => wiz.setTargetMs(Number(e.target.value) * 1000)}
             className="flex-1 accent-[var(--accent,#38d0c4)]"
           />
-          <span className="w-12 text-right font-mono text-ink-1">{fmtMin(wiz.targetMs)}</span>
+          <span className="w-12 text-right font-mono text-ink-1">
+            {formatDuration(wiz.targetMs)}
+          </span>
         </div>
         <div className="mt-2 flex items-center gap-2">
           <Music className="size-3.5 shrink-0 text-ink-3" />
@@ -238,7 +318,9 @@ export function AutoEditPanel() {
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-2xs text-ink-3">
           <span>{t("auto.yalHint")}:</span>
           {preset.yalKeywords.map((k) => (
-            <span key={k} className="rounded bg-white/5 px-1.5 py-0.5">{k}</span>
+            <span key={k} className="rounded bg-white/5 px-1.5 py-0.5">
+              {k}
+            </span>
           ))}
           <a
             href="https://studio.youtube.com/channel/UC/music"
@@ -253,7 +335,8 @@ export function AutoEditPanel() {
           type="button"
           className="btn-ghost mt-1.5 px-2 py-0.5 text-2xs"
           onClick={() => {
-            const tags = stats.story?.events.map((e) => e.label.split("— ")[1] ?? "").filter(Boolean) ?? [];
+            const tags =
+              stats.story?.events.map((e) => e.label.split("— ")[1] ?? "").filter(Boolean) ?? [];
             void navigator.clipboard.writeText(sunoPrompt(wiz.mode, wiz.targetMs, tags));
             toast.success(t("auto.sunoCopied"));
           }}
@@ -280,7 +363,9 @@ export function AutoEditPanel() {
               setSemanticState(ok ? "on" : "failed");
               if (ok) {
                 useAnalysisStore.getState().reset();
-                useAnalysisStore.getState().enqueue(useProjectStore.getState().project.mediaLibrary);
+                useAnalysisStore
+                  .getState()
+                  .enqueue(useProjectStore.getState().project.mediaLibrary);
                 toast.success(t("auto.semanticReady"));
               } else toast.error(t("auto.semanticFailed"));
             }}
@@ -406,12 +491,6 @@ export function AutoEditPanel() {
     </div>
   );
 }
-
-const fmtMin = (ms: number): string => {
-  const s = Math.round(ms / 1000);
-  const m = Math.floor(s / 60);
-  return m > 0 ? `${m}:${String(s % 60).padStart(2, "0")}` : `${s}s`;
-};
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

@@ -39,11 +39,14 @@ test("generates a rough cut on AUTO tracks and one undo removes it", async ({ pa
   await expect(page.getByText(`${FIXTURES.length}/${FIXTURES.length}`, { exact: true })).toBeVisible({
     timeout: 180_000,
   });
+  await expect(page.getByText(/Found about .* for a first cut\./)).toBeVisible();
+  await expect(page.getByText(/Suggested starting point:/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Emotional highlight" })).toBeVisible();
 
   const clipCount = () => page.locator("[data-clip]").count();
   expect(await clipCount()).toBe(0);
 
-  await page.getByRole("button", { name: "Generate rough cut" }).click();
+  await page.getByRole("button", { name: "Build a first cut with these settings" }).click();
   await expect(page.getByText("AUTO V", { exact: true })).toBeVisible({ timeout: 60_000 });
   await expect.poll(clipCount).toBeGreaterThan(0);
 
