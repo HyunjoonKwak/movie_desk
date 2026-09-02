@@ -1,5 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 
+const PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+  "base64",
+);
+
 const configurePage = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "en" }, version: 0 }));
@@ -58,4 +63,40 @@ test("persists a newly named project across a reload", async ({ page }) => {
 
   await expect(projectName).toHaveValue("E2E persistence project");
   await expect(page).toHaveTitle("E2E persistence project — Movie Desk");
+});
+
+test("keeps populated panels contained at compact desktop width", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await page.goto("/editor");
+
+  const filename = "a-very-long-family-trip-video-filename-for-layout-check.png";
+  await page
+    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
+    .setInputFiles({ name: filename, mimeType: "image/png", buffer: PNG });
+  await expect(page.getByText(filename, { exact: true })).toBeVisible();
+
+  const overflows = await page
+    .getByTestId("media-controls")
+    .locator("*")
+    .evaluateAll((nodes) =>
+      nodes
+        .filter((node) => {
+          const el = node as HTMLElement;
+          return (
+            getComputedStyle(el).overflowX === "visible" && el.scrollWidth > el.clientWidth + 2
+          );
+        })
+        .map((node) => (node.textContent ?? "").trim()),
+    );
+  expect(overflows).toEqual([]);
+
+  await page.getByTitle("Click to add to timeline").click();
+  const clip = page.locator("[data-clip]").first();
+  await expect(clip).toBeVisible();
+  await clip.click();
+
+  const assetValue = page.locator(`dd[title="${filename}"]`);
+  await expect(assetValue).toBeVisible();
+  await expect(assetValue).toHaveCSS("text-overflow", "ellipsis");
+  await expect(assetValue).toHaveCSS("white-space", "nowrap");
 });

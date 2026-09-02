@@ -252,7 +252,7 @@ export function MediaBin() {
       <ImportProgress />
 
       {media.length > 0 && (
-        <div className="space-y-2 px-2 pb-2">
+        <div className="space-y-2 px-2 pb-2" data-testid="media-controls">
           <label className="relative flex items-center">
             <Search className="absolute left-2 size-3 text-ink-3" />
             <input
