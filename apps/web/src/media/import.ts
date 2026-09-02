@@ -1,10 +1,11 @@
-import { newId, type MediaAsset } from "@movie-desk/core";
-import { writeMediaFile } from "@/persistence/opfs";
-import { probeMedia } from "./probe";
-import { makeImageThumb, makeVideoThumb, makeVideoFilmstrip } from "./thumbnail";
-import { extractWaveformPeaks } from "./waveform";
-import { leaseMediaKey } from "@/persistence/media-gc";
 import { extractCaptureMeta } from "@/autoedit/metadata";
+import { leaseMediaKey } from "@/persistence/media-gc";
+import { writeMediaFile } from "@/persistence/opfs";
+import { type MediaAsset, newId } from "@movie-desk/core";
+import { readMp4ContainerInfo } from "./container-info";
+import { probeMedia } from "./probe";
+import { makeImageThumb, makeVideoFilmstrip, makeVideoThumb } from "./thumbnail";
+import { extractWaveformPeaks } from "./waveform";
 
 export interface ImportResult {
   asset: MediaAsset;
@@ -44,6 +45,14 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       if (peaks) waveformPeaks = peaks;
     }
 
+    // Container display rotation (iPhone portrait). The <video> probe already
+    // reports rotated dimensions; WebCodecs frames need this to match.
+    let rotation: MediaAsset["rotation"];
+    if (probe.kind === "video") {
+      const container = await readMp4ContainerInfo(file).catch(() => null);
+      if (container && container.rotation !== 0) rotation = container.rotation;
+    }
+
     // Capture time + GPS for the auto-edit story engine (EXIF / mvhd / ISO6709).
     // File.lastModified is the honest fallback when the container has no clock.
     const capture = await extractCaptureMeta(file, probe.kind, file.lastModified);
@@ -66,6 +75,7 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(filmstripDataUrl ? { filmstripDataUrl } : {}),
       ...(filmstripFrames !== undefined ? { filmstripFrames } : {}),
       ...(waveformPeaks ? { waveformPeaks } : {}),
+      ...(rotation ? { rotation } : {}),
       importedAt: Date.now(),
     };
 

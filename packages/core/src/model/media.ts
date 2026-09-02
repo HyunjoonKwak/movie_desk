@@ -1,5 +1,6 @@
 import type { ID } from "../utils/id";
 import type { Ms } from "../utils/time";
+import type { SourceRotation } from "./media-rotation";
 import type { SourceRef } from "./media-source";
 
 export type MediaKind = "video" | "audio" | "image";
@@ -28,6 +29,7 @@ export interface MediaAsset {
   readonly height?: number;
   readonly opfsPath: string;       // key into OPFS file store (full-res original)
   readonly sourceRef?: SourceRef;  // D1: where the bytes live; absent = legacy OPFS copy
+  readonly rotation?: SourceRotation; // container display rotation (tkhd); frames decode unrotated
   readonly sizeBytes?: number;     // full-res byte length; lets a peer detect an
                                    // incomplete/partial OPFS file (e.g. a media
                                    // transfer interrupted by a crash) instead of

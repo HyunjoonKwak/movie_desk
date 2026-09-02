@@ -3,6 +3,7 @@
 // from the source and decoded. This avoids copying and decoding the whole asset.
 
 import { type RandomAccessMediaSource, clampReadRange } from "@/media/source/media-source";
+import { quietMp4BoxLogs } from "./mp4box-log";
 import type { VideoFrameCache } from "./video-frame-cache";
 
 interface MP4Sample {
@@ -52,6 +53,15 @@ interface MP4File {
 }
 
 type MP4ArrayBuffer = ArrayBuffer & { fileStart: number };
+
+// Thrown when WebCodecs reports it cannot decode this stream (e.g. HEVC in a
+// browser without a platform decoder). Callers stop retrying the asset.
+export class UnsupportedCodecError extends Error {
+  constructor(readonly codec: string) {
+    super(`WebCodecs cannot decode ${codec} in this runtime`);
+    this.name = "UnsupportedCodecError";
+  }
+}
 
 export interface DecoderHandle {
   readonly assetId: string;
@@ -182,6 +192,7 @@ export const decodeMp4ToCache = async (
   if (!isMp4Available() || source.size === 0) return null;
 
   const MP4Box = await import("mp4box");
+  quietMp4BoxLogs((MP4Box as unknown as { Log: Parameters<typeof quietMp4BoxLogs>[0] }).Log);
   // keepMdatData=false: mp4box discards media payload after sample extraction.
   const file = (
     MP4Box as unknown as { createFile: (keepMdatData?: boolean) => MP4File }
@@ -199,6 +210,9 @@ export const decodeMp4ToCache = async (
       return value ? { description: value } : {};
     })(),
   };
+
+  const support = await VideoDecoder.isConfigSupported(config).catch(() => null);
+  if (support && support.supported === false) throw new UnsupportedCodecError(track.codec);
 
   let closed = false;
   let generation = 0;

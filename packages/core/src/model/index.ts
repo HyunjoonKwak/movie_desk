@@ -1,6 +1,7 @@
 export * from "./project";
 export * from "./media";
 export * from "./media-source";
+export * from "./media-rotation";
 export * from "./track";
 export * from "./clip";
 export * from "./effect";

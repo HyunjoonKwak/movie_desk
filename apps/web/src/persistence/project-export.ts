@@ -143,6 +143,7 @@ const mediaAssetSchema = z
     durationMs: nonNegative,
     opfsPath: z.string().min(1),
     sourceRef: sourceRefSchema.optional(),
+    rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
     importedAt: z.number().int().nonnegative(),
   })
   .passthrough();

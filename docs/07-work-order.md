@@ -59,6 +59,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B11 완료. 회전 규약은 "디코드된 프레임을 화면에 맞추려 시계 방향으로 돌릴
+  각도"(`SourceRotation` 0/90/180/270). iPhone 세로(matrix [0,1,-1,0]) = 90, ffmpeg
+  `-display_rotation 90` = 270. 스파이크 문서의 미확정 항목 중 mp4box `.mov` demux와 WebCodecs
+  경로 회전은 해소, 실제 iPhone HDR/VFR만 도그푸딩으로 남음.
 - 2026-09-03 통합: 사용자 승인으로 e3b7c7d → B2 → HEIC 스파이크 → D1 원문 → D1 검토를
   main에 순서대로 올리고 푸시했다. 다음은 새 기준선에서 A1-a(Claude)·A1-b/c(Codex).
 - 2026-09-03 Claude: Electron `nativeImage`도 HEIC를 못 읽는다(`isEmpty`). Codex의 ImageIO
@@ -140,7 +144,7 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 | --- | --- | --- | --- |
 | B9 실패 격리와 안내 | S | 파일별 실패 이유(코덱 미지원·손상·저장 공간)를 구분해 안내, 한 파일 실패가 일괄 가져오기를 멈추지 않게, 호환 표 문서 | 실패 파일이 있어도 나머지가 들어온다 |
 | B10 HEIC/HEIF | M | D3에 따라 썸네일·프레임 디코드, EXIF 촬영 시각·위치 유지, 소형 fixture를 CI에 | 아이폰 HEIC가 변환 없이 들어온다 |
-| B11 HEVC·.mov·회전 | M | Electron과 Chrome에서 WebCodecs HEVC 지원 확인 스파이크 → 재생·분석·내보내기 경로, 미지원 시 안내, 회전 메타 반영, fixture | HEVC .mov가 재생·분석·내보내기된다 |
+| B11 HEVC·.mov·회전 | Claude | 완료, 통합 대기 | `claude/b11-hevc-mov` · mp4box가 QuickTime `.mov`를 demux(node 검증), `readMp4ContainerInfo`가 코덱·오디오·`tkhd` 회전을 읽어 `MediaAsset.rotation`에 기록, WebCodecs 경로는 `rotate` 셰이더 패스로 회전, `<video>` 경로는 브라우저가 처리. `isConfigSupported`로 미지원 코덱(CI Chromium의 HEVC 등)은 1회만 실패하고 `<video>` 폴백. 남은 일: 실제 iPhone HDR/VFR 검증(도그푸딩), Chrome 채널 HEVC e2e |
 | B12 Live Photo·폴더 | S~M | Live Photo 정지/영상 쌍 처리, 폴더 드래그 재귀, DCIM 구조 | 폴더째 넣어도 빠짐없이 들어온다 |
 
 게이트: 기준 세트 전 파일이 들어오거나 파일별 해결 안내가 나온다.

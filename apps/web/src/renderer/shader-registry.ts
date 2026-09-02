@@ -23,6 +23,7 @@ import { fs as vibranceFs } from "./shaders/vibrance";
 import { fs as splitToneFs } from "./shaders/split-tone";
 import { fs as blendModesFs } from "./shaders/blend-modes";
 import { fs as fitFs } from "./shaders/fit";
+import { fs as rotateFs } from "./shaders/rotate";
 
 // Built-in fragment shaders. Each name maps to the GLSL source from a single
 // dedicated file under shaders/.
@@ -49,6 +50,7 @@ const SHADERS: Readonly<Record<string, string>> = {
   "split-tone": splitToneFs,
   "blend-modes": blendModesFs,
   fit: fitFs,
+  rotate: rotateFs,
 };
 
 // Thin wrapper around a linked WebGLProgram that memoises uniform locations.

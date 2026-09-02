@@ -3,7 +3,7 @@
 // while that asynchronous range is being decoded.
 
 import type { RandomAccessMediaSource } from "@/media/source/media-source";
-import { type DecoderHandle, decodeMp4ToCache } from "./mp4-decoder";
+import { type DecoderHandle, UnsupportedCodecError, decodeMp4ToCache } from "./mp4-decoder";
 import { VideoFrameCache } from "./video-frame-cache";
 
 const isWebCodecsAvailable = (): boolean =>
@@ -27,6 +27,7 @@ class CachingFrameProvider implements FrameProvider {
   private readonly handles = new Map<string, DecoderHandle>();
   private readonly pending = new Map<string, Promise<boolean>>();
   private readonly epochs = new Map<string, number>();
+  private readonly unsupported = new Set<string>();
   private disposed = false;
 
   framesFor(assetId: string, atMs: number): VideoFrame | null {
@@ -38,6 +39,7 @@ class CachingFrameProvider implements FrameProvider {
   async prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean> {
     if (this.disposed || !isWebCodecsAvailable()) return false;
     if (this.handles.has(assetId)) return true;
+    if (this.unsupported.has(assetId)) return false;
     const inflight = this.pending.get(assetId);
     if (inflight) return inflight;
 
@@ -52,7 +54,8 @@ class CachingFrameProvider implements FrameProvider {
         }
         this.handles.set(assetId, handle);
         return true;
-      } catch {
+      } catch (error) {
+        if (error instanceof UnsupportedCodecError) this.unsupported.add(assetId);
         return false;
       } finally {
         this.pending.delete(assetId);

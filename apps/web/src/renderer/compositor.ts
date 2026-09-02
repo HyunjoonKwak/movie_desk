@@ -1,47 +1,48 @@
+import { getSegmenter } from "@/ai/bg-remove";
+import { useLutStore } from "@/effects/lut/lut-store";
+import { getEffect } from "@/effects/registry";
+import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import {
-  activeTransitionFor,
-  clipTransform,
-  isMediaClip,
-  isTextClip,
-  isShapeClip,
-  isAdjustmentClip,
-  isBackdropBlend,
-  isWipe,
+  type AdjustmentClip,
   type BackdropBlendMode,
   type Clip,
-  type AdjustmentClip,
   type EffectInstance,
   type ID,
   type MediaAsset,
   type MediaClip,
   type Project,
-  type TextClip,
   type ShapeClip,
+  type TextClip,
   type TransitionFrame,
+  activeTransitionFor,
+  clipTransform,
+  isAdjustmentClip,
+  isBackdropBlend,
+  isMediaClip,
+  isShapeClip,
+  isTextClip,
+  isWipe,
 } from "@movie-desk/core";
 import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@movie-desk/core";
-import { getEffect } from "@/effects/registry";
-import { getSegmenter } from "@/ai/bg-remove";
-import { resolveMediaSource } from "@/media/source/resolve-media-source";
-import { createGL, createQuad, createTexture, uploadSource, type GL } from "./gl";
-import { ShaderRegistry, type Program } from "./shader-registry";
-import { PingPong } from "./ping-pong";
-import { ScratchPool } from "./scratch-pool";
-import { FrameSourcePool } from "./frame-source";
-import { renderTextToCanvas } from "./text-source";
-import { renderShapeToCanvas } from "./shape-source";
-import { getFrameProvider } from "./webcodecs-decoder";
-import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
 import { BoundedResourceCache } from "./bounded-resource-cache";
-import { useLutStore } from "@/effects/lut/lut-store";
 import {
-  animateEffects,
   BACKDROP_BLEND_MODE,
+  animateEffects,
   setBlendMode,
   setMaskUniforms,
   setTransformUniforms,
   setWipeUniforms,
 } from "./compositor-uniforms";
+import { FrameSourcePool } from "./frame-source";
+import { type GL, createGL, createQuad, createTexture, uploadSource } from "./gl";
+import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
+import { PingPong } from "./ping-pong";
+import { ScratchPool } from "./scratch-pool";
+import { type Program, ShaderRegistry } from "./shader-registry";
+import { renderShapeToCanvas } from "./shape-source";
+import { quarterTurns } from "./source-rotation";
+import { renderTextToCanvas } from "./text-source";
+import { getFrameProvider } from "./webcodecs-decoder";
 
 // Per-clip ping-pong effect chain + final composite to the screen. Effect
 // chain is data-driven by `effects/registry.ts`. Bg-remove receives a mask
@@ -70,6 +71,7 @@ export class Compositor {
   // the spatial-conform (fit) target. They never alias in a single iteration.
   private static readonly SCRATCH_BACKDROP = 0;
   private static readonly SCRATCH_FIT = 1;
+  private static readonly SCRATCH_ROTATE = 2;
   readonly sources: FrameSourcePool;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -288,6 +290,33 @@ export class Compositor {
     gl.uniform1f(prog.uniform("u_scale"), 1);
     gl.uniform1f(prog.uniform("u_rotation"), 0);
     gl.uniform2f(prog.uniform("u_uv_scale"), sx, sy);
+    this.quad.draw();
+    return slot.tex;
+  }
+
+  // Turns a decoded frame by the container's display rotation into a
+  // frame-sized scratch slot. Only the WebCodecs path needs it.
+  private applySourceRotation(src: WebGLTexture, rotation: MediaAsset["rotation"]): WebGLTexture {
+    const turns = quarterTurns(rotation ?? 0);
+    if (turns === 0) return src;
+    const gl = this.gl;
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const slot = this.scratch.acquire(Compositor.SCRATCH_ROTATE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, slot.fbo);
+    gl.viewport(0, 0, w, h);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const prog = this.shaders.get("rotate");
+    prog.use();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, src);
+    gl.uniform1i(prog.uniform("u_tex"), 0);
+    gl.uniform4f(prog.uniform("u_dest"), 0, 0, 1, 1);
+    gl.uniform2f(prog.uniform("u_translate"), 0, 0);
+    gl.uniform1f(prog.uniform("u_scale"), 1);
+    gl.uniform1f(prog.uniform("u_rotation"), 0);
+    gl.uniform1i(prog.uniform("u_turns"), turns);
     this.quad.draw();
     return slot.tex;
   }
@@ -531,7 +560,9 @@ export class Compositor {
           this.assetTextures.set(asset.id, tex);
         }
         uploadSource(this.gl, tex, frame);
-        return tex;
+        // WebCodecs frames come back unrotated; the media element path below
+        // already honours the container's display matrix.
+        return asset.rotation ? this.applySourceRotation(tex, asset.rotation) : tex;
       }
     }
 
