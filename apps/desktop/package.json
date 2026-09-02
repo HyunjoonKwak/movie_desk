@@ -12,9 +12,10 @@
     "build:mac:arm64": "pnpm run build:web && electron-builder --mac --arm64 --config electron-builder.yml",
     "build:mac:x64": "pnpm run build:web && electron-builder --mac --x64 --config electron-builder.yml",
     "release:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml --publish=always",
+    "smoke:media": "cross-env MOVIE_DESK_MEDIA_SMOKE=1 electron .",
     "start": "electron .",
     "lint": "biome lint src",
-    "test": "node --test src/update-check.test.cjs src/music-credits.test.cjs"
+    "test": "node --test src/*.test.cjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",

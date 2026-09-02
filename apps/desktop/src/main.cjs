@@ -8,6 +8,9 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const path = require("node:path");
 const fs = require("node:fs");
+const { MediaCatalog } = require("./catalog.cjs");
+const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
+const { resolveAssetSource } = require("./source-resolver.cjs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
 
 const isDev = !!process.env.MOVIE_DESK_DEV_URL;
@@ -41,7 +44,20 @@ protocol.registerSchemesAsPrivileged([
       allowServiceWorkers: true,
     },
   },
+  {
+    scheme: "media",
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      corsEnabled: true,
+      stream: true,
+    },
+  },
 ]);
+
+let mediaCatalog;
+const mediaLeases = new MediaLeaseRegistry();
 
 const mimeFromExt = (ext) => {
   const map = {
@@ -127,6 +143,22 @@ const saveWindowState = (win) => {
   }
 };
 
+const isTrustedRendererUrl = (url) => {
+  try {
+    if (isDev) return new URL(url).origin === new URL(DEV_URL).origin;
+    const parsed = new URL(url);
+    return parsed.protocol === "app:" && parsed.hostname === "cut-editor";
+  } catch {
+    return false;
+  }
+};
+
+const requireTrustedIpc = (event) => {
+  if (!isTrustedRendererUrl(event.senderFrame?.url ?? "")) {
+    throw new Error("untrusted media IPC sender");
+  }
+};
+
 const createWindow = () => {
   const state = loadWindowState();
   const win = new BrowserWindow({
@@ -151,6 +183,8 @@ const createWindow = () => {
   });
   if (state?.maximized) win.maximize();
   win.on("close", () => saveWindowState(win));
+  // A playback URL is a project-session capability, not a permanent path.
+  win.on("closed", () => mediaLeases.releaseAll());
 
   if (isDev) {
     win.loadURL(DEV_URL);
@@ -161,15 +195,6 @@ const createWindow = () => {
     win.loadURL("app://cut-editor/editor/");
   }
 
-  const isTrustedNavigation = (url) => {
-    try {
-      if (isDev) return new URL(url).origin === new URL(DEV_URL).origin;
-      const parsed = new URL(url);
-      return parsed.protocol === "app:" && parsed.hostname === "cut-editor";
-    } catch {
-      return false;
-    }
-  };
   const openExternal = (url) => {
     try {
       const parsed = new URL(url);
@@ -190,13 +215,53 @@ const createWindow = () => {
     return { action: "deny" };
   });
   win.webContents.on("will-navigate", (event, url) => {
-    if (isTrustedNavigation(url)) return;
+    if (isTrustedRendererUrl(url)) return;
     event.preventDefault();
     openExternal(url);
   });
 
   return win;
 };
+
+const initializeMediaInfrastructure = async () => {
+  const catalogDirectory = path.join(app.getPath("userData"), "catalog");
+  await fs.promises.mkdir(catalogDirectory, { recursive: true });
+  mediaCatalog = new MediaCatalog(path.join(catalogDirectory, "media.sqlite3"));
+  await mediaCatalog.ready();
+  installMediaProtocol(protocol, { catalog: mediaCatalog, leases: mediaLeases });
+};
+
+const requireMediaCatalog = () => {
+  if (!mediaCatalog) throw new Error("media catalog is not ready");
+  return mediaCatalog;
+};
+
+ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
+  requireTrustedIpc(event);
+  const catalog = requireMediaCatalog();
+  const asset = await catalog.getAsset(assetId);
+  if (!asset) return null;
+  return mediaLeases.acquire(asset.id);
+});
+
+ipcMain.handle("movie-desk:media-release", (event, leaseId) => {
+  requireTrustedIpc(event);
+  if (typeof leaseId !== "string") return false;
+  return mediaLeases.release(leaseId);
+});
+
+ipcMain.handle("movie-desk:media-source-state", async (event, assetId) => {
+  requireTrustedIpc(event);
+  const asset = await requireMediaCatalog().getAsset(assetId);
+  if (!asset) return { state: "offline" };
+  const resolved = await resolveAssetSource(asset);
+  // Paths remain main-process-only. The renderer only receives actionable state.
+  return {
+    state: resolved.state,
+    ...(resolved.reason ? { reason: resolved.reason } : {}),
+    ...(resolved.candidates ? { candidateCount: resolved.candidates.length } : {}),
+  };
+});
 
 const installAppProtocol = () => {
   protocol.handle("app", async (request) => {
@@ -371,10 +436,31 @@ ipcMain.handle("movie-desk:fetch-music-credits", async (_event, url) => {
   }
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // MOVIE_DESK_UPDATE_SMOKE=1 drives the update check once and exits (no window).
   if (process.env.MOVIE_DESK_UPDATE_SMOKE === "1") {
     void runSmokeCheck();
+    return;
+  }
+  try {
+    await initializeMediaInfrastructure();
+  } catch (error) {
+    // biome-ignore lint/suspicious/noConsole: Startup failures need a desktop diagnostic trail.
+    console.error("[movie-desk-desktop] could not initialize media catalog:", error);
+    dialog.showErrorBox(
+      "Movie Desk could not start",
+      "The local media catalog could not be opened. Your original media was not changed.",
+    );
+    app.quit();
+    return;
+  }
+  // Headless-ish runtime probe: verifies Electron's bundled Node can open the
+  // worker-owned node:sqlite catalog and register the streaming protocol.
+  if (process.env.MOVIE_DESK_MEDIA_SMOKE === "1") {
+    // biome-ignore lint/suspicious/noConsole: CI consumes this smoke marker.
+    console.log("[movie-desk-desktop] media infrastructure ready");
+    await mediaCatalog.close();
+    app.quit();
     return;
   }
   installDevHeaders();
@@ -390,6 +476,11 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("before-quit", () => {
+  mediaLeases.releaseAll();
+  if (mediaCatalog) void mediaCatalog.close();
 });
 
 // Diagnostic helper for verifying the bundle in CI.

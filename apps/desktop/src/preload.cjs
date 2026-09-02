@@ -29,4 +29,11 @@ contextBridge.exposeInMainWorld("cutDesktop", {
   // YouTube music-credit text for the music library (desktop only — main
   // process fetch has no CORS). Returns parseable text or null.
   fetchMusicCredits: async (url) => ipcRenderer.invoke("movie-desk:fetch-music-credits", url),
+  media: {
+    // Returns an opaque, revocable media:// URL. Absolute source paths never
+    // cross the context-isolated preload boundary.
+    acquirePlaybackUrl: async (assetId) => ipcRenderer.invoke("movie-desk:media-acquire", assetId),
+    releasePlaybackUrl: async (leaseId) => ipcRenderer.invoke("movie-desk:media-release", leaseId),
+    sourceState: async (assetId) => ipcRenderer.invoke("movie-desk:media-source-state", assetId),
+  },
 });
