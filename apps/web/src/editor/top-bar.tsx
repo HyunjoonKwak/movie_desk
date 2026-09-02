@@ -79,7 +79,7 @@ export function TopBar() {
           <span className="flex size-7 items-center justify-center rounded-md bg-panel-2 text-accent ring-1 ring-inset ring-line-strong transition-colors group-hover:bg-panel-3">
             <Film className="size-3.5" />
           </span>
-          <span className="hidden text-xs font-semibold tracking-wide xl:inline">Movie Desk</span>
+          <span className="hidden text-meta font-semibold tracking-wide xl:inline">Movie Desk</span>
         </Link>
         <div className="hidden h-4 w-px bg-line xl:block" />
         <input

@@ -107,7 +107,7 @@ export default function HomePage() {
                     </span>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-xs font-medium text-ink-1">{title}</span>
+                        <span className="text-meta font-medium text-ink-1">{title}</span>
                         <Check className="size-3.5 text-ok" />
                       </div>
                       <div className="mt-2 h-1 overflow-hidden rounded-full bg-panel-0">
@@ -120,7 +120,7 @@ export default function HomePage() {
                   </div>
                 ))}
               </div>
-              <div className="mx-2 mb-2 mt-1 flex items-center justify-between rounded-md bg-accent px-4 py-3 text-xs font-semibold text-white">
+              <div className="mx-2 mb-2 mt-1 flex items-center justify-between rounded-md bg-accent px-4 py-3 text-meta font-semibold text-white">
                 <span>여행 하이라이트 · 03:42</span>
                 <span>초안 준비됨</span>
               </div>

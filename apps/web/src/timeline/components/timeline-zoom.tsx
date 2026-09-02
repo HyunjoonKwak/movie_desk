@@ -18,7 +18,7 @@ export function TimelineZoom() {
   const t = useT();
 
   return (
-    <div className="flex items-center gap-1 text-xs text-ink-3">
+    <div className="flex items-center gap-1 text-meta text-ink-3">
       <button
         type="button"
         className={cn("btn-ghost px-1.5 py-1", snapEnabled && "text-accent")}

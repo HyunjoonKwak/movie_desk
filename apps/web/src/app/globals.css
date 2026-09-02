@@ -22,7 +22,7 @@
   }
 
   body {
-    @apply bg-panel-0 text-ink-1 font-sans antialiased;
+    @apply bg-panel-0 text-[14px] text-ink-1 font-sans antialiased;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }

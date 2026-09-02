@@ -72,7 +72,7 @@ export function NumberScrubber({
           e.stopPropagation();
         }}
         className={cn(
-          "w-16 rounded bg-white/10 px-1 text-right font-mono text-xs text-ink-1 outline-none",
+          "w-16 rounded bg-white/10 px-1 text-right font-mono text-meta text-ink-1 outline-none",
           className,
         )}
       />
@@ -133,7 +133,7 @@ export function NumberScrubber({
         }
       }}
       className={cn(
-        "cursor-ew-resize select-none rounded px-1 font-mono text-xs text-ink-1",
+        "cursor-ew-resize select-none rounded px-1 font-mono text-meta text-ink-1",
         "hover:bg-white/10 focus:bg-white/10 focus:outline-none",
         className,
       )}

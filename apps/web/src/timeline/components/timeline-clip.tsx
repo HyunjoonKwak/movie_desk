@@ -84,7 +84,10 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
       // moves the whole group when grouped — all from the drag-start layout.
       useProjectStore.getState().dragClipTo(clip.id, drag.originalStart + deltaMs);
     } else if (drag.mode === "trim-end") {
-      trimEnd(clip.id, Math.max(drag.originalStart + drag.originalDuration + deltaMs, drag.originalStart + 50));
+      trimEnd(
+        clip.id,
+        Math.max(drag.originalStart + drag.originalDuration + deltaMs, drag.originalStart + 50),
+      );
     } else {
       const newStart = Math.min(
         Math.max(0, drag.originalStart + deltaMs),
@@ -145,58 +148,58 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
 
   return (
     <ClipContextMenu clipId={clip.id}>
-    <div
-      data-clip={clip.id}
-      className={cn(
-        "absolute top-1 select-none overflow-hidden rounded-md border text-xs",
-        "transition-shadow",
-        isMedia
-          ? "border-clip-media/40 bg-clip-media/20 hover:bg-clip-media/30"
-          : isAdjustment
-            ? "border-clip-adjustment/40 bg-clip-adjustment/20 hover:bg-clip-adjustment/30"
-            : "border-clip-overlay/40 bg-clip-overlay/20 hover:bg-clip-overlay/30",
-        isSelected && "ring-2 ring-accent shadow-lg",
-        clip.disabled && "opacity-40 grayscale",
-        clip.groupId && "outline-dashed outline-1 outline-sky-300/50",
-      )}
-      style={{ left, width, height: trackHeight - 8 }}
-      onPointerDown={onPointerDown("move")}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      {filmstrip && (
-        <div className="pointer-events-none absolute inset-0 opacity-70" style={filmstrip} />
-      )}
-      {showThumb && (
+      <div
+        data-clip={clip.id}
+        className={cn(
+          "absolute top-1 select-none overflow-hidden rounded-md border text-meta",
+          "transition-shadow",
+          isMedia
+            ? "border-clip-media/40 bg-clip-media/20 hover:bg-clip-media/30"
+            : isAdjustment
+              ? "border-clip-adjustment/40 bg-clip-adjustment/20 hover:bg-clip-adjustment/30"
+              : "border-clip-overlay/40 bg-clip-overlay/20 hover:bg-clip-overlay/30",
+          isSelected && "ring-2 ring-accent shadow-lg",
+          clip.disabled && "opacity-40 grayscale",
+          clip.groupId && "outline-dashed outline-1 outline-sky-300/50",
+        )}
+        style={{ left, width, height: trackHeight - 8 }}
+        onPointerDown={onPointerDown("move")}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {filmstrip && (
+          <div className="pointer-events-none absolute inset-0 opacity-70" style={filmstrip} />
+        )}
+        {showThumb && (
+          <div
+            className="pointer-events-none absolute inset-0 opacity-60"
+            style={{
+              backgroundImage: `url(${asset!.thumbDataUrl})`,
+              backgroundSize: "auto 100%",
+              backgroundRepeat: "repeat-x",
+            }}
+          />
+        )}
+        {showWaveform && isMediaClip(clip) && (
+          <ClipWaveform clip={clip} width={width} height={trackHeight - 8} />
+        )}
+        <div className="pointer-events-none relative flex h-full items-center px-2">
+          <span className="truncate text-ink-1">{clip.label ?? asset?.name ?? clip.kind}</span>
+        </div>
         <div
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            backgroundImage: `url(${asset!.thumbDataUrl})`,
-            backgroundSize: "auto 100%",
-            backgroundRepeat: "repeat-x",
-          }}
+          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
+          onPointerDown={onPointerDown("trim-start")}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
         />
-      )}
-      {showWaveform && isMediaClip(clip) && (
-        <ClipWaveform clip={clip} width={width} height={trackHeight - 8} />
-      )}
-      <div className="pointer-events-none relative flex h-full items-center px-2">
-        <span className="truncate text-ink-1">{clip.label ?? asset?.name ?? clip.kind}</span>
+        <div
+          className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
+          onPointerDown={onPointerDown("trim-end")}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+        />
       </div>
-      <div
-        className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
-        onPointerDown={onPointerDown("trim-start")}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      />
-      <div
-        className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
-        onPointerDown={onPointerDown("trim-end")}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-      />
-    </div>
     </ClipContextMenu>
   );
 }

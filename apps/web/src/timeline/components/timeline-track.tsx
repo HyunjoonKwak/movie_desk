@@ -3,7 +3,13 @@
 import { useCallback, useState } from "react";
 import { Headphones, Lock, Trash2, Unlock, Volume2, VolumeX } from "lucide-react";
 import type { Track } from "@movie-desk/core";
-import { collectSnapPoints, newId, resolvePlacement, snapMsToFrame, snapToNearest } from "@movie-desk/core";
+import {
+  collectSnapPoints,
+  newId,
+  resolvePlacement,
+  snapMsToFrame,
+  snapToNearest,
+} from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useT } from "@/i18n/use-t";
@@ -29,7 +35,7 @@ export function TimelineTrack({ track, width }: Props) {
   // UI store (dataTransfer is unreadable during dragover).
   const [previewMs, setPreviewMs] = useState<number | null>(null);
   const dragAsset = useProjectStore((s) =>
-    dragAssetId ? s.project.mediaLibrary.find((a) => a.id === dragAssetId) ?? null : null,
+    dragAssetId ? (s.project.mediaLibrary.find((a) => a.id === dragAssetId) ?? null) : null,
   );
   const accepts =
     !!dragAsset && !track.locked && track.kind === (dragAsset.kind === "audio" ? "audio" : "video");
@@ -87,7 +93,7 @@ export function TimelineTrack({ track, width }: Props) {
       <div
         className={cn(
           "group sticky left-0 z-10 flex shrink-0 items-center justify-between gap-1",
-          "border-y border-r border-white/5 bg-panel-2 px-2 text-xs",
+          "border-y border-r border-white/5 bg-panel-2 px-2 text-meta",
         )}
         style={{ height: track.height, width: TRACK_HEADER_W }}
       >
@@ -131,10 +137,7 @@ export function TimelineTrack({ track, width }: Props) {
         </span>
       </div>
       <div
-        className={cn(
-          "relative border-y border-white/5 bg-panel-2/40",
-          accepts && "bg-accent/5",
-        )}
+        className={cn("relative border-y border-white/5 bg-panel-2/40", accepts && "bg-accent/5")}
         style={{ width: width - TRACK_HEADER_W, height: track.height }}
         onDragOver={onDragOver}
         onDragLeave={() => setPreviewMs(null)}

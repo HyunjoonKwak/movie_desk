@@ -139,7 +139,7 @@ export function MusicFreeSearch() {
 
   return (
     <div className="border-b border-white/5 p-3">
-      <p className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
+      <p className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-ink-3">
         <Globe className="size-3.5" />
         {t("music.freeSearch")}
       </p>

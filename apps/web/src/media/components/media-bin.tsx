@@ -479,7 +479,7 @@ export function MediaBin() {
                         </div>
                         <div className="flex items-center gap-1.5 px-2 py-1.5">
                           <Icon className="size-3 shrink-0 text-ink-3" />
-                          <span className="truncate text-xs text-ink-1">{asset.name}</span>
+                          <span className="truncate text-meta text-ink-1">{asset.name}</span>
                         </div>
                       </button>
                       <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">

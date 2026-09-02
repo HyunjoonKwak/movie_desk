@@ -44,7 +44,7 @@ export function MarkerPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
+        <span className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-ink-3">
           <MapPin className="size-3.5" />
           {t("marker.title")} ({sorted.length})
         </span>

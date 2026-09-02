@@ -147,7 +147,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
           </div>
 
           <div className="mt-4 space-y-3">
-            <div className="block text-xs uppercase tracking-wider text-ink-3">
+            <div className="block text-2xs uppercase tracking-wider text-ink-3">
               {t("export.preset")} ({selectedIds.size})
             </div>
             <div className="grid grid-cols-1 gap-1">

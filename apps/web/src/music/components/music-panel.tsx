@@ -19,7 +19,7 @@ export function MusicPanel() {
   return (
     <div className="flex h-full flex-col overflow-y-auto">
       <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
-        <span className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3">
+        <span className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-ink-3">
           <Music2 className="size-3.5" />
           {t("music.library")} ({refs.length})
         </span>

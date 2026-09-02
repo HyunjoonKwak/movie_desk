@@ -53,8 +53,10 @@ const config: Config = {
         },
       },
       fontSize: {
-        // Editor micro-typography: panel labels and badges sit below
-        // Tailwind's default xs (12px).
+        // Shared Photo Desk typography scale. `xs` is the primary compact UI
+        // label size; metadata and section labels use the smaller named steps.
+        xs: ["13.5px", { lineHeight: "18px" }],
+        meta: ["12px", { lineHeight: "16px" }],
         "2xs": ["11px", { lineHeight: "14px" }],
         "3xs": ["10px", { lineHeight: "12px" }],
       },

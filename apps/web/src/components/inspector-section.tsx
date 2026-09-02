@@ -31,7 +31,7 @@ export function InspectorSection({
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-ink-3 transition-colors hover:text-ink-1"
+          className="flex items-center gap-1.5 text-2xs uppercase tracking-wider text-ink-3 transition-colors hover:text-ink-1"
         >
           <ChevronRight className={cn("size-3 transition-transform", open && "rotate-90")} />
           {icon}

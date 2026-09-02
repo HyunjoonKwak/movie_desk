@@ -55,7 +55,7 @@ export function InspectorPanel() {
             <span className="mb-3 flex size-10 items-center justify-center rounded-lg border border-line bg-panel-2 text-ink-3">
               <Sliders className="size-4" />
             </span>
-            <p className="max-w-48 text-xs leading-5 text-ink-3">{t("inspector.empty")}</p>
+            <p className="max-w-56 text-xs leading-5 text-ink-3">{t("inspector.empty")}</p>
           </div>
         )}
 
@@ -134,8 +134,8 @@ export function InspectorPanel() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-xs uppercase tracking-wide text-ink-3">{label}</dt>
-      <dd className="font-mono text-xs text-ink-1">{value}</dd>
+      <dt className="text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dd className="font-mono text-meta text-ink-1">{value}</dd>
     </div>
   );
 }
@@ -143,7 +143,7 @@ function Row({ label, value }: { label: string; value: string }) {
 function EditableRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dt className="text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
       <dd>{children}</dd>
     </div>
   );
