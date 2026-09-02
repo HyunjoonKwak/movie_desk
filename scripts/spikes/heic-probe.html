@@ -1,0 +1,55 @@
+<!doctype html><meta charset="utf-8"><title>HEIC capability probe</title>
+<script>
+window.probe = async (fixtures) => {
+  const support = {};
+  for (const mime of ["image/heic", "image/heif", "image/jpeg", "image/png"]) {
+    try {
+      support[mime] = typeof ImageDecoder === "undefined"
+        ? "ImageDecoder undefined"
+        : await ImageDecoder.isTypeSupported(mime);
+    } catch (error) {
+      support[mime] = `error: ${error.message}`;
+    }
+  }
+
+  const files = [];
+  for (const fixture of fixtures) {
+    const binary = atob(fixture.base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: fixture.mime });
+    const result = { name: fixture.name, mime: blob.type, bytes: blob.size };
+
+    try {
+      const bitmap = await createImageBitmap(blob);
+      result.createImageBitmap = { ok: true, width: bitmap.width, height: bitmap.height };
+      bitmap.close();
+    } catch (error) {
+      result.createImageBitmap = { ok: false, error: `${error.name}: ${error.message}` };
+    }
+
+    result.imageElement = await new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const image = new Image();
+      image.onload = () => {
+        resolve({ ok: true, width: image.naturalWidth, height: image.naturalHeight });
+        URL.revokeObjectURL(url);
+      };
+      image.onerror = () => {
+        resolve({ ok: false });
+        URL.revokeObjectURL(url);
+      };
+      image.src = url;
+    });
+
+    files.push(result);
+  }
+
+  return {
+    userAgent: navigator.userAgent,
+    secureContext: window.isSecureContext,
+    imageDecoderSupport: support,
+    files,
+  };
+};
+</script>
