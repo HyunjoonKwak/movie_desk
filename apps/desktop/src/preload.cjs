@@ -4,7 +4,7 @@
 // The web app stays origin-agnostic: it listens for `movie-desk:menu-export`
 // and `movie-desk:menu-snapshot`, which the bridge re-dispatches from IPC.
 
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 const forward = (channel, eventName) => {
   ipcRenderer.on(channel, () => {
@@ -35,5 +35,9 @@ contextBridge.exposeInMainWorld("cutDesktop", {
     acquirePlaybackUrl: async (assetId) => ipcRenderer.invoke("movie-desk:media-acquire", assetId),
     releasePlaybackUrl: async (leaseId) => ipcRenderer.invoke("movie-desk:media-release", leaseId),
     sourceState: async (assetId) => ipcRenderer.invoke("movie-desk:media-source-state", assetId),
+    // Resolve the native path inside the isolated preload and send it directly
+    // to main. The absolute path is never returned to page JavaScript.
+    importHeicFile: async (file) =>
+      ipcRenderer.invoke("movie-desk:media-import-heic", webUtils.getPathForFile(file)),
   },
 });

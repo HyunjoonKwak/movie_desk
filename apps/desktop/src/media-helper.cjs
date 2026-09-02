@@ -63,6 +63,7 @@ const handlers = {
   async inspect(input) {
     requireMacOS("inspect");
     const sourcePath = absoluteInputPath(input.path, "input.path");
+    await requireReadableFile(sourcePath);
     const { stdout } = await runExecutable("/usr/bin/sips", [
       "-g",
       "pixelWidth",
@@ -74,9 +75,16 @@ const handlers = {
       "space",
       "-g",
       "orientation",
+      "-g",
+      "creation",
+      "-g",
+      "make",
+      "-g",
+      "model",
       sourcePath,
     ]);
     const properties = parseKeyValueOutput(stdout);
+    const spotlight = await inspectSpotlightMetadata(sourcePath);
     return {
       kind: "image",
       width: nullableNumber(properties.get("pixelWidth")),
@@ -84,6 +92,19 @@ const handlers = {
       format: nullableValue(properties.get("format")),
       colorSpace: nullableValue(properties.get("space")),
       orientation: nullableNumber(properties.get("orientation")),
+      capturedAtMs:
+        nullableDate(spotlight.get("kMDItemContentCreationDate")) ??
+        nullableDate(properties.get("creation")),
+      gpsLat: nullableNumber(spotlight.get("kMDItemLatitude")),
+      gpsLon: nullableNumber(spotlight.get("kMDItemLongitude")),
+      cameraMake:
+        nullableMdlsValue(spotlight.get("kMDItemAcquisitionMake")) ??
+        nullableValue(properties.get("make")),
+      cameraModel:
+        nullableMdlsValue(spotlight.get("kMDItemAcquisitionModel")) ??
+        nullableValue(properties.get("model")),
+      lensModel: nullableMdlsValue(spotlight.get("kMDItemLensModel")),
+      colorProfile: nullableMdlsValue(spotlight.get("kMDItemProfileName")),
     };
   },
 
@@ -91,6 +112,7 @@ const handlers = {
     requireMacOS("preview");
     const sourcePath = absoluteInputPath(input.sourcePath, "input.sourcePath");
     const outputPath = absoluteInputPath(input.outputPath, "input.outputPath");
+    await requireReadableFile(sourcePath);
     const maxDimension = integerInRange(
       input.maxDimension ?? 2560,
       16,
@@ -214,6 +236,45 @@ const runExecutable = (executable, args) =>
     });
   });
 
+const inspectSpotlightMetadata = async (sourcePath) => {
+  const keys = [
+    "kMDItemContentCreationDate",
+    "kMDItemLatitude",
+    "kMDItemLongitude",
+    "kMDItemAcquisitionMake",
+    "kMDItemAcquisitionModel",
+    "kMDItemLensModel",
+    "kMDItemProfileName",
+  ];
+  try {
+    const { stdout } = await runExecutable("/usr/bin/mdls", [
+      ...keys.flatMap((key) => ["-name", key]),
+      sourcePath,
+    ]);
+    return parseMdlsOutput(stdout);
+  } catch {
+    // Spotlight metadata is supplemental. ImageIO dimensions/preview remain
+    // useful on volumes that are not indexed or while indexing is incomplete.
+    return new Map();
+  }
+};
+
+const requireReadableFile = async (sourcePath) => {
+  try {
+    const fileStat = await fs.promises.stat(sourcePath);
+    if (!fileStat.isFile()) throw helperError("NOT_A_FILE", "source is not a file");
+    await fs.promises.access(sourcePath, fs.constants.R_OK);
+  } catch (error) {
+    if (error?.code === "ENOENT" || error?.code === "ENOTDIR") {
+      throw helperError("SOURCE_NOT_FOUND", "source file was not found");
+    }
+    if (error?.code === "EACCES" || error?.code === "EPERM") {
+      throw helperError("PERMISSION_DENIED", "source file is not readable");
+    }
+    throw error;
+  }
+};
+
 const runJsonLinesServer = () => {
   const lines = readline.createInterface({
     input: process.stdin,
@@ -241,6 +302,15 @@ const parseKeyValueOutput = (value) => {
     const separator = line.indexOf(":");
     if (separator < 0) continue;
     result.set(line.slice(0, separator).trim(), line.slice(separator + 1).trim());
+  }
+  return result;
+};
+
+const parseMdlsOutput = (value) => {
+  const result = new Map();
+  for (const line of value.split(/\r?\n/)) {
+    const match = /^(\S+)\s+=\s+(.+)$/.exec(line.trim());
+    if (match) result.set(match[1], match[2].trim());
   }
   return result;
 };
@@ -289,9 +359,27 @@ const requireMacOS = (command) => {
 };
 
 const nullableNumber = (value) => {
-  if (value == null || value === "<nil>") return null;
-  const parsed = Number(value);
+  const normalized = nullableMdlsValue(value);
+  if (normalized == null) return null;
+  const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : null;
+};
+const nullableDate = (value) => {
+  const normalized = nullableMdlsValue(value);
+  if (normalized == null) return null;
+  const parsed = Date.parse(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+const nullableMdlsValue = (value) => {
+  if (value == null || value === "<nil>" || value === "(null)") return null;
+  if (value.startsWith('"') && value.endsWith('"')) {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
 };
 const nullableValue = (value) => (value == null || value === "<nil>" ? null : value);
 const helperError = (code, message) => Object.assign(new Error(message), { code });
@@ -303,6 +391,7 @@ module.exports = {
   fullHash,
   parseDfMountPoint,
   parseKeyValueOutput,
+  parseMdlsOutput,
   quickHash,
   runJsonLinesServer,
   volumeRelativePathFor,

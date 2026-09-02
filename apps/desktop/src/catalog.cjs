@@ -88,6 +88,19 @@ class MediaCatalog {
     return this.#request("getAsset", requiredText(assetId, "assetId"));
   }
 
+  async getAssetByLocation(rootIdValue, relativePathValue) {
+    const rootId = requiredText(rootIdValue, "rootId");
+    const root = await this.getRoot(rootId);
+    if (!root) return null;
+    const relativePath = normalizeRelativePath(relativePathValue);
+    return this.#request("getAssetByLocation", {
+      rootId,
+      relativePathKey: root.caseSensitive
+        ? relativePath
+        : relativePath.toLocaleLowerCase("en-US"),
+    });
+  }
+
   setUserMetadata(input) {
     const tags = input?.tags ?? [];
     if (!Array.isArray(tags) || tags.some((tag) => typeof tag !== "string" || tag.length === 0)) {

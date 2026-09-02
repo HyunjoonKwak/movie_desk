@@ -227,7 +227,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
 | B9 실패 안내 | Codex | 대기 | |
-| B10 HEIC | Codex | 스파이크 완료(`docs/spikes/2026-09-03-heic.md`), A1 뒤 착수 | Electron·nativeImage는 HEIC 불가, ImageIO 경계로 확정 |
+| B10 HEIC | Codex | 구현 완료, 실제 아이폰 검증 대기 | 원본 참조 + ImageIO 썸네일·4096px 캐시, 촬영 시각·GPS·방향·카메라 메타 보존, 실제 HEIC 통합 테스트. HDR gain map·대량 성능은 B7/B12 게이트 |
 | B11 HEVC·.mov·회전 | Claude | 스파이크 완료, A1 뒤 착수 | `claude/spike-hevc` · `docs/spikes/2026-09-03-hevc-mov.md`: Electron·Chrome ✅(미디어 요소·capability), CI Chromium ❌, 실제 iPhone·WebCodecs demux/회전은 미확정 |
 | B12 Live Photo·폴더 | Codex | 대기 | |
 | B13~B14 리포트·컷 이유 | Codex | 대기 | |

@@ -6,6 +6,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 import { importMediaFile } from "./import";
 import { useImportProgressStore } from "./import-progress-store";
+import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
 
 export interface ImportState {
   importing: boolean;
@@ -29,6 +30,7 @@ export const useMediaImport = (): ImportState => {
       progress.start(files.length);
       let done = 0;
       let failed = 0;
+      let desktopRequired = 0;
       let cancelled = false;
       try {
         for (const file of files) {
@@ -39,23 +41,36 @@ export const useMediaImport = (): ImportState => {
           useImportProgressStore.getState().beginFile(file.name);
           try {
             // process serially to keep memory bounded
-            const { asset, releaseLease } = await importMediaFile(file);
-            try {
-              addMediaAsset(asset);
-            } finally {
-              releaseLease();
+            if (isHeicFile(file)) {
+              const asset = await importDesktopHeicFile(file);
+              const alreadyImported = useProjectStore
+                .getState()
+                .project.mediaLibrary.some((candidate) => candidate.id === asset.id);
+              if (!alreadyImported) addMediaAsset(asset);
+            } else {
+              const { asset, releaseLease } = await importMediaFile(file);
+              try {
+                addMediaAsset(asset);
+              } finally {
+                releaseLease();
+              }
             }
             done++;
             useImportProgressStore.getState().fileDone();
-          } catch {
+          } catch (error) {
             // One bad file must not abort the whole batch.
             failed++;
+            if (error instanceof DesktopHeicImportError && error.code === "DESKTOP_REQUIRED") {
+              desktopRequired++;
+            }
             useImportProgressStore.getState().fileFailed();
           }
         }
         const skipped = files.length - done - failed;
         if (cancelled) {
           toast.info(t("media.importCancelled", { done, skipped }));
+        } else if (desktopRequired === failed && failed > 0) {
+          toast.warning(t("media.heicDesktopOnly", { n: failed }));
         } else if (failed > 0) {
           toast.warning(t("media.importedPartial", { done, failed }));
         } else {

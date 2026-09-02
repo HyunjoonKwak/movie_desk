@@ -487,6 +487,7 @@ export const ko = {
     "media.importStopping": "중단 중…",
     "media.importCancelled": "가져오기 중단 — {done}개 완료, {skipped}개 건너뜀",
     "media.importedPartial": "{done}개 완료, {failed}개 실패",
+    "media.heicDesktopOnly": "HEIC/HEIF {n}개는 Movie Desk macOS 앱에서 가져올 수 있습니다.",
     "media.thumbSize": "썸네일 크기",
     "media.selectedCount": "{n}개 선택",
     "media.markUse": "사용",

@@ -1,5 +1,6 @@
 import type { MediaAsset } from "@movie-desk/core";
 import { acquireMediaUrl } from "@/persistence/opfs";
+import { resolveMediaSource } from "@/media/source/resolve-media-source";
 
 // Small-plane frame sampler for analysis. Videos are seeked at a coarse
 // interval (~1s), plus short bursts for shake estimation. Photos decode once.
@@ -75,11 +76,23 @@ export interface VideoSampleResult {
   readonly bursts: readonly (readonly SampledFrame[])[];
 }
 
+const acquireVisualSource = async (asset: MediaAsset) => {
+  if (asset.proxyPath) {
+    const proxy = await acquireMediaUrl(asset.proxyPath);
+    if (proxy) return proxy;
+  }
+  try {
+    return await (await resolveMediaSource(asset)).acquirePlaybackUrl();
+  } catch {
+    return null;
+  }
+};
+
 export const sampleVideo = async (
   asset: MediaAsset,
   onProgress?: (p: number) => void,
 ): Promise<VideoSampleResult | null> => {
-  const lease = await acquireMediaUrl(asset.proxyPath ?? asset.opfsPath);
+  const lease = await acquireVisualSource(asset);
   if (!lease) return null;
   try {
     const video = await loadVideo(lease.url);
@@ -127,7 +140,7 @@ export const sampleVideo = async (
 };
 
 export const samplePhoto = async (asset: MediaAsset): Promise<SampledFrame | null> => {
-  const lease = await acquireMediaUrl(asset.opfsPath);
+  const lease = await acquireVisualSource(asset);
   if (!lease) return null;
   try {
     const img = new Image();

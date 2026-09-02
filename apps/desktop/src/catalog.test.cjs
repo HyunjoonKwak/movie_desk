@@ -72,6 +72,8 @@ describe("MediaCatalog", () => {
     assert.equal(asset.root.volumeUuid, "A1B2-C3D4");
     assert.equal(asset.root.lastKnownAbsolutePath, "/Volumes/CAMERA/Movies");
     assert.equal((await catalog.getAsset("asset-1")).quickHash, "sha256:quick");
+    assert.equal((await catalog.getAssetByLocation("root-1", "Day 01/C001.mov")).id, "asset-1");
+    assert.equal(await catalog.getAssetByLocation("root-1", "missing.mov"), null);
   });
 
   it("honors root case sensitivity when enforcing path identity", async () => {

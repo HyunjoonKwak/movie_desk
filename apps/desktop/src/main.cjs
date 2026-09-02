@@ -10,6 +10,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { MediaCatalog } = require("./catalog.cjs");
 const { MediaHelperClient } = require("./helper-client.cjs");
+const { createDesktopImageImporter, isHeicMime } = require("./image-import.cjs");
 const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
 const { VolumeRootResolver } = require("./volume-root-resolver.cjs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
@@ -60,6 +61,7 @@ protocol.registerSchemesAsPrivileged([
 let mediaCatalog;
 let mediaHelper;
 let volumeRootResolver;
+let imageImporter;
 const mediaLeases = new MediaLeaseRegistry();
 
 const mimeFromExt = (ext) => {
@@ -241,6 +243,13 @@ const initializeMediaInfrastructure = async () => {
   }
   mediaHelper = new MediaHelperClient();
   volumeRootResolver = new VolumeRootResolver({ helper: mediaHelper });
+  if (mediaCatalog) {
+    imageImporter = createDesktopImageImporter({
+      catalog: mediaCatalog,
+      helper: mediaHelper,
+      cacheDirectory: path.join(app.getPath("userData"), "cache", "image-previews"),
+    });
+  }
   installMediaProtocol(protocol, {
     catalog: { getAsset: (assetId) => mediaCatalog?.getAsset(assetId) ?? null },
     leases: mediaLeases,
@@ -257,11 +266,48 @@ ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
   if (resolved.state !== "online" && resolved.state !== "moved") {
     return { state: resolved.state, ...(resolved.reason ? { reason: resolved.reason } : {}) };
   }
-  return {
-    ...mediaLeases.acquire(asset.id, { asset, resolved }),
-    state: resolved.state,
-  };
+  if (isHeicMime(asset.mime) && imageImporter) {
+    const preview = await imageImporter.acquireEditingPreview(asset, resolved);
+    return {
+      ...mediaLeases.acquire(asset.id, {
+        asset: { id: asset.id, ...preview.asset },
+        resolved: { state: "online", absolutePath: preview.absolutePath },
+      }),
+      state: resolved.state,
+    };
+  }
+  return { ...mediaLeases.acquire(asset.id, { asset, resolved }), state: resolved.state };
 });
+
+ipcMain.handle("movie-desk:media-import-heic", async (event, sourcePath) => {
+  requireTrustedIpc(event);
+  if (!imageImporter) {
+    return {
+      ok: false,
+      error: { code: "CATALOG_UNAVAILABLE", message: "The local media catalog is unavailable." },
+    };
+  }
+  try {
+    return { ok: true, asset: await imageImporter.importHeicFile(sourcePath) };
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code : "IMPORT_FAILED";
+    return {
+      ok: false,
+      error: {
+        code,
+        message: safeImageImportMessage(code),
+      },
+    };
+  }
+});
+
+const safeImageImportMessage = (code) => {
+  if (code === "PERMISSION_DENIED") return "Movie Desk does not have permission to read this file.";
+  if (code === "SOURCE_NOT_FOUND") return "The selected file is no longer available.";
+  if (code === "UNSUPPORTED_FORMAT") return "This HEIC/HEIF variant is not supported.";
+  if (code === "CATALOG_UNAVAILABLE") return "The local media catalog is unavailable.";
+  return "Movie Desk could not inspect or preview this HEIC/HEIF file.";
+};
 
 ipcMain.handle("movie-desk:media-release", (event, leaseId) => {
   requireTrustedIpc(event);

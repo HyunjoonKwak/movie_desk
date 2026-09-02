@@ -4,8 +4,10 @@ const crypto = require("node:crypto");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { execFileSync } = require("node:child_process");
 const { MediaHelperClient } = require("./helper-client.cjs");
 const { HELPER_PROTOCOL_VERSION, validateHelperRequest } = require("./helper-protocol.cjs");
+const { parseMdlsOutput } = require("./media-helper.cjs");
 
 const clients = new Set();
 const temporaryDirectories = new Set();
@@ -34,6 +36,16 @@ const temporaryFile = (contents) => {
 };
 
 describe("helper protocol", () => {
+  it("parses Spotlight metadata without treating null fields as values", () => {
+    const parsed = parseMdlsOutput(`
+kMDItemAcquisitionModel    = "iPhone 17 Pro"
+kMDItemContentCreationDate = 2026-09-03 01:02:03 +0000
+kMDItemLatitude            = (null)
+`);
+    assert.equal(parsed.get("kMDItemAcquisitionModel"), '"iPhone 17 Pro"');
+    assert.equal(parsed.get("kMDItemLatitude"), "(null)");
+  });
+
   it("requires an exact protocol version and known command", () => {
     const request = {
       version: HELPER_PROTOCOL_VERSION,
@@ -95,6 +107,36 @@ describe("helper protocol", () => {
       assert.equal(fs.existsSync(outputPath), true);
       assert.ok(inspected.width <= 240);
       assert.ok(inspected.height <= 240);
+    },
+  );
+
+  it(
+    "decodes a real HEIC fixture through ImageIO without changing the original",
+    { skip: process.platform !== "darwin" },
+    async () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-heic-"));
+      temporaryDirectories.add(directory);
+      const sourcePng = path.join(__dirname, "..", "build", "icon.png");
+      const heicPath = path.join(directory, "fixture.heic");
+      const outputPath = path.join(directory, "preview.jpg");
+      execFileSync("/usr/bin/sips", ["-s", "format", "heic", sourcePng, "--out", heicPath]);
+      const before = fs.readFileSync(heicPath);
+      const helper = client();
+
+      const inspected = await helper.request("inspect", { path: heicPath });
+      const preview = await helper.request("preview", {
+        sourcePath: heicPath,
+        outputPath,
+        maxDimension: 240,
+        format: "jpeg",
+      });
+
+      assert.equal(inspected.kind, "image");
+      assert.ok(inspected.width > 0);
+      assert.ok(inspected.height > 0);
+      assert.equal(preview.pipelineVersion, "sips-preview-v1");
+      assert.equal(fs.existsSync(outputPath), true);
+      assert.deepEqual(fs.readFileSync(heicPath), before);
     },
   );
 

@@ -487,6 +487,7 @@ export const en = {
     "media.importStopping": "Stopping…",
     "media.importCancelled": "Import stopped — {done} done, {skipped} skipped",
     "media.importedPartial": "{done} done, {failed} failed",
+    "media.heicDesktopOnly": "Open the Movie Desk macOS app to import {n} HEIC/HEIF files.",
     "media.thumbSize": "Thumbnail size",
     "media.selectedCount": "{n} selected",
     "media.markUse": "Use",

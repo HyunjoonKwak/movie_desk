@@ -8,6 +8,7 @@ export interface DesktopMediaBridge {
   acquirePlaybackUrl(assetId: string): Promise<unknown>;
   releasePlaybackUrl(leaseId: string): Promise<unknown>;
   sourceState(assetId: string): Promise<unknown>;
+  importHeicFile?: (file: File) => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

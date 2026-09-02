@@ -130,6 +130,22 @@ const handlers = {
     return row ? mapAsset(row) : null;
   },
 
+  getAssetByLocation(location) {
+    const row = requireDatabase()
+      .prepare(`
+        SELECT
+          a.id, a.root_id, a.relative_path, a.size_bytes, a.modified_at_ms,
+          a.inode, a.quick_hash, a.full_hash, a.mime, a.media_kind,
+          r.kind AS root_kind, r.volume_uuid, r.volume_relative_path,
+          r.last_known_absolute_path, r.case_sensitive
+        FROM media_assets a
+        JOIN source_roots r ON r.id = a.root_id
+        WHERE a.root_id = ? AND a.relative_path_key = ?
+      `)
+      .get(location.rootId, location.relativePathKey);
+    return row ? mapAsset(row) : null;
+  },
+
   setUserMetadata(metadata) {
     const db = requireDatabase();
     db.prepare(`
