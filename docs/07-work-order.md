@@ -67,6 +67,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   각도"(`SourceRotation` 0/90/180/270). iPhone 세로(matrix [0,1,-1,0]) = 90, ffmpeg
   `-display_rotation 90` = 270. 스파이크 문서의 미확정 항목 중 mp4box `.mov` demux와 WebCodecs
   경로 회전은 해소, 실제 iPhone HDR/VFR만 도그푸딩으로 남음.
+- 2026-09-03 Claude: A2-a 오디오 variant 완료. D1 검토에서 지적한 "오디오 엔진·exporter의 파일 전체
+  읽기"가 AAC 소스에서 해소됨. 원본이 MP4/MOV+AAC가 아니면(WebM, 무음 영상) 종전처럼 원본을
+  읽는다. core `CacheVariant`의 `audio-48k`는 실제 내용에 맞춰 `audio-track`으로 바꿨다. main의
+  A1-d(Codex 구현)를 채택했고 Claude의 병합본 브랜치는 폐기했다.
 - 2026-09-03 통합: 사용자 승인으로 e3b7c7d → B2 → HEIC 스파이크 → D1 원문 → D1 검토를
   main에 순서대로 올리고 푸시했다. 다음은 새 기준선에서 A1-a(Claude)·A1-b/c(Codex).
 - 2026-09-03 Claude: Electron `nativeImage`도 HEIC를 못 읽는다(`isEmpty`). Codex의 ImageIO
@@ -247,7 +251,8 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B23 muxer 교체 | Claude | 대기 | |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
 | B25 v0.4.0 | 사용자 | 대기 | |
-| A1-a MediaSource 계약 | Claude | 완료, 통합 후보 | core 타입·fingerprint·cacheKey, zod 스키마(safe relativePath), OPFS adapter, resolver, 디코더 ByteSource(clampReadRange), 컴포지터 연결. Codex 검토 반영(77917f5). CI Node 22 |
-| A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, 통합 후보 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
-| A1-c helper 계약 | Codex | 완료, 통합 후보 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
+| A1-a MediaSource 계약 | Claude | 완료, main 통합 | core 타입·fingerprint·cacheKey, zod 스키마(safe relativePath), OPFS adapter, resolver, 디코더 ByteSource(clampReadRange), 컴포지터 연결. Codex 검토 반영(77917f5). CI Node 22 |
+| A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, main 통합 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
+| A1-c helper 계약 | Codex | 완료, main 통합 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
 | A1-d 렌더러 disk adapter | Claude + Codex | 완료, main 통합 | `26e3058` + `4760e18`. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록. `<img>/<video>` fallback도 공통 resolver를 사용하며 오류 응답 CORS·상태 헤더를 노출. 읽기 lease 재사용은 프로파일링 뒤 최적화 |
+| A2-a 오디오 트랙 variant | Claude | 완료, 통합 대기 | `claude/a2-audio-variant` · AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS `cache__audio-track__v1__<fingerprint>`로 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. GC는 참조 자산의 variant를 보존. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |

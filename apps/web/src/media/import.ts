@@ -2,6 +2,7 @@ import { extractCaptureMeta } from "@/autoedit/metadata";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { writeMediaFile } from "@/persistence/opfs";
 import { type MediaAsset, newId } from "@movie-desk/core";
+import { ensureAudioVariant } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
 import { probeMedia } from "./probe";
 import { makeImageThumb, makeVideoFilmstrip, makeVideoThumb } from "./thumbnail";
@@ -41,7 +42,12 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
     // a waveform. Images skip this.
     let waveformPeaks: number[] | undefined;
     if (probe.kind === "audio" || probe.kind === "video") {
-      const peaks = await extractWaveformPeaks(file);
+      // Build the audio-track variant now so the waveform, preview and export
+      // all decode the small audio-only file instead of the whole original.
+      const audio =
+        (await ensureAudioVariant({ opfsPath, sizeBytes: file.size, mime: probe.mime, kind: probe.kind })) ??
+        file;
+      const peaks = await extractWaveformPeaks(audio);
       if (peaks) waveformPeaks = peaks;
     }
 

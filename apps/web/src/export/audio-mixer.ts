@@ -1,4 +1,4 @@
-import { readMediaFile } from "@/persistence/opfs";
+import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import {
   type EffectInstance,
@@ -399,7 +399,7 @@ export class ProjectAudioMixer {
       return cached;
     }
     throwIfAborted(signal);
-    const blob = await readMediaFile(asset.opfsPath);
+    const blob = await audioBlobFor(asset);
     if (!blob) return null;
     let decoded: AudioBuffer | null = null;
     try {

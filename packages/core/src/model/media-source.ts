@@ -49,7 +49,7 @@ export type CacheVariant =
   | "preview-2560"
   | "proxy-1080p"
   | "waveform-v1"
-  | "audio-48k"
+  | "audio-track"
   | `analysis-${string}`;
 
 // Fingerprint components are URL-encoded so a rootId or path can never forge

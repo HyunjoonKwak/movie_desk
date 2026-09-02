@@ -1,6 +1,7 @@
-import type { Project } from "@movie-desk/core";
+import { audioVariantKey } from "@/media/audio/audio-variant";
 import { musicStoreKeepKeys } from "@/music/file-store";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
+import type { Project } from "@movie-desk/core";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
 
@@ -22,10 +23,13 @@ export const leaseMediaKey = (key: string): (() => void) => {
 
 export const isMediaKeyLeased = (key: string): boolean => mediaLeases.has(key);
 
-const collectKeys = (p: Project, keep: Set<string>): void => {
+// Originals, proxies and the rebuildable audio variant of every asset the
+// project references. Exported so the policy is testable without Dexie.
+export const referencedMediaKeys = (p: Project, keep: Set<string>): void => {
   for (const a of p.mediaLibrary) {
     if (a.opfsPath) keep.add(a.opfsPath);
     if (a.proxyPath) keep.add(a.proxyPath);
+    if (a.kind !== "image") keep.add(audioVariantKey(a));
   }
 };
 
@@ -61,7 +65,7 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
 // Returns the number of blobs reclaimed.
 export const collectMediaGarbage = async (current: Project): Promise<number> => {
   const keep = new Set<string>();
-  collectKeys(current, keep);
+  referencedMediaKeys(current, keep);
   // Music files in the app-global store stay alive while a library ref
   // points at them — deleting the ref lets the next GC pass reap the file.
   for (const key of musicStoreKeepKeys(useMusicLibraryStore.getState().refs)) keep.add(key);
@@ -75,7 +79,7 @@ export const collectMediaGarbage = async (current: Project): Promise<number> => 
       salvageMediaKeys(result.raw, keep);
       continue;
     }
-    if (result.status === "ok") collectKeys(result.project, keep);
+    if (result.status === "ok") referencedMediaKeys(result.project, keep);
   }
 
   let removed = 0;

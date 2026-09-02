@@ -1,4 +1,4 @@
-import { readMediaFile } from "@/persistence/opfs";
+import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
 import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@movie-desk/core";
 import { sampleVolumeCurve } from "./volume-curve";
@@ -58,7 +58,9 @@ class AudioEngine {
   }
 
   private async decode(asset: MediaAsset): Promise<AudioBuffer | null> {
-    const blob = await readMediaFile(asset.opfsPath);
+    // The audio-track variant is a few percent of a 4K original; decoding
+    // it keeps the file read and the PCM footprint to the audio alone.
+    const blob = await audioBlobFor(asset);
     if (!blob) return null;
     try {
       return await this.getCtx().decodeAudioData(await blob.arrayBuffer());
