@@ -40,6 +40,9 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 - `apps/web/package.json` 의존성: Claude가 관리한다. Codex가 의존성을 더해야 하면
   인계 메모에 이유를 적고 진행한다.
 - `docs/07-work-order.md`: 상태 표에서 자기 행만 고친다.
+- 포맷: `biome format`은 게이트에 넣지 않는다. 각 배치는 자기가 만들거나 고친 파일만
+  포맷한다. 루트 `scripts/`만 `biome check`로 게이트한다. 전면 포맷 커밋은 양쪽에 열린
+  브랜치가 없는 통합 직후에 Claude가 한 번 한다.
 
 ### 작업 트리와 통합
 
@@ -56,6 +59,11 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: Electron `nativeImage`도 HEIC를 못 읽는다(`isEmpty`). Codex의 ImageIO
+  경계 결론이 유효하다. D1 보충안 검토: `read(start,length)`는 현재 `mp4-decoder.ts`의
+  `readChunk(blob.slice)`와 1:1이라 충돌 없음. 오디오 엔진은 전체 파일을 `decodeAudioData`에
+  넘기므로 오디오 프록시 캐시 variant가 필요. 자세한 내용은
+  `docs/decisions/2026-09-03-local-media-storage.review.md`(`claude/d1-review`).
 - 2026-09-03 Claude: HEVC·.mov·회전 스파이크 완료(`docs/spikes/2026-09-03-hevc-mov.md`).
   Electron·Chrome은 fixture의 `<video>` 재생과 WebCodecs codec capability가 모두 OK이고
   `<video>`는 회전 matrix를 반영한다. WebCodecs 실제 프레임 디코드·demux·회전과 실제 iPhone
@@ -100,7 +108,7 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 | 결정 | 내용 | 권장안 | 막히는 배치 |
 | --- | --- | --- | --- |
 | D1 저장 모델 | **결정(사용자, 2026-09-03): Movie Desk는 Photo Desk처럼 macOS 기반 로컬 앱이다.** 편집 결과물을 어디에 저장하느냐는 큰 문제가 아니다. 따라서 브라우저 OPFS 한계에 맞춰 설계하지 않는다. 남은 세부: 라이브러리 원본을 디스크 참조 + 인덱스로 둘지(권장), 웹 빌드는 개발·미리보기용으로만 유지할지 | 데스크톱(Electron) 우선. 라이브러리는 디스크 원본 참조 + SQLite 카탈로그, OPFS는 기존 웹 프로젝트 호환과 캐시(프록시·썸네일)로 제한. 사용자 메타데이터(태그·평점·컬렉션)는 재생성 가능한 인덱스와 **분리해 백업·내보내기 가능**하게 두고, 자산 식별자는 경로만이 아니라 **volume/path/size/mtime/content fingerprint**와 재연결 전략을 포함한다(Codex 검토 반영). Photo Desk의 NAS 경로 계약에 합류 | Track A |
-| D2 버전 정책 | root/web/core 0.1.0과 desktop 0.3.1의 분리 | desktop `package.json`을 단일 기준으로 삼고 릴리스 스크립트가 나머지를 맞춘다 | B2, B5 |
+| D2 버전 정책 | **결정(Codex 제안, Claude 동의, 사용자 확인 대기):** `apps/desktop/package.json`이 canonical release version. `scripts/check-versions.mjs`가 root/web/core를 검증하고 `pnpm sync:versions`로 맞춘다. Changesets는 공개 배포·다중 패키지 릴리스 전까지 보류 | 적용됨 (B2) | B2, B5 |
 | D3 HEIC·HEVC 처리 위치 | **D1에 따라 데스크톱 먼저.** 단 "내장 디코더라 의존성 0"으로 확정하지 않는다. Electron/Chromium이 macOS 디코더를 어떤 경로로 쓸 수 있는지 **HEIC·HEVC·MOV fixture로 capability spike**를 먼저 하고, 결과에 따라 직접 재생 / 네이티브 Swift helper / 프록시 변환 중 하나로 경로를 고정한다. 원본 메타데이터 보존을 게이트에 넣는다(Codex 검토 반영) | 스파이크 결과가 정한다. 스파이크: HEVC·MOV는 Claude, HEIC는 Codex, 결과는 `docs/spikes/`에 | B10, B11 |
 | D4 이름 | Movie Desk 유지 여부 | CLAUDE.md대로 개인 단계에서는 유지, 공개 전 정식 조사 | Phase 7 |
 
@@ -201,9 +209,9 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
-| D1~D4 | 사용자 | D1·D3·D4 결정, D2 대기 | D1: macOS 로컬 앱 확정(2026-09-03) |
+| D1~D4 | 사용자 | D1·D3·D4 결정, D2 적용(확인 대기) | D1 세부: `docs/decisions/2026-09-03-local-media-storage.md` (Codex, Claude 검토 중) |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
-| B2 정책·포맷 | Claude | 대기 | D2 필요 |
+| B2 정책·포맷 | Claude | 완료, 통합 대기 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
 | B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
 | B4 첫 실행 오프라인 | Codex | 구현·번들 스모크 완료 | arm64/x64 DMG에 MediaPipe·Whisper 포함, DNS 차단 새 프로필 기동 확인. RC 수동 기능 검증은 B5에서 반복 |
 | B5 RC | Claude 준비 · 사용자 태그 | 대기 | |

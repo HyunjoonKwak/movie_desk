@@ -31,7 +31,7 @@ const LABELS: Record<PlaceMode, string> = {
 
 // Media clip from an asset, honouring its marked use-range. `start` is a
 // placeholder — every mode positions the clip itself.
-export const clipFromAsset = (asset: MediaAsset): MediaClip => {
+const clipFromAsset = (asset: MediaAsset): MediaClip => {
   const inMs = asset.useInMs ?? 0;
   const outMs = asset.useOutMs ?? asset.durationMs;
   return {

@@ -37,6 +37,9 @@ jobs:
 
       # Each step runs across every workspace package. Ordered cheapest-first
       # so the fastest signal (lint) fails the run before the slower gates.
+      - name: Check version policy
+        run: pnpm check:versions
+
       - name: Lint
         run: pnpm lint
 

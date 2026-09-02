@@ -1,6 +1,6 @@
 {
   "name": "movie-desk",
-  "version": "0.1.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Movie Desk — an AI-native, local-first video editor that turns raw moments into finished movies.",
   "packageManager": "pnpm@9.12.0",
@@ -8,9 +8,11 @@
     "dev": "pnpm --filter @movie-desk/web dev",
     "build": "pnpm --filter @movie-desk/web build",
     "start": "pnpm --filter @movie-desk/web start",
-    "lint": "pnpm -r lint && biome lint scripts",
+    "lint": "pnpm -r lint && biome check scripts",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
+    "test": "pnpm -r test && node --test scripts/*.test.mjs",
+    "check:versions": "node scripts/check-versions.mjs",
+    "sync:versions": "node scripts/check-versions.mjs --write",
     "test:e2e": "pnpm --filter @movie-desk/web test:e2e",
     "audit:prod": "node scripts/osv-audit.mjs",
     "format": "pnpm -r format && biome format --write scripts"
