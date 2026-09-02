@@ -114,7 +114,13 @@ describe("media protocol", () => {
   it("invalidates released leases and never accepts a path as an asset id", async () => {
     const media = await fixture();
     media.leases.release(media.lease.leaseId);
-    assert.equal((await media.handler(new Request(media.lease.url))).status, 403);
+    const response = await media.handler(new Request(media.lease.url));
+    assert.equal(response.status, 403);
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.match(
+      response.headers.get("access-control-expose-headers"),
+      /X-Movie-Desk-Source-State/,
+    );
     assert.equal(parseMediaUrl("media://asset/../../etc/passwd?lease=x"), null);
   });
 
@@ -131,6 +137,11 @@ describe("media protocol", () => {
 
     assert.equal(response.status, 409);
     assert.equal(response.headers.get("x-movie-desk-source-state"), "changed");
+    assert.equal(response.headers.get("access-control-allow-origin"), "*");
+    assert.match(
+      response.headers.get("access-control-expose-headers"),
+      /X-Movie-Desk-Source-State/,
+    );
   });
 
   it("reuses the resolved source snapshot for every range in one lease", async () => {

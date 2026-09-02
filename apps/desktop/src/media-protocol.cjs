@@ -179,6 +179,8 @@ const mediaHeaders = (mime, range, sizeBytes) => {
   const headers = {
     "Accept-Ranges": "bytes",
     "Access-Control-Allow-Origin": "*",
+    "Access-Control-Expose-Headers":
+      "Accept-Ranges, Content-Length, Content-Range, X-Movie-Desk-Source-State",
     "Cache-Control": "no-store",
     "Content-Length": String(range.length),
     "Content-Type": mime || "application/octet-stream",
@@ -195,7 +197,15 @@ const sourceStateResponse = (state, status, message) =>
 const textResponse = (body, status, headers = {}) =>
   new Response(body, {
     status,
-    headers: { "Content-Type": "text/plain; charset=utf-8", ...headers },
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers":
+        "Accept-Ranges, Content-Length, Content-Range, X-Movie-Desk-Source-State",
+      "Cross-Origin-Resource-Policy": "cross-origin",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Type": "text/plain; charset=utf-8",
+      ...headers,
+    },
   });
 
 module.exports = {

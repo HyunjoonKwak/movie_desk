@@ -1,10 +1,41 @@
 import { useProxyStore } from "@/media/proxy-store";
-import { type MediaUrlLease, acquireMediaUrl } from "@/persistence/opfs";
+import type { PlaybackLease, RandomAccessMediaSource } from "@/media/source/media-source";
+import { resolveMediaSource } from "@/media/source/resolve-media-source";
+import { acquireMediaUrl } from "@/persistence/opfs";
 import type { MediaAsset } from "@movie-desk/core";
 import { BoundedResourceCache } from "./bounded-resource-cache";
 
 type Source = HTMLVideoElement | HTMLImageElement;
-const mediaUrlLeases = new WeakMap<Source, MediaUrlLease>();
+const mediaUrlLeases = new WeakMap<Source, PlaybackLease>();
+
+interface FrameSourceLeaseDependencies {
+  readonly acquireProxy: (key: string) => Promise<PlaybackLease | null>;
+  readonly resolveSource: (asset: MediaAsset) => Promise<RandomAccessMediaSource>;
+}
+
+const defaultLeaseDependencies: FrameSourceLeaseDependencies = {
+  acquireProxy: acquireMediaUrl,
+  resolveSource: resolveMediaSource,
+};
+
+// Proxies remain rebuildable OPFS entries. Originals go through the common
+// source resolver so referenced disk images and codecs that fall back from
+// WebCodecs receive the same revocable playback URL as the decoder path.
+export const acquireFrameSourceLease = async (
+  asset: MediaAsset,
+  useProxy: boolean,
+  dependencies: FrameSourceLeaseDependencies = defaultLeaseDependencies,
+): Promise<PlaybackLease | null> => {
+  if (useProxy && asset.proxyPath) {
+    const proxy = await dependencies.acquireProxy(asset.proxyPath);
+    if (proxy) return proxy;
+  }
+  try {
+    return await (await dependencies.resolveSource(asset)).acquirePlaybackUrl();
+  } catch {
+    return null;
+  }
+};
 
 const releaseSource = (source: Source): void => {
   if (source instanceof HTMLVideoElement) {
@@ -75,8 +106,7 @@ export class FrameSourcePool {
   private async load(asset: MediaAsset): Promise<Source | null> {
     // Use the low-res proxy for preview/scrub when enabled and available.
     const useProxy = useProxyStore.getState().useProxy;
-    const proxyLease = useProxy && asset.proxyPath ? await acquireMediaUrl(asset.proxyPath) : null;
-    const lease = proxyLease ?? (await acquireMediaUrl(asset.opfsPath));
+    const lease = await acquireFrameSourceLease(asset, useProxy);
     if (!lease) return null;
     let source: Source | null = null;
     if (asset.kind === "image") {
