@@ -239,6 +239,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B23 muxer 교체 | Claude | 대기 | |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
 | B25 v0.4.0 | 사용자 | 대기 | |
-| A1-a MediaSource 계약 | Claude | 진행 중 | `claude/a1-a-media-source` · core 타입·fingerprint·cacheKey, zod 스키마, OPFS adapter, resolver, 디코더 ByteSource, 컴포지터 연결 |
-| A1-b 데스크톱 adapter | Codex | 대기 | node:sqlite worker 카탈로그, `media://` Range, `registerMediaSourceAdapter("disk", …)` |
-| A1-c helper 계약 | Codex | 대기 | inspect·preview·fingerprint JSON 프로토콜, 1차 sips |
+| A1-a MediaSource 계약 | Claude | 완료, 통합 후보 | core 타입·fingerprint·cacheKey, zod 스키마(safe relativePath), OPFS adapter, resolver, 디코더 ByteSource(clampReadRange), 컴포지터 연결. Codex 검토 반영(77917f5). CI Node 22 |
+| A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, 통합 후보 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
+| A1-c helper 계약 | Codex | 완료, 통합 후보 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
+| A1-d 렌더러 disk adapter | Claude | 대기 | A1 통합 뒤. `fetch` Range over `media://`, 상태 헤더→MediaSourceError, 길이 0 가드, `registerMediaSourceAdapter("disk")` |
