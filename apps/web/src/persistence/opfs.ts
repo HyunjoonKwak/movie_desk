@@ -102,9 +102,23 @@ export const writeMediaFile = async (key: string, file: File): Promise<string> =
   const root = await getRoot();
   const handle = await root.getFileHandle(key, { create: true });
   const writable = await handle.createWritable();
-  await writable.write(file);
-  await writable.close();
-  return key;
+  try {
+    await writable.write(file);
+    await writable.close();
+    return key;
+  } catch (error) {
+    try {
+      await writable.abort();
+    } catch {
+      // Preserve the original write failure; cleanup continues below.
+    }
+    try {
+      await root.removeEntry(key);
+    } catch {
+      // The browser may already have discarded the incomplete entry.
+    }
+    throw error;
+  }
 };
 
 export const readMediaFile = async (key: string): Promise<Blob | null> => {

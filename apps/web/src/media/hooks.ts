@@ -7,6 +7,8 @@ import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 import { importMediaFile } from "./import";
 import { useImportProgressStore } from "./import-progress-store";
+import { useImportFailureStore } from "./import-failure-store";
+import { createMediaImportFailure } from "./import-errors";
 import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
 import {
   type MediaImportCandidate,
@@ -80,6 +82,7 @@ export const useMediaImport = (): ImportState => {
           } catch (error) {
             // One bad file must not abort the whole batch.
             failed++;
+            useImportFailureStore.getState().add(createMediaImportFailure(candidate, error));
             if (error instanceof DesktopHeicImportError && error.code === "DESKTOP_REQUIRED") {
               desktopRequired++;
             }

@@ -36,6 +36,8 @@ Movie Desk는 세 종류의 제품을 동시에 기준으로 삼습니다. 사�
 Final Cut Pro와 DaVinci Resolve는 편집 깊이·정확도·성능·신뢰성의 기준선입니다.
 타임라인·이펙트·내보내기 비교는 [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md),
 기술 설계는 [`docs/02-architecture.md`](docs/02-architecture.md)를 참고하세요.
+카메라 원본과 혼합 DCIM 폴더를 가져오기 전에는
+[`docs/08-media-compatibility.md`](docs/08-media-compatibility.md)에서 현재 호환 범위를 확인할 수 있습니다.
 
 ## 현재 동작하는 기능
 

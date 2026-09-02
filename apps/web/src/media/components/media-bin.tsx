@@ -38,6 +38,7 @@ import { generateProxy } from "@/media/proxy";
 import { fmtSec, formatBytes } from "@/media/format";
 import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
+import { ImportFailures } from "./import-failures";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -269,6 +270,7 @@ export function MediaBin() {
       </div>
 
       <ImportProgress />
+      <ImportFailures onRetry={importFiles} />
 
       {media.length > 0 && (
         <div className="space-y-2 px-2 pb-2" data-testid="media-controls">

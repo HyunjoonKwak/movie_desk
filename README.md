@@ -41,6 +41,8 @@ performance, and reliability.
 [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md) tracks the timeline,
 effects, and export against them, and
 [`docs/02-architecture.md`](docs/02-architecture.md) covers the technical plan.
+See [`docs/08-media-compatibility.md`](docs/08-media-compatibility.md) before importing
+camera originals or mixed DCIM folders.
 
 ## What ships today
 
