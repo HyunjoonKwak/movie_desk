@@ -262,34 +262,20 @@ export function MediaBin() {
               className="w-full rounded bg-white/5 py-1 pl-7 pr-2 text-xs text-ink-1 outline-none focus:bg-white/10"
             />
           </label>
-          <div className="flex items-center gap-1">
+          <div className="grid grid-cols-4 gap-1">
             {KIND_FILTERS.map((k) => (
               <button
                 key={k}
                 type="button"
                 onClick={() => setFilter(k)}
                 className={cn(
-                  "rounded px-1.5 py-0.5 text-3xs uppercase tracking-wider",
+                  "min-w-0 rounded px-1 py-1 text-2xs uppercase tracking-[0.04em]",
                   filter === k ? "bg-accent text-accent-fg" : "text-ink-3 hover:text-ink-1",
                 )}
               >
                 {k}
               </button>
             ))}
-            <div className="ml-auto flex items-center gap-1" title={t("media.thumbSize")}>
-              <ZoomOut className="size-3 text-ink-3" />
-              <input
-                type="range"
-                min={0}
-                max={2}
-                step={1}
-                value={thumbSize}
-                onChange={(e) => setThumbSize(Number(e.target.value))}
-                className="w-14 accent-[var(--accent)]"
-                aria-label={t("media.thumbSize")}
-              />
-              <ZoomIn className="size-3 text-ink-3" />
-            </div>
           </div>
           <div className="flex items-center gap-1">
             <select
@@ -300,7 +286,7 @@ export function MediaBin() {
                   .setMediaOrder(e.target.value === "imported" ? "imported" : "captured")
               }
               aria-label={t("media.sort")}
-              className="rounded bg-white/5 px-1 py-0.5 text-3xs text-ink-2 outline-none focus:bg-white/10"
+              className="min-w-0 flex-1 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
             >
               <option value="captured">{t("media.sortCaptured")}</option>
               <option value="imported">{t("media.sortImported")}</option>
@@ -310,13 +296,27 @@ export function MediaBin() {
               onClick={() => useViewStore.getState().toggleMediaGroupByDay()}
               aria-pressed={groupDays}
               className={cn(
-                "flex items-center gap-1 rounded px-1.5 py-0.5 text-3xs",
+                "flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-2xs",
                 groupDays ? "bg-accent text-accent-fg" : "text-ink-3 hover:text-ink-1",
               )}
             >
               <CalendarDays className="size-3" />
               {t("media.groupByDay")}
             </button>
+          </div>
+          <div className="flex items-center gap-1.5" title={t("media.thumbSize")}>
+            <ZoomOut className="size-3 shrink-0 text-ink-3" />
+            <input
+              type="range"
+              min={0}
+              max={2}
+              step={1}
+              value={thumbSize}
+              onChange={(e) => setThumbSize(Number(e.target.value))}
+              className="min-w-0 flex-1 accent-[var(--accent)]"
+              aria-label={t("media.thumbSize")}
+            />
+            <ZoomIn className="size-3 shrink-0 text-ink-3" />
           </div>
         </div>
       )}

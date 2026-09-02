@@ -134,8 +134,13 @@ export function InspectorPanel() {
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
-      <dd className="font-mono text-meta text-ink-1">{value}</dd>
+      <dt className="shrink-0 text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dd
+        className="min-w-0 flex-1 truncate text-right font-mono text-meta text-ink-1"
+        title={value}
+      >
+        {value}
+      </dd>
     </div>
   );
 }
@@ -143,8 +148,8 @@ function Row({ label, value }: { label: string; value: string }) {
 function EditableRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <dt className="text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
-      <dd>{children}</dd>
+      <dt className="shrink-0 text-2xs uppercase tracking-wide text-ink-3">{label}</dt>
+      <dd className="shrink-0">{children}</dd>
     </div>
   );
 }

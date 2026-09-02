@@ -158,7 +158,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                 >
                   <span>
                     <span className="block font-medium text-ink-1">{p.name}</span>
-                    <span className="block text-2xs text-ink-3">
+                    <span className="block text-meta text-ink-3">
                       {p.width}×{p.height} • {p.fps} fps • {p.videoCodec}/{p.audioCodec} •{" "}
                       {p.videoBitrateKbps} kbps
                     </span>
@@ -199,7 +199,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
               value={targetLufs}
               onChange={(e) => setTargetLufs(Number(e.target.value))}
               disabled={!normEnabled}
-              className="rounded bg-white/5 px-2 py-1 text-2xs text-ink-1 outline-none disabled:opacity-40"
+              className="rounded bg-white/5 px-2 py-1 text-meta text-ink-1 outline-none disabled:opacity-40"
             >
               <option value={-14} className="bg-panel-2">
                 -14 LUFS (web)
@@ -220,7 +220,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                 type="button"
                 onClick={handleMeasure}
                 disabled={measuring}
-                className="flex items-center gap-1 rounded px-2 py-0.5 text-2xs text-ink-3 hover:bg-white/10 hover:text-ink-1 disabled:opacity-50"
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-meta text-ink-3 hover:bg-white/10 hover:text-ink-1 disabled:opacity-50"
               >
                 {measuring ? (
                   <Loader2 className="size-3 animate-spin" />
@@ -231,7 +231,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
               </button>
             </div>
             {loudness && (
-              <div className="mt-1.5 flex justify-between text-2xs">
+              <div className="mt-1.5 flex justify-between text-meta">
                 <span className="text-ink-3">
                   {t("loudness.integrated")}:{" "}
                   <span className="font-mono text-ink-1">{fmtLufs(loudness.integratedLufs)}</span>
@@ -246,8 +246,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
           {progress && (
             <div className="mt-4 space-y-1">
-              {queueLabel && <div className="text-2xs font-medium text-ink-2">{queueLabel}</div>}
-              <div className="flex justify-between text-2xs text-ink-3">
+              {queueLabel && <div className="text-meta font-medium text-ink-2">{queueLabel}</div>}
+              <div className="flex justify-between text-meta text-ink-3">
                 <span>{t(STAGE_KEY[progress.stage])}</span>
                 <span>
                   {Math.round(progress.progress * 100)}%

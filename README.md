@@ -175,26 +175,13 @@ all, add the Apple Developer secrets to the repo (`CSC_LINK`,
 `APPLE_TEAM_ID`) and remove the `identity: null` line — no workflow change
 required.
 
-## Roadmap (post v0.2)
+## Roadmap
 
-- WebGPU renderer and WGSL shader support
-- Compound / nested sequences
-- Background render queue
-- Per-language subtitle tracks and translation workflow
-- Effect preview thumbnails and GIF / image-sequence export
-- Mobile native shells (Capacitor)
+The plan lives in [`docs/06-master-plan.md`](docs/06-master-plan.md) (Korean).
+Phases: 0 ship the Movie Desk rename, 1 dogfood one real family set end to
+end, 2 accept iPhone and camera originals as-is (HEIC, HEVC, .mov), 3 rough-cut
+quality and analysis speed, 4 finishing and sharing, 5 reliability (auto-edit
+e2e, muxer successor), 6 public release when interests grow.
 
-### Deferred (assessed, not yet shipped)
-
-- **Compound / nested sequences.** Wrapping a clip range into a reusable
-  sub-timeline. Requires recursive rendering (render the inner sequence
-  to an offscreen FBO, sample that as the parent clip's source) and a
-  new `kind: "compound"` in the discriminated union with non-trivial
-  serialisation / undo considerations. Estimated 2–3 days for an
-  MVP that covers playback + edit, longer for full keyframe propagation.
-- **Background render queue.** Running the export pipeline in a separate
-  Electron `BrowserWindow` / `utilityProcess` so the user keeps editing
-  while a render completes. The pipeline currently runs in the main
-  renderer (WebCodecs lives there). Splitting it cleanly requires a
-  shared OPFS layer and an IPC encoder bridge — estimated 2 days for the
-  desktop bundle alone, more if we want web parity.
+Not planned: collaboration, plugins, compound sequences, cloud accounts,
+template marketplaces.
