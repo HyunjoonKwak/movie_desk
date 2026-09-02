@@ -10,7 +10,7 @@ import {
   type TextAlign,
   type TextAnimation,
   type Track,
-} from "@cut/core";
+} from "@movie-desk/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 // Reserved lanes are owned by generators (SRT import wipes "Subtitles"

@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { AlertTriangle, CircleAlert, Info, CheckCircle2 } from "lucide-react";
-import { inspectProject, type IssueSeverity, type ID } from "@cut/core";
+import { inspectProject, type IssueSeverity, type ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useT } from "@/i18n/use-t";

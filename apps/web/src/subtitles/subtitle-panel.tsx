@@ -3,7 +3,7 @@
 import { useMemo, useRef } from "react";
 import { Download, FileText, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import { isTextClip, formatTimecode } from "@cut/core";
+import { isTextClip, formatTimecode } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { parseSrt, parseVtt, toSrt, toVtt, type SubtitleCue } from "./srt";

@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: "Pretendard Variable";
+  font-style: normal;
+  font-weight: 45 920;
+  font-display: block;
+  src: url("/fonts/PretendardVariable.woff2") format("woff2-variations");
+}
+
 @layer base {
   :root {
     color-scheme: dark;
@@ -31,30 +39,55 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
+    background: #3c434a;
+    border: 2px solid transparent;
+    border-radius: 5px;
+    background-clip: padding-box;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background-color: #838c92;
+  }
+
+  :focus-visible {
+    outline: 2px solid #00bafe;
+    outline-offset: 2px;
   }
 }
 
 @layer components {
   .panel {
-    @apply bg-panel-1 border border-white/5;
+    @apply border border-line bg-panel-1;
   }
   .panel-header {
-    @apply flex items-center justify-between px-3 py-2 text-xs uppercase tracking-wider text-ink-3;
+    @apply flex min-h-9 items-center justify-between border-b border-line
+           bg-panel-1 px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-ink-3;
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm
-           font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none;
+    @apply inline-flex min-h-7 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-2.5
+           py-1 text-[13.5px] font-medium transition-colors disabled:pointer-events-none disabled:opacity-35;
   }
   .btn-primary {
-    @apply btn bg-accent text-accent-fg hover:bg-accent-hover;
+    @apply btn bg-accent font-semibold text-accent-fg hover:brightness-110;
   }
   .btn-ghost {
-    @apply btn text-ink-2 hover:bg-white/5 hover:text-ink-1;
+    @apply btn text-ink-2 hover:bg-panel-3 hover:text-ink-1;
+  }
+  .toolbar-cluster {
+    @apply flex items-center rounded-md border border-line-strong bg-panel-2 p-0.5;
+  }
+  .landing-surface {
+    background: radial-gradient(circle at 18% 0%, rgb(96 93 255 / 0.14), transparent 31rem),
+      radial-gradient(circle at 85% 35%, rgb(0 186 254 / 0.05), transparent 29rem), #15191e;
+  }
+  .landing-grid {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: linear-gradient(to bottom, black, transparent 82%);
+  }
+  .landing-card {
+    @apply border border-line bg-panel-2 shadow-[0_18px_60px_rgba(0,0,0,0.2)]
+           transition-colors duration-200 hover:border-line-strong hover:bg-panel-3;
   }
 
   /* Electron desktop: make the top bar act as the native title bar

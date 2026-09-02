@@ -12,7 +12,7 @@ import {
   type Ms,
   type Project,
   type Track,
-} from "@cut/core";
+} from "@movie-desk/core";
 import type { ProjectMutating, SetFn } from "../store-helpers";
 
 // FCP three-point edit modes: E append, W insert, D overwrite, Q connect.

@@ -1,4 +1,4 @@
-import { createEmptyProject } from "@cut/core";
+import { createEmptyProject } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import { ProjectAudioMixer, decodedStereoChannels, packStereoPlanar } from "../audio-mixer";
 import { combineInline, combineInlineStateful } from "../audio-mixer-worker";

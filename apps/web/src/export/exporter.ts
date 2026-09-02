@@ -1,6 +1,6 @@
 import { Compositor } from "@/renderer/compositor";
 import { useRangeStore } from "@/stores/range-store";
-import { type Project, framesToMs, msToFrames } from "@cut/core";
+import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
@@ -233,7 +233,7 @@ export class WebCodecsExporter implements Exporter {
 
   private async resolveProject(_projectId: string): Promise<{
     project: Project;
-    getAsset: (id: import("@cut/core").ID) => import("@cut/core").MediaAsset | undefined;
+    getAsset: (id: import("@movie-desk/core").ID) => import("@movie-desk/core").MediaAsset | undefined;
   }> {
     const { useProjectStore } = await import("@/stores/project-store");
     const project = useProjectStore.getState().project;

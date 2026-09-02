@@ -2,7 +2,7 @@
 // ../web/out and serves it via a custom `app://` protocol so the service
 // worker and SharedArrayBuffer (COOP/COEP) keep working.
 //
-// In dev mode (CUT_DEV_URL env var set) we point straight at the Next dev
+// In dev mode (MOVIE_DESK_DEV_URL env var set) we point straight at the Next dev
 // server so HMR works.
 
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
@@ -10,12 +10,12 @@ const path = require("node:path");
 const fs = require("node:fs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
 
-const isDev = !!process.env.CUT_DEV_URL;
-const DEV_URL = process.env.CUT_DEV_URL ?? "http://localhost:3000/editor";
+const isDev = !!process.env.MOVIE_DESK_DEV_URL;
+const DEV_URL = process.env.MOVIE_DESK_DEV_URL ?? "http://localhost:3000/editor";
 
 // Proper product name for the application menu / dock (package.json's
 // lowercase `name` would otherwise leak into the UI).
-app.setName("Reelog");
+app.setName("Movie Desk");
 // In a packaged build the web export lives at <Resources>/web (see
 // electron-builder.yml `extraResources`). Unpackaged runs read from the
 // repo's apps/web/out directory.
@@ -123,7 +123,7 @@ const saveWindowState = (win) => {
     );
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: Main-process persistence failures belong in desktop logs.
-    console.warn("[cut-desktop] could not persist window state:", err?.message ?? err);
+    console.warn("[movie-desk-desktop] could not persist window state:", err?.message ?? err);
   }
 };
 
@@ -135,7 +135,7 @@ const createWindow = () => {
     ...(Number.isFinite(state?.x) && Number.isFinite(state?.y) ? { x: state.x, y: state.y } : {}),
     minWidth: 960,
     minHeight: 600,
-    backgroundColor: "#0b0d10",
+    backgroundColor: "#15191e",
     titleBarStyle: "hiddenInset",
     // Center the traffic lights vertically in the web app's 44px top bar.
     trafficLightPosition: { x: 16, y: 14 },
@@ -146,7 +146,7 @@ const createWindow = () => {
       nodeIntegration: false,
       // Hand the app version to the sandboxed preload synchronously so the
       // web top bar can show it from the first paint.
-      additionalArguments: [`--reelog-version=${app.getVersion()}`],
+      additionalArguments: [`--movie-desk-version=${app.getVersion()}`],
     },
   });
   if (state?.maximized) win.maximize();
@@ -156,6 +156,8 @@ const createWindow = () => {
     win.loadURL(DEV_URL);
     win.webContents.openDevTools({ mode: "detach" });
   } else {
+    // Keep the legacy host: Chromium storage is origin-scoped, so changing it
+    // would hide existing projects and OPFS media after the product rename.
     win.loadURL("app://cut-editor/editor/");
   }
 
@@ -174,7 +176,7 @@ const createWindow = () => {
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return;
       void shell.openExternal(parsed.toString()).catch((err) => {
         // biome-ignore lint/suspicious/noConsole: External-browser failures belong in desktop logs.
-        console.warn("[cut-desktop] could not open external link:", err?.message ?? err);
+        console.warn("[movie-desk-desktop] could not open external link:", err?.message ?? err);
       });
     } catch {
       // Invalid URLs are intentionally denied.
@@ -314,7 +316,7 @@ const buildMenu = (win) => {
       submenu: [
         {
           label: "Project on GitHub",
-          click: () => shell.openExternal("https://github.com/HyunjoonKwak/awesome_film"),
+          click: () => shell.openExternal("https://github.com/HyunjoonKwak/movie_desk"),
         },
         ...(isMac ? [] : [checkUpdatesItem]),
       ],
@@ -327,11 +329,11 @@ const buildMenu = (win) => {
 // us the encoded bytes + a suggested file name; we open a Save panel and,
 // on confirm, write the file to the chosen location. Returns the absolute
 // path written, or null when the user cancelled.
-ipcMain.handle("cut:save-export", async (event, payload) => {
+ipcMain.handle("movie-desk:save-export", async (event, payload) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const { suggestedName, bytes, mimeType } = payload ?? {};
   if (!bytes || !(bytes instanceof Uint8Array)) {
-    throw new Error("cut:save-export expects bytes:Uint8Array");
+    throw new Error("movie-desk:save-export expects bytes:Uint8Array");
   }
   const ext = typeof suggestedName === "string" ? path.extname(suggestedName).slice(1) : "";
   const filters = ext ? [{ name: mimeType ?? ext.toUpperCase(), extensions: [ext] }] : [];
@@ -349,7 +351,7 @@ ipcMain.handle("cut:save-export", async (event, payload) => {
 // the renderer parses the returned text with its own credits parser.
 const { creditsTextFromWatchHtml, isAllowedYoutubeUrl } = require("./music-credits.cjs");
 
-ipcMain.handle("cut:fetch-music-credits", async (_event, url) => {
+ipcMain.handle("movie-desk:fetch-music-credits", async (_event, url) => {
   if (!isAllowedYoutubeUrl(url)) return null;
   try {
     const res = await fetch(String(url), {
@@ -370,8 +372,8 @@ ipcMain.handle("cut:fetch-music-credits", async (_event, url) => {
 });
 
 app.whenReady().then(() => {
-  // CUT_UPDATE_SMOKE=1 drives the update check once and exits (no window).
-  if (process.env.CUT_UPDATE_SMOKE === "1") {
+  // MOVIE_DESK_UPDATE_SMOKE=1 drives the update check once and exits (no window).
+  if (process.env.MOVIE_DESK_UPDATE_SMOKE === "1") {
     void runSmokeCheck();
     return;
   }
@@ -392,7 +394,7 @@ app.on("window-all-closed", () => {
 
 // Diagnostic helper for verifying the bundle in CI.
 // biome-ignore lint/suspicious/noConsole: Desktop boot paths are verified from main-process logs.
-console.log("[cut-desktop] booting", {
+console.log("[movie-desk-desktop] booting", {
   isDev,
   devUrl: DEV_URL,
   webOut: WEB_OUT,

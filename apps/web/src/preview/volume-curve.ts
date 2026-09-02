@@ -1,4 +1,4 @@
-import { sampleKeyframeTrack, type KeyframeTrack } from "@cut/core";
+import { sampleKeyframeTrack, type KeyframeTrack } from "@movie-desk/core";
 
 // Sample a clip's volume keyframe track into a WebAudio gain curve over a
 // clip-relative timeline window. Mirrors the export mixer's semantics

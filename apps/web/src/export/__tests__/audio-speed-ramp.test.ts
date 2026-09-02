@@ -1,4 +1,4 @@
-import type { ID, MediaClip } from "@cut/core";
+import type { ID, MediaClip } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import { resampleClipAudio } from "../audio-mixer";
 

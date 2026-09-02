@@ -5,7 +5,7 @@
 // previous projects" experience.
 
 import Dexie, { type Table } from "dexie";
-import type { Project } from "@cut/core";
+import type { Project } from "@movie-desk/core";
 import { parseStoredProject } from "./project-export";
 
 interface StoredProject {
@@ -20,10 +20,11 @@ interface MetaRow {
   value: string;
 }
 
-class CutLibraryDB extends Dexie {
+class MovieDeskLibraryDB extends Dexie {
   projects!: Table<StoredProject, string>;
   meta!: Table<MetaRow, string>;
   constructor() {
+    // Legacy storage key retained so the rename never hides saved projects.
     super("cut_editor.library.v1");
     this.version(1).stores({
       projects: "id, updatedAt, name",
@@ -32,9 +33,9 @@ class CutLibraryDB extends Dexie {
   }
 }
 
-let db: CutLibraryDB | null = null;
+let db: MovieDeskLibraryDB | null = null;
 const getDb = () => {
-  if (!db) db = new CutLibraryDB();
+  if (!db) db = new MovieDeskLibraryDB();
   return db;
 };
 

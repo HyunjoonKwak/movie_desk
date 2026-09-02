@@ -1,13 +1,13 @@
 {
-  "name": "@cut/desktop",
+  "name": "@movie-desk/desktop",
   "version": "0.3.1",
   "private": true,
-  "description": "Electron shell that packages the Reelog web app as a native macOS application.",
-  "author": "Reelog contributors",
+  "description": "Movie Desk — a local-first AI video editor that organizes footage and creates a first cut.",
+  "author": "Movie Desk contributors",
   "main": "src/main.cjs",
   "scripts": {
-    "dev": "concurrently -k -n web,electron -c blue,green \"pnpm --filter @cut/web dev\" \"wait-on http://localhost:3000/editor && CUT_DEV_URL=http://localhost:3000 electron .\"",
-    "build:web": "pnpm --filter @cut/web exec cross-env NEXT_OUTPUT=export next build",
+    "dev": "concurrently -k -n web,electron -c blue,green \"pnpm --filter @movie-desk/web dev\" \"wait-on http://localhost:3000/editor && MOVIE_DESK_DEV_URL=http://localhost:3000 electron .\"",
+    "build:web": "pnpm --filter @movie-desk/web exec cross-env NEXT_OUTPUT=export next build",
     "build:mac": "pnpm run build:web && electron-builder --mac --config electron-builder.yml",
     "build:mac:arm64": "pnpm run build:web && electron-builder --mac --arm64 --config electron-builder.yml",
     "build:mac:x64": "pnpm run build:web && electron-builder --mac --x64 --config electron-builder.yml",

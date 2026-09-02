@@ -1,4 +1,4 @@
-import { addClip, addTrackAt, newId, type Project, type Track } from "@cut/core";
+import { addClip, addTrackAt, newId, type Project, type Track } from "@movie-desk/core";
 import type { SubtitleCue } from "./srt";
 
 const SUBS_TRACK_NAME = "Subtitles";

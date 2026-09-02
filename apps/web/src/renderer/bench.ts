@@ -1,5 +1,5 @@
 import { useProjectStore } from "@/stores/project-store";
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { Compositor } from "./compositor";
 
 interface BenchResult {

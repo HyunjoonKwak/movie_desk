@@ -7,7 +7,7 @@ import {
   type ID,
   type KeyframeTrack,
   type MediaClip,
-} from "@cut/core";
+} from "@movie-desk/core";
 import type { ProjectMutating, SetFn } from "../store-helpers";
 
 export interface MusicActions {

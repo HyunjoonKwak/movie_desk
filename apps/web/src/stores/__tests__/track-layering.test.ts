@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MediaAsset, MediaClip, Project } from "@cut/core";
-import { addClip, createEmptyProject, newId } from "@cut/core";
+import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
+import { addClip, createEmptyProject, newId } from "@movie-desk/core";
 import { applyPlanToProject } from "@/autoedit/apply";
 import { replaceSubtitlesFromCues } from "@/subtitles/subtitle-utils";
 

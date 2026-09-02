@@ -1,4 +1,4 @@
-import type { Ms } from "@cut/core";
+import type { Ms } from "@movie-desk/core";
 
 export interface Subtitle {
   readonly start: Ms;

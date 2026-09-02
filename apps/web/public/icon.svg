@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
   <!-- Timeline + playhead — matches the desktop app icon (D1). Clip colors
        mirror the editor's media/adjustment/overlay categories. -->
-  <rect width="64" height="64" rx="14" fill="#11141a"/>
-  <rect x="12" y="17" width="26" height="8" rx="2.5" fill="#6366f1"/>
-  <rect x="40" y="17" width="12" height="8" rx="2.5" fill="#6366f1" opacity="0.55"/>
-  <rect x="12" y="28" width="16" height="8" rx="2.5" fill="#10b981"/>
-  <rect x="30" y="28" width="22" height="8" rx="2.5" fill="#10b981" opacity="0.55"/>
-  <rect x="12" y="39" width="30" height="8" rx="2.5" fill="#f59e0b"/>
+  <rect width="64" height="64" rx="14" fill="#1d232a"/>
+  <rect x="12" y="17" width="26" height="8" rx="2.5" fill="#605dff"/>
+  <rect x="40" y="17" width="12" height="8" rx="2.5" fill="#605dff" opacity="0.55"/>
+  <rect x="12" y="28" width="16" height="8" rx="2.5" fill="#3ecf8e"/>
+  <rect x="30" y="28" width="22" height="8" rx="2.5" fill="#3ecf8e" opacity="0.55"/>
+  <rect x="12" y="39" width="30" height="8" rx="2.5" fill="#fcb700"/>
   <rect x="33.2" y="12" width="2.6" height="40" rx="1.3" fill="#ffffff"/>
   <path d="M 30.5 9.5 L 38.5 9.5 L 34.5 15.5 Z" fill="#ffffff"/>
 </svg>

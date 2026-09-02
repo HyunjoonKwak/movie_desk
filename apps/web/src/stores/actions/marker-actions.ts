@@ -1,5 +1,5 @@
-import { addMarker, removeMarker, updateMarker } from "@cut/core";
-import type { ID, Marker, Ms } from "@cut/core";
+import { addMarker, removeMarker, updateMarker } from "@movie-desk/core";
+import type { ID, Marker, Ms } from "@movie-desk/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface MarkerActions {

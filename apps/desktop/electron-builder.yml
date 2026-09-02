@@ -1,6 +1,7 @@
+# Kept for upgrade continuity with existing installations.
 appId: dev.cuteditor.app
-productName: Reelog
-copyright: Copyright © 2026 Reelog contributors
+productName: Movie Desk
+copyright: Copyright © 2026 Movie Desk contributors
 
 directories:
   output: dist
@@ -53,8 +54,8 @@ dmg:
 # the same repo's releases/latest API and offers the .dmg download — unsigned
 # builds cannot self-install, so installation stays a manual download. Set
 # `GH_TOKEN` to a personal access token with `repo` scope before running
-# `pnpm --filter @cut/desktop exec electron-builder --mac --publish=always`.
+# `pnpm --filter @movie-desk/desktop exec electron-builder --mac --publish=always`.
 publish:
   - provider: github
     owner: HyunjoonKwak
-    repo: awesome_film
+    repo: movie_desk

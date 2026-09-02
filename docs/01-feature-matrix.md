@@ -1,14 +1,14 @@
-# Feature matrix: cut_editor vs OpenCut vs CapCut vs Final Cut Pro
+# Feature matrix: Movie Desk vs OpenCut vs CapCut vs Final Cut Pro
 
 This is a directional product comparison, not a benchmark or compatibility
-promise. The cut_editor column reflects the current repository as of
+promise. The Movie Desk column reflects the current repository as of
 2026-07-16.
 
 Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Editing core
 
-| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| Capability | OpenCut | CapCut | FCP | Movie Desk current |
 | --- | :---: | :---: | :---: | :---: |
 | Multi-track timeline | ✅ | ✅ | ✅ | ✅ |
 | Magnetic snap and ripple edits | 🟡 | 🟡 | ✅ | ✅ |
@@ -22,7 +22,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Effects and graphics
 
-| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| Capability | OpenCut | CapCut | FCP | Movie Desk current |
 | --- | :---: | :---: | :---: | :---: |
 | GPU effect chain | ✅ | ✅ | ✅ | ✅ |
 | Vector clip masks / blend modes | ✅ | ✅ | ✅ | ✅ |
@@ -32,7 +32,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Local AI and automation
 
-| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| Capability | OpenCut | CapCut | FCP | Movie Desk current |
 | --- | :---: | :---: | :---: | :---: |
 | Automatic subtitles | ✅ | ✅ | 🟡 | ✅ local Whisper |
 | Multilingual translation | 🟡 | ✅ | ❌ | ❌ |
@@ -47,7 +47,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Persistence
 
-| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| Capability | OpenCut | CapCut | FCP | Movie Desk current |
 | --- | :---: | :---: | :---: | :---: |
 | Named local snapshots | 🟡 | ✅ | ✅ | ✅ |
 | Offline-first project/media storage | 🟡 | ❌ | n/a | ✅ ⭐ |
@@ -56,7 +56,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## Output and platform
 
-| Capability | OpenCut | CapCut | FCP | cut_editor current |
+| Capability | OpenCut | CapCut | FCP | Movie Desk current |
 | --- | :---: | :---: | :---: | :---: |
 | H.264 / VP9 / AV1 video | 🟡 | ✅ | ✅ | ✅ |
 | Stereo AAC and LUFS normalization | 🟡 | ✅ | ✅ | ✅ |

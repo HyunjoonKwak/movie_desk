@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MediaClip, Project } from "@cut/core";
-import { addClip, createEmptyProject, newId } from "@cut/core";
+import type { MediaClip, Project } from "@movie-desk/core";
+import { addClip, createEmptyProject, newId } from "@movie-desk/core";
 import { bpmFit } from "../recommend";
 import { projectCutBpm } from "../tempo";
 

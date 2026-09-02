@@ -1,5 +1,5 @@
-import { addTrack, removeTrack, updateTrack, addClip, moveClipToTrack } from "@cut/core";
-import type { Clip, ID, TrackKind } from "@cut/core";
+import { addTrack, removeTrack, updateTrack, addClip, moveClipToTrack } from "@movie-desk/core";
+import type { Clip, ID, TrackKind } from "@movie-desk/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface TrackActions {

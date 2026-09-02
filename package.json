@@ -1,17 +1,17 @@
 {
-  "name": "cut-editor",
+  "name": "movie-desk",
   "version": "0.1.0",
   "private": true,
-  "description": "AI-native, local-first, web-first video editor — open alternative to Final Cut Pro and CapCut.",
+  "description": "Movie Desk — an AI-native, local-first video editor that turns raw moments into finished movies.",
   "packageManager": "pnpm@9.12.0",
   "scripts": {
-    "dev": "pnpm --filter @cut/web dev",
-    "build": "pnpm --filter @cut/web build",
-    "start": "pnpm --filter @cut/web start",
+    "dev": "pnpm --filter @movie-desk/web dev",
+    "build": "pnpm --filter @movie-desk/web build",
+    "start": "pnpm --filter @movie-desk/web start",
     "lint": "pnpm -r lint && biome lint scripts",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "test:e2e": "pnpm --filter @cut/web test:e2e",
+    "test:e2e": "pnpm --filter @movie-desk/web test:e2e",
     "audit:prod": "node scripts/osv-audit.mjs",
     "format": "pnpm -r format && biome format --write scripts"
   },

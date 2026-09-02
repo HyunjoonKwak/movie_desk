@@ -1,4 +1,4 @@
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import { formatDayLabel, groupByDay, sortAssets } from "../organize";
 

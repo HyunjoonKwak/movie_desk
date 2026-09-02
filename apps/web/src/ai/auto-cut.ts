@@ -1,5 +1,5 @@
-import type { ID, Project, MediaClip } from "@cut/core";
-import { isMediaClip, splitClipAt, removeClip } from "@cut/core";
+import type { ID, Project, MediaClip } from "@movie-desk/core";
+import { isMediaClip, splitClipAt, removeClip } from "@movie-desk/core";
 import type { Range } from "./types";
 
 // Convert silence ranges (within an asset's source time domain) into a

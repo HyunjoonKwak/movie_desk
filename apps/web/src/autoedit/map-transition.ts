@@ -1,5 +1,5 @@
 import { ArrayBufferTarget, Muxer } from "mp4-muxer";
-import { newId, type MediaAsset } from "@cut/core";
+import { newId, type MediaAsset } from "@movie-desk/core";
 import { writeMediaFile } from "@/persistence/opfs";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import type { TravelMove } from "./story";

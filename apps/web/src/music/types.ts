@@ -1,4 +1,4 @@
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 
 // A saved music reference — a track the user heard somewhere (usually a
 // YouTube video) and wants to reuse later. Lives in the app-level library

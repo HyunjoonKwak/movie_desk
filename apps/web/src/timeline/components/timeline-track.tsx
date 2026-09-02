@@ -2,8 +2,8 @@
 
 import { useCallback, useState } from "react";
 import { Headphones, Lock, Trash2, Unlock, Volume2, VolumeX } from "lucide-react";
-import type { Track } from "@cut/core";
-import { collectSnapPoints, newId, resolvePlacement, snapMsToFrame, snapToNearest } from "@cut/core";
+import type { Track } from "@movie-desk/core";
+import { collectSnapPoints, newId, resolvePlacement, snapMsToFrame, snapToNearest } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useT } from "@/i18n/use-t";

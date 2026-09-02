@@ -1,4 +1,4 @@
-import type { ID, MediaAsset, Ms } from "@cut/core";
+import type { ID, MediaAsset, Ms } from "@movie-desk/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface MediaLibraryActions {

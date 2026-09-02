@@ -34,6 +34,7 @@ export const useViewStore = create<ViewState>()(
     }),
     // The shortcuts overlay should always start closed, so it is not persisted.
     {
+      // Legacy key retained so editor layout preferences survive the rename.
       name: "cut-editor:view",
       partialize: (s) => ({
         showGuides: s.showGuides,

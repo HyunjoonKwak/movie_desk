@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { KeyframeTrack } from "@cut/core";
+import type { KeyframeTrack } from "@movie-desk/core";
 
 // Transient clipboard for copying a clip's keyframe tracks onto another clip.
 interface KeyframeClipboardState {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { KeyframeTrack } from "@cut/core";
+import type { KeyframeTrack } from "@movie-desk/core";
 import { sampleVolumeCurve } from "../volume-curve";
 
 const fade: KeyframeTrack = {

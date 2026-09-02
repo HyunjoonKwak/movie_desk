@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import type { AnalysisEntry, AssetAnalysis } from "./types";
 import { analyzeAsset } from "./analyzer";
 

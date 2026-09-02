@@ -5,7 +5,7 @@ import { Scissors, X } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { fmtSec } from "@/media/format";
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 
 export function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: () => void }) {
   const t = useT();

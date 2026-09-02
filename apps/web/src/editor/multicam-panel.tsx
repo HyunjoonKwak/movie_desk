@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Clapperboard } from "lucide-react";
 import { toast } from "sonner";
-import type { MulticamAngle } from "@cut/core";
+import type { MulticamAngle } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";

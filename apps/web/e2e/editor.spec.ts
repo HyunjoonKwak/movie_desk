@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 
 test("opens the editor from the landing page", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("link", { name: "Open the editor" }).click();
+  await page.getByRole("link", { name: "편집 시작" }).click();
 
   await expect(page).toHaveURL(/\/editor$/);
   await expect(page.getByRole("button", { name: "Projects" })).toBeVisible();
@@ -51,11 +51,11 @@ test("persists a newly named project across a reload", async ({ page }) => {
   await expect(projectName).toHaveValue("Untitled");
   await projectName.fill("E2E persistence project");
   await projectName.press("Enter");
-  await expect(page).toHaveTitle("E2E persistence project — Reelog");
+  await expect(page).toHaveTitle("E2E persistence project — Movie Desk");
 
   await expect.poll(() => projectNamesInLibrary(page)).toContain("E2E persistence project");
   await page.reload();
 
   await expect(projectName).toHaveValue("E2E persistence project");
-  await expect(page).toHaveTitle("E2E persistence project — Reelog");
+  await expect(page).toHaveTitle("E2E persistence project — Movie Desk");
 });

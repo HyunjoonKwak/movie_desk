@@ -1,12 +1,12 @@
 import { readMediaFile } from "@/persistence/opfs";
-import type { ID, MediaAsset, Project } from "@cut/core";
+import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import {
   type EffectInstance,
   type MediaClip,
   isMediaClip,
   sampleKeyframeTrack,
   sourceOffsetForRamp,
-} from "@cut/core";
+} from "@movie-desk/core";
 import { combineInlineStateful } from "./audio-mixer-worker";
 import { denoise } from "./spectral-denoise";
 

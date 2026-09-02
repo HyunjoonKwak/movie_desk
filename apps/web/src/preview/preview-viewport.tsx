@@ -3,8 +3,9 @@
 import { Compositor } from "@/renderer/compositor";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { selectPlayhead, useProjectStore } from "@/stores/project-store";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { Clapperboard } from "lucide-react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for
 // console-driven render benchmarks.
 import "@/renderer/bench";
@@ -148,15 +149,19 @@ export function PreviewViewport() {
     <div className="relative flex h-full w-full items-center justify-center p-4">
       <PreviewControls />
       <div
-        className="relative max-h-full max-w-full overflow-hidden rounded-md bg-black shadow-2xl"
+        className="relative max-h-full max-w-full overflow-hidden rounded-md border border-line bg-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]"
         style={{ aspectRatio: `${w} / ${h}` }}
       >
         <canvas ref={canvasRef} data-preview-canvas className="size-full" />
         <RegionOverlay />
         <GuidesOverlay />
         {project.mediaLibrary.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center text-xs text-ink-3">
-            {t("preview.empty")}
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(96,93,255,0.08),transparent_55%)] px-8 text-center">
+            <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-line-strong bg-panel-2 text-accent">
+              <Clapperboard className="size-5" />
+            </span>
+            <p className="text-sm font-medium text-ink-1">{t("preview.empty")}</p>
+            <p className="mt-2 max-w-sm text-2xs leading-5 text-ink-3">{t("preview.emptyHint")}</p>
           </div>
         )}
       </div>

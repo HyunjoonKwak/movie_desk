@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyProject, newId } from "@cut/core";
+import { createEmptyProject, newId } from "@movie-desk/core";
 import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-export";
 
 // The JSON export is the user's escape hatch for their work — a lossy or

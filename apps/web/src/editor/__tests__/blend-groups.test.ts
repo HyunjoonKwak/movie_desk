@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLEND_MODES } from "@cut/core";
+import { BLEND_MODES } from "@movie-desk/core";
 import { BLEND_GROUPS } from "../blend-groups";
 
 // The picker renders from BLEND_GROUPS, not from BLEND_MODES, so a mode that is

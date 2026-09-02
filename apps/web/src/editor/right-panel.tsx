@@ -30,7 +30,7 @@ export function RightPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex overflow-hidden border-b border-white/5">
+      <div className="flex h-10 overflow-hidden border-b border-line bg-panel-1 px-1 pt-1">
         <TabButton
           active={tab === "inspector"}
           onClick={() => setTab("inspector")}
@@ -94,9 +94,8 @@ export function RightPanel() {
   );
 }
 
-// Icon-only tabs — eight labels don't fit a ~300px panel without wrapping.
-// The label lives in the tooltip/aria-label, and the active tab shows it
-// inline since the active state frees up the most attention.
+// Stable icon-only tabs keep all tools in a predictable position. Labels live
+// in native tooltips and aria-labels; the active tool gets a filled surface.
 function TabButton({
   active,
   onClick,
@@ -115,12 +114,14 @@ function TabButton({
       title={label}
       aria-label={label}
       className={cn(
-        "flex min-w-0 flex-1 items-center justify-center gap-1.5 border-b-2 px-2 py-2 text-2xs transition",
-        active ? "border-accent text-ink-1" : "border-transparent text-ink-3 hover:text-ink-1",
+        "relative flex min-w-0 flex-1 items-center justify-center rounded-t-md border border-transparent px-2 text-2xs transition-colors",
+        active
+          ? "border-line-strong bg-panel-2 text-accent"
+          : "text-ink-3 hover:bg-panel-3 hover:text-ink-1",
       )}
     >
       {icon}
-      {active && <span className="truncate uppercase tracking-wider">{label}</span>}
+      {active && <span className="absolute inset-x-2 bottom-0 h-px bg-accent" />}
     </button>
   );
 }

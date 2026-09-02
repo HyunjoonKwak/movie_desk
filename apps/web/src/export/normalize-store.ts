@@ -20,6 +20,7 @@ export const useNormalizeStore = create<NormalizeState>()(
       setEnabled: (v) => set({ enabled: v }),
       setTargetLufs: (v) => set({ targetLufs: v }),
     }),
+    // Legacy key retained so user export preferences survive the rename.
     { name: "cut-editor:normalize" },
   ),
 );

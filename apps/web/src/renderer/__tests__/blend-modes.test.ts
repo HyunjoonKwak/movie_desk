@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLEND_MODES, isBackdropBlend } from "@cut/core";
+import { BLEND_MODES, isBackdropBlend } from "@movie-desk/core";
 import { BACKDROP_BLEND_MODE } from "../compositor-uniforms";
 import { MASK_FN, MASK_UNIFORMS, WIPE_FN, WIPE_UNIFORMS } from "../shaders/common";
 import { fs as blendModesFs } from "../shaders/blend-modes";

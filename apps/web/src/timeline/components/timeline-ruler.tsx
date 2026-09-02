@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { formatTimecode } from "@cut/core";
+import { formatTimecode } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 
 interface Tick {

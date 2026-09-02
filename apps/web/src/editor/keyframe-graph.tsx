@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Clip, ID, EasingFn, BezierHandles } from "@cut/core";
-import { sampleKeyframeTrack } from "@cut/core";
+import type { Clip, ID, EasingFn, BezierHandles } from "@movie-desk/core";
+import { sampleKeyframeTrack } from "@movie-desk/core";
 import { Copy, ClipboardPaste } from "lucide-react";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { useKeyframeClipboard } from "@/stores/keyframe-clipboard-store";

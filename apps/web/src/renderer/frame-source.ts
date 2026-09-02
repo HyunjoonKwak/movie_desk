@@ -1,6 +1,6 @@
 import { useProxyStore } from "@/media/proxy-store";
 import { type MediaUrlLease, acquireMediaUrl } from "@/persistence/opfs";
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 import { BoundedResourceCache } from "./bounded-resource-cache";
 
 type Source = HTMLVideoElement | HTMLImageElement;

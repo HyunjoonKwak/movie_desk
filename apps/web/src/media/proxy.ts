@@ -1,6 +1,6 @@
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { acquireMediaUrl, writeMediaFile } from "@/persistence/opfs";
-import { type MediaAsset, newId } from "@cut/core";
+import { type MediaAsset, newId } from "@movie-desk/core";
 
 // Generate a low-res proxy of a video asset. We re-encode via WebCodecs +
 // mp4-muxer at a reduced resolution so the editor can scrub a lighter file.

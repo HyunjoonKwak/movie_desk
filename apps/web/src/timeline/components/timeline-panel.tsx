@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import { clipIdsInMarquee, type ID } from "@cut/core";
+import { clipIdsInMarquee, type ID } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useRangeStore } from "@/stores/range-store";
@@ -223,9 +223,12 @@ export function TimelinePanel() {
 
   return (
     <div className="flex h-full flex-col bg-panel-1">
-      <div className="flex items-center justify-between border-b border-white/5 px-3 py-1.5">
-        <div className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wider text-ink-3">{t("timeline.title")}</span>
+      <div className="flex min-h-11 items-center justify-between gap-3 border-b border-line bg-panel-1 px-3 py-1.5">
+        <div className="flex min-w-0 items-center gap-1.5 overflow-x-auto">
+          <span className="mr-1 shrink-0 text-2xs font-medium uppercase tracking-[0.14em] text-ink-3">
+            {t("timeline.title")}
+          </span>
+          <div className="mr-1 h-4 w-px shrink-0 bg-line" />
           <button
             type="button"
             className="btn-ghost px-1.5 py-0.5 text-2xs"
@@ -292,11 +295,13 @@ export function TimelinePanel() {
           >
             <Plus className="size-3" /> {t("timeline.adjustment")}
           </button>
-          <div className="mx-1 h-4 w-px bg-white/10" />
+          <div className="mx-1 h-4 w-px bg-line" />
           <button
             type="button"
             className="btn-ghost px-1.5 py-0.5 text-2xs"
-            onClick={() => useRangeStore.getState().setIn(useProjectStore.getState().project.timeline.playhead)}
+            onClick={() =>
+              useRangeStore.getState().setIn(useProjectStore.getState().project.timeline.playhead)
+            }
             title={t("range.setIn")}
           >
             {t("range.in")}
@@ -304,7 +309,9 @@ export function TimelinePanel() {
           <button
             type="button"
             className="btn-ghost px-1.5 py-0.5 text-2xs"
-            onClick={() => useRangeStore.getState().setOut(useProjectStore.getState().project.timeline.playhead)}
+            onClick={() =>
+              useRangeStore.getState().setOut(useProjectStore.getState().project.timeline.playhead)
+            }
             title={t("range.setOut")}
           >
             {t("range.out")}

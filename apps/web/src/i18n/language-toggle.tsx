@@ -12,7 +12,7 @@ export function LanguageToggle() {
 
   return (
     <label
-      className="inline-flex items-center gap-1 rounded border border-white/5 bg-white/5 px-1.5 py-0.5 text-2xs text-ink-2"
+      className="inline-flex min-h-7 items-center gap-1.5 rounded-md border border-line-strong bg-panel-2 px-2 text-2xs text-ink-2 transition-colors hover:bg-panel-3"
       title={t("topbar.language")}
     >
       <Languages className="size-3" />

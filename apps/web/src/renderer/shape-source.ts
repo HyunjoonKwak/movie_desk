@@ -1,4 +1,4 @@
-import type { ShapeClip } from "@cut/core";
+import type { ShapeClip } from "@movie-desk/core";
 
 // Renders a shape clip to an offscreen canvas at project resolution. Cached
 // by a content hash so we only repaint when the shape definition changes.

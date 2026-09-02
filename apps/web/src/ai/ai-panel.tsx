@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Crosshair, Loader2, ScissorsSquare, Scissors, Scan, Sparkles, Type, Music, Droplet } from "lucide-react";
 import { toast } from "sonner";
-import { isMediaClip, type ID } from "@cut/core";
+import { isMediaClip, type ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { InspectorSection } from "@/components/inspector-section";

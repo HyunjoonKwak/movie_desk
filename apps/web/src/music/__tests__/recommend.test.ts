@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import type { MusicRef } from "../types";
 import { collectAllTags, collectTags, recommendMusic } from "../recommend";
 

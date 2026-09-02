@@ -1,4 +1,4 @@
-import type { ID, Ms } from "@cut/core";
+import type { ID, Ms } from "@movie-desk/core";
 
 // Shake tiers drive how a segment may be used (design: 흔들림 4단계 정책).
 export type ShakeTier = "stable" | "mild" | "heavy" | "reject";

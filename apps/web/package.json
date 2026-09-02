@@ -1,5 +1,5 @@
 {
-  "name": "@cut/web",
+  "name": "@movie-desk/web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,7 @@
     "prebundle:whisper": "node scripts/download-whisper.mjs"
   },
   "dependencies": {
-    "@cut/core": "workspace:*",
+    "@movie-desk/core": "workspace:*",
     "@huggingface/transformers": "^4.2.0",
     "@mediapipe/tasks-vision": "^0.10.35",
     "@radix-ui/react-context-menu": "^2.2.16",

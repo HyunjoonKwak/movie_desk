@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import type { Clip } from "@cut/core";
-import { isMediaClip, isAdjustmentClip } from "@cut/core";
+import type { Clip } from "@movie-desk/core";
+import { isMediaClip, isAdjustmentClip } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";

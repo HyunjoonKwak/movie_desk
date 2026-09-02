@@ -1,4 +1,4 @@
-import type { Project } from "@cut/core";
+import type { Project } from "@movie-desk/core";
 import { musicStoreKeepKeys } from "@/music/file-store";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { deleteMediaFile, listMediaKeys } from "./opfs";

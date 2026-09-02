@@ -1,4 +1,4 @@
-import type { ClipboardEntry } from "@cut/core";
+import type { ClipboardEntry } from "@movie-desk/core";
 import { create } from "zustand";
 
 // In-app clip clipboard for Cmd+C/X/V. Session-only — deliberately not the

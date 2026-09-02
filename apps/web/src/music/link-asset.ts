@@ -1,4 +1,4 @@
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { readMediaFile } from "@/persistence/opfs";
 import { useMusicLibraryStore } from "@/stores/music-library-store";

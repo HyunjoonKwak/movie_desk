@@ -1,5 +1,5 @@
 // Barrel re-exporter for the timeline mutate slices. Splitting kept the
-// public API stable — every existing `import { addClip, ... } from "@cut/core"`
+// public API stable — every existing `import { addClip, ... } from "@movie-desk/core"`
 // keeps resolving to the same symbol thanks to this re-export.
 //
 //   mutate-core       — track + clip CRUD, move/trim, updateClip/Track,

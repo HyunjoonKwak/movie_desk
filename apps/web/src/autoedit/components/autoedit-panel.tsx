@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, ExternalLink, Music, Pin, RefreshCw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";

@@ -1,4 +1,4 @@
-import type { BlendMode } from "@cut/core";
+import type { BlendMode } from "@movie-desk/core";
 
 // Presentation grouping for the blend-mode picker. Seventeen modes in one flat
 // list is unreadable, so they are bucketed the way every other editor buckets

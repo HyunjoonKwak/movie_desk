@@ -42,7 +42,7 @@ importers:
 
   apps/web:
     dependencies:
-      '@cut/core':
+      '@movie-desk/core':
         specifier: workspace:*
         version: link:../../packages/core
       '@huggingface/transformers':

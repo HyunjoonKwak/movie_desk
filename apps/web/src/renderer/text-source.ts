@@ -1,4 +1,4 @@
-import type { TextClip } from "@cut/core";
+import type { TextClip } from "@movie-desk/core";
 
 // Off-screen canvas cache keyed by a content hash. Text clips re-render
 // only when text/font/size/color (or the typewriter char count) changes.

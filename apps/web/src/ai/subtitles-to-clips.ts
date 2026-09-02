@@ -5,7 +5,7 @@ import {
   type Project,
   type Track,
   type MediaClip,
-} from "@cut/core";
+} from "@movie-desk/core";
 import type { Subtitle } from "./types";
 
 // Convert a list of subtitles (source-relative ms) into text clips placed

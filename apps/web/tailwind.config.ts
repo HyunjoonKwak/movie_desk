@@ -6,33 +6,50 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        sans: [
+          "Pretendard Variable",
+          "Pretendard",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "sans-serif",
+        ],
+        mono: ["ui-monospace", "SF Mono", "Menlo", "Monaco", "Consolas", "monospace"],
       },
       colors: {
-        // Editor surface — true dark, neutral cool grays.
+        // Shared Photo Desk family palette: blue-grey surfaces progress from
+        // canvas to chrome, raised panels, and hover states.
         panel: {
-          0: "#0b0d10",
-          1: "#101317",
-          2: "#161a20",
-          3: "#1e242c",
-          4: "#262d37",
+          0: "#15191e",
+          1: "#191e24",
+          2: "#1d232a",
+          3: "#293037",
+          4: "#3c434a",
         },
         ink: {
-          1: "#e7ecf3",
-          2: "#9aa5b4",
-          3: "#5d6776",
+          1: "#ecf9ff",
+          2: "#a4afb5",
+          3: "#838c92",
+        },
+        line: {
+          DEFAULT: "#2b3239",
+          strong: "#3c434a",
         },
         accent: {
-          DEFAULT: "#6366f1", // indigo-500
-          hover: "#818cf8", // indigo-400
+          DEFAULT: "#605dff",
+          hover: "#7774ff",
           fg: "#ffffff",
         },
+        focus: "#00bafe",
+        ok: "#3ecf8e",
+        keep: "#fcb700",
+        drop: "#ff627d",
         // Timeline clip categories — keep in sync with timeline-clip.tsx.
         clip: {
-          media: "#6366f1", // indigo-500
-          adjustment: "#10b981", // emerald-500
-          overlay: "#f59e0b", // amber-500
+          media: "#605dff",
+          adjustment: "#3ecf8e",
+          overlay: "#fcb700",
         },
       },
       fontSize: {

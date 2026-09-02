@@ -1,8 +1,8 @@
-# @cut/desktop
+# @movie-desk/desktop
 
 **English** · [한국어](README.ko.md)
 
-Electron shell that packages the cut_editor web app as a native macOS
+Electron shell that packages the Movie Desk web app as a native macOS
 application. The web bundle (Next.js static export from `apps/web`) is
 served via a custom `app://` protocol so Service Worker registration and
 SharedArrayBuffer (COOP/COEP) keep working inside the desktop window.
@@ -13,31 +13,31 @@ SharedArrayBuffer (COOP/COEP) keep working inside the desktop window.
 electron main (src/main.cjs)
  ├─ app:// protocol handler  → serves apps/web/out/** with COOP/COEP headers
  ├─ session header injector  → mirrors COOP/COEP onto http://localhost (dev)
- ├─ BrowserWindow            → loads `app://cut-editor/editor/`
+ ├─ BrowserWindow            → loads the compatibility origin `app://cut-editor/editor/`
  └─ native menu              → forwards File/Edit/View commands via preload
 ```
 
 The preload (`src/preload.cjs`) translates IPC messages from native menu
-items into `window.dispatchEvent(new CustomEvent("cut:menu-export"))` etc.
+items into `window.dispatchEvent(new CustomEvent("movie-desk:menu-export"))` etc.
 The web app can listen for these events to react to native menu clicks.
 
 ## Dev workflow
 
 ```bash
-pnpm --filter @cut/desktop install      # one-time
-pnpm --filter @cut/desktop dev          # boots next dev + electron together
+pnpm --filter @movie-desk/desktop install      # one-time
+pnpm --filter @movie-desk/desktop dev          # boots next dev + electron together
 ```
 
-`dev` launches `pnpm --filter @cut/web dev` and, once `http://localhost:3000/editor`
+`dev` launches `pnpm --filter @movie-desk/web dev` and, once `http://localhost:3000/editor`
 is reachable, opens an Electron window pointed at it. DevTools open in
 a detached pane.
 
 ## Packaging a `.dmg`
 
 ```bash
-pnpm --filter @cut/desktop build:mac          # universal (arm64 + x64)
-pnpm --filter @cut/desktop build:mac:arm64    # Apple silicon only
-pnpm --filter @cut/desktop build:mac:x64      # Intel only
+pnpm --filter @movie-desk/desktop build:mac          # universal (arm64 + x64)
+pnpm --filter @movie-desk/desktop build:mac:arm64    # Apple silicon only
+pnpm --filter @movie-desk/desktop build:mac:x64      # Intel only
 ```
 
 The script:
@@ -65,7 +65,7 @@ opened"** dialog that right-click → Open won't bypass. They (or you) have
 to strip it once:
 
 ```bash
-xattr -cr /Applications/cut_editor.app
+xattr -cr "/Applications/Movie Desk.app"
 ```
 
 ```yaml
@@ -84,7 +84,7 @@ export CSC_KEY_PASSWORD='...'
 export APPLE_ID='you@example.com'
 export APPLE_APP_SPECIFIC_PASSWORD='abcd-efgh-ijkl-mnop'
 export APPLE_TEAM_ID='ABCDE12345'
-pnpm --filter @cut/desktop build:mac
+pnpm --filter @movie-desk/desktop build:mac
 ```
 
 electron-builder picks them up automatically and runs `notarytool` on the
@@ -99,7 +99,7 @@ fires only on:
 - a `v*` tag push (`git tag v0.1.1 && git push --tags`), or
 - a manual **Run workflow** click on the GitHub Actions page.
 
-Both paths run `pnpm --filter @cut/desktop release:mac` on a macOS runner,
+Both paths run `pnpm --filter @movie-desk/desktop release:mac` on a macOS runner,
 which builds the static web export, packages arm64 + x64 `.dmg`s, and
 uploads them to a GitHub Release that matches the version in this
 package's `package.json`. `latest-mac.yml` is written too so

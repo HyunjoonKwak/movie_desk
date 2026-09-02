@@ -1,8 +1,8 @@
 "use client";
 
 import { Diamond } from "lucide-react";
-import type { Clip, ID, BlendMode } from "@cut/core";
-import { clipTransform } from "@cut/core";
+import type { Clip, ID, BlendMode } from "@movie-desk/core";
+import { clipTransform } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { NumberScrubber } from "@/components/number-scrubber";

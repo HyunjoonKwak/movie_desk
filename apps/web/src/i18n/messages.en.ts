@@ -13,6 +13,7 @@ export const en = {
     "topbar.secondsAgo": "{n}s ago",
     "topbar.minutesAgo": "{n}m ago",
     "topbar.language": "Language",
+    "project.rename": "Rename project",
 
     // Collab bar
 
@@ -206,9 +207,13 @@ export const en = {
     "loudness.noAudio": "No audio to measure",
 
     // Preview
-    "preview.empty": "Import media on the left to begin.",
+    "preview.empty": "Bring in your footage to begin",
+    "preview.emptyHint": "Movie Desk organizes it by capture time and suggests a first edit.",
     "preview.guides": "Toggle guides (thirds + safe areas)",
     "preview.reframe": "Reframe aspect ratio",
+    "persistence.openFailed": "Could not open local persistence for this project.",
+    "persistence.welcome": "Local-first saving is on (IndexedDB)",
+    "persistence.unavailable": "Local project persistence is unavailable for this session.",
     "sc.title": "Keyboard shortcuts",
     "sc.play": "Play / pause",
     "sc.shuttle": "Shuttle reverse / pause / forward",

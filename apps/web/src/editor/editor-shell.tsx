@@ -59,7 +59,7 @@ export function EditorShell() {
       <ShortcutCheatsheet />
       <header
         className={cn(
-          "h-11 shrink-0 border-b border-white/5 bg-panel-1",
+          "h-12 shrink-0 border-b border-line bg-panel-1",
           // Electron hiddenInset window: leave room for the traffic lights
           // and let the bar double as the draggable title bar.
           isDesktopApp && "app-region-drag pl-[72px]",
@@ -69,28 +69,28 @@ export function EditorShell() {
       </header>
       {/* Resizable workspace, FCP-style: browser | viewer | inspector on
           top, timeline below. Split ratios persist via autoSaveId. */}
-      <PanelGroup direction="vertical" autoSaveId="cut:layout-rows" className="flex-1">
+      <PanelGroup direction="vertical" autoSaveId="movie-desk:layout-rows" className="flex-1">
         <Panel defaultSize={62} minSize={30}>
-          <PanelGroup direction="horizontal" autoSaveId="cut:layout-cols">
+          <PanelGroup direction="horizontal" autoSaveId="movie-desk:layout-cols">
             <Panel
               defaultSize={18}
               minSize={12}
               collapsible
               collapsedSize={0}
-              className="overflow-hidden border-r border-white/5"
+              className="overflow-hidden border-r border-line bg-panel-1"
             >
               <MediaBin />
             </Panel>
             <ResizeHandle orientation="vertical" />
             <Panel minSize={30}>
-              <main className="flex h-full flex-col overflow-hidden bg-black">
+              <main className="flex h-full flex-col overflow-hidden bg-panel-0">
                 <div className="min-h-0 flex-1">
                   <ErrorBoundary label="Preview">
                     <PreviewViewport />
                   </ErrorBoundary>
                 </div>
                 {/* Transport controls live with the viewer, FCP-style. */}
-                <div className="h-10 shrink-0 border-t border-white/5 bg-panel-1">
+                <div className="h-11 shrink-0 border-t border-line bg-panel-1">
                   <TransportBar />
                 </div>
               </main>
@@ -101,14 +101,14 @@ export function EditorShell() {
               minSize={14}
               collapsible
               collapsedSize={0}
-              className="overflow-hidden border-l border-white/5"
+              className="overflow-hidden border-l border-line bg-panel-1"
             >
               <RightPanel />
             </Panel>
           </PanelGroup>
         </Panel>
         <ResizeHandle orientation="horizontal" />
-        <Panel defaultSize={38} minSize={15} className="overflow-hidden border-t border-white/5">
+        <Panel defaultSize={38} minSize={15} className="overflow-hidden border-t border-line">
           <TimelinePanel />
         </Panel>
       </PanelGroup>
@@ -122,8 +122,8 @@ function ResizeHandle({ orientation }: { orientation: "vertical" | "horizontal" 
   return (
     <PanelResizeHandle
       className={cn(
-        "bg-white/5 transition-colors hover:bg-accent/60 data-[resize-handle-active]:bg-accent",
-        orientation === "vertical" ? "w-[3px]" : "h-[3px]",
+        "bg-transparent transition-colors hover:bg-accent/40 data-[resize-handle-active]:bg-accent/70",
+        orientation === "vertical" ? "w-1" : "h-1",
       )}
     />
   );
@@ -135,21 +135,21 @@ function MobileShell() {
     <div className="flex h-full flex-col bg-panel-0 text-ink-1">
       <CommandPalette />
       <ShortcutCheatsheet />
-      <header className="h-12 border-b border-white/5 bg-panel-1">
+      <header className="h-12 border-b border-line bg-panel-1">
         <TopBar />
       </header>
-      <main className="flex-1 overflow-hidden bg-black">
+      <main className="flex-1 overflow-hidden bg-panel-0">
         <ErrorBoundary label="Preview">
           <PreviewViewport />
         </ErrorBoundary>
       </main>
-      <section className="h-10 border-t border-white/5 bg-panel-1">
+      <section className="h-11 border-t border-line bg-panel-1">
         <TransportBar />
       </section>
-      <section className="h-56 overflow-hidden border-t border-white/5">
+      <section className="h-56 overflow-hidden border-t border-line">
         <TimelinePanel />
       </section>
-      <nav className="flex h-12 items-center justify-around border-t border-white/5 bg-panel-1">
+      <nav className="flex h-12 items-center justify-around border-t border-line bg-panel-1">
         <button
           type="button"
           onClick={() => setDrawer("media")}

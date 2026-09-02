@@ -2,8 +2,8 @@
 // with plain `node --test`. The Electron glue (network, dialogs, menu) lives
 // in updater.cjs.
 
-const RELEASES_LATEST_API = "https://api.github.com/repos/HyunjoonKwak/awesome_film/releases/latest";
-const RELEASES_PAGE_URL = "https://github.com/HyunjoonKwak/awesome_film/releases/latest";
+const RELEASES_LATEST_API = "https://api.github.com/repos/HyunjoonKwak/movie_desk/releases/latest";
+const RELEASES_PAGE_URL = "https://github.com/HyunjoonKwak/movie_desk/releases/latest";
 
 // Numeric semver compare on the x.y.z prefix; prerelease suffixes and a
 // leading "v" are tolerated ("v0.3.0-beta" → [0,3,0]). Returns <0, 0, >0.
@@ -22,8 +22,8 @@ const compareVersions = (a, b) => {
   return 0;
 };
 
-// electron-builder names the arm64 artifact `Reelog-x.y.z-arm64.dmg` and the
-// Intel one plain `Reelog-x.y.z.dmg` (no arch suffix). Blockmaps and yml
+// electron-builder names the arm64 artifact `Movie Desk-x.y.z-arm64.dmg` and the
+// Intel one plain `Movie Desk-x.y.z.dmg` (no arch suffix). Blockmaps and yml
 // metadata must never be offered as downloads.
 const pickDmgAsset = (assets, arch) => {
   const dmgs = (assets ?? []).filter((a) => a?.name?.endsWith(".dmg"));

@@ -1,4 +1,4 @@
-import type { Ms } from "@cut/core";
+import type { Ms } from "@movie-desk/core";
 import type { MusicAnalysis } from "./types";
 
 // Re-conform — design: 음악 후속 삽입/교체 시 자동 보정, 강도 ①.

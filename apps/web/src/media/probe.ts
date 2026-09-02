@@ -1,4 +1,4 @@
-import type { MediaKind } from "@cut/core";
+import type { MediaKind } from "@movie-desk/core";
 
 export interface ProbeResult {
   kind: MediaKind;

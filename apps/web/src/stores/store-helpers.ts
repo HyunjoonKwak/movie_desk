@@ -2,9 +2,9 @@
 // the same `SetFn`/`GetFn` pair so it can compose against the single source
 // of truth without circular imports.
 
-import type { Project } from "@cut/core";
-import { runCommand } from "@cut/core";
-import type { CommandHistory } from "@cut/core";
+import type { Project } from "@movie-desk/core";
+import { runCommand } from "@movie-desk/core";
+import type { CommandHistory } from "@movie-desk/core";
 
 export interface ProjectMutating {
   readonly project: Project;

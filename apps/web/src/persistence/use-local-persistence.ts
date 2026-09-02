@@ -42,19 +42,19 @@ export const useLocalPersistence = (): boolean => {
             try {
               getLiveDoc();
             } catch {
-              toast.error("Could not open local persistence for this project.");
+              toast.error(t("persistence.openFailed"));
             }
           },
         );
 
         // No noisy toast on every reload — only the first time.
         if (!localStorage.getItem(WELCOME_KEY)) {
-          toast.success("Local-first persistence on (IndexedDB)");
+          toast.success(t("persistence.welcome"));
           localStorage.setItem(WELCOME_KEY, "1");
         }
       } catch {
         // Persistence failure should not make the editor unusable.
-        toast.error("Local project persistence is unavailable for this session.");
+        toast.error(t("persistence.unavailable"));
       } finally {
         if (!cancelled) setHydrated(true);
       }

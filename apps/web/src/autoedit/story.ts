@@ -1,4 +1,4 @@
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 import { haversineKm, isGoldenHour, guessTransport, TRANSPORT_LABEL, type Transport } from "./geo";
 import { coordLabel, reverseGeocode } from "./geocode";
 import type { ChapterBreak } from "./assembler";

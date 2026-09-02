@@ -1,9 +1,15 @@
-// cut_editor service worker — app-shell caching with a network-first strategy
+// movie_desk service worker — app-shell caching with a network-first strategy
 // for navigation and stale-while-revalidate for static assets. Media blobs
 // live in OPFS and are never cached here.
 
-const CACHE = "cut-editor-v2";
-const APP_SHELL = ["/", "/editor", "/manifest.webmanifest", "/icon.svg"];
+const CACHE = "movie-desk-v3";
+const APP_SHELL = [
+  "/",
+  "/editor",
+  "/manifest.webmanifest",
+  "/icon.svg",
+  "/fonts/PretendardVariable.woff2",
+];
 const MAX_STATIC_ENTRIES = 80;
 
 const cacheSuccessful = async (request, response) => {

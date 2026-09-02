@@ -1,4 +1,4 @@
-import { type ID, type MediaClip, type Project, type Track, createEmptyProject } from "@cut/core";
+import { type ID, type MediaClip, type Project, type Track, createEmptyProject } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";

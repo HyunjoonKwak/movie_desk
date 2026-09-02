@@ -4,8 +4,8 @@ import {
   clearClipKeyframes,
   setClipKeyframes,
   setClipKeyframeEasing,
-} from "@cut/core";
-import type { BezierHandles, EasingFn, ID, KeyframeTrack, Ms } from "@cut/core";
+} from "@movie-desk/core";
+import type { BezierHandles, EasingFn, ID, KeyframeTrack, Ms } from "@movie-desk/core";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface KeyframeActions {

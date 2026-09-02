@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { ID, Project } from "@cut/core";
+import type { ID, Project } from "@movie-desk/core";
 import type { EditMode, EditPlan, MusicAnalysis } from "./types";
 import type { StoryArc } from "./story";
 

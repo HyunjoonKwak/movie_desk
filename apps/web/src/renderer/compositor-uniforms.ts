@@ -10,7 +10,7 @@ import {
   type Project,
   type TransitionFrame,
   type TransitionType,
-} from "@cut/core";
+} from "@movie-desk/core";
 import type { GL } from "./gl";
 import type { Program } from "./shader-registry";
 

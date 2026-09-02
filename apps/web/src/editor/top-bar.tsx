@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Check, Cloud, Download, Film, Loader2, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
@@ -25,7 +25,13 @@ export function TopBar() {
   const lastSavedAt = useSaveStateStore((s) => s.lastSavedAt);
   const [exportOpen, setExportOpen] = useState(false);
   const [draftName, setDraftName] = useState(projectName);
-  useEffect(() => setDraftName(projectName), [projectName]);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const committedOnEnterRef = useRef(false);
+  useEffect(() => {
+    // A project switch can finish while the user is already typing. Keep the
+    // in-progress edit intact and sync external names once the field is idle.
+    if (document.activeElement !== nameInputRef.current) setDraftName(projectName);
+  }, [projectName]);
   const t = useT();
   const appVersion = useAppVersion();
 
@@ -33,7 +39,7 @@ export function TopBar() {
   // streamed route metadata AFTER hydration, clobbering a one-shot assignment
   // — so watch the <title> node and re-assert ours until unmount.
   useEffect(() => {
-    const desired = `${projectName} — Reelog`;
+    const desired = `${projectName} — Movie Desk`;
     document.title = desired;
     const el = document.querySelector("title");
     if (!el) return;
@@ -54,25 +60,38 @@ export function TopBar() {
         toast.success(t("snap.saved")),
       );
     };
-    window.addEventListener("cut:menu-export", onMenuExport);
-    window.addEventListener("cut:menu-snapshot", onMenuSnapshot);
+    window.addEventListener("movie-desk:menu-export", onMenuExport);
+    window.addEventListener("movie-desk:menu-snapshot", onMenuSnapshot);
     return () => {
-      window.removeEventListener("cut:menu-export", onMenuExport);
-      window.removeEventListener("cut:menu-snapshot", onMenuSnapshot);
+      window.removeEventListener("movie-desk:menu-export", onMenuExport);
+      window.removeEventListener("movie-desk:menu-snapshot", onMenuSnapshot);
     };
   }, [t]);
 
   return (
-    <div className="flex h-full items-center justify-between gap-4 px-4">
-      <div className="flex items-center gap-3">
-        <Link href="/" className="text-accent">
-          <Film className="size-4" />
+    <div className="flex h-full items-center justify-between gap-2 px-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Link
+          href="/"
+          className="group flex shrink-0 items-center gap-2 text-ink-1"
+          title="Movie Desk"
+        >
+          <span className="flex size-7 items-center justify-center rounded-md bg-panel-2 text-accent ring-1 ring-inset ring-line-strong transition-colors group-hover:bg-panel-3">
+            <Film className="size-3.5" />
+          </span>
+          <span className="hidden text-xs font-semibold tracking-wide xl:inline">Movie Desk</span>
         </Link>
+        <div className="hidden h-4 w-px bg-line xl:block" />
         <input
+          ref={nameInputRef}
           type="text"
           value={draftName}
           onChange={(e) => setDraftName(e.target.value)}
           onBlur={(e) => {
+            if (committedOnEnterRef.current) {
+              committedOnEnterRef.current = false;
+              return;
+            }
             // Read from the DOM event instead of the render-time draft. A
             // paste/fill immediately followed by Enter can blur before React
             // has committed the latest onChange state.
@@ -80,48 +99,62 @@ export function TopBar() {
             if (name !== projectName) renameProject(name);
           }}
           onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
+            if (e.key === "Enter") {
+              // Commit before blur so keyboard submission does not depend on
+              // React flushing the controlled input's latest value first.
+              const name = e.currentTarget.value;
+              committedOnEnterRef.current = true;
+              if (name !== projectName) renameProject(name);
+              e.currentTarget.blur();
+            }
             if (e.key === "Escape") setDraftName(projectName);
           }}
-          className="rounded bg-transparent px-1 text-sm font-medium text-ink-1 outline-none hover:bg-white/5 focus:bg-white/10"
+          aria-label={t("project.rename")}
+          className="min-w-0 w-24 rounded-md border border-transparent bg-transparent px-2 py-1 text-[13.5px] font-medium text-ink-1 outline-none transition-colors hover:border-line hover:bg-panel-2 focus:border-line-strong focus:bg-panel-2 sm:w-36 lg:w-44"
         />
-        <span className="text-xs text-ink-3">
-          Reelog
-          {appVersion && <span className="ml-1 font-mono text-3xs">v{appVersion}</span>}
+        {appVersion && (
+          <span className="hidden font-mono text-3xs text-ink-3 2xl:inline">v{appVersion}</span>
+        )}
+        <span className="hidden md:inline-flex">
+          <SaveBadge state={saveState} lastSavedAt={lastSavedAt} />
         </span>
-        <SaveBadge state={saveState} lastSavedAt={lastSavedAt} />
       </div>
 
-      <div className="flex items-center gap-1">
+      <div className="flex shrink-0 items-center gap-1.5">
+        <div className="toolbar-cluster hidden lg:flex">
+          <button
+            type="button"
+            className="btn-ghost min-h-7 px-2 py-1"
+            onClick={undo}
+            disabled={!canUndo}
+            aria-label={t("topbar.undo")}
+            title={t("topbar.undo")}
+          >
+            <Undo2 className="size-3.5" />
+          </button>
+          <button
+            type="button"
+            className="btn-ghost min-h-7 px-2 py-1"
+            onClick={redo}
+            disabled={!canRedo}
+            aria-label={t("topbar.redo")}
+            title={t("topbar.redo")}
+          >
+            <Redo2 className="size-3.5" />
+          </button>
+        </div>
+        <div className="toolbar-cluster">
+          <ProjectMenu />
+          <span className="hidden xl:block">
+            <SnapshotMenu />
+          </span>
+        </div>
+        <span className="hidden lg:block">
+          <LanguageToggle />
+        </span>
         <button
           type="button"
-          className="btn-ghost"
-          onClick={undo}
-          disabled={!canUndo}
-          aria-label={t("topbar.undo")}
-          title={t("topbar.undo")}
-        >
-          <Undo2 className="size-4" />
-        </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={redo}
-          disabled={!canRedo}
-          aria-label={t("topbar.redo")}
-          title={t("topbar.redo")}
-        >
-          <Redo2 className="size-4" />
-        </button>
-        <div className="mx-2 h-5 w-px bg-white/10" />
-        <ProjectMenu />
-        <SnapshotMenu />
-        <div className="mx-2 h-5 w-px bg-white/10" />
-        <LanguageToggle />
-        <div className="mx-2 h-5 w-px bg-white/10" />
-        <button
-          type="button"
-          className="btn-primary"
+          className="btn-primary min-h-8 px-3"
           onClick={() => setExportOpen(true)}
         >
           <Download className="size-4" />
@@ -144,7 +177,7 @@ function SaveBadge({ state, lastSavedAt }: { state: string; lastSavedAt: number 
   const Icon = state === "saving" ? Loader2 : state === "saved" ? Check : Cloud;
   return (
     <span
-      className="ml-2 inline-flex items-center gap-1 rounded-full bg-white/5 px-2 py-0.5 text-3xs text-ink-3"
+      className="inline-flex items-center gap-1.5 rounded-md border border-ok/25 bg-ok/[0.06] px-2 py-1 text-3xs text-ok"
       title={state}
     >
       <Icon className={state === "saving" ? "size-3 animate-spin" : "size-3"} />

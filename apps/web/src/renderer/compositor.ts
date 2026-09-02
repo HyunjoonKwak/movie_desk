@@ -18,8 +18,8 @@ import {
   type TextClip,
   type ShapeClip,
   type TransitionFrame,
-} from "@cut/core";
-import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@cut/core";
+} from "@movie-desk/core";
+import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@movie-desk/core";
 import { getEffect } from "@/effects/registry";
 import { getSegmenter } from "@/ai/bg-remove";
 import { readMediaFile } from "@/persistence/opfs";

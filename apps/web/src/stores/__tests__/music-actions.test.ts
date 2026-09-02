@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { MediaAsset, MediaClip, Project } from "@cut/core";
-import { createEmptyProject, newId } from "@cut/core";
-import { addClip } from "@cut/core";
+import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
+import { createEmptyProject, newId } from "@movie-desk/core";
+import { addClip } from "@movie-desk/core";
 import { useProjectStore } from "../project-store";
 
 const makeAudioAsset = (durationMs = 120_000): MediaAsset => ({

@@ -7,7 +7,7 @@ import { useT } from "@/i18n/use-t";
 import { readMediaFile } from "@/persistence/opfs";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { parseYoutubeCredits } from "../credits-parser";
 import { readAudioTags } from "../id3";
 import { enrichRefFromAsset } from "../link-asset";

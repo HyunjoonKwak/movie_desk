@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BLEND_MODES } from "@cut/core";
+import { BLEND_MODES } from "@movie-desk/core";
 import { en } from "../messages.en";
 import { ko } from "../messages.ko";
 import { BLEND_GROUPS } from "@/editor/blend-groups";

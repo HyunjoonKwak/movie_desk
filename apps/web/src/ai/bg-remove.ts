@@ -1,5 +1,5 @@
-import { newId, type ID, type Project } from "@cut/core";
-import { addEffectToClip } from "@cut/core";
+import { newId, type ID, type Project } from "@movie-desk/core";
+import { addEffectToClip } from "@movie-desk/core";
 
 // Lazy MediaPipe Selfie Segmenter. Heavy (~10MB) so we only load when first
 // needed.

@@ -1,6 +1,6 @@
 "use client";
 
-import { type ClipboardEntry, nextEditPoint, prevEditPoint } from "@cut/core";
+import { type ClipboardEntry, nextEditPoint, prevEditPoint } from "@movie-desk/core";
 import { useEffect } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";

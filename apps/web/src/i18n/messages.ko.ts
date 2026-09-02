@@ -13,6 +13,7 @@ export const ko = {
     "topbar.secondsAgo": "{n}초 전",
     "topbar.minutesAgo": "{n}분 전",
     "topbar.language": "언어",
+    "project.rename": "프로젝트 이름 변경",
 
     // Collab bar
 
@@ -206,9 +207,13 @@ export const ko = {
     "loudness.noAudio": "측정할 오디오가 없습니다",
 
     // Preview
-    "preview.empty": "왼쪽에서 미디어를 가져와 시작하세요.",
+    "preview.empty": "영상을 가져와 편집을 시작하세요",
+    "preview.emptyHint": "촬영 시간순으로 정리하고 AI가 첫 편집 방향을 제안합니다.",
     "preview.guides": "가이드 표시 (3분할 + 안전영역)",
     "preview.reframe": "화면비 변경",
+    "persistence.openFailed": "이 프로젝트의 로컬 저장소를 열지 못했습니다.",
+    "persistence.welcome": "내 기기에 자동 저장합니다 (IndexedDB)",
+    "persistence.unavailable": "이번 세션에서는 로컬 프로젝트 저장을 사용할 수 없습니다.",
     "sc.title": "키보드 단축키",
     "sc.play": "재생 / 일시정지",
     "sc.shuttle": "역재생 / 정지 / 정재생",

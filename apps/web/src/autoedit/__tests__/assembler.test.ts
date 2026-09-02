@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { assemble, buildCandidates, type Candidate } from "../assembler";
 import { estimateBpm, energyPerBeat, noveltySections, phraseBefore } from "../music";
 import { beatSnap } from "../reconform";
 import { applyPlanToProject } from "../apply";
-import { createEmptyProject } from "@cut/core";
+import { createEmptyProject } from "@movie-desk/core";
 import type { AssetAnalysis, MusicAnalysis } from "../types";
 
 const asset = (id: string, kind: "video" | "image", capturedAt: number, durationMs = 10000): MediaAsset =>

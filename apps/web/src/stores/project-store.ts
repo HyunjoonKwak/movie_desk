@@ -61,7 +61,7 @@ import {
   undo as undoHistory,
   ungroupClips,
   updateClip,
-} from "@cut/core";
+} from "@movie-desk/core";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 import { type TitleTemplate, createClipCreateActions } from "./actions/clip-create-actions";

@@ -1,6 +1,6 @@
 "use client";
 
-import { newId, type ID } from "@cut/core";
+import { newId, type ID } from "@movie-desk/core";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type { MusicLicense, MusicRef } from "@/music/types";

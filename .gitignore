@@ -26,7 +26,7 @@ blob-report
 *.log
 .playwright-mcp/
 
-# Whisper model — fetch via `pnpm --filter @cut/web prebundle:whisper`
+# Whisper model — fetch via `pnpm --filter @movie-desk/web prebundle:whisper`
 apps/web/public/whisper/
 
 # OpenCut clone used as study reference only

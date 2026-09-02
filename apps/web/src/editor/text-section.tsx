@@ -1,6 +1,6 @@
 "use client";
 
-import type { TextClip, TextAnimation, TextAlign } from "@cut/core";
+import type { TextClip, TextAnimation, TextAlign } from "@movie-desk/core";
 import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";

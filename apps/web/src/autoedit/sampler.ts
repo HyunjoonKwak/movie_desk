@@ -1,4 +1,4 @@
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 import { acquireMediaUrl } from "@/persistence/opfs";
 
 // Small-plane frame sampler for analysis. Videos are seeked at a coarse

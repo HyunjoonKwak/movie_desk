@@ -52,7 +52,7 @@ jobs:
       # Production build catches Next/RSC issues that tsc alone misses. The
       # static Electron export + .dmg packaging still live in release.yml.
       - name: Build (web production)
-        run: pnpm --filter @cut/web build
+        run: pnpm --filter @movie-desk/web build
         env:
           # `next dev --turbopack` runs immediately afterward for Playwright.
           # Production and development caches are incompatible, so keep the
@@ -60,7 +60,7 @@ jobs:
           NEXT_DIST_DIR: .next-ci
 
       - name: Install Playwright Chromium
-        run: pnpm --filter @cut/web exec playwright install --with-deps chromium
+        run: pnpm --filter @movie-desk/web exec playwright install --with-deps chromium
 
       - name: Browser E2E
         run: pnpm test:e2e

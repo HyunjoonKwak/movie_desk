@@ -1,4 +1,4 @@
-import type { ID, MediaAsset, Project } from "@cut/core";
+import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import { assemble, buildCandidates, type Candidate, type ChapterBreak } from "./assembler";
 import { MODE_PRESETS } from "./modes";
 import { analyzeMusic } from "./music";

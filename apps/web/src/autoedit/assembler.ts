@@ -1,4 +1,4 @@
-import type { ID, MediaAsset, Ms } from "@cut/core";
+import type { ID, MediaAsset, Ms } from "@movie-desk/core";
 import { bestWindow } from "./interest";
 import { MODE_PRESETS } from "./modes";
 import { cosine } from "./semantic";

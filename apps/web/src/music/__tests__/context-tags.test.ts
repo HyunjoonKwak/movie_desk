@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyProject, type ID } from "@cut/core";
+import { createEmptyProject, type ID } from "@movie-desk/core";
 import { projectContextText, suggestTagsFromText } from "../context-tags";
 
 describe("suggestTagsFromText", () => {

@@ -9,7 +9,7 @@ import { useT } from "@/i18n/use-t";
 import { importMediaFile } from "@/media/import";
 import { useMusicLibraryStore } from "@/stores/music-library-store";
 import { useProjectStore } from "@/stores/project-store";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { audioMimeFor, readMusicFile, safeFileName } from "../file-store";
 import { enrichRefFromAsset } from "../link-asset";
 import type { MusicRecommendation } from "../recommend";

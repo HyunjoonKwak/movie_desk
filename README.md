@@ -1,20 +1,21 @@
-# Reelog
+# Movie Desk
 
 **English** · [한국어](README.ko.md)
 
-An open-source, AI-native, local-first video editor for the web — built to
-match Final Cut Pro's craft and CapCut's accessibility, with on-device
-AI features neither of them ships. Prebuilt macOS apps are on the
-[Releases page](../../releases/latest).
+**Movie Desk is a local-first AI video editor anyone can start using without
+learning editing first.** Drop in the footage you have been collecting and it
+organizes it, proposes a direction, and creates a first cut. You decide and
+finish from there; your footage never leaves your device. Prebuilt macOS apps
+are on the [Releases page](../../releases/latest).
 
-> Formerly `cut_editor` (the repo and on-disk data identifiers keep that name
-> for continuity). Started from a study of
-> [OpenCut](https://github.com/OpenCut-app/OpenCut) (cloned into `reference/`
-> for offline reading; not part of the build).
+Repository and local folder: `movie_desk`. Started from a study of
+[OpenCut](https://github.com/OpenCut-app/OpenCut) (cloned into `reference/`
+for offline reading; not part of the build). Legacy storage identifiers remain
+unchanged so projects created before the rename still open normally.
 
 ## Why another editor?
 
-| | Final Cut Pro | CapCut | OpenCut | **Reelog** |
+| | Final Cut Pro | CapCut | OpenCut | **Movie Desk** |
 |--|:--:|:--:|:--:|:--:|
 | Open source | ❌ | ❌ | ✅ | ✅ |
 | Free for everything | ❌ | partial | ✅ | ✅ |
@@ -68,7 +69,7 @@ Requirements: Node 20+, pnpm 9+.
 ### Browser E2E tests
 
 ```bash
-pnpm --filter @cut/web exec playwright install chromium  # first run only
+pnpm --filter @movie-desk/web exec playwright install chromium  # first run only
 pnpm test:e2e
 ```
 
@@ -77,7 +78,7 @@ project recovery after reload, and timeline marquee selection.
 
 ## Install as an app on macOS
 
-Reelog ships a PWA manifest + service worker so you can install it as a
+Movie Desk ships a PWA manifest + service worker so you can install it as a
 standalone desktop window — no extra tooling required. Prefer a native app?
 Grab the prebuilt `.dmg` from the [Releases page](../../releases/latest).
 
@@ -111,7 +112,7 @@ browser's HTTP cache thereafter. To make it offline-from-first-launch (e.g.
 for the desktop bundle), run:
 
 ```bash
-pnpm --filter @cut/web prebundle:whisper
+pnpm --filter @movie-desk/web prebundle:whisper
 ```
 
 The script populates `apps/web/public/whisper/Xenova/whisper-tiny.en/` with
@@ -145,7 +146,7 @@ About 15 minutes later the matching GitHub Release has both `.dmg`s
 (`-arm64` and Intel) attached.
 
 Installed apps check the Releases API on launch (and every 4 hours, or via
-**Reelog → Check for Updates…**) and show a dialog when a newer version
+**Movie Desk → Check for Updates…**) and show a dialog when a newer version
 exists — Download opens the matching `.dmg` in the browser. Unsigned builds
 cannot self-install, so installation stays a drag-to-Applications step.
 
@@ -159,7 +160,7 @@ can't be opened"** dialog — right-click → Open won't bypass it. Users (or
 you) need to strip the attribute once:
 
 ```bash
-xattr -cr /Applications/Reelog.app
+xattr -cr "/Applications/Movie Desk.app"
 ```
 
 To ship a properly signed + notarised `.dmg` that opens with no prompts at

@@ -1,4 +1,4 @@
-import type { ID, Ms } from "@cut/core";
+import type { ID, Ms } from "@movie-desk/core";
 import { detectBeatsFromBlob } from "@/ai/beat-detect";
 import { readMediaFile } from "@/persistence/opfs";
 import type { MusicAnalysis } from "./types";

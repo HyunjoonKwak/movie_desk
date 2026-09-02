@@ -9,7 +9,7 @@ import {
   type KeyframeTrack,
   type MediaAsset,
   type Project,
-} from "@cut/core";
+} from "@movie-desk/core";
 import { MODE_PRESETS } from "./modes";
 import { beatSnap, timelineBeats } from "./reconform";
 import { planReframe } from "./reframe";

@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 
 interface SelectionState {
   clipIds: ReadonlySet<ID>;

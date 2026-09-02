@@ -5,7 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@cut/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
+      "@movie-desk/core": fileURLToPath(new URL("../../packages/core/src/index.ts", import.meta.url)),
     },
   },
   test: {

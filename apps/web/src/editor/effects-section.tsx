@@ -3,8 +3,8 @@
 import { useRef } from "react";
 import { GripVertical, Plus, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import type { Clip, ID } from "@cut/core";
-import { newId } from "@cut/core";
+import type { Clip, ID } from "@movie-desk/core";
+import { newId } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { listEffects } from "@/effects/registry";

@@ -1,4 +1,4 @@
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 import { blurVariance, classifyShake, estimateShift, exposureStats, judgeJunk, motionDiff, toLuma } from "./quality";
 import { fuseInterest } from "./interest";
 import { samplePhoto, sampleVideo, sampleAudioRms } from "./sampler";

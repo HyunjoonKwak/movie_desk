@@ -1,7 +1,7 @@
 "use client";
 
 import { MoveHorizontal } from "lucide-react";
-import type { MediaClip, SpatialFit } from "@cut/core";
+import type { MediaClip, SpatialFit } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";

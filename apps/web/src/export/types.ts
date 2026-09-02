@@ -1,4 +1,4 @@
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 
 type Container = "mp4" | "webm";
 type VideoCodec = "h264" | "vp9" | "av1";

@@ -1,8 +1,8 @@
-# @cut/desktop
+# @movie-desk/desktop
 
 [English](README.md) · **한국어**
 
-cut_editor 웹 앱을 네이티브 macOS 애플리케이션으로 패키징하는 Electron
+Movie Desk 웹 앱을 네이티브 macOS 애플리케이션으로 패키징하는 Electron
 셸입니다. Next.js 정적 export(`apps/web`)를 커스텀 `app://` 프로토콜로
 서빙해 서비스 워커 등록과 SharedArrayBuffer(COOP/COEP)가 데스크톱
 윈도우 내부에서도 정상 동작합니다.
@@ -13,31 +13,31 @@ cut_editor 웹 앱을 네이티브 macOS 애플리케이션으로 패키징하�
 electron main (src/main.cjs)
  ├─ app:// 프로토콜 핸들러   → apps/web/out/** 을 COOP/COEP 헤더와 함께 서빙
  ├─ session 헤더 주입       → 개발 시 http://localhost 응답에도 동일 헤더 추가
- ├─ BrowserWindow           → `app://cut-editor/editor/` 로드
+ ├─ BrowserWindow           → 호환 origin `app://cut-editor/editor/` 로드
  └─ 네이티브 메뉴           → File/Edit/View 명령을 preload 통해 전달
 ```
 
 preload(`src/preload.cjs`)는 네이티브 메뉴 클릭 IPC를
-`window.dispatchEvent(new CustomEvent("cut:menu-export"))` 등으로 변환해
+`window.dispatchEvent(new CustomEvent("movie-desk:menu-export"))` 등으로 변환해
 웹 앱이 메뉴 동작에 반응할 수 있도록 합니다.
 
 ## 개발 워크플로
 
 ```bash
-pnpm --filter @cut/desktop install      # 최초 1회
-pnpm --filter @cut/desktop dev          # next dev + electron 동시 실행
+pnpm --filter @movie-desk/desktop install      # 최초 1회
+pnpm --filter @movie-desk/desktop dev          # next dev + electron 동시 실행
 ```
 
-`dev`는 `pnpm --filter @cut/web dev`를 띄우고 `http://localhost:3000/editor`가
+`dev`는 `pnpm --filter @movie-desk/web dev`를 띄우고 `http://localhost:3000/editor`가
 응답하면 Electron 윈도우가 해당 주소를 로드합니다. DevTools는 분리된 창으로
 열립니다.
 
 ## `.dmg` 패키징
 
 ```bash
-pnpm --filter @cut/desktop build:mac          # universal (arm64 + x64)
-pnpm --filter @cut/desktop build:mac:arm64    # Apple silicon 전용
-pnpm --filter @cut/desktop build:mac:x64      # Intel 전용
+pnpm --filter @movie-desk/desktop build:mac          # universal (arm64 + x64)
+pnpm --filter @movie-desk/desktop build:mac:arm64    # Apple silicon 전용
+pnpm --filter @movie-desk/desktop build:mac:x64      # Intel 전용
 ```
 
 스크립트 동작:
@@ -64,7 +64,7 @@ export CSC_KEY_PASSWORD='...'
 export APPLE_ID='you@example.com'
 export APPLE_APP_SPECIFIC_PASSWORD='abcd-efgh-ijkl-mnop'
 export APPLE_TEAM_ID='ABCDE12345'
-pnpm --filter @cut/desktop build:mac
+pnpm --filter @movie-desk/desktop build:mac
 ```
 
 electron-builder가 자동으로 이 변수들을 읽어 사이닝하고 결과 `.dmg`에
@@ -77,7 +77,7 @@ electron-builder가 자동으로 이 변수들을 읽어 사이닝하고 결과 
 첫 실행 전에 속성을 제거해야 합니다:
 
 ```bash
-xattr -cr /Applications/cut_editor.app
+xattr -cr "/Applications/Movie Desk.app"
 ```
 
 ## GitHub Actions로 릴리스
@@ -89,7 +89,7 @@ xattr -cr /Applications/cut_editor.app
 - `v*` 태그 push (`git tag v0.1.1 && git push --tags`)
 - GitHub Actions 페이지에서 **Run workflow** 수동 클릭
 
-두 경로 모두 macOS 러너에서 `pnpm --filter @cut/desktop release:mac` 을
+두 경로 모두 macOS 러너에서 `pnpm --filter @movie-desk/desktop release:mac` 을
 실행하고, web 정적 export → arm64 + x64 `.dmg` 패키징 → 현재 패키지의
 `package.json` version 과 동일한 GitHub Release 에 업로드합니다.
 `electron-updater` 가 찾을 수 있도록 `latest-mac.yml` 도 함께 생성됩니다.

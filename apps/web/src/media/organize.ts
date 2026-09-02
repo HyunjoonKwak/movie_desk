@@ -1,4 +1,4 @@
-import type { MediaAsset } from "@cut/core";
+import type { MediaAsset } from "@movie-desk/core";
 
 // "Throw footage in and it comes back organized": ordering and day grouping
 // for the media bin. Pure functions; the bin injects the geocoder so tests

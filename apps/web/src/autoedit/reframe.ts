@@ -1,4 +1,4 @@
-import type { KeyframeTrack, Ms } from "@cut/core";
+import type { KeyframeTrack, Ms } from "@movie-desk/core";
 import type { AssetAnalysis } from "./types";
 
 // P6 — 9:16 auto-reframe (AutoFlip-style, simplified for the family case).

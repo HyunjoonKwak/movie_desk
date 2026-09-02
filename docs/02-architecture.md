@@ -1,4 +1,4 @@
-# cut_editor — current architecture
+# Movie Desk — current architecture
 
 This document describes the code that ships today. Future work belongs in the
 README roadmap or `04-honest-gap-analysis.md`; it should not be presented here
@@ -24,7 +24,7 @@ as if it were already implemented.
 Next.js / React editor
   ├─ editor + domain panels
   ├─ Zustand project/history/UI stores
-  │    └─ @cut/core immutable edit and timeline functions
+  │    └─ @movie-desk/core immutable edit and timeline functions
   ├─ preview
   │    ├─ WebCodecs MP4 decoder + bounded VideoFrame cache
   │    ├─ HTML media fallback + Web Audio playback
@@ -110,7 +110,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm test:e2e
-pnpm --filter @cut/web knip
+pnpm --filter @movie-desk/web knip
 ```
 
 Unit tests cover the core timeline, the Yjs document schema, persistence

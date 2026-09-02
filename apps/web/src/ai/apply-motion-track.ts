@@ -1,4 +1,4 @@
-import { upsertClipKeyframe, type ID, type MediaClip, type Project } from "@cut/core";
+import { upsertClipKeyframe, type ID, type MediaClip, type Project } from "@movie-desk/core";
 import type { TrackPoint } from "./motion-track";
 
 // Turn tracked center points into transform.x / transform.y keyframes,

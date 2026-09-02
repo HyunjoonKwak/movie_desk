@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { MediaClip } from "@cut/core";
+import type { MediaClip } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 
 interface Props {

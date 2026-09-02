@@ -1,6 +1,6 @@
 import { readMediaFile } from "@/persistence/opfs";
-import type { MediaAsset, MediaClip, Project } from "@cut/core";
-import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@cut/core";
+import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
+import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@movie-desk/core";
 import { sampleVolumeCurve } from "./volume-curve";
 
 // Live audio monitoring uses a rolling schedule instead of decoding and

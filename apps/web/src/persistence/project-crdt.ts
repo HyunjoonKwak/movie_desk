@@ -1,5 +1,5 @@
 import { parseStoredProject } from "@/persistence/project-export";
-import type { Clip, MediaAsset, Project, Track } from "@cut/core";
+import type { Clip, MediaAsset, Project, Track } from "@movie-desk/core";
 import type * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
 

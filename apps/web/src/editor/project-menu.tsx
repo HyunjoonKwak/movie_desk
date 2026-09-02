@@ -10,7 +10,7 @@ import {
   upsertProject,
 } from "@/persistence/project-library";
 import { useProjectStore } from "@/stores/project-store";
-import { type Project, createEmptyProject } from "@cut/core";
+import { type Project, createEmptyProject } from "@movie-desk/core";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Download, FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";

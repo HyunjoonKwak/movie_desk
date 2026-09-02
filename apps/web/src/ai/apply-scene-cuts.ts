@@ -1,4 +1,4 @@
-import { splitClipAt, type ID, type MediaClip, type Project } from "@cut/core";
+import { splitClipAt, type ID, type MediaClip, type Project } from "@movie-desk/core";
 import type { SceneCut } from "./types";
 
 // Apply detected scene cuts (in source-relative ms) to a media clip by

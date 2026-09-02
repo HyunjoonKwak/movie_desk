@@ -1,4 +1,4 @@
-import type { Track } from "@cut/core";
+import type { Track } from "@movie-desk/core";
 
 // Median cut interval of the VIDEO tracks, expressed as a musical tempo so
 // it can be compared against track BPM. Text/subtitle and audio clips are

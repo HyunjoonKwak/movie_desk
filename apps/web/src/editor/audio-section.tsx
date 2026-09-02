@@ -1,7 +1,7 @@
 "use client";
 
 import { Diamond, Volume2 } from "lucide-react";
-import type { MediaClip } from "@cut/core";
+import type { MediaClip } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";

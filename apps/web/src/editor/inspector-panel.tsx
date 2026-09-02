@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Sliders } from "lucide-react";
-import { findClip, isMediaClip, isTextClip, isShapeClip } from "@cut/core";
+import { findClip, isMediaClip, isTextClip, isShapeClip } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { EffectsSection } from "./effects-section";
@@ -50,7 +50,14 @@ export function InspectorPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 text-sm">
-        {!clip && <p className="text-ink-3">{t("inspector.empty")}</p>}
+        {!clip && (
+          <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center">
+            <span className="mb-3 flex size-10 items-center justify-center rounded-lg border border-line bg-panel-2 text-ink-3">
+              <Sliders className="size-4" />
+            </span>
+            <p className="max-w-48 text-xs leading-5 text-ink-3">{t("inspector.empty")}</p>
+          </div>
+        )}
 
         {clip && (
           <div className="space-y-3">
@@ -93,7 +100,10 @@ export function InspectorPanel() {
                     <Row label={t("inspector.asset")} value={asset.name} />
                     <Row label={t("inspector.assetDuration")} value={`${asset.durationMs} ms`} />
                     {asset.width && asset.height && (
-                      <Row label={t("inspector.resolution")} value={`${asset.width}×${asset.height}`} />
+                      <Row
+                        label={t("inspector.resolution")}
+                        value={`${asset.width}×${asset.height}`}
+                      />
                     )}
                   </>
                 )}

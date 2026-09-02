@@ -18,10 +18,10 @@ describe("compareVersions", () => {
 describe("pickDmgAsset", () => {
   const assets = [
     { name: "latest-mac.yml", browser_download_url: "u0" },
-    { name: "Reelog-0.2.2-arm64.dmg", browser_download_url: "u1" },
-    { name: "Reelog-0.2.2-arm64.dmg.blockmap", browser_download_url: "u2" },
-    { name: "Reelog-0.2.2.dmg", browser_download_url: "u3" },
-    { name: "Reelog-0.2.2.dmg.blockmap", browser_download_url: "u4" },
+    { name: "Movie Desk-0.2.2-arm64.dmg", browser_download_url: "u1" },
+    { name: "Movie Desk-0.2.2-arm64.dmg.blockmap", browser_download_url: "u2" },
+    { name: "Movie Desk-0.2.2.dmg", browser_download_url: "u3" },
+    { name: "Movie Desk-0.2.2.dmg.blockmap", browser_download_url: "u4" },
   ];
   it("picks the arm64 dmg on arm64", () => {
     assert.equal(pickDmgAsset(assets, "arm64").browser_download_url, "u1");
@@ -37,11 +37,11 @@ describe("pickDmgAsset", () => {
 describe("evaluateRelease", () => {
   const release = {
     tag_name: "v0.2.3",
-    html_url: "https://github.com/HyunjoonKwak/awesome_film/releases/tag/v0.2.3",
+    html_url: "https://github.com/HyunjoonKwak/movie_desk/releases/tag/v0.2.3",
     body: "notes",
     assets: [
-      { name: "Reelog-0.2.3-arm64.dmg", browser_download_url: "dl-arm" },
-      { name: "Reelog-0.2.3.dmg", browser_download_url: "dl-x64" },
+      { name: "Movie Desk-0.2.3-arm64.dmg", browser_download_url: "dl-arm" },
+      { name: "Movie Desk-0.2.3.dmg", browser_download_url: "dl-x64" },
     ],
   };
   it("reports an update with the arch-matching download", () => {

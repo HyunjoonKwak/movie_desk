@@ -1,7 +1,7 @@
 "use client";
 
 import { Pause, Play, SkipBack, SkipForward, Scissors, Camera } from "lucide-react";
-import { formatTimecode } from "@cut/core";
+import { formatTimecode } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead, selectDuration } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
@@ -34,8 +34,8 @@ export function TransportBar() {
   };
 
   return (
-    <div className="flex h-full items-center justify-between px-3">
-      <div className="flex items-center gap-1">
+    <div className="flex h-full items-center justify-between gap-3 px-3">
+      <div className="flex min-w-0 items-center gap-1">
         <button
           type="button"
           className="btn-ghost px-2 py-1.5"
@@ -47,12 +47,16 @@ export function TransportBar() {
         </button>
         <button
           type="button"
-          className="btn-primary"
+          className="btn-primary size-8 min-h-8 rounded-full px-0"
           onClick={toggle}
           aria-label={playing ? t("transport.pause") : t("transport.play")}
           title={playing ? t("transport.pause") : t("transport.play")}
         >
-          {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+          {playing ? (
+            <Pause className="size-3.5 fill-current" />
+          ) : (
+            <Play className="size-3.5 fill-current" />
+          )}
         </button>
         <button
           type="button"
@@ -63,7 +67,7 @@ export function TransportBar() {
         >
           <SkipForward className="size-4" />
         </button>
-        <div className="mx-2 h-5 w-px bg-white/10" />
+        <div className="mx-1.5 h-4 w-px bg-line" />
         <button
           type="button"
           className="btn-ghost"
@@ -74,19 +78,14 @@ export function TransportBar() {
           <Scissors className="size-4" />
           {t("transport.split")}
         </button>
-        <button
-          type="button"
-          className="btn-ghost"
-          onClick={onStill}
-          title={t("still.capture")}
-        >
+        <button type="button" className="btn-ghost" onClick={onStill} title={t("still.capture")}>
           <Camera className="size-4" />
         </button>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         <LevelMeter />
-        <div className="font-mono text-xs text-ink-2">
+        <div className="rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-2xs text-ink-2">
           <span className="text-ink-1">{formatTimecode(playhead, fps)}</span>
           <span className="mx-1 text-ink-3">/</span>
           <span>{formatTimecode(duration, fps)}</span>

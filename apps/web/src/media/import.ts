@@ -1,4 +1,4 @@
-import { newId, type MediaAsset } from "@cut/core";
+import { newId, type MediaAsset } from "@movie-desk/core";
 import { writeMediaFile } from "@/persistence/opfs";
 import { probeMedia } from "./probe";
 import { makeImageThumb, makeVideoThumb, makeVideoFilmstrip } from "./thumbnail";

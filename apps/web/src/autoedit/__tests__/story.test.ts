@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { guessTransport, haversineKm, isGoldenHour, sunTimes } from "../geo";
 import { coordLabel, reverseGeocode } from "../geocode";
 import { buildStory, chapterBreaks, goldenStats } from "../story";

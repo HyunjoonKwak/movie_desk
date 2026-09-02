@@ -1,4 +1,4 @@
-import { createEmptyProject } from "@cut/core";
+import { createEmptyProject } from "@movie-desk/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebCodecsExporter } from "../exporter";
 import { PRESETS } from "../presets";

@@ -1,12 +1,12 @@
 {
-  "name": "Reelog",
-  "short_name": "Reelog",
-  "description": "Open-source, AI-native, collaborative video editor.",
+  "name": "Movie Desk",
+  "short_name": "Movie Desk",
+  "description": "영상을 정리하고 방향을 제안하고 초안까지 만드는 로컬 우선 AI 영상 편집기.",
   "start_url": "/editor",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#0b0d10",
-  "theme_color": "#0b0d10",
+  "background_color": "#15191e",
+  "theme_color": "#15191e",
   "icons": [
     {
       "src": "/icon.svg",

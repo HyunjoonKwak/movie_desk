@@ -1,4 +1,4 @@
-import type { ID, MediaAsset } from "@cut/core";
+import type { ID, MediaAsset } from "@movie-desk/core";
 import { Compositor } from "@/renderer/compositor";
 import { useProjectStore } from "@/stores/project-store";
 

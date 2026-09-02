@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { useMusicLibraryStore } from "../music-library-store";
 
 const reset = () => useMusicLibraryStore.setState({ refs: [] });

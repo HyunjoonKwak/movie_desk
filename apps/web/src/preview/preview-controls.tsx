@@ -27,17 +27,17 @@ export function PreviewControls() {
   const matched = REFRAME.find((r) => r.w === res.w && r.h === res.h)?.id ?? "";
 
   return (
-    <div className="absolute right-2 top-2 z-10 flex items-center gap-1">
+    <div className="absolute right-3 top-3 z-10 flex items-center gap-1 rounded-md border border-line-strong bg-panel-2 p-1 shadow-lg">
       <button
         type="button"
         onClick={toggleGuides}
         title={t("preview.guides")}
         aria-pressed={showGuides}
-        className={`rounded p-1 ${showGuides ? "bg-accent text-white" : "bg-black/40 text-ink-2 hover:text-ink-1"}`}
+        className={`flex size-7 items-center justify-center rounded-md transition-colors ${showGuides ? "bg-panel-3 text-accent" : "text-ink-2 hover:bg-panel-3 hover:text-ink-1"}`}
       >
         <Grid3x3 className="size-3.5" />
       </button>
-      <div className="flex items-center gap-1 rounded bg-black/40 px-1 text-ink-2">
+      <div className="flex min-h-7 items-center gap-1.5 rounded-md px-1.5 text-ink-2 hover:bg-panel-3">
         <Crop className="size-3" />
         <select
           value={matched}

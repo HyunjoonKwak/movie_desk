@@ -1,18 +1,20 @@
-# Reelog
+# Movie Desk
 
 [English](README.md) · **한국어**
 
-웹용 오픈소스 로컬 우선 AI 비디오 에디터 — Final Cut Pro의 완성도와 CapCut의
-접근성을 모두 잡되, 두 도구 어디에도 없는 온디바이스 AI 기능까지 함께 제공합니다.
-macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 있습니다.
+**Movie Desk는 편집을 몰라도 시작할 수 있는 로컬 우선 AI 영상 편집기입니다.**
+찍어만 두고 쌓인 영상을 넣으면 촬영 시간과 장소로 정리하고, 영상의 방향을 제안하고,
+초안까지 만듭니다. 그 위에서 내가 결정하고 마무리하며 영상은 내 기기를 떠나지
+않습니다. macOS용 빌드는 [Releases 페이지](../../releases/latest)에서 받을 수 있습니다.
 
-> 이전 이름은 `cut_editor`입니다 (저장소와 디스크 데이터 식별자는 호환을 위해
-> 그 이름을 유지). [OpenCut](https://github.com/OpenCut-app/OpenCut) 학습에서
-> 출발했습니다 (오프라인 참고용으로 `reference/`에 클론, 빌드에 포함되지 않음).
+저장소와 로컬 폴더 이름은 `movie_desk`입니다.
+[OpenCut](https://github.com/OpenCut-app/OpenCut) 학습에서 출발했습니다
+(오프라인 참고용으로 `reference/`에 클론, 빌드에 포함되지 않음). 이름 변경 전
+프로젝트도 그대로 열 수 있도록 기존 로컬 저장 식별자는 호환용으로 유지합니다.
 
 ## 왜 또 하나의 에디터인가?
 
-| | Final Cut Pro | CapCut | OpenCut | **Reelog** |
+| | Final Cut Pro | CapCut | OpenCut | **Movie Desk** |
 |--|:--:|:--:|:--:|:--:|
 | 오픈소스 | ❌ | ❌ | ✅ | ✅ |
 | 전체 기능 무료 | ❌ | 일부 | ✅ | ✅ |
@@ -65,7 +67,7 @@ pnpm dev          # http://localhost:3000
 ### 브라우저 E2E 테스트
 
 ```bash
-pnpm --filter @cut/web exec playwright install chromium  # 최초 1회
+pnpm --filter @movie-desk/web exec playwright install chromium  # 최초 1회
 pnpm test:e2e
 ```
 
@@ -74,7 +76,7 @@ pnpm test:e2e
 
 ## macOS 앱으로 설치하기
 
-Reelog는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
+Movie Desk는 PWA manifest + 서비스 워커를 동봉하므로 별도 도구 없이 독립
 데스크톱 윈도우로 설치할 수 있습니다. 네이티브 앱이 필요하면
 [Releases 페이지](../../releases/latest)에서 빌드된 `.dmg`를 받으세요.
 
@@ -107,7 +109,7 @@ HuggingFace에서 다운로드되며, 이후 브라우저 HTTP 캐시에 보관�
 실행하세요:
 
 ```bash
-pnpm --filter @cut/web prebundle:whisper
+pnpm --filter @movie-desk/web prebundle:whisper
 ```
 
 스크립트가 `apps/web/public/whisper/Xenova/whisper-tiny.en/`에 모델 파일 7개
@@ -139,7 +141,7 @@ git push --tags
 약 15분 후 동일 이름의 GitHub Release 에 `.dmg` 두 개(`-arm64` / Intel)가
 업로드됩니다.
 
-설치된 앱은 실행 시(그리고 4시간마다, 또는 **Reelog → 업데이트 확인…**
+설치된 앱은 실행 시(그리고 4시간마다, 또는 **Movie Desk → 업데이트 확인…**
 메뉴로) Releases API를 확인해 새 버전이 있으면 다이얼로그를 띄웁니다 —
 다운로드를 누르면 브라우저에서 아키텍처에 맞는 `.dmg`를 받습니다. 미서명
 빌드는 자체 설치가 불가능하므로 설치는 기존처럼 Applications에 드래그하는
@@ -156,7 +158,7 @@ workflow** 버튼. 현재 `apps/desktop/package.json` 의 version 값을 그대�
 않습니다. 첫 실행 전에 속성을 제거해야 합니다:
 
 ```bash
-xattr -cr /Applications/Reelog.app
+xattr -cr "/Applications/Movie Desk.app"
 ```
 
 별도 안내 없이 바로 열리는 사이닝 + 공증된 `.dmg` 를 만들려면 Apple

@@ -3,7 +3,7 @@
 // project at a moment in time.
 
 import Dexie, { type Table } from "dexie";
-import type { Project } from "@cut/core";
+import type { Project } from "@movie-desk/core";
 import { parseStoredProject } from "./project-export";
 
 export interface ProjectSnapshot {
@@ -17,6 +17,7 @@ export interface ProjectSnapshot {
 class SnapshotDB extends Dexie {
   snapshots!: Table<ProjectSnapshot, string>;
   constructor() {
+    // Legacy storage key retained so the rename never hides saved snapshots.
     super("cut_editor.snapshots.v1");
     this.version(1).stores({
       snapshots: "id, projectId, createdAt",

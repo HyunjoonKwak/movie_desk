@@ -39,7 +39,7 @@ jobs:
       # apps/web/public/whisper/ so the bundled .app can transcribe
       # fully offline from first launch.
       - name: Prebundle Whisper model
-        run: pnpm --filter @cut/web prebundle:whisper
+        run: pnpm --filter @movie-desk/web prebundle:whisper
 
       # Builds the static web export and packages it as a signed-or-unsigned
       # .dmg for arm64 + x64, then uploads both to a GitHub Release matching
@@ -47,4 +47,4 @@ jobs:
       - name: Build and publish macOS .dmg
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm --filter @cut/desktop release:mac
+        run: pnpm --filter @movie-desk/desktop release:mac

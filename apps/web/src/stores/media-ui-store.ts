@@ -1,4 +1,4 @@
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { create } from "zustand";
 
 // Transient media-bin UI state. `activeAssetId` is the source the E/W/D/Q

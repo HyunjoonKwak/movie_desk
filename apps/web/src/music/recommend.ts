@@ -1,4 +1,4 @@
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import type { MusicRef } from "./types";
 
 // Tag-overlap recommendation over the saved music library. Deliberately

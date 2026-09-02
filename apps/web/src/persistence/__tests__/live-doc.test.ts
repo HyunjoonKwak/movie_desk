@@ -1,4 +1,4 @@
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import { projectPersistenceName } from "../live-doc";
 

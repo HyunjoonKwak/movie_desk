@@ -2,7 +2,7 @@
 
 import * as Menu from "@radix-ui/react-context-menu";
 import { Copy, Scissors, Trash2, ChevronsLeft, AlignHorizontalJustifyStart, EyeOff, Blend, AudioLines } from "lucide-react";
-import type { ID } from "@cut/core";
+import type { ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useT } from "@/i18n/use-t";

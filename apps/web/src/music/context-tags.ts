@@ -1,4 +1,4 @@
-import type { Project } from "@cut/core";
+import type { Project } from "@movie-desk/core";
 
 // Text the project already carries about itself — the cheapest honest
 // context signal for preselecting recommendation tags.

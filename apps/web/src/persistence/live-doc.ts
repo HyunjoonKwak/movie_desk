@@ -1,5 +1,5 @@
 import { useProjectStore } from "@/stores/project-store";
-import type { Clip, Project, Track } from "@cut/core";
+import type { Clip, Project, Track } from "@movie-desk/core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { createProjectCrdt } from "./project-crdt";
@@ -58,7 +58,7 @@ export interface LiveDoc {
 
 let live: LiveDoc | null = null;
 
-// Kept as-is across the rename so existing browsers keep opening their projects.
+// Legacy storage namespace retained so existing browsers keep opening their projects.
 export const projectPersistenceName = (projectId: Project["id"]): string =>
   `cut-editor:project:${encodeURIComponent(projectId)}`;
 

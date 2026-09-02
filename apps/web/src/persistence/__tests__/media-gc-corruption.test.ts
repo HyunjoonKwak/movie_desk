@@ -1,4 +1,4 @@
-import { createEmptyProject } from "@cut/core";
+import { createEmptyProject } from "@movie-desk/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({

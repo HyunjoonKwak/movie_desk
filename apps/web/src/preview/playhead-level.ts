@@ -4,7 +4,7 @@ import {
   type Project,
   isMediaClip,
   sourceOffsetForRamp,
-} from "@cut/core";
+} from "@movie-desk/core";
 
 // Estimates the instantaneous audio level (0..1) at the current playhead by
 // sampling each audio-bearing clip's precomputed peak envelope. There is no

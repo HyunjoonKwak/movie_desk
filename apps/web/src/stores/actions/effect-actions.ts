@@ -6,8 +6,8 @@ import {
   reorderEffect,
   upsertEffect,
   newId,
-} from "@cut/core";
-import type { EffectParamValue, ID, Project } from "@cut/core";
+} from "@movie-desk/core";
+import type { EffectParamValue, ID, Project } from "@movie-desk/core";
 import { listEffects } from "@/effects/registry";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 

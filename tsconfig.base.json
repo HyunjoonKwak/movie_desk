@@ -19,8 +19,8 @@
     "incremental": true,
     "baseUrl": ".",
     "paths": {
-      "@cut/core": ["packages/core/src/index.ts"],
-      "@cut/core/*": ["packages/core/src/*"]
+      "@movie-desk/core": ["packages/core/src/index.ts"],
+      "@movie-desk/core/*": ["packages/core/src/*"]
     }
   }
 }

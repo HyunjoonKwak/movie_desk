@@ -1,10 +1,11 @@
 import { z } from "zod";
-import type { Project } from "@cut/core";
-import { PROJECT_VERSION } from "@cut/core";
+import type { Project } from "@movie-desk/core";
+import { PROJECT_VERSION } from "@movie-desk/core";
 
 // JSON envelope so we can evolve the on-disk format independently of the
 // in-memory Project type.
 export interface ProjectExport {
+  // Wire identifier stays stable so older and renamed builds interoperate.
   readonly schema: "cut_editor-project";
   readonly version: number;
   readonly exportedAt: number;
@@ -185,7 +186,7 @@ export const downloadProjectJson = (project: Project): void => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `${sanitize(project.name)}.cut.json`;
+  a.download = `${sanitize(project.name)}.movie-desk.json`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

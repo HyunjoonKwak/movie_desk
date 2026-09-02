@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { MediaClip, Project } from "@cut/core";
-import { addClip, addTrack, createEmptyProject, newId, setPlayhead } from "@cut/core";
+import type { MediaClip, Project } from "@movie-desk/core";
+import { addClip, addTrack, createEmptyProject, newId, setPlayhead } from "@movie-desk/core";
 import { useProjectStore } from "../project-store";
 
 const makeMediaClip = (start = 0, duration = 5000): MediaClip => ({
