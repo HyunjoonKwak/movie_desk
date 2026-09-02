@@ -1,0 +1,59 @@
+<!doctype html><meta charset="utf-8"><title>HEVC capability probe</title>
+<script>
+// Shared probe body. The page is loaded from file:// so it is a secure context
+// (WebCodecs needs one) and file:// media is allowed. `window.probe(paths)`
+// resolves to a JSON-able report.
+window.probe = async (paths) => {
+  const codecs = [
+    "hvc1.1.6.L93.B0", // HEVC Main (iPhone default)
+    "hev1.1.6.L93.B0",
+    "hvc1.2.4.L120.B0", // HEVC Main 10 (iPhone HDR)
+    "avc1.640028", // H.264 High
+    "vp09.00.10.08",
+    "av01.0.04M.08",
+  ];
+  const webcodecs = {};
+  for (const codec of codecs) {
+    try {
+      if (typeof VideoDecoder === "undefined") { webcodecs[codec] = "VideoDecoder undefined"; continue; }
+      const r = await VideoDecoder.isConfigSupported({ codec, codedWidth: 1280, codedHeight: 720 });
+      webcodecs[codec] = r.supported === true;
+    } catch (e) { webcodecs[codec] = `error: ${e.message}`; }
+  }
+  const encoders = {};
+  for (const codec of ["hvc1.1.6.L93.B0", "avc1.640028", "vp09.00.10.08"]) {
+    try {
+      if (typeof VideoEncoder === "undefined") { encoders[codec] = "VideoEncoder undefined"; continue; }
+      const r = await VideoEncoder.isConfigSupported({ codec, width: 1280, height: 720 });
+      encoders[codec] = r.supported === true;
+    } catch (e) { encoders[codec] = `error: ${e.message}`; }
+  }
+  const v = document.createElement("video");
+  const canPlay = {
+    'video/mp4; codecs="hvc1.1.6.L93.B0"': v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"'),
+    'video/mp4; codecs="hvc1.2.4.L120.B0"': v.canPlayType('video/mp4; codecs="hvc1.2.4.L120.B0"'),
+    "video/quicktime": v.canPlayType("video/quicktime"),
+    'video/mp4; codecs="avc1.640028"': v.canPlayType('video/mp4; codecs="avc1.640028"'),
+  };
+  const media = [];
+  for (const p of paths) {
+    const el = document.createElement("video");
+    el.muted = true; el.preload = "auto";
+    const result = await new Promise((resolve) => {
+      const done = (r) => { clearTimeout(timer); resolve(r); };
+      const timer = setTimeout(() => done({ status: "timeout" }), 8000);
+      el.addEventListener("error", () => done({ status: "error", code: el.error?.code, message: el.error?.message }));
+      el.addEventListener("loadedmetadata", () => {
+        const meta = { width: el.videoWidth, height: el.videoHeight, duration: el.duration };
+        if (typeof el.requestVideoFrameCallback === "function") {
+          el.requestVideoFrameCallback((_n, f) => done({ status: "frame", ...meta, frameW: f.width, frameH: f.height }));
+          el.play().catch(() => {});
+        } else done({ status: "metadata", ...meta });
+      });
+      el.src = `file://${p}`;
+    });
+    media.push({ file: p.split("/").pop(), ...result });
+  }
+  return { userAgent: navigator.userAgent, secureContext: window.isSecureContext, webcodecs, encoders, canPlay, media };
+};
+</script>
