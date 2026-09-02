@@ -46,4 +46,30 @@ describe("toByteSource", () => {
     expect(chunk.fileStart).toBe(4);
     expect(reads).toEqual([[4, 4]]); // clamped before it reaches the adapter
   });
+
+  it("never asks the adapter for zero or out-of-range bytes and rejects bad ranges", async () => {
+    const { toByteSource } = await import("../mp4-decoder");
+    const reads: [number, number][] = [];
+    const source = toByteSource({
+      assetId: "a",
+      sizeBytes: 8,
+      mime: "video/mp4",
+      read: async (start, length) => {
+        reads.push([start, length]);
+        return payload.slice(start, start + length).buffer;
+      },
+      acquirePlaybackUrl: async () => ({ url: "", release() {} }),
+    });
+    const empty = await source.read(4, 0);
+    expect(empty.byteLength).toBe(0);
+    expect(empty.fileStart).toBe(4);
+    expect((await source.read(8, 10)).byteLength).toBe(0);
+    expect((await source.read(20, 10)).byteLength).toBe(0);
+    expect(reads).toEqual([]); // nothing crossed the adapter boundary
+    await expect(source.read(-1, 1)).rejects.toThrow(RangeError);
+    await expect(source.read(0, 1.5)).rejects.toThrow(RangeError);
+    const blobSource = toByteSource(new Blob([payload]));
+    expect((await blobSource.read(8, 4)).byteLength).toBe(0);
+    await expect(blobSource.read(Number.NaN, 1)).rejects.toThrow(RangeError);
+  });
 });

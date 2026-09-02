@@ -52,27 +52,54 @@ export type CacheVariant =
   | "audio-48k"
   | `analysis-${string}`;
 
-// Changes whenever the referenced bytes may have changed; stable across app
-// restarts, remounts and catalog rebuilds.
-export const sourceFingerprint = (ref: SourceRef): string =>
+// Fingerprint components are URL-encoded so a rootId or path can never forge
+// a delimiter, and the result carries no "/" or ":" — safe to reuse as a
+// single cache file name segment. Changes whenever the referenced bytes may
+// have changed; stable across restarts, remounts and catalog rebuilds.
+const FINGERPRINT_DELIMITER = ",";
+
+const fingerprintComponents = (ref: SourceRef): readonly (string | number)[] =>
   ref.kind === "disk"
     ? [
         "disk",
-        ref.rootId,
-        ref.relativePath,
+        encodeURIComponent(ref.rootId),
+        encodeURIComponent(ref.relativePath),
         ref.sizeBytes,
         ref.modifiedAtMs,
-        ...(ref.quickHash ? [ref.quickHash] : []),
-      ].join(":")
-    : ["opfs", ref.key, ...(ref.sizeBytes !== undefined ? [ref.sizeBytes] : [])].join(":");
+        ...(ref.quickHash ? [encodeURIComponent(ref.quickHash)] : []),
+      ]
+    : [
+        "opfs",
+        encodeURIComponent(ref.key),
+        ...(ref.sizeBytes !== undefined ? [ref.sizeBytes] : []),
+      ];
+
+export const sourceFingerprint = (ref: SourceRef): string =>
+  fingerprintComponents(ref).join(FINGERPRINT_DELIMITER);
 
 // Cache entries are rebuildable, so the key also carries the pipeline version
-// that produced them; bump it when colour, orientation or model handling changes.
+// that produced them; bump it when colour, orientation or model handling
+// changes. Exactly three path segments: variant / version / fingerprint.
 export const cacheKey = (
   fingerprint: string,
   variant: CacheVariant,
   pipelineVersion: number,
-): string => `${variant}/v${pipelineVersion}/${fingerprint}`;
+): string => {
+  if (!Number.isSafeInteger(pipelineVersion) || pipelineVersion < 0) {
+    throw new RangeError(`pipelineVersion must be a non-negative integer, got ${pipelineVersion}`);
+  }
+  return `${encodeURIComponent(variant)}/v${pipelineVersion}/${encodeURIComponent(fingerprint)}`;
+};
+
+// A DiskSourceRef.relativePath must stay inside its root: relative, no NUL,
+// no ".." segment on either separator. Validation lives here so the stored
+// project schema and the desktop catalog agree on one rule.
+export const isSafeRelativePath = (value: string): boolean => {
+  if (value.length === 0 || value.includes("\0")) return false;
+  if (value.startsWith("/") || value.startsWith("\\") || /^[A-Za-z]:[\\/]/.test(value))
+    return false;
+  return value.split(/[\\/]/).every((segment) => segment !== "..");
+};
 
 interface LegacyAssetLike {
   readonly opfsPath: string;

@@ -18,7 +18,7 @@
     "format": "pnpm -r format && biome format --write scripts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "pnpm": {
     "comment": "Transitive pins that carry a published advisory. Each entry is the lowest version OSV reports as fixed or newer; drop an entry once the parent package ships a range that already satisfies it (scripts/osv-audit.mjs is the gate).",

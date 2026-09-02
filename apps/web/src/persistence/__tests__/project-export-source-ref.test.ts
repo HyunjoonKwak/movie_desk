@@ -39,6 +39,44 @@ describe("stored project sourceRef", () => {
     expect(project.mediaLibrary[0]?.sourceRef).toEqual(sourceRef);
   });
 
+  it("rejects relative paths that escape the root, are absolute, or carry NUL", () => {
+    const base = {
+      kind: "disk" as const,
+      version: 1 as const,
+      rootId: "root-1",
+      rootSnapshot: {},
+      sizeBytes: 10,
+      modifiedAtMs: 20,
+    };
+    for (const relativePath of [
+      "/abs/clip.mov",
+      "a/../b.mov",
+      "../b.mov",
+      "a\\..\\b.mov",
+      "a\0b",
+    ]) {
+      expect(() =>
+        parseStoredProject(stored(asset({ sourceRef: { ...base, relativePath } }))),
+      ).toThrow();
+    }
+    expect(() =>
+      parseStoredProject(stored(asset({ sourceRef: { ...base, relativePath: "2025/clip.mov" } }))),
+    ).not.toThrow();
+  });
+
+  it("rejects a negative modification time", () => {
+    const sourceRef = {
+      kind: "disk" as const,
+      version: 1 as const,
+      rootId: "root-1",
+      rootSnapshot: {},
+      relativePath: "clip.mov",
+      sizeBytes: 10,
+      modifiedAtMs: -1,
+    };
+    expect(() => parseStoredProject(stored(asset({ sourceRef })))).toThrow();
+  });
+
   it("rejects a disk reference that lost its root", () => {
     const broken = { kind: "disk", version: 1, relativePath: "x", sizeBytes: 1, modifiedAtMs: 1 };
     expect(() => parseStoredProject(stored(asset({ sourceRef: broken as never })))).toThrow();

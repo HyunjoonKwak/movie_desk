@@ -1,7 +1,12 @@
+import { acquireMediaUrl, readMediaFile } from "@/persistence/opfs";
 import type { MediaAsset } from "@movie-desk/core";
 import { sourceRefOf } from "@movie-desk/core";
-import { acquireMediaUrl, readMediaFile } from "@/persistence/opfs";
-import { MediaSourceError, type PlaybackLease, type RandomAccessMediaSource } from "./media-source";
+import {
+  MediaSourceError,
+  type PlaybackLease,
+  type RandomAccessMediaSource,
+  clampReadRange,
+} from "./media-source";
 
 // Legacy adapter: the asset's bytes are a Blob in the app's OPFS store.
 // Blob.slice is zero-copy until the range is actually read.
@@ -15,9 +20,9 @@ export const blobMediaSource = (
   sizeBytes: blob.size,
   mime,
   read: async (start, length) => {
-    const from = Math.max(0, Math.min(start, blob.size));
-    const to = Math.max(from, Math.min(blob.size, start + length));
-    return blob.slice(from, to).arrayBuffer();
+    const range = clampReadRange(start, length, blob.size);
+    if (range.length === 0) return new ArrayBuffer(0);
+    return blob.slice(range.start, range.start + range.length).arrayBuffer();
   },
   acquirePlaybackUrl: acquire,
 });

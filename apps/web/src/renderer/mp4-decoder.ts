@@ -2,7 +2,7 @@
 // container incrementally; only samples around the requested playhead are read
 // from the source and decoded. This avoids copying and decoding the whole asset.
 
-import type { RandomAccessMediaSource } from "@/media/source/media-source";
+import { type RandomAccessMediaSource, clampReadRange } from "@/media/source/media-source";
 import type { VideoFrameCache } from "./video-frame-cache";
 
 interface MP4Sample {
@@ -95,17 +95,18 @@ const stamp = (buffer: ArrayBuffer, start: number): MP4ArrayBuffer => {
 };
 
 export const toByteSource = (input: Blob | RandomAccessMediaSource): ByteSource => {
-  if (input instanceof Blob) {
-    return {
-      size: input.size,
-      read: async (start, length) =>
-        stamp(await input.slice(start, Math.min(input.size, start + length)).arrayBuffer(), start),
-    };
-  }
+  const size = input instanceof Blob ? input.size : input.sizeBytes;
+  const readRange =
+    input instanceof Blob
+      ? (start: number, length: number) => input.slice(start, start + length).arrayBuffer()
+      : (start: number, length: number) => input.read(start, length);
   return {
-    size: input.sizeBytes,
-    read: async (start, length) =>
-      stamp(await input.read(start, Math.max(0, Math.min(length, input.sizeBytes - start))), start),
+    size,
+    read: async (start, length) => {
+      const range = clampReadRange(start, length, size);
+      if (range.length === 0) return stamp(new ArrayBuffer(0), range.start);
+      return stamp(await readRange(range.start, range.length), range.start);
+    },
   };
 };
 
@@ -279,7 +280,12 @@ export const decodeMp4ToCache = async (
     let offset = Math.max(0, Math.floor(seek.offset));
     file.start();
 
-    while (!closed && requestGeneration === generation && !reachedWindowEnd && offset < source.size) {
+    while (
+      !closed &&
+      requestGeneration === generation &&
+      !reachedWindowEnd &&
+      offset < source.size
+    ) {
       const chunk = await source.read(offset, SAMPLE_CHUNK_BYTES);
       if (closed || requestGeneration !== generation) break;
       const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);

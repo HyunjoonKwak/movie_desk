@@ -1,6 +1,6 @@
-import { z } from "zod";
 import type { Project } from "@movie-desk/core";
-import { PROJECT_VERSION } from "@movie-desk/core";
+import { PROJECT_VERSION, isSafeRelativePath } from "@movie-desk/core";
+import { z } from "zod";
 
 // JSON envelope so we can evolve the on-disk format independently of the
 // in-memory Project type.
@@ -113,9 +113,12 @@ const sourceRefSchema = z.discriminatedUnion("kind", [
       version: z.literal(1),
       rootId: z.string().min(1),
       rootSnapshot: rootSnapshotSchema,
-      relativePath: z.string().min(1),
+      relativePath: z
+        .string()
+        .min(1)
+        .refine(isSafeRelativePath, { message: "relativePath must stay inside its root" }),
       sizeBytes: nonNegative,
-      modifiedAtMs: finite,
+      modifiedAtMs: nonNegative,
       inode: z.string().optional(),
       quickHash: z.string().optional(),
       fullHash: z.string().optional(),

@@ -34,6 +34,19 @@ describe("blobMediaSource", () => {
     expect((await source.read(100, 10)).byteLength).toBe(0);
   });
 
+  it("rejects negative or non-integer ranges and returns nothing for zero length", async () => {
+    const source = blobMediaSource("a1", "video/mp4", blob, async () => ({
+      url: "blob:x",
+      release() {},
+    }));
+    await expect(source.read(-1, 5)).rejects.toThrow(RangeError);
+    await expect(source.read(1.5, 5)).rejects.toThrow(RangeError);
+    await expect(source.read(0, -5)).rejects.toThrow(RangeError);
+    await expect(source.read(0, Number.NaN)).rejects.toThrow(RangeError);
+    expect((await source.read(10, 0)).byteLength).toBe(0);
+    expect((await source.read(500, 5)).byteLength).toBe(0);
+  });
+
   it("hands out and releases a playback url lease", async () => {
     let released = 0;
     const source = blobMediaSource("a1", "video/mp4", blob, async () => ({
