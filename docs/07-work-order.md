@@ -204,6 +204,12 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 
 ## 주차장
 
+**유지보수 후속 항목**
+
+- GitHub Actions: `actions/checkout@v4`, `actions/setup-node@v4`, `pnpm/action-setup@v4`가
+  Node 20 런타임 deprecation 경고를 낸다(run 33684793493). 다음 CI 손질 때 v5 계열로
+  올린다. 담당 Claude(`.github/`).
+
 WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, 영어 랜딩·온보딩,
 서명·공증. 성능·전문 작업 검증이나 사용자 발생 같은 조건이 채워지면 꺼낸다.
 
