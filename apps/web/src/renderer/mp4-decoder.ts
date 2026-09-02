@@ -3,6 +3,7 @@
 // from the source and decoded. This avoids copying and decoding the whole asset.
 
 import { type RandomAccessMediaSource, clampReadRange } from "@/media/source/media-source";
+import { primeMp4Box, serializeBoxPayload } from "./mp4-demux";
 import { quietMp4BoxLogs } from "./mp4box-log";
 import type { VideoFrameCache } from "./video-frame-cache";
 
@@ -149,9 +150,7 @@ const description = (file: MP4File, trackId: number): Uint8Array | undefined => 
     };
     const entry = trak.mdia?.minf?.stbl?.stsd?.entries?.[0];
     const box = entry?.avcC ?? entry?.hvcC;
-    if (!box) return undefined;
-    const value = (box as { value?: Uint8Array }).value;
-    return value instanceof Uint8Array ? value : undefined;
+    return box ? serializeBoxPayload(box) : undefined;
   } catch {
     return undefined;
   }
@@ -193,6 +192,7 @@ export const decodeMp4ToCache = async (
 
   const MP4Box = await import("mp4box");
   quietMp4BoxLogs((MP4Box as unknown as { Log: Parameters<typeof quietMp4BoxLogs>[0] }).Log);
+  await primeMp4Box();
   // keepMdatData=false: mp4box discards media payload after sample extraction.
   const file = (
     MP4Box as unknown as { createFile: (keepMdatData?: boolean) => MP4File }
