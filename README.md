@@ -2,11 +2,14 @@
 
 **English** · [한국어](README.ko.md)
 
-**Movie Desk is a local-first AI video editor anyone can start using without
-learning editing first.** Drop in the footage you have been collecting and it
-organizes it, proposes a direction, and creates a first cut. You decide and
-finish from there; your footage never leaves your device. Prebuilt macOS apps
-are on the [Releases page](../../releases/latest).
+**Movie Desk is a local-first video workstation that combines a serious media
+library with professional-grade editing while guiding first-time editors from
+import to final export.** It makes powerful tools approachable through good
+defaults and progressive disclosure instead of removing their depth. Local AI
+assists with analysis, search, transcription, suggestions, and optional rough
+cuts; the user keeps final control and precise finishing. Footage never leaves
+the device. Prebuilt macOS apps are on the
+[Releases page](../../releases/latest).
 
 Repository and local folder: `movie_desk`. Started from a study of
 [OpenCut](https://github.com/OpenCut-app/OpenCut) (cloned into `reference/`
@@ -15,15 +18,16 @@ unchanged so projects created before the rename still open normally.
 
 ## Where it fits
 
-Directional, not a benchmark. With a pile of footage, most people reach for
-the auto-memories in their photo app or a template app. Those fail in four
-places: they ignore what you marked, hide why a shot was picked, send footage
-to the cloud, and charge for the parts that matter. Movie Desk is built on the
-opposite of each.
+Movie Desk takes three product categories as simultaneous quality bars: the
+organisation and search of a media manager, the approachable first run of a
+guided app, and the depth, precision, and performance of a professional editor.
+It joins work that otherwise forces users to move among a file manager, an
+automatic editing app, and a professional NLE. The table below compares only
+the assisted-editing direction; it does not define the product's full scope.
 
 | | Photo-app auto memories (Google Photos, Apple Memories) | Template apps (CapCut, GoPro Quik) | **Movie Desk** |
 |--|:--:|:--:|:--:|
-| Footage stays on your device | varies | varies | ✅ analysis, models, storage |
+| Footage stays on your device | varies | varies | ✅ local media, analysis, storage |
 | Shows why each shot was picked | ❌ | ❌ | ✅ reason per pick |
 | Respects your pins and exclusions, then re-cuts | ❌ | partial | ✅ re-assemble, one undo |
 | Rejected shots are one click from coming back | ❌ | ❌ | ✅ rejected-candidate browser |
@@ -32,7 +36,8 @@ opposite of each.
 | Finish on a real timeline (ripple, keyframes, LUTs, subtitles) | ❌ | partial | ✅ |
 | Free and open source | ❌ | ❌ | ✅ MIT |
 
-Final Cut Pro and CapCut remain the bar for the finishing stage.
+Final Cut Pro and DaVinci Resolve remain the bars for editing depth, precision,
+performance, and reliability.
 [`docs/01-feature-matrix.md`](docs/01-feature-matrix.md) tracks the timeline,
 effects, and export against them, and
 [`docs/02-architecture.md`](docs/02-architecture.md) covers the technical plan.
@@ -47,7 +52,7 @@ effects, and export against them, and
 | Effects | 24 built-in GPU/audio effects, 1D/3D `.cube` LUTs, vector masks, blend modes, and background removal |
 | Text | Canvas2D-rendered text clips with size/color/bg controls + a dedicated subtitles track |
 | Media | OPFS-backed assets, thumbnail/filmstrip/waveform probe, drag-drop ingest with progress + cancel, capture-time ordering with day/place groups (offline geocoded), proxies, thumbnail sizing, marquee multi-select, use/skip marks, per-asset usable-range trim |
-| AI (all local) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie), Smile detection (FaceLandmarker), opt-in semantic tags/dedup (MobileCLIP) |
+| AI (local execution) | Auto silence cut (WebAudio RMS), Whisper transcription (HuggingFace), Scene detect (χ²), Background removal (MediaPipe Selfie), Smile detection (FaceLandmarker), opt-in semantic tags/dedup (MobileCLIP). Some models require a first-use download |
 | Auto-edit | 6-step wizard for travel/landscape footage: junk filter (blur/exposure/shake), interest scoring, beat-grid assembly with photo stacks + Ken Burns, GPS/date story chapters with offline geocoding, rendered map-transition clips, YouTube Audio Library / Suno music flow, beat-snap re-conform when music changes — applied as one undo step on dedicated AUTO tracks |
 | Export | WebCodecs H.264/VP9/AV1 + chunked stereo AAC mixer, streaming LUFS normalization, work ranges, four presets |
 | Persistence | Validated project library + snapshots, Yjs/IndexedDB state, OPFS media, corruption-safe recovery |
@@ -178,10 +183,12 @@ required.
 ## Roadmap
 
 The plan lives in [`docs/06-master-plan.md`](docs/06-master-plan.md) (Korean).
-Phases: 0 ship the Movie Desk rename, 1 dogfood one real family set end to
-end, 2 accept iPhone and camera originals as-is (HEIC, HEVC, .mov), 3 rough-cut
-quality and analysis speed, 4 finishing and sharing, 5 reliability (auto-edit
-e2e, muxer successor), 6 public release when interests grow.
+Phases: 0 restore CI/security and build a Movie Desk release candidate, 1
+dogfood one real family set end to end, 2 accept iPhone and camera originals
+as-is (HEIC, HEVC, .mov), 3 improve rough-cut quality and analysis speed, 4
+complete finishing and sharing, 5 pass regression gates and ship the first
+stable `v0.4.0`, 6 mature the media library, professional editor, and guided
+workflow together, 7 expand publicly when real users appear.
 
-Not planned: collaboration, plugins, compound sequences, cloud accounts,
-template marketplaces.
+Not planned: real-time team collaboration, a plugin marketplace, required cloud
+upload or accounts, an auto-edit-only product, or mass short-form generation.

@@ -69,9 +69,14 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
 ## North star
 
-The differentiating combination remains:
+The product target has three equal pillars:
 
-1. open and self-hostable;
-2. useful local AI without uploading source media;
-3. an AI rough cut the user reviews and overrides, never a black box;
-4. one web codebase shared by PWA and desktop packaging.
+1. a serious media library for large, reusable, safely managed collections;
+2. professional editing depth, precision, performance, and export quality;
+3. a guided first-success path plus optional local AI assistance that never takes
+   control away from the editor.
+
+Movie Desk must make advanced capability approachable through progressive
+disclosure, not by lowering the ceiling. Source media stays local, automatic
+changes remain explainable and reversible, and a normal project should not need
+another editor for final finishing.
