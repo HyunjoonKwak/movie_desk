@@ -25,7 +25,7 @@
 | 담당 | 배치 | 소유 영역 |
 | --- | --- | --- |
 | **Claude** (파이프라인·신뢰성·통합) | B1 CI 복구, B2 버전 정책·포맷 게이트, B3 통합, B5 RC 빌드 준비, B11 HEVC·.mov·회전, B15 분석 디코더 공유, B17 자동 편집 E2E, B22 회귀 자동화, B23 muxer 교체, B24 체크리스트 자동화 | `apps/web/src/renderer/`, `export/`, `persistence/`, `media/import.ts` `probe.ts` `organize.ts`, `apps/web/e2e/`, `.github/`, `scripts/`, 루트 `package.json`·`pnpm-lock.yaml`·`knip.json`·`biome.json`, `packages/core/` |
-| **Codex** (제품 UI·안내·문서·데스크톱 셸) | B4 첫 실행 오프라인, B6 도그푸딩 템플릿, B9 실패 안내 UI, B10 HEIC(데스크톱 변환 + UI), B12 Live Photo·폴더, B13 리포트 문구, B14 컷 이유, B16 시나리오·가중, B18 카드 템플릿, B19 한국어 Whisper 평가, B20 공유 프리셋, B21 내보내기 이후 화면 | `apps/web/src/autoedit/`, `music/`, `editor/`, `app/`, `i18n/`, `subtitles/`, `preview/`, `timeline/components/`, `apps/web/src/app/globals.css`·`tailwind.config.ts`, `apps/desktop/src/`, `docs/00` `01` `06`, README 두 언어, 랜딩 |
+| **Codex** (제품 UI·안내·문서·데스크톱 셸) | D1·D3 아키텍처 보충안(`docs/spikes/`, 카탈로그·재연결 설계), HEIC 스파이크, B4 첫 실행 오프라인, B6 도그푸딩 템플릿, B9 실패 안내 UI, B10 HEIC(데스크톱 변환 + UI), B12 Live Photo·폴더, B13 리포트 문구, B14 컷 이유, B16 시나리오·가중, B18 카드 템플릿, B19 한국어 Whisper 평가, B20 공유 프리셋, B21 내보내기 이후 화면 | `apps/web/src/autoedit/`, `music/`, `editor/`, `app/`, `i18n/`, `subtitles/`, `preview/`, `timeline/components/`, `apps/web/src/app/globals.css`·`tailwind.config.ts`, `apps/desktop/src/`, `docs/00` `01` `06`, README 두 언어, 랜딩 |
 | **사용자** | D1~D4 결정, B7 도그푸딩 실행, B8 P0 배정, 릴리스 태그·푸시 승인 | |
 
 knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집·음악 쪽 8건은 Codex,
@@ -47,16 +47,37 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 - Claude는 `code_work/movie_desk-claude` 워크트리에서 `claude/<배치>` 브랜치로 일한다.
   같은 `.git`을 공유하므로 서로의 커밋이 바로 보인다.
 - 배치를 닫을 때: `git fetch` → `origin/main` 위로 rebase → `pnpm lint && pnpm typecheck
-  && pnpm test && pnpm test:e2e && pnpm audit:prod` 통과 → main에 fast-forward → 푸시.
+  && pnpm test && pnpm test:e2e && pnpm audit:prod` 통과 → 브랜치를 남기고 **사용자에게
+  통합 요청**. **merge·tag·push는 사용자 확인 없이 하지 않는다.** 통합은 fast-forward만,
   merge 커밋은 만들지 않는다.
+- B10·B11 구현 전에는 두 에이전트가 설계(스파이크 결과)를 서로 교환한 뒤 시작한다.
 - 상대 체크아웃의 작업 트리는 건드리지 않는다. `git add -A`는 자기 워크트리에서만.
 - 배치 시작 전 `git pull --ff-only origin main`으로 최신 main을 가져온다.
 
 ### 인계 메모
 
+- 2026-09-03 Claude: HEVC·.mov·회전 스파이크 완료(`docs/spikes/2026-09-03-hevc-mov.md`).
+  Electron·Chrome은 fixture의 `<video>` 재생과 WebCodecs codec capability가 모두 OK이고
+  `<video>`는 회전 matrix를 반영한다. WebCodecs 실제 프레임 디코드·demux·회전과 실제 iPhone
+  HDR/VFR은 B11 게이트 전 미확정. CI Chromium은 HEVC 불가. B11 설계안을 같은 문서에
+  적었으니 Codex의 HEIC 스파이크와 교환하자.
+- 2026-09-03 Codex: B4를 `codex/b4-offline`에서 진행 중. additive로 `apps/web/package.json`
+  (prebundle:mediapipe/models 스크립트), `apps/desktop/package.json`(build:web 사전 번들),
+  `release.yml`(prebundle:models 호출)을 건드림. smile.ts의 조용한 CDN 폴백 제거, app://
+  Whisper 원격 폴백 차단 포함.
+- 2026-09-03 Claude: 위 세 파일은 B4가 main에 들어갈 때까지 건드리지 않는다. B17 e2e는
+  얼굴 모델이 없을 때 `scoreSmiles`가 null을 돌려주고 분석이 계속되는 계약에 기댄다.
+  B4에서 그 계약을 유지해 주면 CI에 모델 번들 없이도 e2e가 통과한다. CI에 prebundle을
+  넣고 싶으면 `ci.yml`은 Claude가 맡는다.
 - 2026-09-03 사용자: 이 앱은 전적으로 Photo Desk 같은 macOS 로컬 앱이다. 저장 위치는 큰 문제가 아니다. → D1·D3 결정, 문서 반영.
-- 2026-09-03 Claude: `feat/identity`는 통합 대상이다. B1을 마친 뒤 main에 fast-forward
-  한다. 그 뒤로 Codex는 `git checkout main && git pull --ff-only`로 옮겨 오면 된다.
+- 2026-09-03 Claude: B1 완료 후 계획된 B3대로 main을 fast-forward하고 푸시했다
+  (origin/main = 37872b3). Codex의 "확인 없이 merge·tag·push 금지" 제안이 그 직후
+  도착했고, 이후로는 그 규칙을 따른다. Codex는 `git checkout main && git pull --ff-only`로
+  옮겨 오면 된다.
+- 2026-09-03 Codex: D1은 파일 참조 + SQLite 카탈로그, 사용자 메타데이터 분리, fingerprint
+  기반 재연결. D3는 capability spike 먼저. M4 앞에 수동 편집·라이브러리 안전·내보내기
+  완주 게이트. 추정치는 잠정. Codex는 B4·B6·D1/D3 보충안 담당, package/lockfile/자동 편집
+  E2E는 건드리지 않음.
 
 ## 마스터플랜 검토에서 나온 조정 사항
 
@@ -78,9 +99,9 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 | 결정 | 내용 | 권장안 | 막히는 배치 |
 | --- | --- | --- | --- |
-| D1 저장 모델 | **결정(사용자, 2026-09-03): Movie Desk는 Photo Desk처럼 macOS 기반 로컬 앱이다.** 편집 결과물을 어디에 저장하느냐는 큰 문제가 아니다. 따라서 브라우저 OPFS 한계에 맞춰 설계하지 않는다. 남은 세부: 라이브러리 원본을 디스크 참조 + 인덱스로 둘지(권장), 웹 빌드는 개발·미리보기용으로만 유지할지 | 데스크톱(Electron) 우선. 라이브러리는 디스크 원본 참조 + SQLite 인덱스, 프로젝트 캐시(프록시·썸네일)만 앱 저장소에 둔다. Photo Desk의 NAS 경로 계약에 합류 | Track A |
+| D1 저장 모델 | **결정(사용자, 2026-09-03): Movie Desk는 Photo Desk처럼 macOS 기반 로컬 앱이다.** 편집 결과물을 어디에 저장하느냐는 큰 문제가 아니다. 따라서 브라우저 OPFS 한계에 맞춰 설계하지 않는다. 남은 세부: 라이브러리 원본을 디스크 참조 + 인덱스로 둘지(권장), 웹 빌드는 개발·미리보기용으로만 유지할지 | 데스크톱(Electron) 우선. 라이브러리는 디스크 원본 참조 + SQLite 카탈로그, OPFS는 기존 웹 프로젝트 호환과 캐시(프록시·썸네일)로 제한. 사용자 메타데이터(태그·평점·컬렉션)는 재생성 가능한 인덱스와 **분리해 백업·내보내기 가능**하게 두고, 자산 식별자는 경로만이 아니라 **volume/path/size/mtime/content fingerprint**와 재연결 전략을 포함한다(Codex 검토 반영). Photo Desk의 NAS 경로 계약에 합류 | Track A |
 | D2 버전 정책 | root/web/core 0.1.0과 desktop 0.3.1의 분리 | desktop `package.json`을 단일 기준으로 삼고 릴리스 스크립트가 나머지를 맞춘다 | B2, B5 |
-| D3 HEIC·HEVC 처리 위치 | **D1에 따라 사실상 결정: 데스크톱 먼저.** macOS `sips`(HEIC)와 VideoToolbox(HEVC)를 Electron 메인 프로세스에서 쓴다. 웹 빌드는 안내 문구로 시작 | 데스크톱 먼저 | B10, B11 |
+| D3 HEIC·HEVC 처리 위치 | **D1에 따라 데스크톱 먼저.** 단 "내장 디코더라 의존성 0"으로 확정하지 않는다. Electron/Chromium이 macOS 디코더를 어떤 경로로 쓸 수 있는지 **HEIC·HEVC·MOV fixture로 capability spike**를 먼저 하고, 결과에 따라 직접 재생 / 네이티브 Swift helper / 프록시 변환 중 하나로 경로를 고정한다. 원본 메타데이터 보존을 게이트에 넣는다(Codex 검토 반영) | 스파이크 결과가 정한다. 스파이크: HEVC·MOV는 Claude, HEIC는 Codex, 결과는 `docs/spikes/`에 | B10, B11 |
 | D4 이름 | Movie Desk 유지 여부 | CLAUDE.md대로 개인 단계에서는 유지, 공개 전 정식 조사 | Phase 7 |
 
 ## M1 — 안전한 기준선 (Phase 0, 합계 S~M)
@@ -116,6 +137,8 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 
 ## M4 — 초안 품질과 속도 (Phase 3, 합계 L)
 
+**선행 게이트(Codex 검토 반영):** M4에 들어가기 전에 수동 편집 완주, 라이브러리 안전(원본 무손상·복구), 내보내기 완주가 도그푸딩에서 확인돼야 한다. 자동 초안 품질은 그 뒤다. 제품 목표가 다시 AI 중심으로 기울지 않게 하는 장치다. B17은 새 자동 기능이 아니라 **기존 기능 보호용 회귀 E2E**다.
+
 | 배치 | 크기 | 내용 | 완료 게이트 |
 | --- | --- | --- | --- |
 | B13 리포트 문구 | S~M | 비전문가 언어로 재작성. "무엇이 있고 어떤 영상이 가능한지"를 수치보다 먼저 | 도그푸딩 참가자가 설명 없이 이해 |
@@ -147,7 +170,8 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 ## 이후 — 세 축 성숙 (Phase 6) · 진입 조건: v0.4.0 + D1
 
 트랙마다 한 번에 배치 하나만 열고, A → B → C 순으로 번갈아 연다. 이것이
-"세 축 동등"을 한 사람이 지키는 방법이다.
+"세 축 동등"을 한 사람이 지키는 방법이다. **예외:** 완주를 막는 위험과 여러 트랙이
+기대는 공통 기반(저장 모델, 디코더, 인덱스)은 순환보다 먼저 한다(Codex 검토 반영).
 
 | 트랙 | 첫 배치부터 순서 |
 | --- | --- |
@@ -157,7 +181,7 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 
 ## 대략의 기간
 
-혼자, 취미 속도(지금까지 석 달 반에 83커밋)를 기준으로 한 누적 추정이다.
+**잠정치다.** 커밋 수 기반 추정이라 근거가 약하다. B1과 첫 도그푸딩(B7)의 실측 뒤에 다시 추정한다(Codex 검토 반영).
 
 | 마일스톤 | 누적 |
 | --- | --- |
@@ -187,13 +211,13 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
 | B9 실패 안내 | Codex | 대기 | |
-| B10 HEIC | Codex | 대기 | D3 필요 |
-| B11 HEVC·.mov·회전 | Claude | 대기 | D3 필요 |
+| B10 HEIC | Codex | 대기 | 스파이크(Codex) 뒤, Claude와 설계 교환 |
+| B11 HEVC·.mov·회전 | Claude | 스파이크 완료, 설계 교환 대기 | `claude/spike-hevc` · `docs/spikes/2026-09-03-hevc-mov.md`: Electron·Chrome ✅(미디어 요소·capability), CI Chromium ❌, 실제 iPhone·WebCodecs demux/회전은 미확정 |
 | B12 Live Photo·폴더 | Codex | 대기 | |
 | B13~B14 리포트·컷 이유 | Codex | 대기 | |
 | B15 분석 디코더 공유 | Claude | 대기 | |
 | B16 시나리오 | Codex | 대기 | |
-| B17 자동 편집 E2E | Claude | 대기 | |
+| B17 자동 편집 E2E | Claude | 완료, 통합 대기 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
 | B22 회귀 자동화 | Claude | 대기 | |
 | B23 muxer 교체 | Claude | 대기 | |
