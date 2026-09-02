@@ -242,4 +242,4 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A1-a MediaSource 계약 | Claude | 완료, 통합 후보 | core 타입·fingerprint·cacheKey, zod 스키마(safe relativePath), OPFS adapter, resolver, 디코더 ByteSource(clampReadRange), 컴포지터 연결. Codex 검토 반영(77917f5). CI Node 22 |
 | A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, 통합 후보 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
 | A1-c helper 계약 | Codex | 완료, 통합 후보 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
-| A1-d 렌더러 disk adapter | Claude | 대기 | A1 통합 뒤. `fetch` Range over `media://`, 상태 헤더→MediaSourceError, 길이 0 가드, `registerMediaSourceAdapter("disk")` |
+| A1-d 렌더러 disk adapter | Claude + Codex | 완료, 통합 후보 | 충돌 없는 검토 브랜치 `HyunjoonKwak/codex-a1d-review`에서 정리. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록 |

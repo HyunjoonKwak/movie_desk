@@ -1,5 +1,7 @@
 import type { MediaAsset, SourceRef } from "@movie-desk/core";
 import { sourceRefOf } from "@movie-desk/core";
+import { readDesktopMediaBridge } from "./desktop-media-bridge";
+import { createDiskMediaSourceAdapter } from "./disk-media-source";
 import { MediaSourceError, type RandomAccessMediaSource } from "./media-source";
 import { createOpfsMediaSource } from "./opfs-media-source";
 
@@ -13,6 +15,8 @@ const adapters = new Map<SourceRef["kind"], MediaSourceAdapter>();
 
 const registerDefaults = (): void => {
   adapters.set("opfs", (asset) => createOpfsMediaSource(asset));
+  const bridge = readDesktopMediaBridge();
+  if (bridge) adapters.set("disk", createDiskMediaSourceAdapter({ bridge }));
 };
 registerDefaults();
 
