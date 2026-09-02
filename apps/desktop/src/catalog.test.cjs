@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
+const { DatabaseSync } = require("node:sqlite");
 const { MediaCatalog, normalizeRelativePath } = require("./catalog.cjs");
 
 const catalogs = new Set();
@@ -30,6 +31,19 @@ describe("MediaCatalog", () => {
   it("opens WAL schema version 1 in its worker", async () => {
     const catalog = await createCatalog();
     assert.deepEqual(await catalog.ready(), { schemaVersion: 1, journalMode: "wal" });
+  });
+
+  it("refuses to overwrite a catalog created by a newer app", async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-catalog-"));
+    temporaryDirectories.add(directory);
+    const databasePath = path.join(directory, "catalog.sqlite3");
+    const database = new DatabaseSync(databasePath);
+    database.exec("PRAGMA user_version = 999");
+    database.close();
+    const catalog = new MediaCatalog(databasePath);
+    catalogs.add(catalog);
+
+    await assert.rejects(catalog.ready(), (error) => error.code === "CATALOG_TOO_NEW");
   });
 
   it("stores source roots and produces an asset with its root snapshot", async () => {

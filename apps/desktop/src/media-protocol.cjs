@@ -3,15 +3,17 @@ const fs = require("node:fs");
 const { Readable } = require("node:stream");
 const { resolveAssetSource } = require("./source-resolver.cjs");
 
-const ASSET_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$/;
+// Core currently uses nanoid, whose alphabet permits '_' and '-' in the first
+// position. Keep the protocol token path-safe without assuming UUID syntax.
+const ASSET_ID_PATTERN = /^[a-zA-Z0-9._-]{1,128}$/;
 
 class MediaLeaseRegistry {
   #leases = new Map();
 
-  acquire(assetId) {
+  acquire(assetId, source = null) {
     assertAssetId(assetId);
     const leaseId = crypto.randomUUID();
-    this.#leases.set(leaseId, assetId);
+    this.#leases.set(leaseId, { assetId, source });
     return {
       leaseId,
       url: `media://asset/${encodeURIComponent(assetId)}?lease=${encodeURIComponent(leaseId)}`,
@@ -27,7 +29,12 @@ class MediaLeaseRegistry {
   }
 
   validates(assetId, leaseId) {
-    return typeof leaseId === "string" && this.#leases.get(leaseId) === assetId;
+    return typeof leaseId === "string" && this.#leases.get(leaseId)?.assetId === assetId;
+  }
+
+  lookup(assetId, leaseId) {
+    const lease = this.#leases.get(leaseId);
+    return lease?.assetId === assetId ? lease : null;
   }
 }
 
@@ -68,8 +75,9 @@ const createMediaProtocolHandler = ({
   resolveSource = resolveAssetSource,
   open = fs.promises.open,
 }) => {
-  if (!catalog || typeof catalog.getAsset !== "function") throw new TypeError("catalog is required");
-  if (!leases || typeof leases.validates !== "function") throw new TypeError("leases are required");
+  if (!catalog || typeof catalog.getAsset !== "function")
+    throw new TypeError("catalog is required");
+  if (!leases || typeof leases.lookup !== "function") throw new TypeError("leases are required");
 
   return async (request) => {
     let parsed;
@@ -82,15 +90,17 @@ const createMediaProtocolHandler = ({
     if (request.method !== "GET" && request.method !== "HEAD") {
       return textResponse("Method not allowed", 405, { Allow: "GET, HEAD" });
     }
-    if (!leases.validates(parsed.assetId, parsed.leaseId)) {
+    const lease = leases.lookup(parsed.assetId, parsed.leaseId);
+    if (!lease) {
       return textResponse("Media lease expired", 403);
     }
 
-    const asset = await catalog.getAsset(parsed.assetId);
+    const asset = lease.source?.asset ?? (await catalog.getAsset(parsed.assetId));
     if (!asset) return sourceStateResponse("offline", 404, "Media asset not found");
-    const resolved = await resolveSource(asset);
+    const resolved = lease.source?.resolved ?? (await resolveSource(asset));
     if (resolved.state !== "online" && resolved.state !== "moved") {
-      const status = resolved.state === "permission-denied" ? 403 : resolved.state === "offline" ? 404 : 409;
+      const status =
+        resolved.state === "permission-denied" ? 403 : resolved.state === "offline" ? 404 : 409;
       return sourceStateResponse(resolved.state, status, `Media source is ${resolved.state}`);
     }
 
@@ -123,6 +133,9 @@ const createMediaProtocolHandler = ({
       }
 
       const stream = file.createReadStream({ start: range.start, end: range.end, autoClose: true });
+      const abort = () => stream.destroy(new Error("media request aborted"));
+      request.signal?.addEventListener("abort", abort, { once: true });
+      stream.once("close", () => request.signal?.removeEventListener("abort", abort));
       return new Response(Readable.toWeb(stream), {
         status: range.partial ? 206 : 200,
         headers,
@@ -170,6 +183,7 @@ const mediaHeaders = (mime, range, sizeBytes) => {
     "Content-Length": String(range.length),
     "Content-Type": mime || "application/octet-stream",
     "Cross-Origin-Resource-Policy": "cross-origin",
+    "X-Content-Type-Options": "nosniff",
   };
   if (range.partial) headers["Content-Range"] = `bytes ${range.start}-${range.end}/${sizeBytes}`;
   return headers;

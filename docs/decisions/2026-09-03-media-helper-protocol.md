@@ -21,6 +21,7 @@ Movie Desk의 Electron main은 SQLite 카탈로그와 `media://` lease를 소유
 | 명령 | 입력 | 핵심 결과 | 현재 구현 |
 | --- | --- | --- | --- |
 | `volume-resolve` | `path` | volume UUID, mount, volume-relative path, filesystem | macOS `diskutil` |
+| `volume-mount` | `volumeUuid` | 현재 mount와 읽기 전용 여부 | macOS `diskutil` |
 | `inspect` | `path` | 종류, 크기, 형식, 색공간, orientation | 이미지: macOS `sips` |
 | `preview` | source/output path, max dimension, JPEG/PNG | 출력 크기·pipeline version | macOS `sips` |
 | `fingerprint` | `path`, quick/full | 알고리즘, 크기, SHA-256 | Node streaming I/O |

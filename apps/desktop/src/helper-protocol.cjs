@@ -1,5 +1,11 @@
 const HELPER_PROTOCOL_VERSION = 1;
-const HELPER_COMMANDS = new Set(["volume-resolve", "inspect", "preview", "fingerprint"]);
+const HELPER_COMMANDS = new Set([
+  "volume-resolve",
+  "volume-mount",
+  "inspect",
+  "preview",
+  "fingerprint",
+]);
 
 const validateHelperRequest = (value) => {
   if (!isRecord(value)) throw protocolError("request must be an object");

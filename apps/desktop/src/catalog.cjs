@@ -11,6 +11,7 @@ class MediaCatalog {
   #pending = new Map();
   #closed = false;
   #startupError;
+  #workerError;
 
   constructor(databasePath) {
     if (typeof databasePath !== "string" || databasePath.length === 0) {
@@ -20,10 +21,14 @@ class MediaCatalog {
       workerData: { databasePath },
     });
     this.#worker.on("message", (message) => this.#onMessage(message));
-    this.#worker.on("error", (error) => this.#failAll(error));
+    this.#worker.on("error", (error) => {
+      this.#workerError = error;
+      this.#failAll(error);
+    });
     this.#worker.on("exit", (code) => {
-      if (!this.#closed && code !== 0) {
-        this.#failAll(new Error(`catalog worker exited with code ${code}`));
+      if (!this.#closed) {
+        this.#workerError = new Error(`catalog worker exited with code ${code}`);
+        this.#failAll(this.#workerError);
       }
     });
   }
@@ -70,7 +75,8 @@ class MediaCatalog {
       inode: optionalText(input?.inode, "asset.inode"),
       quickHash: optionalText(input?.quickHash, "asset.quickHash"),
       fullHash: optionalText(input?.fullHash, "asset.fullHash"),
-      mime: input?.mime == null ? "application/octet-stream" : requiredText(input.mime, "asset.mime"),
+      mime:
+        input?.mime == null ? "application/octet-stream" : requiredText(input.mime, "asset.mime"),
       mediaKind: enumValue(input?.mediaKind ?? "unknown", MEDIA_KINDS, "asset.mediaKind"),
       createdAtMs: nonNegativeInteger(input?.createdAtMs ?? now, "asset.createdAtMs"),
       updatedAtMs: nonNegativeInteger(input?.updatedAtMs ?? now, "asset.updatedAtMs"),
@@ -113,7 +119,7 @@ class MediaCatalog {
     if (this.#closed) return;
     this.#closed = true;
     try {
-      await this.#request("close", undefined, true);
+      await this.#request("close", undefined, true).catch(() => {});
     } finally {
       await this.#worker.terminate();
       this.#failAll(new Error("catalog is closed"));
@@ -123,6 +129,7 @@ class MediaCatalog {
   #request(method, arg, allowWhenClosed = false) {
     if (this.#closed && !allowWhenClosed) return Promise.reject(new Error("catalog is closed"));
     if (this.#startupError) return Promise.reject(this.#startupError);
+    if (this.#workerError) return Promise.reject(this.#workerError);
     const id = this.#nextId++;
     return new Promise((resolve, reject) => {
       this.#pending.set(id, { resolve, reject });

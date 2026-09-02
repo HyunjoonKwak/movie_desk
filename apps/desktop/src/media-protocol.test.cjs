@@ -118,6 +118,12 @@ describe("media protocol", () => {
     assert.equal(parseMediaUrl("media://asset/../../etc/passwd?lease=x"), null);
   });
 
+  it("accepts every path-safe leading character used by core nanoid values", () => {
+    const leases = new MediaLeaseRegistry();
+    assert.match(leases.acquire("_asset").url, /_asset/);
+    assert.match(leases.acquire("-asset").url, /-asset/);
+  });
+
   it("refuses to stream a source that changed after cataloging", async () => {
     const media = await fixture();
     fs.appendFileSync(media.absolutePath, "changed");
@@ -125,5 +131,24 @@ describe("media protocol", () => {
 
     assert.equal(response.status, 409);
     assert.equal(response.headers.get("x-movie-desk-source-state"), "changed");
+  });
+
+  it("reuses the resolved source snapshot for every range in one lease", async () => {
+    const media = await fixture();
+    const resolved = {
+      state: "online",
+      absolutePath: await fs.promises.realpath(media.absolutePath),
+    };
+    const cachedLease = media.leases.acquire(media.asset.id, { asset: media.asset, resolved });
+    const handler = createMediaProtocolHandler({
+      catalog: { getAsset: async () => assert.fail("catalog should not be queried") },
+      leases: media.leases,
+      resolveSource: async () => assert.fail("source should not be resolved twice"),
+    });
+
+    const first = await handler(new Request(cachedLease.url, { headers: { Range: "bytes=0-1" } }));
+    const second = await handler(new Request(cachedLease.url, { headers: { Range: "bytes=8-9" } }));
+    assert.equal(await first.text(), "01");
+    assert.equal(await second.text(), "89");
   });
 });

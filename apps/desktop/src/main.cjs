@@ -9,8 +9,9 @@ const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = 
 const path = require("node:path");
 const fs = require("node:fs");
 const { MediaCatalog } = require("./catalog.cjs");
+const { MediaHelperClient } = require("./helper-client.cjs");
 const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
-const { resolveAssetSource } = require("./source-resolver.cjs");
+const { VolumeRootResolver } = require("./volume-root-resolver.cjs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
 
 const isDev = !!process.env.MOVIE_DESK_DEV_URL;
@@ -57,6 +58,8 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 let mediaCatalog;
+let mediaHelper;
+let volumeRootResolver;
 const mediaLeases = new MediaLeaseRegistry();
 
 const mimeFromExt = (ext) => {
@@ -226,22 +229,38 @@ const createWindow = () => {
 const initializeMediaInfrastructure = async () => {
   const catalogDirectory = path.join(app.getPath("userData"), "catalog");
   await fs.promises.mkdir(catalogDirectory, { recursive: true });
-  mediaCatalog = new MediaCatalog(path.join(catalogDirectory, "media.sqlite3"));
-  await mediaCatalog.ready();
-  installMediaProtocol(protocol, { catalog: mediaCatalog, leases: mediaLeases });
-};
-
-const requireMediaCatalog = () => {
-  if (!mediaCatalog) throw new Error("media catalog is not ready");
-  return mediaCatalog;
+  try {
+    mediaCatalog = new MediaCatalog(path.join(catalogDirectory, "media.sqlite3"));
+    await mediaCatalog.ready();
+  } catch (error) {
+    if (mediaCatalog) await mediaCatalog.close().catch(() => {});
+    mediaCatalog = undefined;
+    // A rebuildable catalog failure must not prevent legacy OPFS projects from opening.
+    // biome-ignore lint/suspicious/noConsole: The renderer will add a recovery UI in C2.
+    console.warn("[movie-desk-desktop] media catalog unavailable; continuing degraded:", error);
+  }
+  mediaHelper = new MediaHelperClient();
+  volumeRootResolver = new VolumeRootResolver({ helper: mediaHelper });
+  installMediaProtocol(protocol, {
+    catalog: { getAsset: (assetId) => mediaCatalog?.getAsset(assetId) ?? null },
+    leases: mediaLeases,
+    resolveSource: (asset) => volumeRootResolver.resolve(asset),
+  });
 };
 
 ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
   requireTrustedIpc(event);
-  const catalog = requireMediaCatalog();
-  const asset = await catalog.getAsset(assetId);
+  if (!mediaCatalog) return { state: "offline", reason: "catalog-unavailable" };
+  const asset = await mediaCatalog.getAsset(assetId);
   if (!asset) return null;
-  return mediaLeases.acquire(asset.id);
+  const resolved = await volumeRootResolver.resolve(asset);
+  if (resolved.state !== "online" && resolved.state !== "moved") {
+    return { state: resolved.state, ...(resolved.reason ? { reason: resolved.reason } : {}) };
+  }
+  return {
+    ...mediaLeases.acquire(asset.id, { asset, resolved }),
+    state: resolved.state,
+  };
 });
 
 ipcMain.handle("movie-desk:media-release", (event, leaseId) => {
@@ -252,9 +271,15 @@ ipcMain.handle("movie-desk:media-release", (event, leaseId) => {
 
 ipcMain.handle("movie-desk:media-source-state", async (event, assetId) => {
   requireTrustedIpc(event);
-  const asset = await requireMediaCatalog().getAsset(assetId);
+  if (!mediaCatalog) {
+    return {
+      state: "offline",
+      reason: "catalog-unavailable",
+    };
+  }
+  const asset = await mediaCatalog.getAsset(assetId);
   if (!asset) return { state: "offline" };
-  const resolved = await resolveAssetSource(asset);
+  const resolved = await volumeRootResolver.resolve(asset);
   // Paths remain main-process-only. The renderer only receives actionable state.
   return {
     state: resolved.state,
@@ -459,7 +484,8 @@ app.whenReady().then(async () => {
   if (process.env.MOVIE_DESK_MEDIA_SMOKE === "1") {
     // biome-ignore lint/suspicious/noConsole: CI consumes this smoke marker.
     console.log("[movie-desk-desktop] media infrastructure ready");
-    await mediaCatalog.close();
+    if (mediaCatalog) await mediaCatalog.close();
+    await mediaHelper.close();
     app.quit();
     return;
   }
@@ -481,6 +507,7 @@ app.on("window-all-closed", () => {
 app.on("before-quit", () => {
   mediaLeases.releaseAll();
   if (mediaCatalog) void mediaCatalog.close();
+  if (mediaHelper) void mediaHelper.close();
 });
 
 // Diagnostic helper for verifying the bundle in CI.

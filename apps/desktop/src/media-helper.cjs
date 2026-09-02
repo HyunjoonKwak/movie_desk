@@ -40,6 +40,26 @@ const handlers = {
     };
   },
 
+  async "volume-mount"(input) {
+    requireMacOS("volume-mount");
+    if (typeof input.volumeUuid !== "string" || !/^[A-Fa-f0-9-]{8,64}$/.test(input.volumeUuid)) {
+      throw helperError("INVALID_REQUEST", "input.volumeUuid is invalid");
+    }
+    const { stdout } = await runExecutable("/usr/sbin/diskutil", ["info", input.volumeUuid]);
+    const properties = parseKeyValueOutput(stdout);
+    const mountPoint = properties.get("Mount Point");
+    if (!mountPoint || !path.isAbsolute(mountPoint)) {
+      throw helperError("VOLUME_NOT_FOUND", "volume is not currently mounted");
+    }
+    return {
+      volumeUuid: nullableValue(properties.get("Volume UUID")),
+      mountPoint,
+      readOnly:
+        properties.get("Media Read-Only") === "Yes" ||
+        properties.get("Volume Read-Only")?.startsWith("Yes") === true,
+    };
+  },
+
   async inspect(input) {
     requireMacOS("inspect");
     const sourcePath = absoluteInputPath(input.path, "input.path");

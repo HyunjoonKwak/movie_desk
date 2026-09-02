@@ -67,9 +67,14 @@ describe("resolveAssetSource", () => {
     const movedFixture = await fixture();
     const movedPath = path.join(movedFixture.root, "renamed.mov");
     fs.renameSync(movedFixture.absolutePath, movedPath);
-    const moved = await resolveAssetSource(movedFixture.asset, { candidates: [movedPath] });
+    const moved = await resolveAssetSource(movedFixture.asset, {
+      candidates: [{ absolutePath: movedPath, quickHash: "quick-1" }],
+    });
     assert.equal(moved.state, "moved");
     assert.equal(moved.absolutePath, await fs.promises.realpath(movedPath));
+
+    const inodeOnly = await resolveAssetSource(movedFixture.asset, { candidates: [movedPath] });
+    assert.equal(inodeOnly.state, "ambiguous");
 
     const offlineFixture = await fixture();
     fs.rmSync(offlineFixture.absolutePath);
@@ -118,6 +123,7 @@ describe("source reference helpers", () => {
   it("keeps absolute paths out of the asset-relative path", async () => {
     const media = await fixture();
     const sourceRef = toDiskSourceRef(media.asset);
+    assert.equal(sourceRef.kind, "disk");
     assert.equal(sourceRef.version, 1);
     assert.equal(sourceRef.rootId, "root-1");
     assert.equal(sourceRef.relativePath, path.join("day-01", "clip.mov"));

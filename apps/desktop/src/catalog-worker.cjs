@@ -12,8 +12,17 @@ const open = () => {
   database.exec("PRAGMA foreign_keys = ON");
   database.exec("PRAGMA journal_mode = WAL");
   database.exec("PRAGMA synchronous = NORMAL");
+  const currentVersion = database.prepare("PRAGMA user_version").get().user_version;
+  if (currentVersion > SCHEMA_VERSION) {
+    throw Object.assign(
+      new Error(`catalog schema ${currentVersion} is newer than supported ${SCHEMA_VERSION}`),
+      { code: "CATALOG_TOO_NEW" },
+    );
+  }
   database.exec(SCHEMA_SQL);
-  database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  if (currentVersion < SCHEMA_VERSION) {
+    database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
+  }
 };
 
 const requireDatabase = () => {

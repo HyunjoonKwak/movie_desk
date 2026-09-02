@@ -69,8 +69,9 @@ const resolveAssetSource = async (
         quickHash: typeof candidate === "object" ? candidate.quickHash : undefined,
         fullHash: typeof candidate === "object" ? candidate.fullHash : undefined,
       };
-      if (matchesMovedFingerprint(asset, fingerprint)) {
-        matches.push({ absolutePath: fileRealPath, fingerprint });
+      const confidence = movedFingerprintConfidence(asset, fingerprint);
+      if (confidence) {
+        matches.push({ absolutePath: fileRealPath, fingerprint, confidence });
       }
     } catch (error) {
       if (isPermissionError(error)) sawPermissionError = true;
@@ -78,20 +79,20 @@ const resolveAssetSource = async (
     }
   }
 
-  if (matches.length === 1) return result("moved", matches[0]);
-  if (matches.length > 1) return result("ambiguous", { candidates: matches });
+  const verified = matches.filter((candidate) => candidate.confidence === "verified");
+  if (verified.length === 1) return result("moved", verified[0]);
+  if (matches.length > 0) return result("ambiguous", { candidates: matches });
   if (sawPermissionError) return result("permission-denied", { reason: "candidate-permission" });
   return result("offline", { expectedPath: absolutePath });
 };
 
 const toDiskSourceRef = (asset) => ({
+  kind: "disk",
   version: 1,
   rootId: asset.rootId,
   rootSnapshot: {
     ...(asset.root.volumeUuid ? { volumeUuid: asset.root.volumeUuid } : {}),
-    ...(asset.root.volumeRelativePath
-      ? { volumeRelativePath: asset.root.volumeRelativePath }
-      : {}),
+    ...(asset.root.volumeRelativePath ? { volumeRelativePath: asset.root.volumeRelativePath } : {}),
     ...(asset.root.lastKnownAbsolutePath
       ? { lastKnownAbsolutePath: asset.root.lastKnownAbsolutePath }
       : {}),
@@ -122,11 +123,17 @@ const matchesFastFingerprint = (asset, current) =>
   asset.sizeBytes === current.sizeBytes &&
   Math.trunc(asset.modifiedAtMs) === Math.trunc(current.modifiedAtMs);
 
-const matchesMovedFingerprint = (asset, current) => {
+const movedFingerprintConfidence = (asset, current) => {
   if (asset.sizeBytes !== current.sizeBytes) return false;
-  if (asset.fullHash && current.fullHash) return asset.fullHash === current.fullHash;
-  if (asset.quickHash && current.quickHash) return asset.quickHash === current.quickHash;
-  return Boolean(asset.inode && current.inode && asset.inode === current.inode);
+  if (asset.fullHash) {
+    if (current.fullHash) return asset.fullHash === current.fullHash ? "verified" : false;
+    return asset.inode && current.inode && asset.inode === current.inode ? "candidate" : false;
+  }
+  if (asset.quickHash) {
+    if (current.quickHash) return asset.quickHash === current.quickHash ? "verified" : false;
+    return asset.inode && current.inode && asset.inode === current.inode ? "candidate" : false;
+  }
+  return asset.inode && current.inode && asset.inode === current.inode ? "candidate" : false;
 };
 
 const isPathInside = (root, candidate) => {

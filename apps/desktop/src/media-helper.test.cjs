@@ -104,8 +104,11 @@ describe("helper protocol", () => {
     async () => {
       const helper = client();
       const resolved = await helper.request("volume-resolve", { path: process.cwd() });
+      const mounted = await helper.request("volume-mount", { volumeUuid: resolved.volumeUuid });
 
       assert.match(resolved.volumeUuid, /^[A-F0-9-]{36}$/);
+      assert.equal(mounted.volumeUuid, resolved.volumeUuid);
+      assert.equal(mounted.mountPoint, resolved.mountPoint);
       assert.equal(path.isAbsolute(resolved.mountPoint), true);
       assert.equal(path.isAbsolute(resolved.volumeRelativePath), false);
       const reconstructed = path.join(resolved.mountPoint, resolved.volumeRelativePath);
