@@ -59,6 +59,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B15 후속 `claude/b15-followups`. (1) 자동 편집 `sampleAudioRms`가 원본 전체를
+  decodeAudioData에 넣던 것을 A2 오디오 variant(`audioBlobFor`)로 전환 — 60초 1080p 클립에서 31MB → 734KB
+  확인. (2) GitHub Actions를 checkout@v7 · setup-node@v7 · pnpm/action-setup@v6으로 올려 Node 20 런타임
+  deprecation 후속 항목을 닫음(CI 통과는 push 후 확인 필요). (3) B15 행을 통합 완료로 갱신.
 - 2026-09-03 Claude: B15 실측(Chrome 152, Apple Silicon, 60초 1080p H.264 GOP 30 합성 클립, 같은 프로젝트에서 교대 측정):
 
   | 항목 | main(요소 seek) | B15 |
@@ -248,7 +252,7 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 **유지보수 후속 항목**
 
 - GitHub Actions: `actions/checkout@v4`, `actions/setup-node@v4`, `pnpm/action-setup@v4`가
-  Node 20 런타임 deprecation 경고를 낸다(run 33684793493). 다음 CI 손질 때 v5 계열로
+  Node 20 런타임 deprecation 경고를 냈다(run 33684793493). 2026-09-03 B15 후속에서 v7/v7/v6으로
   올린다. 담당 Claude(`.github/`).
 
 WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, 영어 랜딩·온보딩,
