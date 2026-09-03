@@ -1,6 +1,6 @@
 {
   "name": "movie-desk",
-  "version": "0.3.1",
+  "version": "0.4.0-rc.1",
   "private": true,
   "description": "Movie Desk — an AI-native, local-first video editor that turns raw moments into finished movies.",
   "packageManager": "pnpm@9.12.0",

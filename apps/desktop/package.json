@@ -1,6 +1,6 @@
 {
   "name": "@movie-desk/desktop",
-  "version": "0.3.1",
+  "version": "0.4.0-rc.1",
   "private": true,
   "description": "Movie Desk — a local-first AI video editor that organizes footage and creates a first cut.",
   "author": "Movie Desk contributors",
