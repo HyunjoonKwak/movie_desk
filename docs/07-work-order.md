@@ -59,6 +59,11 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B22. 내보내기 e2e를 쓰다가 dev 서버에서 내보내기가 항상 멈추는 결함을 찾았다(위 표).
+  turbopack은 `typeof window`를 브라우저 타깃 상수로 접으므로 worker/메인 분기 가드에 쓰면 안 된다
+  (컴파일 청크에 `//TURBOPACK unreachable`로 남는다). 프로덕션(webpack) 빌드는 영향이 다를 수 있으나
+  타임아웃 폴백으로 어느 쪽이든 멈추지 않는다. Codex 확인 요청: 미디어 카드 선택 후 `e` 한 번에 클립이
+  두 개 붙는다(e2e 시딩에서 관찰, editor/media-bin 소유). e2e는 상대 개수로 작성해 영향 없음.
 - 2026-09-03 Claude: B15 후속 `claude/b15-followups`. (1) 자동 편집 `sampleAudioRms`가 원본 전체를
   decodeAudioData에 넣던 것을 A2 오디오 variant(`audioBlobFor`)로 전환 — 60초 1080p 클립에서 31MB → 734KB
   확인. (2) GitHub Actions를 checkout@v7 · setup-node@v7 · pnpm/action-setup@v6으로 올려 Node 20 런타임
@@ -281,7 +286,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B16 시나리오 | Codex | 대기 | |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
-| B22 회귀 자동화 | Claude | 대기 | |
+| B22 회귀 자동화 | Claude | 구현 완료, Codex 검토 대기 | `claude/b22-regression` · e2e `export.spec.ts`: VP9 프리셋 내보내기 → 다운로드 MP4 크기·성공 토스트, 렌더 중 취소 → 취소 토스트·다이얼로그 재사용, 스냅샷 저장 → 변경 → 복원. 작성 중 잡은 결함: (1) 오디오 mixer worker가 dev(turbopack)에서 영원히 무응답 → 내보내기가 "렌더링 99%"에서 멈추고 취소도 불가. 원인은 worker 진입 가드 `typeof window === "undefined"`를 turbopack이 상수로 접어 블록을 제거한 것. `WorkerGlobalScope` 검사로 교체, 5초 무응답 시 inline 폴백 + abort 연결. (2) 렌더 루프에 encoder 역압이 없어 1080p 프레임 수백 장이 큐에 쌓임 → `encodeQueueSize ≤ 8` 대기. (3) AAC는 `AudioEncoder` 존재만 보고 지원 여부를 안 물어 코덱 없는 Chromium에서 실패 → `isConfigSupported`. (4) 취소가 "내보내기 실패"로 표시 → `export.cancelled` 토스트. 단위 4개 추가 |
 | B23 muxer 교체 | Claude | 대기 | |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
 | B25 v0.4.0 | 사용자 | 대기 | |
