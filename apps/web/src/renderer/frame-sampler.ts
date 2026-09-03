@@ -2,7 +2,7 @@ import type { RandomAccessMediaSource } from "@/media/source/media-source";
 import type { SourceRotation } from "@movie-desk/core";
 import { decodeRunsInOrder } from "./linear-decoder";
 import { type ByteSource, toByteSource } from "./mp4-decoder";
-import { type OpenedMp4, openMp4, syncSampleTimesMs } from "./mp4-demux";
+import { type OpenedMp4, openMp4 } from "./mp4-demux";
 
 // One frame sampler for every analysis pass. Requested times are grouped into
 // runs, each run is decoded once in order with WebCodecs, and every request
@@ -183,14 +183,14 @@ const sampleViaWebCodecs = async (
   emit: SampleSink,
 ): Promise<ReadonlySet<number>> => {
   const served = new Set<number>();
-  const video = opened.videoTrack?.video;
+  const video = opened.videoTrack;
   if (!video) return served;
   const rotation = options.rotation ?? 0;
   const swapped = rotation === 90 || rotation === 270;
   const size = resolveSize(
     options.size,
-    swapped ? video.height : video.width,
-    swapped ? video.width : video.height,
+    swapped ? video.codedHeight : video.codedWidth,
+    swapped ? video.codedWidth : video.codedHeight,
   );
   const ctx = createCanvas(size);
   const total = sortedUnique(timesMs).length;
@@ -209,7 +209,7 @@ const sampleViaWebCodecs = async (
     return waits.length > 0 ? Promise.all(waits).then(() => undefined) : undefined;
   };
 
-  const keyframes = syncSampleTimesMs(opened);
+  const keyframes = await video.packets.keyTimesMs();
   const runs = planSampleRuns(timesMs, options.gapMs ?? DEFAULT_GAP_MS, keyframes);
   const pickers = runs.map((run) => createSamplePicker(run));
   const finishRun = (runIndex: number): Promise<void> | undefined => {
@@ -362,11 +362,17 @@ export const streamFramesAt = async (
     const source: ByteSource = toByteSource(input);
     const opened = await openMp4(source);
     if (opened?.videoTrack) {
-      const requested = typeof times === "function" ? times(opened.durationMs) : times;
-      if (requested.length === 0) return;
-      const served = await sampleViaWebCodecs(opened, requested, options, emit);
-      remaining = remainingTimes(requested, served);
-      if (remaining.length === 0 || options.signal?.aborted) return;
+      try {
+        const requested = typeof times === "function" ? times(opened.durationMs) : times;
+        if (requested.length === 0) return;
+        const served = await sampleViaWebCodecs(opened, requested, options, emit);
+        remaining = remainingTimes(requested, served);
+        if (remaining.length === 0 || options.signal?.aborted) return;
+      } finally {
+        opened.dispose();
+      }
+    } else {
+      opened?.dispose();
     }
   }
   await sampleViaElement(input, remaining, options, emit);

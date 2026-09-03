@@ -11,8 +11,10 @@ const fixture = (name: string, type = "video/mp4"): Blob =>
 describe("readMp4ContainerInfo", () => {
   it("reads a QuickTime HEVC file with a 90° display matrix", async () => {
     const info = await readMp4ContainerInfo(fixture("hevc-rotated90.mov", "video/quicktime"));
-    expect(info?.brands[0]).toBe("qt  ");
-    expect(info?.videoCodec).toMatch(/^hvc1\./);
+    expect(info?.container).toBe("mov");
+    expect(info?.videoCodec).toMatch(/^(hvc1|hev1)\./);
+    expect(info?.width).toBe(160);
+    expect(info?.height).toBe(90);
     expect(info?.rotation).toBe(270); // ffmpeg's +90 is counter-clockwise
     expect(info?.audioCodec).toBeNull();
   });
@@ -23,6 +25,7 @@ describe("readMp4ContainerInfo", () => {
     ).toBe(90);
     const plain = await readMp4ContainerInfo(fixture("aac-video.mp4"));
     expect(plain?.rotation).toBe(0);
+    expect(plain?.container).toBe("mp4");
     expect(plain?.videoCodec).toMatch(/^avc1\./);
     expect(plain?.audioCodec).toBe("mp4a.40.2");
   });

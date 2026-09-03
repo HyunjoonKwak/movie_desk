@@ -1,22 +1,16 @@
 import { type FrameVerdict, createFrameDelivery } from "./frame-delivery";
-import {
-  type Mp4Sample,
-  type OpenedMp4,
-  nextAppendOffset,
-  presentationOffsetMs,
-  videoDecoderConfig,
-} from "./mp4-demux";
+import { type OpenedMp4, videoDecoderConfig } from "./mp4-demux";
 
 // Decodes windows of a video track in presentation order with one WebCodecs
 // decoder. Analysis (scene cuts, motion, auto-edit sampling) used to seek a
 // media element frame by frame; a linear pass through the demuxer is what
 // the hardware decoder is built for. Each run starts at the keyframe before
-// `fromMs`, reads only the bytes its samples occupy, and ends with a flush so
-// the next run can begin at another keyframe on the same decoder.
+// `fromMs`, reads only the packets it needs, and ends with a flush so the
+// next run can begin at another keyframe on the same decoder.
 //
 // Timestamps given to `onFrame` are presentation time in microseconds (the
-// container's edit-list delay removed), so they line up with what a media
-// element shows at the same time.
+// demuxer has applied the container's edit list), so they line up with what
+// a media element shows at the same time.
 
 export type LinearDecodeResult = "done" | "stopped" | "unsupported" | "failed";
 
@@ -40,7 +34,6 @@ export interface LinearDecodeOptions {
   ) => FrameVerdict | PromiseLike<FrameVerdict>;
 }
 
-const READ_CHUNK_BYTES = 1024 * 1024;
 const MAX_QUEUE = 16;
 // B-frame reordering can put a wanted frame after later-decoded samples.
 const REORDER_SLACK_US = 1_000_000;
@@ -63,30 +56,6 @@ const waitForQueue = async (decoder: VideoDecoder): Promise<void> => {
   }
 };
 
-interface SampleEntry {
-  readonly cts: number;
-  readonly timescale: number;
-  readonly offset: number;
-  readonly size: number;
-}
-
-// Last byte needed for a run: the end of the latest sample whose media time
-// is within the run (plus reorder slack). Falls back to the file end.
-const runEndOffset = (
-  samples: readonly SampleEntry[],
-  startOffset: number,
-  mediaToUs: number,
-  fileSize: number,
-): number => {
-  let end = startOffset;
-  for (const sample of samples) {
-    if (sample.offset < startOffset) continue;
-    if ((sample.cts * 1_000_000) / sample.timescale > mediaToUs + REORDER_SLACK_US) break;
-    end = Math.max(end, sample.offset + sample.size);
-  }
-  return end > startOffset ? Math.min(end, fileSize) : fileSize;
-};
-
 export const decodeRunsInOrder = async (
   opened: OpenedMp4,
   runs: readonly DecodeRun[],
@@ -99,12 +68,7 @@ export const decodeRunsInOrder = async (
   const support = await VideoDecoder.isConfigSupported(config).catch(() => null);
   if (support && support.supported === false) return "unsupported";
 
-  const { file, source } = opened;
-  const trak = file.getTrackById(track.id) as { samples?: readonly SampleEntry[] };
-  const sampleTable = trak.samples ?? [];
-  const offsetUs = presentationOffsetMs(opened) * 1000;
-  const presentationUs = (sample: Mp4Sample): number =>
-    Math.round((sample.cts * 1_000_000) / sample.timescale - offsetUs);
+  const reader = track.packets;
 
   // Input and output are decoupled: the reorder limit only stops feeding,
   // while outputs stay open until the caller has what it wanted or the run
@@ -144,71 +108,33 @@ export const decodeRunsInOrder = async (
     return "unsupported";
   }
 
-  const pending: Mp4Sample[] = [];
-  file.onSamples = (_id, _user, samples) => {
-    pending.push(...samples);
-  };
-
   const isAborted = (): boolean => options.signal?.aborted === true;
-
-  const feed = async (toUs: number): Promise<void> => {
-    while (pending.length > 0 && feeding && !isAborted()) {
-      const sample = pending.shift() as Mp4Sample;
-      if (!sample.data) continue;
-      const timestamp = presentationUs(sample);
-      if (timestamp > toUs + REORDER_SLACK_US) {
-        feeding = false;
-        break;
-      }
-      decoder.decode(
-        new EncodedVideoChunk({
-          type: sample.is_sync ? "key" : "delta",
-          timestamp,
-          duration: (sample.duration * 1_000_000) / sample.timescale,
-          data: sample.data,
-        }),
-      );
-      await waitForQueue(decoder);
-      await delivery.drain();
-    }
-  };
 
   // Resolves to whether the run was cut short by the abort signal.
   const decodeRun = async (index: number, run: DecodeRun): Promise<boolean> => {
     activeRun = index;
     outputsOpen = true;
     feeding = true;
-    pending.length = 0;
-    file.stop();
-    file.setExtractionOptions(track.id, null, { nbSamples: 32, rapAlignement: true });
-    const seek = file.seekTrack(
-      Math.max(0, (run.fromMs * 1000 + offsetUs) / 1_000_000),
-      true,
-      file.getTrackById(track.id),
-    );
-    file.start();
     const toUs = run.toMs * 1000;
-    let offset = Math.min(seek.offset, source.size);
-    const end = runEndOffset(sampleTable, offset, toUs + offsetUs, source.size);
-    try {
-      while (feeding && offset < end && !isAborted()) {
-        const chunk = await source.read(offset, Math.min(READ_CHUNK_BYTES, end - offset));
-        if (chunk.byteLength === 0) break;
-        const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);
-        offset = nextAppendOffset(offset, chunk.byteLength, suggested, source.size);
-        await feed(toUs);
+    // Packets arrive in decode order with presentation timestamps; feeding
+    // stops at the first packet past the run (plus reorder slack).
+    let packet = await reader.keyPacketAt(Math.max(0, run.fromMs) * 1000);
+    while (packet && feeding && !isAborted()) {
+      if (packet.timestampUs > toUs + REORDER_SLACK_US) {
+        feeding = false;
+        break;
       }
-      if (feeding && !isAborted() && end >= source.size) {
-        file.flush();
-        await feed(toUs);
-      }
-    } finally {
-      file.stop();
-      try {
-        file.unsetExtractionOptions(track.id);
-      } catch {
-        // Already unset by a stop.
-      }
+      decoder.decode(
+        new EncodedVideoChunk({
+          type: packet.type,
+          timestamp: packet.timestampUs,
+          duration: packet.durationUs,
+          data: packet.data,
+        }),
+      );
+      await waitForQueue(decoder);
+      await delivery.drain();
+      packet = await reader.nextPacket(packet);
     }
     // Emit what the decoder still holds; also resets it for the next keyframe.
     // An aborted run skips this: closing the decoder drops those frames.

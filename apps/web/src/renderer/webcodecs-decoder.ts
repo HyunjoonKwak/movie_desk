@@ -1,4 +1,4 @@
-// WebCodecs frame provider backed by range-based mp4box demuxing. A cache miss
+// WebCodecs frame provider backed by range-based demuxing. A cache miss
 // requests a small window around the playhead; callers use the <video> fallback
 // while that asynchronous range is being decoded.
 

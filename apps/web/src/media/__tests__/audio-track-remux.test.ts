@@ -10,22 +10,23 @@ const fixture = (name: string): Blob =>
   new Blob([readFileSync(new URL(`./fixtures/${name}`, import.meta.url))], { type: "video/mp4" });
 
 const inspect = async (blob: Blob) => {
-  const MP4Box = await import("mp4box");
-  const file = MP4Box.createFile();
-  const info = await new Promise<{
-    audioTracks: { codec: string; nb_samples: number }[];
-    videoTracks: unknown[];
-  }>((resolve, reject) => {
-    file.onError = reject;
-    file.onReady = resolve;
-    blob.arrayBuffer().then((buffer) => {
-      const chunk = buffer as ArrayBuffer & { fileStart: number };
-      chunk.fileStart = 0;
-      file.appendBuffer(chunk);
-      file.flush();
-    });
-  });
-  return info;
+  const { ALL_FORMATS, BlobSource, EncodedPacketSink, Input } = await import("mediabunny");
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+  try {
+    const videoTracks = await input.getVideoTracks();
+    const audioTracks = await input.getAudioTracks();
+    const audio = audioTracks[0] ?? null;
+    let packets = 0;
+    if (audio) for await (const _ of new EncodedPacketSink(audio).packets()) packets += 1;
+    return {
+      videoTracks: videoTracks.length,
+      audioTracks: audioTracks.length,
+      codec: audio ? await audio.getCodecParameterString() : null,
+      packets,
+    };
+  } finally {
+    input.dispose();
+  }
 };
 
 describe("remuxAudioTrack", () => {
@@ -39,10 +40,10 @@ describe("remuxAudioTrack", () => {
     expect(result?.durationMs).toBeGreaterThan(900);
     expect(result?.blob.size).toBeLessThan(input.size);
     const info = await inspect(result?.blob as Blob);
-    expect(info.videoTracks).toHaveLength(0);
-    expect(info.audioTracks).toHaveLength(1);
-    expect(info.audioTracks[0]?.codec).toBe("mp4a.40.2");
-    expect(info.audioTracks[0]?.nb_samples).toBe(result?.sampleCount);
+    expect(info.videoTracks).toBe(0);
+    expect(info.audioTracks).toBe(1);
+    expect(info.codec).toBe("mp4a.40.2");
+    expect(info.packets).toBe(result?.sampleCount);
   });
 
   it("returns null for a file without an audio track", async () => {

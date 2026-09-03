@@ -59,6 +59,16 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-04 Claude: mp4box 읽기를 mediabunny `Input`으로 통일(`claude/mediabunny-demux`). `renderer/mp4-demux.ts`가
+  유일한 ISO BMFF 데먹서가 되어 플레이헤드 디코더·선형 디코더·프레임 샘플러·`container-info`·오디오 remux가 모두
+  같은 `openMp4` + `PacketReader`(키 패킷 탐색, 디코드 순서 순회, 키 시각 목록)를 쓴다. `mp4box` 의존성과
+  `mp4box-log.ts`를 제거. 확인한 동작 차이: (1) 타임스탬프가 편집 리스트가 적용된 표시 시각이라 플레이헤드
+  경로도 B-프레임 소스에서 `<video>`와 같은 시각을 캐시한다(종전엔 원시 cts). (2) HEVC 코덱 문자열이
+  `hvc1.…` 대신 `hev1.…`로 나온다 — WebCodecs는 둘 다 받고 description(hvcC)은 동일. (3) 컨테이너 정보의
+  `brands`는 `container: "mp4" | "mov"`로 바뀜(소비자는 테스트뿐). 새 fixture `avc-bframes.mp4`(libx264 B-프레임 +
+  편집 리스트)로 디코드 순서·표시 시각·키 패킷 탐색을 단위 테스트. 실제 Chrome 152: 1080p H.264(B-프레임)와
+  회전 HEVC .mov 가져오기·분석·재생·스크럽에서 configure/decode/frame 수 일치, 디코더 오류 0.
+  knip의 `onnxruntime-web` unlisted 1건은 Codex의 `download-whisper.mjs`(B19).
 - 2026-09-03 통합: 사용자 승인으로 B5 RC 준비(0.4.0-rc.1 범프) → B24 릴리스 체크리스트 → 신뢰성 후속 3건을
   `main`에 fast-forward하고 푸시했다. 통합 head에서 `pnpm gate --continue` 9단계 전체 통과(단위 core 106 · web 376 ·
   desktop 46 · scripts 11, OSV 0건, 프로덕션 빌드, e2e 21개) + 로컬 `chrome-hevc` 1개 통과. `v0.4.0-rc.1` 태그는

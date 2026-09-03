@@ -1,206 +1,171 @@
+import {
+  CustomSource,
+  type EncodedPacket,
+  EncodedPacketSink,
+  Input,
+  type InputAudioTrack,
+  type InputTrack,
+  type InputVideoTrack,
+  MP4,
+  QTFF,
+  QuickTimeInputFormat,
+} from "mediabunny";
+import type { SourceRotation } from "@movie-desk/core";
 import type { ByteSource } from "./mp4-decoder";
-import { quietMp4BoxLogs } from "./mp4box-log";
 
-// Shared mp4box entry point: parse the metadata window of an ISO BMFF file
-// (MP4, QuickTime .mov) through a ByteSource and expose what WebCodecs needs
-// to configure a decoder. Consumers feed the sample data themselves.
+// The one demuxer for ISO BMFF sources (MP4, QuickTime .mov): mediabunny's
+// Input over a ranged ByteSource, so an OPFS copy and a referenced file
+// behind media:// look the same, and only the bytes a consumer asks for are
+// read. Packets come out in decode order with presentation timestamps (edit
+// lists already applied), which is exactly what a WebCodecs decoder wants.
 
-export interface Mp4Sample {
-  readonly cts: number;
-  readonly dts: number;
-  readonly duration: number;
-  readonly timescale: number;
-  readonly is_sync: boolean;
-  readonly number: number;
-  readonly data?: Uint8Array;
+export interface DemuxPacket {
+  readonly timestampUs: number;
+  readonly durationUs: number;
+  readonly type: "key" | "delta";
+  readonly data: Uint8Array;
+  readonly sequence: number;
 }
 
-interface Mp4Edit {
-  readonly segment_duration: number;
-  readonly media_time: number;
+// Random access into one track's packets. Implemented over mediabunny here
+// and by a tiny in-memory table in tests.
+export interface PacketReader {
+  // The key packet at or before `timestampUs`, else the first key packet.
+  keyPacketAt(timestampUs: number): Promise<DemuxPacket | null>;
+  // The next packet in decode order.
+  nextPacket(packet: DemuxPacket): Promise<DemuxPacket | null>;
+  // Presentation times (ms) of every key packet.
+  keyTimesMs(): Promise<number[]>;
+  // Every packet in decode order.
+  packets(): AsyncIterable<DemuxPacket>;
 }
 
-interface Mp4TrackInfo {
-  readonly edits?: readonly Mp4Edit[];
-  readonly id: number;
-  readonly type?: string;
+interface VideoTrackInfo {
   readonly codec: string;
-  readonly timescale: number;
-  readonly duration: number;
-  readonly nb_samples: number;
-  readonly video?: { readonly width: number; readonly height: number };
-  readonly audio?: { readonly sample_rate: number; readonly channel_count: number };
+  readonly codedWidth: number;
+  readonly codedHeight: number;
+  readonly rotation: SourceRotation;
+  readonly config: VideoDecoderConfig | null;
+  readonly packets: PacketReader;
 }
 
-interface Mp4Info {
-  readonly duration: number;
-  readonly timescale: number;
-  readonly brands: readonly string[];
-  readonly videoTracks: readonly Mp4TrackInfo[];
-  readonly audioTracks: readonly Mp4TrackInfo[];
-}
-
-type Mp4ArrayBuffer = ArrayBuffer & { fileStart: number };
-
-interface Mp4File {
-  onError: (error: string) => void;
-  onReady: (info: Mp4Info) => void;
-  onSamples: (id: number, user: unknown, samples: readonly Mp4Sample[]) => void;
-  setExtractionOptions: (
-    id: number,
-    user: unknown,
-    options: { nbSamples: number; rapAlignement?: boolean },
-  ) => void;
-  unsetExtractionOptions: (id: number) => void;
-  start: () => void;
-  stop: () => void;
-  flush: () => void;
-  seekTrack: (timeSeconds: number, useRap: boolean, track: unknown) => { offset: number };
-  appendBuffer: (buffer: Mp4ArrayBuffer, last?: boolean) => number;
-  getTrackById: (id: number) => unknown;
+interface AudioTrackInfo {
+  readonly codec: string;
+  readonly sampleRate: number;
+  readonly channelCount: number;
+  readonly config: AudioDecoderConfig | null;
+  readonly durationMs: number;
+  readonly packets: PacketReader;
 }
 
 export interface OpenedMp4 {
   readonly source: ByteSource;
-  readonly file: Mp4File;
-  readonly info: Mp4Info;
-  readonly videoTrack: Mp4TrackInfo | null;
+  readonly container: "mp4" | "mov";
+  readonly videoTrack: VideoTrackInfo | null;
+  readonly audioTrack: AudioTrackInfo | null;
   readonly durationMs: number;
+  dispose(): void;
 }
 
-const METADATA_CHUNK_BYTES = 1 * 1024 * 1024;
+const toPacket = (packet: EncodedPacket): DemuxPacket => ({
+  timestampUs: Math.round(packet.timestamp * 1_000_000),
+  durationUs: Math.round(packet.duration * 1_000_000),
+  type: packet.type,
+  data: packet.data,
+  sequence: packet.sequenceNumber,
+});
 
-export const nextAppendOffset = (
-  offset: number,
-  appended: number,
-  suggested: number,
-  size: number,
-): number => (suggested > offset ? Math.min(suggested, size) : Math.min(offset + appended, size));
-
-interface Mp4BoxModule {
-  createFile: (keepMdat?: boolean) => Mp4File;
-  Log: Parameters<typeof quietMp4BoxLogs>[0];
-  DataStream: new (
-    buffer: ArrayBuffer | undefined,
-    byteOffset: number,
-    endianness: boolean,
-  ) => { buffer: ArrayBuffer; getPosition: () => number };
-}
-
-let mp4box: Mp4BoxModule | null = null;
-
-const loadMp4Box = async (): Promise<Mp4BoxModule> => {
-  if (mp4box) return mp4box;
-  const module = (await import("mp4box")) as unknown as Mp4BoxModule & {
-    DataStream: Mp4BoxModule["DataStream"] & { BIG_ENDIAN: boolean };
+const packetReader = (track: InputTrack): PacketReader => {
+  const sink = new EncodedPacketSink(track);
+  // Our packets stay plain data; the mediabunny originals are kept aside so
+  // nextPacket can continue from them.
+  const originals = new WeakMap<DemuxPacket, EncodedPacket>();
+  const wrap = (packet: EncodedPacket | null): DemuxPacket | null => {
+    if (!packet) return null;
+    const out = toPacket(packet);
+    originals.set(out, packet);
+    return out;
   };
-  quietMp4BoxLogs(module.Log);
-  mp4box = module;
-  return module;
+  return {
+    keyPacketAt: async (timestampUs) =>
+      wrap(
+        (await sink.getKeyPacket(Math.max(0, timestampUs) / 1_000_000)) ??
+          (await sink.getFirstKeyPacket()),
+      ),
+    nextPacket: async (packet) => {
+      const original = originals.get(packet);
+      return original ? wrap(await sink.getNextPacket(original)) : null;
+    },
+    keyTimesMs: async () => {
+      const times: number[] = [];
+      const options = { metadataOnly: true };
+      for (
+        let packet = await sink.getFirstKeyPacket(options);
+        packet;
+        packet = await sink.getNextKeyPacket(packet, options)
+      ) {
+        times.push(packet.timestamp * 1000);
+      }
+      return times;
+    },
+    packets: async function* () {
+      for await (const packet of sink.packets()) yield toPacket(packet);
+    },
+  };
 };
 
-// Loads and quiets mp4box once so serializeBoxPayload has its DataStream.
-export const primeMp4Box = async (): Promise<void> => {
-  await loadMp4Box();
-};
+const videoInfo = async (track: InputVideoTrack): Promise<VideoTrackInfo> => ({
+  codec: (await track.getCodecParameterString()) ?? "",
+  codedWidth: track.codedWidth,
+  codedHeight: track.codedHeight,
+  rotation: track.rotation,
+  config: await track.getDecoderConfig().catch(() => null),
+  packets: packetReader(track),
+});
 
-// mp4box parses avcC/hvcC into fields and keeps no raw copy, so the record
-// WebCodecs wants as `description` is rebuilt by serialising the box and
-// dropping its 8-byte header.
-export const serializeBoxPayload = (box: unknown): Uint8Array | undefined => {
-  const module = mp4box as (Mp4BoxModule & { DataStream: { BIG_ENDIAN: boolean } }) | null;
-  const writable = box as { write?: (stream: unknown) => void } | null;
-  if (!module || !writable || typeof writable.write !== "function") return undefined;
-  const stream = new module.DataStream(undefined, 0, module.DataStream.BIG_ENDIAN);
-  writable.write(stream);
-  const length = stream.getPosition() - 8;
-  return length > 0 ? new Uint8Array(stream.buffer, 8, length).slice() : undefined;
-};
+const audioInfo = async (track: InputAudioTrack): Promise<AudioTrackInfo> => ({
+  codec: (await track.getCodecParameterString()) ?? "",
+  sampleRate: track.sampleRate,
+  channelCount: track.numberOfChannels,
+  config: await track.getDecoderConfig().catch(() => null),
+  durationMs: (await track.computeDuration()) * 1000,
+  packets: packetReader(track),
+});
 
-// Reads chunks until mp4box has parsed `moov`; appendBuffer's return value
-// jumps over a large mdat when the index sits at the end of the file.
+const inputFor = (source: ByteSource): Input =>
+  new Input({
+    formats: [MP4, QTFF],
+    source: new CustomSource({
+      getSize: () => source.size,
+      read: async (start, end) => new Uint8Array(await source.read(start, end - start)),
+    }),
+  });
+
+// Reads the metadata window and describes the primary tracks. Null when the
+// bytes are not an ISO BMFF file (or cannot be read at all).
 export const openMp4 = async (source: ByteSource): Promise<OpenedMp4 | null> => {
   if (source.size === 0) return null;
-  const MP4Box = await loadMp4Box();
-  const file = MP4Box.createFile(false);
-  const state: { info: Mp4Info | null; failed: boolean } = { info: null, failed: false };
-  file.onError = () => {
-    state.failed = true;
-  };
-  file.onReady = (ready) => {
-    state.info = ready;
-  };
-  let offset = 0;
+  const input = inputFor(source);
   try {
-    while (!state.info && !state.failed && offset < source.size) {
-      const chunk = await source.read(offset, METADATA_CHUNK_BYTES);
-      if (chunk.byteLength === 0) break;
-      const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);
-      offset = nextAppendOffset(offset, chunk.byteLength, suggested, source.size);
-    }
+    const format = await input.getFormat();
+    const [video, audio, durationSeconds] = await Promise.all([
+      input.getPrimaryVideoTrack(),
+      input.getPrimaryAudioTrack(),
+      input.computeDuration(),
+    ]);
+    return {
+      source,
+      container: format instanceof QuickTimeInputFormat ? "mov" : "mp4",
+      videoTrack: video ? await videoInfo(video) : null,
+      audioTrack: audio ? await audioInfo(audio) : null,
+      durationMs: durationSeconds * 1000,
+      dispose: () => input.dispose(),
+    };
   } catch {
+    input.dispose();
     return null;
   }
-  const ready = state.info;
-  if (!ready) return null;
-  const videoTrack = ready.videoTracks.find((t) => t.video) ?? null;
-  return {
-    source,
-    file,
-    info: ready,
-    videoTrack,
-    durationMs: ready.timescale > 0 ? (ready.duration * 1000) / ready.timescale : 0,
-  };
 };
 
-// avcC / hvcC bytes from the sample description; some streams carry their
-// parameter sets in-band, so undefined stays valid.
-const decoderDescription = (file: Mp4File, trackId: number): Uint8Array | undefined => {
-  try {
-    const trak = file.getTrackById(trackId) as {
-      mdia?: { minf?: { stbl?: { stsd?: { entries?: { avcC?: unknown; hvcC?: unknown }[] } } } };
-    };
-    const entry = trak.mdia?.minf?.stbl?.stsd?.entries?.[0];
-    const box = entry?.avcC ?? entry?.hvcC;
-    return box ? serializeBoxPayload(box) : undefined;
-  } catch {
-    return undefined;
-  }
-};
-
-// Media time (ms) at which presentation starts. Encoders with B-frames write
-// an edit list that skips the initial reorder delay; sample `cts` values are
-// raw media time, so timestamps handed out to callers subtract this.
-export const presentationOffsetMs = (opened: OpenedMp4): number => {
-  const track = opened.videoTrack;
-  const edit = track?.edits?.find((entry) => entry.media_time >= 0);
-  if (!track || !edit || track.timescale <= 0) return 0;
-  return (edit.media_time * 1000) / track.timescale;
-};
-
-// Presentation times (ms) of the video track's sync samples, from the sample
-// table mp4box builds while parsing moov. Empty when unknown.
-export const syncSampleTimesMs = (opened: OpenedMp4): number[] => {
-  const track = opened.videoTrack;
-  if (!track) return [];
-  const trak = opened.file.getTrackById(track.id) as {
-    samples?: readonly { is_sync?: boolean; cts: number; timescale: number }[];
-  };
-  const offsetMs = presentationOffsetMs(opened);
-  const samples = trak.samples ?? [];
-  return samples
-    .filter((sample) => sample.is_sync)
-    .map((sample) => (sample.cts * 1000) / sample.timescale - offsetMs);
-};
-
-export const videoDecoderConfig = (opened: OpenedMp4): VideoDecoderConfig | null => {
-  const track = opened.videoTrack;
-  if (!track?.video) return null;
-  const description = decoderDescription(opened.file, track.id);
-  return {
-    codec: track.codec,
-    codedWidth: track.video.width,
-    codedHeight: track.video.height,
-    ...(description ? { description } : {}),
-  };
-};
+export const videoDecoderConfig = (opened: OpenedMp4): VideoDecoderConfig | null =>
+  opened.videoTrack?.config ?? null;

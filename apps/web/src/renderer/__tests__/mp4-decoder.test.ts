@@ -15,17 +15,16 @@ describe("frameDecodeWindow", () => {
 });
 
 // The demuxer reads ranges through a ByteSource so a Blob (legacy OPFS copy)
-// and a RandomAccessMediaSource (disk reference) look identical to mp4box.
+// and a RandomAccessMediaSource (disk reference) look identical to it.
 describe("toByteSource", () => {
   const payload = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
 
-  it("wraps a Blob and stamps fileStart on every chunk", async () => {
+  it("wraps a Blob and reads the requested range", async () => {
     const { toByteSource } = await import("../mp4-decoder");
     const source = toByteSource(new Blob([payload]));
     expect(source.size).toBe(8);
     const chunk = await source.read(2, 3);
     expect(Array.from(new Uint8Array(chunk))).toEqual([3, 4, 5]);
-    expect(chunk.fileStart).toBe(2);
   });
 
   it("delegates to a RandomAccessMediaSource without copying the whole file", async () => {
@@ -43,7 +42,6 @@ describe("toByteSource", () => {
     });
     const chunk = await source.read(4, 100);
     expect(Array.from(new Uint8Array(chunk))).toEqual([5, 6, 7, 8]);
-    expect(chunk.fileStart).toBe(4);
     expect(reads).toEqual([[4, 4]]); // clamped before it reaches the adapter
   });
 
@@ -62,7 +60,6 @@ describe("toByteSource", () => {
     });
     const empty = await source.read(4, 0);
     expect(empty.byteLength).toBe(0);
-    expect(empty.fileStart).toBe(4);
     expect((await source.read(8, 10)).byteLength).toBe(0);
     expect((await source.read(20, 10)).byteLength).toBe(0);
     expect(reads).toEqual([]); // nothing crossed the adapter boundary

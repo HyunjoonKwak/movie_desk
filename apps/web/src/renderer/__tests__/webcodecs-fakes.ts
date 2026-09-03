@@ -1,8 +1,8 @@
 import { vi } from "vitest";
-import type { Mp4Sample, OpenedMp4 } from "../mp4-demux";
+import type { DemuxPacket, OpenedMp4, PacketReader } from "../mp4-demux";
 
-// A four-sample track (one frame every 40 ms, 100 bytes each) behind fake
-// mp4box and WebCodecs objects, so decoder and sampler contracts can be
+// A four-packet track (one frame every 40 ms) behind a fake packet reader
+// and fake WebCodecs objects, so decoder and sampler contracts can be
 // exercised in node without a real MP4 or hardware decoder.
 
 export interface FakeFrame {
@@ -11,17 +11,14 @@ export interface FakeFrame {
   close(): void;
 }
 
-const SAMPLE_BYTES = 100;
 export const SAMPLE_COUNT = 4;
 
-const sampleAt = (index: number): Mp4Sample => ({
-  cts: index * 40,
-  dts: index * 40,
-  duration: 40,
-  timescale: 1000,
-  is_sync: index === 0,
-  number: index,
+const packetAt = (index: number): DemuxPacket => ({
+  timestampUs: index * 40_000,
+  durationUs: 40_000,
+  type: index === 0 ? "key" : "delta",
   data: new Uint8Array([index]),
+  sequence: index,
 });
 
 // `emitOn: "flush"` holds decoded frames back and releases them in one burst,
@@ -65,55 +62,37 @@ export const installFakeWebCodecs = (emitOn: "decode" | "flush"): FakeFrame[] =>
   return frames;
 };
 
+export const fakePacketReader = (packets: readonly DemuxPacket[]): PacketReader => ({
+  keyPacketAt: async (timestampUs) => {
+    let found: DemuxPacket | null = null;
+    for (const packet of packets) {
+      if (packet.type === "key" && packet.timestampUs <= timestampUs) found = packet;
+    }
+    return found ?? packets.find((packet) => packet.type === "key") ?? null;
+  },
+  nextPacket: async (packet) => packets[packet.sequence + 1] ?? null,
+  keyTimesMs: async () =>
+    packets.filter((packet) => packet.type === "key").map((packet) => packet.timestampUs / 1000),
+  packets: async function* () {
+    yield* packets;
+  },
+});
+
 export const openedFixture = (): OpenedMp4 => {
-  const samples = Array.from({ length: SAMPLE_COUNT }, (_, i) => sampleAt(i));
-  const table = samples.map((s, i) => ({
-    cts: s.cts,
-    timescale: s.timescale,
-    offset: i * SAMPLE_BYTES,
-    size: SAMPLE_BYTES,
-  }));
-  const file = {
-    onSamples: (() => {}) as (id: number, user: unknown, samples: readonly Mp4Sample[]) => void,
-    getTrackById: () => ({ samples: table }),
-    setExtractionOptions() {},
-    unsetExtractionOptions() {},
-    start() {},
-    stop() {},
-    flush() {},
-    seekTrack: () => ({ offset: 0 }),
-    appendBuffer(buffer: ArrayBuffer & { fileStart: number }) {
-      const from = buffer.fileStart;
-      const to = from + buffer.byteLength;
-      const inChunk = table
-        .map((entry, i) => (entry.offset >= from && entry.offset < to ? samples[i] : null))
-        .filter((s): s is Mp4Sample => s !== null);
-      file.onSamples(1, null, inChunk);
-      return to;
-    },
-  };
-  const size = SAMPLE_COUNT * SAMPLE_BYTES;
+  const packets = Array.from({ length: SAMPLE_COUNT }, (_, i) => packetAt(i));
   return {
-    source: {
-      size,
-      read: async (offset: number, length: number) => {
-        const chunk = new ArrayBuffer(Math.min(length, size - offset)) as ArrayBuffer & {
-          fileStart: number;
-        };
-        chunk.fileStart = offset;
-        return chunk;
-      },
-    },
-    file,
-    info: { duration: 160, timescale: 1000, brands: [], videoTracks: [], audioTracks: [] },
+    source: { size: 400, read: async () => new ArrayBuffer(0) },
+    container: "mp4",
     videoTrack: {
-      id: 1,
       codec: "avc1.42E01E",
-      timescale: 1000,
-      duration: 160,
-      nb_samples: SAMPLE_COUNT,
-      video: { width: 16, height: 16 },
+      codedWidth: 16,
+      codedHeight: 16,
+      rotation: 0,
+      config: { codec: "avc1.42E01E", codedWidth: 16, codedHeight: 16 },
+      packets: fakePacketReader(packets),
     },
+    audioTrack: null,
     durationMs: 160,
-  } as unknown as OpenedMp4;
+    dispose() {},
+  };
 };

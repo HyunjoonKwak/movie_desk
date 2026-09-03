@@ -11,7 +11,6 @@ const fixture = vi.hoisted(() => ({ opened: null as OpenedMp4 | null }));
 vi.mock("../mp4-demux", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../mp4-demux")>()),
   openMp4: async () => fixture.opened,
-  syncSampleTimesMs: () => [0],
 }));
 vi.mock("../mp4-decoder", () => ({ toByteSource: (input: unknown) => input }));
 
