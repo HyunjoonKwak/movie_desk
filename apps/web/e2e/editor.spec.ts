@@ -49,12 +49,19 @@ test("opens the editor from the landing page", async ({ page }) => {
 
 test("persists a newly named project across a reload", async ({ page }) => {
   await page.goto("/editor");
-  await page.getByRole("button", { name: "Projects" }).click();
+  const projectsButton = page.getByRole("button", { name: "Projects" });
+  await projectsButton.click();
   await page.getByRole("button", { name: "New", exact: true }).click();
+  // Project creation persists the new record before closing the async dialog.
+  // Wait for Radix to finish closing and restoring focus before editing the
+  // input behind it; actionability alone can catch the teardown mid-frame.
+  await expect(page.getByRole("dialog")).toBeHidden();
+  await expect(projectsButton).toBeFocused();
 
   const projectName = page.locator('header input[type="text"]').first();
   await expect(projectName).toHaveValue("Untitled");
   await projectName.fill("E2E persistence project");
+  await expect(projectName).toHaveValue("E2E persistence project");
   await projectName.press("Enter");
   await expect(page).toHaveTitle("E2E persistence project — Movie Desk");
 
