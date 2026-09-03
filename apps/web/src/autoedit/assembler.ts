@@ -120,7 +120,9 @@ export const buildCandidates = (
         ...base,
         isPhoto: false,
         srcStartMs: rin,
-        maxDurMs: Math.max(500, rangeMs),
+        // Never invent source time. The assembler rejects an automatic
+        // sub-400ms window and keeps a pinned one at its real duration.
+        maxDurMs: rangeMs,
         score: 0.4,
       });
       continue;
@@ -136,13 +138,13 @@ export const buildCandidates = (
       minWindowMs,
     );
     const start1 = Math.max(rin, Math.min(w1.startMs, Math.max(rin, rout - minWindowMs)));
-    candidates.push({
-      ...base,
-      isPhoto: false,
-      srcStartMs: start1,
-      maxDurMs: Math.max(500, rout - start1),
-      score: w1.score,
-      ...sampleSignals(a, start1, minWindowMs),
+      candidates.push({
+        ...base,
+        isPhoto: false,
+        srcStartMs: start1,
+        maxDurMs: Math.max(0, rout - start1),
+        score: w1.score,
+        ...sampleSignals(a, start1, minWindowMs),
     });
     if (rangeMs > 20_000) {
       const subSamples = pool2.filter(({ s }) => Math.abs(s.atMs - start1) > rangeMs * 0.3);
@@ -157,7 +159,7 @@ export const buildCandidates = (
           ...base,
           isPhoto: false,
           srcStartMs: start2,
-          maxDurMs: Math.max(500, rout - start2),
+          maxDurMs: Math.max(0, rout - start2),
           score: w2.score * 0.9, // slight discount for second helpings
           ...sampleSignals(a, start2, minWindowMs),
         });
@@ -176,6 +178,77 @@ const beatsForSlot = (energy: number, hi: number, mode: ReturnType<typeof preset
 };
 
 const presetOf = (mode: EditMode) => MODE_PRESETS[mode];
+
+const scoreForMode = (candidate: Candidate, mode: ReturnType<typeof presetOf>): number => {
+  const faceSignal = Math.max(candidate.smile ?? 0, Math.min(1, (candidate.faceArea ?? 0) / 0.2));
+  const faceMultiplier = 1 + (mode.faceWeight - 1) * faceSignal;
+  const wideBonus = mode.wideBonus * (1 - faceSignal);
+  return Math.max(0, Math.min(1, candidate.score * faceMultiplier + wideBonus));
+};
+
+// Choose one representative from each visually similar group before the
+// chronological assembly. This makes mode weights affect the actual draft,
+// while the surviving shots still play in capture order. Pinned shots always
+// survive and displace non-pinned duplicates.
+const preparePool = (
+  candidates: readonly Candidate[],
+  mode: ReturnType<typeof presetOf>,
+  rejected: RejectedCandidate[],
+): Candidate[] => {
+  const kept: Candidate[] = [];
+  const rejectDuplicate = (candidate: Candidate): void => {
+    rejected.push({
+      assetId: candidate.assetId,
+      atMs: candidate.srcStartMs,
+      reasons: [{ code: "duplicate" }],
+    });
+  };
+
+  for (const original of candidates) {
+    const candidate = { ...original, score: scoreForMode(original, mode) };
+    if (!candidate.embedding) {
+      kept.push(candidate);
+      continue;
+    }
+    const similarIndexes = kept.flatMap((item, index) =>
+      item.embedding && cosine(item.embedding, candidate.embedding!) > DEDUP_COSINE ? [index] : [],
+    );
+    if (similarIndexes.length === 0) {
+      kept.push(candidate);
+      continue;
+    }
+
+    if (candidate.pinned) {
+      for (const index of [...similarIndexes].reverse()) {
+        const existing = kept[index]!;
+        if (existing.pinned) continue;
+        rejectDuplicate(existing);
+        kept.splice(index, 1);
+      }
+      kept.push(candidate);
+      continue;
+    }
+    if (similarIndexes.some((index) => kept[index]!.pinned)) {
+      rejectDuplicate(candidate);
+      continue;
+    }
+
+    const bestExistingIndex = similarIndexes.reduce((best, index) =>
+      kept[index]!.score > kept[best]!.score ? index : best,
+    );
+    if (candidate.score <= kept[bestExistingIndex]!.score) {
+      rejectDuplicate(candidate);
+      continue;
+    }
+    for (const index of [...similarIndexes].reverse()) {
+      rejectDuplicate(kept[index]!);
+      kept.splice(index, 1);
+    }
+    kept.push(candidate);
+  }
+
+  return kept.sort((a, b) => a.capturedAt - b.capturedAt || a.srcStartMs - b.srcStartMs);
+};
 
 export interface AssembleInput {
   readonly mode: EditMode;
@@ -206,7 +279,7 @@ export const assemble = (input: AssembleInput): EditPlan => {
   const chapters = [...(input.chapters ?? [])].sort((a, b) => a.fromCapturedAt - b.fromCapturedAt);
 
   // Photos coming < 60s apart form stacks when the mode allows it.
-  const pool = [...input.candidates];
+  const pool = preparePool(input.candidates, preset, rejected);
 
   const tooSimilar = (c: Candidate): boolean => {
     if (!c.embedding) return false;
@@ -259,7 +332,7 @@ export const assemble = (input: AssembleInput): EditPlan => {
       }
       const holdBeats =
         stackMates.length > 0 ? Math.max(0.5, preset.photoBeats / 2) : preset.photoBeats;
-      const holdMs = Math.round(holdBeats * beatMs);
+      const holdMs = Math.round(music ? holdBeats * beatMs : preset.fallbackCutMs);
       const run = [next, ...stackMates];
       for (const p of run) {
         usedWindows.add(`${p.assetId}:0`);
@@ -281,12 +354,14 @@ export const assemble = (input: AssembleInput): EditPlan => {
     }
 
     // Video slot.
-    const nBeats = beatsForSlot(energy, maxEnergy, preset);
-    let durMs = Math.round(nBeats * beatMs);
+    const nBeats = music ? beatsForSlot(energy, maxEnergy, preset) : 1;
+    let durMs = Math.round(music ? nBeats * beatMs : preset.fallbackCutMs);
     // Heavy shake: usable only as a short transition (design: 4단계 정책).
     if (next.shakeTier === "heavy") durMs = Math.min(durMs, 800);
     durMs = Math.min(durMs, next.maxDurMs);
-    if (durMs < 400) {
+    // A pinned source keeps its real duration even below the normal 400ms
+    // editorial minimum. Zero-length media still cannot form a clip.
+    if (durMs <= 0 || (durMs < 400 && !next.pinned)) {
       rejected.push({
         assetId: next.assetId,
         atMs: next.srcStartMs,

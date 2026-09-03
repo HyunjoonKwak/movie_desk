@@ -78,6 +78,14 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   decodeAudioData에 넣던 것을 A2 오디오 variant(`audioBlobFor`)로 전환 — 60초 1080p 클립에서 31MB → 734KB
   확인. (2) GitHub Actions를 checkout@v7 · setup-node@v7 · pnpm/action-setup@v6으로 올려 Node 20 런타임
   deprecation 후속 항목을 닫음(CI 통과는 push 후 확인 필요). (3) B15 행을 통합 완료로 갱신.
+- 2026-09-03 Codex: B16 고정 시나리오 4종을 추가했다. 사진+영상 혼합은 두 미디어를 모두
+  유지하고, 무음악은 모드의 fallback 길이를 박자 수로 다시 곱하지 않으며, 짧지만 사용자가
+  고정한 소스는 실제 길이 그대로 사용한다. 중복이 많은 성장 기록은 얼굴·미소 가중치로 가장
+  나은 대표 장면을 고른 뒤 촬영 순서를 유지한다. 선언만 돼 있던 `faceWeight`·`wideBonus`가
+  실제 후보 점수와 중복 대표 선택에 반영된다.
+- 2026-09-03 통합: 사용자 승인으로 B13·B14를 B15 기준선 위에 재배치해 `main` `6ce633d`까지
+  fast-forward하고 푸시했다. 리포트 안내와 구조화된 컷 이유가 공유 프레임 샘플러와 함께
+  동작하며 로컬 전체 게이트를 통과했다.
 - 2026-09-03 Claude: B15 실측(Chrome 152, Apple Silicon, 60초 1080p H.264 GOP 30 합성 클립, 같은 프로젝트에서 교대 측정):
 
   | 항목 | main(요소 seek) | B15 |
@@ -290,10 +298,10 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B10 HEIC | Codex | 구현 완료, main 통합 · 실제 아이폰 검증 대기 | 원본 참조 + ImageIO 썸네일·4096px 캐시, 촬영 시각·GPS·방향·카메라 메타 보존, 실제 HEIC 통합 테스트. HDR gain map·대량 성능은 B7/B12 게이트 |
 | B11 HEVC·.mov·회전 | Claude + Codex | 구현·통합 검증 완료, main 통합 | MOV 컨테이너 코덱·회전 판독, WebCodecs 회전, 미지원 코덱 폴백. 자동 테스트 통과, 실제 iPhone HDR/VFR 검증 대기 |
 | B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, main 통합 · 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
-| B13 리포트 문구 | Codex | 1차 구현·화면 검증 완료 | 결과와 다음 행동 우선 구조, 진행·일부 실패·전체 실패 안내, 추천 이유·모드명 한국어/영어 분리. 도그푸딩 이해도 검증 대기 |
-| B14 컷 이유 | Codex | 구현·화면 검증 완료 | 선택·보류 사유 구조화 및 한국어/영어 표시, 자동 결정 누락 방지 테스트. 도그푸딩 이해도 검증 대기 |
+| B13 리포트 문구 | Codex | 구현·화면 검증 완료, main 통합 | 결과와 다음 행동 우선 구조, 진행·일부 실패·전체 실패 안내, 추천 이유·모드명 한국어/영어 분리. 도그푸딩 이해도 검증 대기 |
+| B14 컷 이유 | Codex | 구현·화면 검증 완료, main 통합 | 선택·보류 사유 구조화 및 한국어/영어 표시, 자동 결정 누락 방지 테스트. 도그푸딩 이해도 검증 대기 |
 | B15 분석 디코더 공유 | Claude + Codex | 구현·검토 완료, main 통합 | 공유 WebCodecs 샘플러, 디코더·요소 fallback, 스트리밍 장면 감지, 실제 디코더 E2E와 ffmpeg 시각 정확도 검증. 장면 감지 35% 단축. 자동 편집 패널에서 분석 중단·이어하기를 제공하며 완료 결과는 보존하고 미완료 항목만 재개함. 후속(`claude/b15-proxy-sampler`): 프록시 생성·썸네일·필름스트립도 공용 샘플러로. 프록시 60초 1080p → 640p: 13.3초·seek 1,440회 → 3.3초·seek 0회. 가져오기 썸네일은 seek 0회, 회전 .mov 썸네일 세로 정상. 샘플러 sink가 async를 지원해 encoder 역압이 디코더까지 전달됨 |
-| B16 시나리오 | Codex | 대기 | |
+| B16 시나리오 | Codex | 구현·검증 완료 | 사진+영상 혼합·무음악·짧은 소스·중복 많은 성장 기록 고정 테스트 4종 통과. 모드별 얼굴·풍경 가중치가 실제 중복 대표 선택에 반영 |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
 | B22 회귀 자동화 | Claude + Codex | 구현·검토 완료, main 통합 | `claude/b22-regression` · e2e `export.spec.ts`: VP9 프리셋 내보내기 → 다운로드 MP4 크기·성공 토스트, 렌더 중 취소 → 취소 토스트·다이얼로그 재사용, 스냅샷 저장 → 변경 → 복원. 작성 중 잡은 결함: (1) 오디오 mixer worker가 dev(turbopack)에서 영원히 무응답 → 내보내기가 "렌더링 99%"에서 멈추고 취소도 불가. 원인은 worker 진입 가드 `typeof window === "undefined"`를 turbopack이 상수로 접어 블록을 제거한 것. `WorkerGlobalScope` 검사로 교체, 5초 무응답 시 inline 폴백 + abort 연결. (2) 렌더 루프에 encoder 역압이 없어 1080p 프레임 수백 장이 큐에 쌓임 → `encodeQueueSize ≤ 8` 대기. (3) AAC는 `AudioEncoder` 존재만 보고 지원 여부를 안 물어 코덱 없는 Chromium에서 실패 → `isConfigSupported`. (4) 취소가 "내보내기 실패"로 표시 → `export.cancelled` 토스트. 단위 4개 추가. dev·프로덕션 Chromium e2e 통과 |
