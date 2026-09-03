@@ -99,8 +99,8 @@ product. Use the `.dmg` on the [Releases page](../../releases/latest), or follow
 ### Bundled local AI models
 
 Desktop builds prepare and bundle the MediaPipe runtime, Selfie Segmenter,
-Face Landmarker, and the Whisper transcription model (~41 MB,
-`Xenova/whisper-tiny.en` q8). Packaged `app://` runs do not use a CDN fallback
+Face Landmarker, the multilingual Whisper transcription model (~80 MB,
+`Xenova/whisper-base` q8), and its ONNX Web runtime (~21 MB). Packaged `app://` runs do not use a CDN fallback
 to hide a missing model. To prepare only the models manually, run:
 
 ```bash

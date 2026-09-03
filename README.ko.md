@@ -94,7 +94,8 @@ Movie Desk의 제품 배포 형태는 macOS 데스크톱 앱입니다. `apps/web
 ### 동봉된 로컬 AI 모델
 
 데스크톱 빌드는 MediaPipe 런타임, Selfie Segmenter, Face Landmarker와 Whisper
-자막 모델(~41MB, `Xenova/whisper-tiny.en` q8)을 먼저 준비해 앱에 동봉합니다.
+한국어·영어 자막 모델(~80MB, `Xenova/whisper-base` q8)과 ONNX Web 런타임
+(~21MB)을 먼저 준비해 앱에 동봉합니다.
 패키징된 `app://` 실행에서는 모델 누락을 숨기기 위한 CDN 폴백을 허용하지 않습니다.
 수동으로 모델만 준비하려면 다음 명령을 사용합니다.
 

@@ -308,7 +308,8 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B16 시나리오 | Codex | 구현·검증 완료 | 사진+영상 혼합·무음악·짧은 소스·중복 많은 성장 기록 고정 테스트 4종 통과. 모드별 얼굴·풍경 가중치가 실제 중복 대표 선택에 반영 |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18 카드 템플릿 | Codex | 구현·화면 검증 완료 | 번들 Pretendard 기본값, 여행 타이틀·챕터 카드·성장 기록 카드 3종, 텍스트·배경 그룹 이동. 기존 로워서드·자동 챕터 좌표 수정 |
-| B19~B21 마무리·공유 | Codex | 대기 | 한국어 Whisper 평가, 공유 프리셋, 내보내기 완료 화면 |
+| B19 한국어 Whisper | Codex | 구현·브라우저 오프라인 검증 완료 · 실제 음성 도그푸딩 대기 | multilingual base q8 채택, 한국어/영어 명시 선택, ONNX 런타임 포함 완전 로컬 로딩. 합성 음성 CER·속도 비교와 외부 요청 0건 브라우저 스모크 기록 |
+| B20~B21 공유·완료 화면 | Codex | 대기 | 공유 프리셋, 내보내기 완료 화면 |
 | B22 회귀 자동화 | Claude + Codex | 구현·검토 완료, main 통합 | `claude/b22-regression` · e2e `export.spec.ts`: VP9 프리셋 내보내기 → 다운로드 MP4 크기·성공 토스트, 렌더 중 취소 → 취소 토스트·다이얼로그 재사용, 스냅샷 저장 → 변경 → 복원. 작성 중 잡은 결함: (1) 오디오 mixer worker가 dev(turbopack)에서 영원히 무응답 → 내보내기가 "렌더링 99%"에서 멈추고 취소도 불가. 원인은 worker 진입 가드 `typeof window === "undefined"`를 turbopack이 상수로 접어 블록을 제거한 것. `WorkerGlobalScope` 검사로 교체, 5초 무응답 시 inline 폴백 + abort 연결. (2) 렌더 루프에 encoder 역압이 없어 1080p 프레임 수백 장이 큐에 쌓임 → `encodeQueueSize ≤ 8` 대기. (3) AAC는 `AudioEncoder` 존재만 보고 지원 여부를 안 물어 코덱 없는 Chromium에서 실패 → `isConfigSupported`. (4) 취소가 "내보내기 실패"로 표시 → `export.cancelled` 토스트. 단위 4개 추가. dev·프로덕션 Chromium e2e 통과 |
 | B23 muxer 교체 | Claude + Codex | 구현·검토 완료, main 통합 | `claude/b23-muxer` · 폐기된 `mp4-muxer`(레지스트리 deprecated, 후속 Mediabunny 지정)를 `mediabunny` 1.55.5(MPL-2.0, ESM·tree-shake)로 교체. `media/mux/mp4-writer.ts`가 4개 호출부(exporter, 오디오 variant remux, 프록시, 지도 전환)에 같은 표면(`addVideoChunk`/`addAudioChunk(Raw)`/`finalize`)을 제공, 트랙별 첫 패킷 0 재정렬(구 `firstTimestampBehavior: offset`)·fast start 유지. 동일성: 단위 라운드트립(fixture 패킷 수·타입·시작 0·구간 길이·moov<mdat), Chrome 내보내기 ffprobe 비교(VP9 300f + AAC 472f, 10.069s 동일). 주의: `finalize()`가 async가 됨. 지도 전환(Codex 파일)은 기계적 교체 확인 완료. Codex가 잔여 테스트 mock·주석을 새 래퍼 기준으로 정리하고 전체 14개 E2E 통과 확인 |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |

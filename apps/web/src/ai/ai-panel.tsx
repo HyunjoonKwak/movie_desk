@@ -11,7 +11,7 @@ import { readMediaFile } from "@/persistence/opfs";
 import { useT, t as tFn } from "@/i18n/use-t";
 import { detectSilenceFromBlob } from "./silence-detect";
 import { removeSilentRangesFromClip } from "./auto-cut";
-import { transcribeAudio } from "./transcribe";
+import { transcribeAudio, type TranscriptionStage } from "./transcribe";
 import { subtitlesToClips } from "./subtitles-to-clips";
 import { detectScenesFromBlob } from "./scene-detect";
 import { applySceneCuts } from "./apply-scene-cuts";
@@ -21,14 +21,27 @@ import { applyMotionTrack } from "./apply-motion-track";
 import { detectBeatsFromBlob } from "./beat-detect";
 import { computeAutoWhiteBalance } from "./auto-white-balance";
 import { useTrackRegionStore } from "@/preview/track-region-store";
+import { useLocaleStore } from "@/i18n/store";
+import type { WhisperLanguage } from "./model-policy";
 
 type RunKey = null | "silence" | "whisper" | "scene" | "bgrm" | "track" | "beats" | "awb";
+
+const TRANSCRIPTION_STAGE_MESSAGE: Record<TranscriptionStage, string> = {
+  model: "ai.subtitles.loading",
+  decode: "ai.subtitles.decoding",
+  transcribe: "ai.subtitles.transcribing",
+  done: "ai.subtitles.done",
+};
 
 export function AiPanel() {
   const [running, setRunning] = useState<RunKey>(null);
   const selectedIds = useSelectionStore((s) => s.clipIds);
   const firstSelected = [...selectedIds][0];
   const t = useT();
+  const locale = useLocaleStore((s) => s.locale);
+  const [whisperLanguage, setWhisperLanguage] = useState<WhisperLanguage>(() =>
+    locale === "ko" ? "korean" : "english",
+  );
 
   const withClip = async <T,>(
     fn: (clipId: ID) => Promise<T>,
@@ -74,9 +87,15 @@ export function AiPanel() {
       try {
         const blob = await readMediaFile(asset.opfsPath);
         if (!blob) throw new Error(tFn("ai.assetMissing"));
-        const subs = await transcribeAudio(blob, (label, pct) => {
-          toast.loading(`${label}… ${Math.round(pct * 100)}%`, { id: toastId });
-        });
+        const subs = await transcribeAudio(
+          blob,
+          (stage, pct) => {
+            toast.loading(`${tFn(TRANSCRIPTION_STAGE_MESSAGE[stage])} ${Math.round(pct * 100)}%`, {
+              id: toastId,
+            });
+          },
+          whisperLanguage,
+        );
         if (subs.length === 0) {
           toast.info(tFn("ai.subtitles.none"), { id: toastId });
           return;
@@ -253,9 +272,21 @@ export function AiPanel() {
         running={running === "whisper"}
         icon={Type}
         label={t("ai.subtitles")}
-        badge="~40MB"
+        badge="base · ~80MB"
         title={t("ai.subtitles.hint")}
       />
+      <label className="-mt-1 flex items-center justify-end gap-2 px-1 text-3xs text-ink-3">
+        <span>{t("ai.subtitles.language")}</span>
+        <select
+          value={whisperLanguage}
+          disabled={running !== null}
+          onChange={(event) => setWhisperLanguage(event.target.value as WhisperLanguage)}
+          className="rounded bg-white/5 px-1.5 py-0.5 text-ink-2 outline-none disabled:opacity-50"
+        >
+          <option value="korean">{t("ai.subtitles.language.ko")}</option>
+          <option value="english">{t("ai.subtitles.language.en")}</option>
+        </select>
+      </label>
       <AiButton
         onClick={runSceneDetect}
         disabled={!firstSelected || running !== null}

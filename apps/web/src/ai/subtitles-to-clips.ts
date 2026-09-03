@@ -7,6 +7,7 @@ import {
   type MediaClip,
 } from "@movie-desk/core";
 import type { Subtitle } from "./types";
+import { DEFAULT_TEXT_FONT } from "@/editor/fonts";
 
 // Convert a list of subtitles (source-relative ms) into text clips placed
 // on a dedicated "Subtitles" text track, anchored to the visible portion
@@ -56,7 +57,7 @@ export const subtitlesToClips = (
       effects: [],
       keyframes: [],
       text: sub.text,
-      font: "Inter, system-ui, sans-serif",
+      font: DEFAULT_TEXT_FONT,
       size: 56,
       color: "#ffffff",
     });

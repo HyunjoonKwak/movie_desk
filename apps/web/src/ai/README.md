@@ -33,7 +33,11 @@ user enables it. Media never leaves the device.
   WebCodecs decoder is the main performance opportunity.
 - Translation, smart reframe, color matching across clips, and stem isolation
   are product backlog items, not implemented modules.
-- The bundled Whisper model is English (`whisper-tiny.en`); do not describe the
-  current transcription path as multilingual.
+- The bundled Whisper model is multilingual `whisper-base` q8. The AI panel
+  requires an explicit Korean/English speech-language choice so the runtime
+  never silently defaults to English or translates Korean speech.
+- Whisper's matching ONNX Web runtime is also bundled; neither model loading
+  nor inference depends on a CDN. Transformers.js stays pinned to 3.8.1 until
+  the newer runtime can open the current q8 decoder graph reliably.
 - `model-policy.ts` prevents packaged `app://` builds from silently falling back
   to a remote Whisper model. Face analysis always uses its bundled local path.

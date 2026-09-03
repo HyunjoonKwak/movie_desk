@@ -24,7 +24,7 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 
 | Capability | Status | Notes |
 | -- | :--: | -- |
-| Whisper auto-generation | ✅ | Tiny.en model, source-time mapping |
+| Whisper auto-generation | ✅ | Multilingual base q8 + local ONNX runtime, explicit Korean/English language, source-time mapping |
 | Dedicated subtitle panel (list view, batch edit) | ✅ | `subtitles/subtitle-panel.tsx` |
 | Edit subtitle text inline | ✅ | Panel list + inspector |
 | Adjust subtitle timing | 🟡 | Drag/trim works; no numeric precision input |

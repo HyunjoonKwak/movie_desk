@@ -1,10 +1,21 @@
-import { allowRemoteWhisperModels } from "./model-policy";
+import {
+  allowRemoteWhisperModels,
+  WHISPER_MODEL,
+  whisperGenerationOptions,
+  whisperWasmPaths,
+  type WhisperLanguage,
+} from "./model-policy";
 import type { Subtitle } from "./types";
 
-// Lazy Whisper loader. The model is downloaded once and cached by the
-// transformers runtime via the browser's HTTP cache.
+export type TranscriptionStage = "model" | "decode" | "transcribe" | "done";
+
+// Lazy Whisper loader. The packaged model stays local, and the in-memory
+// pipeline is reused for every transcription in the current editor session.
 let pipelinePromise: Promise<{
-  transcribe: (audio: Float32Array) => Promise<{
+  transcribe: (
+    audio: Float32Array,
+    language: WhisperLanguage,
+  ) => Promise<{
     chunks: Array<{ timestamp: [number, number | null]; text: string }>;
     text: string;
   }>;
@@ -13,33 +24,47 @@ let pipelinePromise: Promise<{
 const loadPipeline = async () => {
   const { pipeline, env } = await import("@huggingface/transformers");
   // Offline-first: prefer a locally vendored copy under /whisper/ if present;
-  // otherwise download from HuggingFace once and rely on the browser cache.
+  // browser development may use the explicit Hugging Face fallback.
   // For a fully self-contained desktop bundle, place the model files under
-  // `apps/web/public/whisper/Xenova/whisper-tiny.en/` (see README).
+  // `apps/web/public/whisper/Xenova/whisper-base/` (see README).
   env.allowLocalModels = true;
   // Packaged desktop builds include the model. Never hide a broken package by
   // silently reaching HuggingFace from app://; browser development keeps the
   // explicit first-use download path for now.
   env.allowRemoteModels = allowRemoteWhisperModels(globalThis.location?.protocol);
   env.localModelPath = "/whisper/";
-  env.useBrowserCache = true;
-  const tx = await pipeline("automatic-speech-recognition", "Xenova/whisper-tiny.en", {
+  // The bundled model is already local. Duplicating its ~77 MB in Cache
+  // Storage can stall model construction and wastes disk space.
+  env.useBrowserCache = false;
+  // Transformers.js otherwise points ONNX Runtime at jsDelivr. Keep both the
+  // model and inference engine local so packaged builds work fully offline.
+  const onnxWasm = env.backends.onnx.wasm;
+  if (!onnxWasm) throw new Error("Whisper requires the ONNX WebAssembly runtime");
+  onnxWasm.wasmPaths = whisperWasmPaths();
+  const tx = await pipeline("automatic-speech-recognition", WHISPER_MODEL, {
     dtype: "q8",
+    device: "wasm",
   });
   return {
-    transcribe: async (audio: Float32Array) => {
-      const result = (await tx(audio, {
-        return_timestamps: true,
-        chunk_length_s: 30,
-        stride_length_s: 5,
-      })) as { chunks?: Array<{ timestamp: [number, number | null]; text: string }>; text: string };
+    transcribe: async (audio: Float32Array, language: WhisperLanguage) => {
+      const result = (await tx(audio, whisperGenerationOptions(language))) as {
+        chunks?: Array<{ timestamp: [number, number | null]; text: string }>;
+        text: string;
+      };
       return { chunks: result.chunks ?? [], text: result.text };
     },
   };
 };
 
 const getWhisper = () => {
-  if (!pipelinePromise) pipelinePromise = loadPipeline();
+  if (!pipelinePromise) {
+    pipelinePromise = loadPipeline().catch((error) => {
+      // A missing/corrupt bundle must not poison every later retry in the
+      // current session after the user repairs the installation.
+      pipelinePromise = null;
+      throw error;
+    });
+  }
   return pipelinePromise;
 };
 
@@ -61,15 +86,16 @@ const decodeAudioForWhisper = async (blob: Blob): Promise<Float32Array> => {
 
 export const transcribeAudio = async (
   blob: Blob,
-  onProgress?: (label: string, pct: number) => void,
+  onProgress?: (stage: TranscriptionStage, pct: number) => void,
+  language: WhisperLanguage = "korean",
 ): Promise<readonly Subtitle[]> => {
-  onProgress?.("Loading Whisper model", 0.05);
+  onProgress?.("model", 0.05);
   const whisper = await getWhisper();
-  onProgress?.("Decoding audio", 0.2);
+  onProgress?.("decode", 0.2);
   const audio = await decodeAudioForWhisper(blob);
-  onProgress?.("Transcribing", 0.4);
-  const result = await whisper.transcribe(audio);
-  onProgress?.("Done", 1);
+  onProgress?.("transcribe", 0.4);
+  const result = await whisper.transcribe(audio, language);
+  onProgress?.("done", 1);
   return result.chunks
     .filter((c): c is { timestamp: [number, number]; text: string } => c.timestamp[1] !== null)
     .map((c) => ({
