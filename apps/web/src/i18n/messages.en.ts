@@ -669,4 +669,9 @@ export const en = {
     "music.restoreMissing": "File missing from the store — relink the audio",
     "export.cancelled": "Export cancelled",
     "export.missingMedia": "Cannot export: media is missing ({names}). Reconnect the originals or remove those clips, then try again.",
+    "media.missingBadge": "Missing",
+    "media.missingOffline": "The original cannot be reached. Reconnect its drive, or import the file again.",
+    "media.missingPermission": "Movie Desk is not allowed to read the original. Allow file access and try again.",
+    "media.missingChanged": "The original changed or was replaced since it was imported. Import it again.",
+    "media.missingUnknown": "The original could not be read. Check the file and try again.",
 } as const;

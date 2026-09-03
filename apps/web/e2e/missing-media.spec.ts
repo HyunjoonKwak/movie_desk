@@ -23,8 +23,13 @@ test("an export with missing media is refused by name and the dialog stays usabl
 }) => {
   await seedTimeline(page, 1);
   await removeOpfsKey(page, "__pix.png");
-  // The card still shows the inline thumbnail, so nothing in the bin warns yet.
+  // The card keeps its inline thumbnail; the next focus re-checks the source
+  // (what happens when a drive is pulled) and flags it.
   await expect(mediaCard(page)).toBeVisible();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(mediaCard(page).locator("[data-missing]")).toHaveText("Missing", {
+    timeout: 15_000,
+  });
 
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");

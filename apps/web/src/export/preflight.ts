@@ -1,4 +1,5 @@
-import { MediaSourceError, type RandomAccessMediaSource } from "@/media/source/media-source";
+import type { RandomAccessMediaSource } from "@/media/source/media-source";
+import { probeAssetSource } from "@/media/source/probe-source";
 import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import {
   type ID,
@@ -61,18 +62,6 @@ export const referencedClips = (project: Project, range: ExportRange): readonly 
   return refs;
 };
 
-// Resolving alone proves little: the OPFS adapter hands back a lazy File and
-// the desktop adapter only checks that its bridge exists. Reading the first
-// byte makes both actually touch the bytes (a media:// range request on the
-// desktop), and an empty copy is the partial-write case, not a source.
-const probeSource = async (source: RandomAccessMediaSource): Promise<void> => {
-  if (source.sizeBytes === 0) throw new MediaSourceError("changed", "media source is empty");
-  await source.read(0, 1);
-};
-
-const stateOf = (error: unknown): MissingMedia["state"] =>
-  error instanceof MediaSourceError ? error.state : "unknown";
-
 // Checks each referenced asset once. An asset that is gone from the library
 // or whose source cannot be opened and read is reported with the best name
 // available: the file name, else the clip label or its timeline position.
@@ -85,12 +74,8 @@ export const findMissingMedia = async (
   const checks = referencedClips(project, range).map(async (ref): Promise<MissingMedia | null> => {
     const asset = getAsset(ref.assetId);
     if (!asset) return { assetId: ref.assetId, name: ref.fallbackName, state: "unknown" };
-    try {
-      await probeSource(await resolve(asset));
-      return null;
-    } catch (error) {
-      return { assetId: asset.id, name: asset.name, state: stateOf(error) };
-    }
+    const health = await probeAssetSource(asset, resolve);
+    return health === "ok" ? null : { assetId: asset.id, name: asset.name, state: health };
   });
   return (await Promise.all(checks)).filter((m): m is MissingMedia => m !== null);
 };

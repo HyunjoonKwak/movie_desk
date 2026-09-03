@@ -33,12 +33,15 @@ import type { ID } from "@movie-desk/core";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type { MediaAsset, MediaKind } from "@movie-desk/core";
+import type { SourceHealth } from "@/media/source/probe-source";
 import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
 import { fmtSec, formatBytes } from "@/media/format";
 import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
+import { useSourceHealth } from "@/media/use-source-health";
 import { ImportFailures } from "./import-failures";
+import { MissingBadge } from "./missing-badge";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -51,6 +54,7 @@ export function MediaBin() {
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const setAssetProxy = useProjectStore((s) => s.setAssetProxy);
   const { importing, importFiles } = useMediaImport();
+  const sourceHealth = useSourceHealth(media);
   const t = useT();
   const [proxying, setProxying] = useState<string | null>(null);
 
@@ -489,6 +493,9 @@ export function MediaBin() {
                             </span>
                           )}
                           <div className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
+                            {sourceHealth[asset.id] && (
+                              <MissingBadge health={sourceHealth[asset.id] as SourceHealth} />
+                            )}
                             {isPinned && (
                               <span className="flex items-center gap-0.5 rounded bg-accent/90 px-1 py-0.5 text-3xs font-medium text-accent-fg">
                                 <Pin className="size-2.5" />

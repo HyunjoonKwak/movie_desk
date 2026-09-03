@@ -668,4 +668,9 @@ export const ko = {
     "music.restoreMissing": "보관소에 파일이 없습니다 — 음원을 다시 연결하세요",
     "export.cancelled": "내보내기를 취소했습니다",
     "export.missingMedia": "내보낼 수 없습니다: 미디어가 없습니다 ({names}). 원본을 다시 연결하거나 해당 클립을 지운 뒤 다시 시도하세요.",
+    "media.missingBadge": "누락",
+    "media.missingOffline": "원본을 찾을 수 없습니다. 드라이브를 다시 연결하거나 파일을 다시 가져오세요.",
+    "media.missingPermission": "원본을 읽을 권한이 없습니다. 파일 접근을 허용한 뒤 다시 시도하세요.",
+    "media.missingChanged": "가져온 뒤 원본이 바뀌었거나 교체됐습니다. 다시 가져오세요.",
+    "media.missingUnknown": "원본을 읽을 수 없습니다. 파일을 확인한 뒤 다시 시도하세요.",
 } as const;
