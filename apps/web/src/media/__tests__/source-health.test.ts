@@ -80,10 +80,58 @@ describe("source health store", () => {
     await useSourceHealthStore.getState().check([a, relinked]);
     expect(probed).toEqual(["a", "b", "b"]);
 
-    // Stale checks are redone when asked with a shorter max age.
+    // Stale checks are redone when asked with a shorter max age; the asset
+    // already flagged missing ("b") goes first.
     now += 10_000;
     await useSourceHealthStore.getState().check([a, relinked], { maxAgeMs: 5_000 });
-    expect(probed).toEqual(["a", "b", "b", "a", "b"]);
+    expect(probed).toEqual(["a", "b", "b", "b", "a"]);
+  });
+
+  it("never probes an asset twice while its probe is still running", async () => {
+    let releaseFirst: (() => void) | null = null;
+    const probed: string[] = [];
+    configureSourceHealthForTests({
+      probe: (a) => {
+        probed.push(a.id);
+        return new Promise((resolve) => {
+          releaseFirst = () => resolve("ok");
+        });
+      },
+    });
+    const a = asset("a");
+    const first = useSourceHealthStore.getState().check([a]);
+    const second = useSourceHealthStore.getState().check([a], { force: true });
+    await Promise.resolve();
+    expect(probed).toEqual(["a"]);
+    (releaseFirst as unknown as () => void)();
+    await Promise.all([first, second]);
+    expect(useSourceHealthStore.getState().entries.a?.health).toBe("ok");
+  });
+
+  it("drops entries for assets that left the library and throttles forced passes", async () => {
+    const probed: string[] = [];
+    let now = 0;
+    configureSourceHealthForTests({
+      probe: async (a) => {
+        probed.push(a.id);
+        return "ok";
+      },
+      now: () => now,
+    });
+    const a = asset("a");
+    const b = asset("b");
+    await useSourceHealthStore.getState().check([a, b]);
+    await useSourceHealthStore.getState().check([a]);
+    expect(Object.keys(useSourceHealthStore.getState().entries)).toEqual(["a"]);
+
+    await useSourceHealthStore.getState().check([a], { force: true });
+    expect(probed).toEqual(["a", "b", "a"]);
+    // A second forced pass right away is absorbed by the throttle.
+    await useSourceHealthStore.getState().check([a], { force: true });
+    expect(probed).toEqual(["a", "b", "a"]);
+    now += 20_000;
+    await useSourceHealthStore.getState().check([a], { force: true });
+    expect(probed).toEqual(["a", "b", "a", "a"]);
   });
 
   it("limits how many probes run at once", async () => {

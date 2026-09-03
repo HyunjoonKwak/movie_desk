@@ -11,9 +11,14 @@ const RELEASES_PAGE_URL = "https://github.com/HyunjoonKwak/movie_desk/releases/l
 // numbers, else as strings ("rc.2" > "rc.1", "rc.10" > "rc.2"). A leading
 // "v" is tolerated. Returns <0, 0, >0.
 const parseVersion = (v) => {
-  const [core = "", pre = ""] = String(v ?? "")
+  // Build metadata ("+abc") never affects precedence; the first "-" starts
+  // the prerelease, which may itself contain dashes ("alpha-1").
+  const cleaned = String(v ?? "")
     .replace(/^v/i, "")
-    .split("-", 2);
+    .replace(/\+.*$/, "");
+  const dash = cleaned.indexOf("-");
+  const core = dash === -1 ? cleaned : cleaned.slice(0, dash);
+  const pre = dash === -1 ? "" : cleaned.slice(dash + 1);
   return {
     numbers: core.split(".").map((part) => Number.parseInt(part, 10) || 0),
     prerelease: pre ? pre.split(".") : [],

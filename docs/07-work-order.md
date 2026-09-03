@@ -60,8 +60,9 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 ### 인계 메모
 
 - 2026-09-04 Claude: Codex 사용량 제한으로 Codex 몫을 모두 인수(`claude/codex-handover`). (1) 데스크톱: 옛
-  `~/Library/Application Support/cut_editor` 데이터는 새 폴더에 데이터가 없는 동안 그 자리에서 그대로 채택
-  (`user-data.cjs`, userData·sessionData 함께, 복사 없음); `update-check.cjs`가 semver prerelease 규칙을 적용해
+  `~/Library/Application Support/cut_editor` 데이터는 그 자리에서 그대로 채택(`user-data.cjs`: 첫 실행에 한 번 결정해
+  `Movie Desk/user-data-location.json`에 고정, 근거는 우리 origin의 IndexedDB 폴더 `app_cut-editor_0.indexeddb.leveldb`
+  존재 여부, userData·sessionData 함께 이동, 복사 없음, 실패해도 기본 경로로 계속); `update-check.cjs`가 semver prerelease 규칙을 적용해
   0.4.0-rc.1 설치에 0.4.0을 안내. (2) 미디어 카드 누락 표시: 라이브러리 변경·창 포커스 때 자산 소스를 열어 1바이트
   읽는 probe(`media/source/probe-source.ts`, 내보내기 사전 점검과 공유) 결과로 빨간 "누락" 배지 + 조치 안내 title.
   (3) B21 완료 화면. (4) knip 미사용 export 정리(semantic 태깅 토글은 호출부가 없어 꺼진 상태 유지 — 제품 결정 필요),

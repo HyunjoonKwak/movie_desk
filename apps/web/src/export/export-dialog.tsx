@@ -6,7 +6,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useRangeStore } from "@/stores/range-store";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, CheckCircle2, Download, FolderOpen, Loader2, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
@@ -57,7 +57,8 @@ interface ExportedFile {
 // The folder part of a saved path, for the completion screen.
 const folderOf = (path: string): string => {
   const cut = path.lastIndexOf("/");
-  return cut > 0 ? path.slice(0, cut) : path;
+  if (cut < 0) return path;
+  return cut === 0 ? "/" : path.slice(0, cut);
 };
 
 export function ExportDialog({ open, onOpenChange }: Props) {
@@ -74,6 +75,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   // user closes or chooses to export again.
   const [completed, setCompleted] = useState<readonly ExportedFile[] | null>(null);
   const [missingNames, setMissingNames] = useState<readonly string[] | null>(null);
+  // The dialog stays mounted while closed; a reopen starts from the presets.
+  useEffect(() => {
+    if (open) return;
+    setCompleted(null);
+    setMissingNames(null);
+  }, [open]);
   const [loudness, setLoudness] = useState<LoudnessResult | null>(null);
   const [measuring, setMeasuring] = useState(false);
   const duckEnabled = useDuckingStore((s) => s.enabled);
@@ -117,7 +124,6 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         }
         exporterRef.current = null;
       }
-      setCompleted(files);
     } catch (err) {
       if (err instanceof ExportCancelledError) {
         toast.info(t("export.cancelled"));
@@ -130,6 +136,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         toast.error(t("export.failed", { msg }));
       }
     } finally {
+      // Files written before a later preset failed are still shown.
+      if (files.length > 0) setCompleted(files);
       setRunning(false);
       setProgress(null);
       setQueueLabel("");

@@ -3,76 +3,130 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { adoptLegacyUserData, chooseUserDataPath, hasUserData } = require("./user-data.cjs");
+const {
+  DECISION_FILE,
+  OUR_STORAGE_MARKER,
+  adoptLegacyUserData,
+  chooseUserData,
+  hasOurStorage,
+} = require("./user-data.cjs");
 
-const current = "/Users/me/Library/Application Support/Movie Desk";
-const legacy = "/Users/me/Library/Application Support/cut_editor";
-
-describe("chooseUserDataPath", () => {
-  it("keeps the new folder when there is no legacy folder", () => {
-    const chosen = chooseUserDataPath({
-      current,
-      legacy,
-      exists: (dir) => dir === current,
-      hasData: () => false,
-    });
-    assert.equal(chosen, current);
+describe("chooseUserData", () => {
+  it("adopts the legacy folder only when it is a directory holding Movie Desk storage", () => {
+    assert.equal(
+      chooseUserData({ decision: null, legacyIsDirectory: true, legacyHasOurStorage: true }),
+      "legacy",
+    );
+    assert.equal(
+      chooseUserData({ decision: null, legacyIsDirectory: true, legacyHasOurStorage: false }),
+      "current",
+    );
+    assert.equal(
+      chooseUserData({ decision: null, legacyIsDirectory: false, legacyHasOurStorage: false }),
+      "current",
+    );
   });
 
-  it("adopts the legacy folder when the new one does not exist yet", () => {
-    const chosen = chooseUserDataPath({
-      current,
-      legacy,
-      exists: (dir) => dir === legacy,
-      hasData: () => false,
-    });
-    assert.equal(chosen, legacy);
-  });
-
-  it("adopts the legacy folder when the new one exists but holds no data", () => {
-    const chosen = chooseUserDataPath({
-      current,
-      legacy,
-      exists: () => true,
-      hasData: (dir) => dir === legacy,
-    });
-    assert.equal(chosen, legacy);
-  });
-
-  it("keeps the new folder once it holds data, even if the legacy one remains", () => {
-    const chosen = chooseUserDataPath({
-      current,
-      legacy,
-      exists: () => true,
-      hasData: () => true,
-    });
-    assert.equal(chosen, current);
+  it("keeps a recorded decision regardless of what the folders hold now", () => {
+    assert.equal(
+      chooseUserData({ decision: "current", legacyIsDirectory: true, legacyHasOurStorage: true }),
+      "current",
+    );
+    assert.equal(
+      chooseUserData({ decision: "legacy", legacyIsDirectory: false, legacyHasOurStorage: false }),
+      "legacy",
+    );
   });
 });
 
-describe("hasUserData", () => {
-  it("recognises browser storage and app files, not an empty folder", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-userdata-"));
-    assert.equal(hasUserData(root, fs, path), false);
-    fs.mkdirSync(path.join(root, "IndexedDB"));
-    assert.equal(hasUserData(root, fs, path), true);
-  });
-});
-
-describe("adoptLegacyUserData", () => {
-  it("moves userData and sessionData to the legacy folder together", () => {
-    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
-    fs.mkdirSync(path.join(appData, "cut_editor", "IndexedDB"), { recursive: true });
-    const paths = { appData, userData: path.join(appData, "Movie Desk") };
-    const app = {
+const fakeApp = (appData) => {
+  const paths = { appData, userData: path.join(appData, "Movie Desk") };
+  return {
+    paths,
+    app: {
       getPath: (name) => paths[name],
       setPath: (name, value) => {
         paths[name] = value;
       },
+    },
+  };
+};
+
+const legacyWithStorage = (appData) => {
+  const legacy = path.join(appData, "cut_editor");
+  fs.mkdirSync(path.join(legacy, ...OUR_STORAGE_MARKER), { recursive: true });
+  return legacy;
+};
+
+describe("adoptLegacyUserData", () => {
+  it("moves userData and sessionData to the legacy folder and records the decision", () => {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    const legacy = legacyWithStorage(appData);
+    const { app, paths } = fakeApp(appData);
+    assert.equal(adoptLegacyUserData(app, fs, path), legacy);
+    assert.equal(paths.userData, legacy);
+    assert.equal(paths.sessionData, legacy);
+    const decision = JSON.parse(
+      fs.readFileSync(path.join(appData, "Movie Desk", DECISION_FILE), "utf8"),
+    );
+    assert.equal(decision.userData, "legacy");
+  });
+
+  it("still adopts when a previous launch already created the new folder with window state", () => {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    const legacy = legacyWithStorage(appData);
+    fs.mkdirSync(path.join(appData, "Movie Desk", "Local Storage"), { recursive: true });
+    fs.writeFileSync(path.join(appData, "Movie Desk", "window-state.json"), "{}");
+    const { app } = fakeApp(appData);
+    assert.equal(adoptLegacyUserData(app, fs, path), legacy);
+  });
+
+  it("ignores a cut_editor folder that is not Movie Desk's, or is a file", () => {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    fs.mkdirSync(path.join(appData, "cut_editor", "Local Storage"), { recursive: true });
+    const first = fakeApp(appData);
+    assert.equal(adoptLegacyUserData(first.app, fs, path), first.paths.userData);
+
+    const appData2 = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    fs.writeFileSync(path.join(appData2, "cut_editor"), "not a folder");
+    const second = fakeApp(appData2);
+    assert.equal(adoptLegacyUserData(second.app, fs, path), second.paths.userData);
+  });
+
+  it("honours a recorded decision on later launches", () => {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    legacyWithStorage(appData);
+    const { app, paths } = fakeApp(appData);
+    fs.mkdirSync(paths.userData, { recursive: true });
+    fs.writeFileSync(
+      path.join(paths.userData, DECISION_FILE),
+      JSON.stringify({ userData: "current" }),
+    );
+    assert.equal(adoptLegacyUserData(app, fs, path), paths.userData);
+    assert.equal(paths.sessionData, undefined);
+  });
+
+  it("never throws: a setPath failure keeps the default folder", () => {
+    const appData = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-appdata-"));
+    legacyWithStorage(appData);
+    const { app, paths } = fakeApp(appData);
+    app.setPath = () => {
+      throw new Error("override failed");
     };
-    const chosen = adoptLegacyUserData(app, fs, path);
-    assert.equal(chosen, path.join(appData, "cut_editor"));
-    assert.equal(paths.userData, chosen);
-    assert.equal(paths.sessionData, chosen);
+    const messages = [];
+    assert.equal(
+      adoptLegacyUserData(app, fs, path, (m) => messages.push(m)),
+      paths.userData,
+    );
+    assert.match(messages[0], /keeping default/);
+  });
+});
+
+describe("hasOurStorage", () => {
+  it("looks for the app://cut-editor IndexedDB directory", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "movie-desk-storage-"));
+    assert.equal(hasOurStorage(root, fs, path), false);
+    fs.mkdirSync(path.join(root, ...OUR_STORAGE_MARKER), { recursive: true });
+    assert.equal(hasOurStorage(root, fs, path), true);
   });
 });

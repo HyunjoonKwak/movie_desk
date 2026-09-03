@@ -22,6 +22,8 @@ describe("compareVersions", () => {
     assert.ok(compareVersions("0.4.0-beta.1", "0.4.0-rc.1") < 0);
     assert.equal(compareVersions("v0.4.0-rc.1", "0.4.0-rc.1"), 0);
     assert.ok(compareVersions("0.4.1-rc.1", "0.4.0") > 0);
+    assert.equal(compareVersions("0.4.0-rc.1+abc", "0.4.0-rc.1"), 0);
+    assert.ok(compareVersions("1.0.0-alpha-1", "1.0.0-alpha") > 0);
   });
 });
 

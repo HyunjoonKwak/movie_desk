@@ -25,16 +25,13 @@ const PROMPT_BANK: readonly { label: string; text: string }[] = [
 
 type ZeroShotFn = (img: ImageData, labels: string[]) => Promise<{ scores: number[] }>;
 
+// Semantic tagging stays off until a product decision wires a setting: it
+// would download a zero-shot model. Nothing turns it on today; a failed
+// model load turns it off for the session.
 let enabled = false;
 let pipePromise: Promise<ZeroShotFn | null> | null = null;
 let failed = false;
 
-// No caller flips this yet: semantic tagging stays off until a product
-// decision wires a setting (it would download a zero-shot model).
-const setSemanticEnabled = (on: boolean): void => {
-  enabled = on;
-};
-void setSemanticEnabled;
 export const isSemanticEnabled = (): boolean => enabled;
 
 const loadZeroShot = async (): Promise<ZeroShotFn | null> => {

@@ -23,8 +23,11 @@ const DEV_URL = process.env.MOVIE_DESK_DEV_URL ?? "http://localhost:3000/editor"
 // lowercase `name` would otherwise leak into the UI).
 app.setName("Movie Desk");
 // Existing users have their projects under the pre-rename folder; keep
-// using it until the new one has data of its own (see user-data.cjs).
-adoptLegacyUserData(app, fs, path);
+// using it in place, decided once and recorded (see user-data.cjs).
+adoptLegacyUserData(app, fs, path, (message) => {
+  // biome-ignore lint/suspicious/noConsole: the data location must be visible in the desktop log.
+  console.warn(`[movie-desk-desktop] ${message}`);
+});
 // In a packaged build the web export lives at <Resources>/web (see
 // electron-builder.yml `extraResources`). Unpackaged runs read from the
 // repo's apps/web/out directory.
