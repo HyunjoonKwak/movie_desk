@@ -2,8 +2,8 @@ import { leaseMediaKey } from "@/persistence/media-gc";
 import { acquireMediaUrl, writeMediaFile } from "@/persistence/opfs";
 import { type MediaAsset, newId } from "@movie-desk/core";
 
-// Generate a low-res proxy of a video asset. We re-encode via WebCodecs +
-// mp4-muxer at a reduced resolution so the editor can scrub a lighter file.
+// Generate a low-res proxy of a video asset. We re-encode via WebCodecs and
+// the shared MP4 writer at a reduced resolution so the editor can scrub a lighter file.
 // Falls back to null if WebCodecs / decode isn't available. Export always
 // uses the original `opfsPath`, never the proxy.
 

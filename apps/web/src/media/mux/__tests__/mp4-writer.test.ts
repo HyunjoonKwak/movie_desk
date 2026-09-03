@@ -111,7 +111,7 @@ describe("Mp4Writer", () => {
     );
   });
 
-  it("refuses a file with no tracks and reports a failed write at finalize", async () => {
+  it("refuses writes for tracks that were not declared", () => {
     expect(() => new Mp4Writer({})).toThrow(/video or an audio track/);
     const writer = new Mp4Writer({ video: { codec: "avc", width: 16, height: 16 } });
     expect(() => writer.addAudioChunkRaw(new Uint8Array(1), "key", 0, 1000)).toThrow(/no audio/);

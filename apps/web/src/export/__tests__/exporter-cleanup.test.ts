@@ -31,18 +31,13 @@ vi.mock("@/stores/range-store", () => ({
   },
 }));
 
-vi.mock("mp4-muxer", () => ({
-  ArrayBufferTarget: class {
-    buffer = new ArrayBuffer(0);
-  },
-  Muxer: class {
-    target: { buffer: ArrayBuffer };
-    constructor(options: { target: { buffer: ArrayBuffer } }) {
-      this.target = options.target;
-    }
+vi.mock("@/media/mux/mp4-writer", () => ({
+  Mp4Writer: class {
     addVideoChunk() {}
     addAudioChunk() {}
-    finalize() {}
+    async finalize() {
+      return new ArrayBuffer(0);
+    }
   },
 }));
 
