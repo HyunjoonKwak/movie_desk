@@ -1,5 +1,6 @@
 "use client";
 
+import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
@@ -12,7 +13,6 @@ import { useLocalPersistence } from "@/persistence/use-local-persistence";
 import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
-import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelinePanel } from "@/timeline/components/timeline-panel";
 import { FolderOpen, Sliders, X } from "lucide-react";
@@ -39,7 +39,7 @@ export function EditorShell() {
   useEffect(() => {
     if (!persistenceReady) return;
     const id = setTimeout(() => {
-      void collectMediaGarbage(useProjectStore.getState().project).catch(() => {});
+      void collectMediaGarbage(() => useProjectStore.getState().project).catch(() => {});
     }, 3000);
     return () => clearTimeout(id);
   }, [persistenceReady]);

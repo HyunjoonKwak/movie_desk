@@ -63,9 +63,13 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
 // then and every saved project is consulted, so nothing still reachable —
 // including anything an in-session Undo could restore — is removed here.
 // Returns the number of blobs reclaimed.
-export const collectMediaGarbage = async (current: Project): Promise<number> => {
+// `current` may be a getter: the pass loads every saved project first, and
+// an import that lands meanwhile must not lose its file — each candidate is
+// re-checked against the live project right before deletion.
+export const collectMediaGarbage = async (current: Project | (() => Project)): Promise<number> => {
+  const live = typeof current === "function" ? current : () => current;
   const keep = new Set<string>();
-  referencedMediaKeys(current, keep);
+  referencedMediaKeys(live(), keep);
   // Music files in the app-global store stay alive while a library ref
   // points at them — deleting the ref lets the next GC pass reap the file.
   for (const key of musicStoreKeepKeys(useMusicLibraryStore.getState().refs)) keep.add(key);
@@ -84,10 +88,14 @@ export const collectMediaGarbage = async (current: Project): Promise<number> => 
 
   let removed = 0;
   for (const key of await listMediaKeys()) {
-    if (!keep.has(key) && !isMediaKeyLeased(key)) {
-      await deleteMediaFile(key);
-      removed++;
-    }
+    if (keep.has(key) || isMediaKeyLeased(key)) continue;
+    // Re-read the live project: an import finishing during the library scan
+    // above adds assets this pass never saw.
+    const now = new Set<string>();
+    referencedMediaKeys(live(), now);
+    if (now.has(key)) continue;
+    await deleteMediaFile(key);
+    removed++;
   }
   return removed;
 };
