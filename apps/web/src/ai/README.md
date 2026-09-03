@@ -26,8 +26,9 @@ user enables it. Media never leaves the device.
 
 ## Constraints and next work
 
-- Long tasks surface progress in `ai-panel.tsx`; cancellation is not yet
-  consistently available across every task.
+- Background footage analysis surfaces progress plus stop/resume controls in
+  the auto-edit panel. Cancellation is not yet consistently available across
+  every standalone tool in `ai-panel.tsx`.
 - Scene and motion analysis seek media elements serially. Sharing the preview
   WebCodecs decoder is the main performance opportunity.
 - Translation, smart reframe, color matching across clips, and stem isolation

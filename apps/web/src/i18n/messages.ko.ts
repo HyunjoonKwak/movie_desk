@@ -453,6 +453,8 @@ export const ko = {
     "auto.reportPartial":
       "{failed}개는 살펴보지 못했지만, 확인된 촬영본으로 계속 편집할 수 있습니다.",
     "auto.analysisProgress": "촬영본 확인 진행률",
+    "auto.analysisCancel": "분석 중단",
+    "auto.analysisResume": "이어서 분석",
     "auto.durationSeconds": "{n}초",
     "auto.analyzed": "확인한 파일",
     "auto.usable": "초안 후보 장면",

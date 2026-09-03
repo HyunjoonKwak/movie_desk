@@ -14,6 +14,8 @@ interface AnalysisState {
   queue: readonly ID[];
   running: boolean;
   enqueue: (assets: readonly MediaAsset[]) => void;
+  cancel: () => void;
+  resume: (assets: readonly MediaAsset[]) => void;
   get: (assetId: ID) => AnalysisEntry | undefined;
   reset: () => void;
 }
@@ -52,6 +54,43 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
     void pump(set, get);
   },
 
+  cancel: () => {
+    if (!get().running) return;
+    const controller = inflight;
+    activePump = null;
+    inflight = null;
+    controller?.abort();
+    set((state) => ({
+      entries: Object.fromEntries(
+        Object.entries(state.entries).map(([id, entry]) => [
+          id,
+          entry.status === "running" || entry.status === "pending"
+            ? { status: "pending" as const, progress: 0 }
+            : entry,
+        ]),
+      ),
+      queue: [],
+      running: false,
+    }));
+  },
+
+  resume: (assets) => {
+    if (get().running) return;
+    const { entries } = get();
+    const remaining = assets.filter((asset) => entries[asset.id]?.status !== "done");
+    if (remaining.length === 0) return;
+    set((state) => ({
+      entries: {
+        ...state.entries,
+        ...Object.fromEntries(
+          remaining.map((asset) => [asset.id, { status: "pending" as const, progress: 0 }]),
+        ),
+      },
+      queue: remaining.map((asset) => asset.id),
+    }));
+    void pump(set, get);
+  },
+
   get: (assetId) => get().entries[assetId],
   reset: () => {
     inflight?.abort();
@@ -64,7 +103,10 @@ type Get = () => AnalysisState;
 
 const patchEntry = (set: Set, id: ID, patch: Partial<AnalysisEntry>) =>
   set((s) => ({
-    entries: { ...s.entries, [id]: { ...(s.entries[id] ?? { status: "pending", progress: 0 }), ...patch } as AnalysisEntry },
+    entries: {
+      ...s.entries,
+      [id]: { ...(s.entries[id] ?? { status: "pending", progress: 0 }), ...patch } as AnalysisEntry,
+    },
   }));
 
 const pump = async (set: Set, get: Get): Promise<void> => {

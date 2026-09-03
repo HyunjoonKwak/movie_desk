@@ -454,6 +454,8 @@ export const en = {
     "auto.reportPartial":
       "Could not inspect {failed} item(s), but you can continue with the footage that was checked.",
     "auto.analysisProgress": "Footage review progress",
+    "auto.analysisCancel": "Stop analysis",
+    "auto.analysisResume": "Resume analysis",
     "auto.durationSeconds": "{n}s",
     "auto.analyzed": "Items checked",
     "auto.usable": "First-cut candidates",

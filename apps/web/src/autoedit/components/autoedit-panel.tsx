@@ -9,6 +9,7 @@ import {
   Pin,
   RefreshCw,
   Sparkles,
+  Square,
   Trash2,
   Wand2,
 } from "lucide-react";
@@ -36,6 +37,7 @@ export function AutoEditPanel() {
   const project = useProjectStore((s) => s.project);
   const applyGenerated = useProjectStore((s) => s.applyGenerated);
   const entries = useAnalysisStore((s) => s.entries);
+  const analysisRunning = useAnalysisStore((s) => s.running);
   const wiz = useAutoEditStore();
   const [confirmRerun, setConfirmRerun] = useState(false);
   const [semanticState, setSemanticState] = useState<"off" | "loading" | "on" | "failed">(
@@ -213,19 +215,36 @@ export function AutoEditPanel() {
                     })}
               </p>
               {!analysisSettled && (
-                <div
-                  className="mt-2 h-1 overflow-hidden rounded-full bg-panel-3"
-                  role="progressbar"
-                  aria-label={t("auto.analysisProgress")}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={Math.round(stats.progress * 100)}
-                  tabIndex={0}
-                >
+                <div className="mt-2 flex items-center gap-2">
                   <div
-                    className="h-full rounded-full bg-accent transition-[width]"
-                    style={{ width: `${Math.round(stats.progress * 100)}%` }}
-                  />
+                    className="h-1 flex-1 overflow-hidden rounded-full bg-panel-3"
+                    role="progressbar"
+                    aria-label={t("auto.analysisProgress")}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={Math.round(stats.progress * 100)}
+                    tabIndex={0}
+                  >
+                    <div
+                      className="h-full rounded-full bg-accent transition-[width]"
+                      style={{ width: `${Math.round(stats.progress * 100)}%` }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-ghost shrink-0 px-2 py-0.5 text-2xs"
+                    onClick={() => {
+                      if (analysisRunning) useAnalysisStore.getState().cancel();
+                      else useAnalysisStore.getState().resume(visualAssets);
+                    }}
+                  >
+                    {analysisRunning ? (
+                      <Square className="size-3" />
+                    ) : (
+                      <RefreshCw className="size-3" />
+                    )}
+                    {analysisRunning ? t("auto.analysisCancel") : t("auto.analysisResume")}
+                  </button>
                 </div>
               )}
               {stats.failedCount > 0 && (
