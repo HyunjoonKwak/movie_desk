@@ -1,3 +1,4 @@
+import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { RandomAccessMediaSource } from "@/media/source/media-source";
 import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import { acquireMediaUrl, readMediaFile } from "@/persistence/opfs";
@@ -124,14 +125,15 @@ export const samplePhoto = async (asset: MediaAsset): Promise<SampledFrame | nul
   }
 };
 
-// Per-second RMS envelope for audio-bearing assets (interest signal).
+// Per-second RMS envelope for audio-bearing assets (interest signal). Reads
+// the audio-track cache variant (built once at import), never the whole
+// original: a 4K HEVC clip is hundreds of MB, its AAC track a few.
 export const sampleAudioRms = async (asset: MediaAsset): Promise<readonly number[] | null> => {
   try {
-    const lease = await acquireMediaUrl(asset.opfsPath);
-    if (!lease) return null;
-    try {
-      const resp = await fetch(lease.url);
-      const buf = await resp.arrayBuffer();
+    const blob = await audioBlobFor(asset);
+    if (!blob) return null;
+    {
+      const buf = await blob.arrayBuffer();
       const Ctx = window.OfflineAudioContext ?? window.AudioContext;
       const ctx = new Ctx(1, 44100, 44100) as OfflineAudioContext;
       const audio = await ctx.decodeAudioData(buf);
@@ -146,8 +148,6 @@ export const sampleAudioRms = async (asset: MediaAsset): Promise<readonly number
       }
       const peak = Math.max(0.0001, ...out);
       return out.map((v) => v / peak);
-    } finally {
-      lease.release();
     }
   } catch {
     return null;
