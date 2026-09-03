@@ -63,6 +63,14 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   연결하고 여행 타이틀·챕터 카드·성장 기록 카드 3종을 추가했다. 각 카드의 텍스트와
   배경은 그룹으로 함께 이동한다. 실제 렌더 캡처에서 좌측 정렬 텍스트가 화면 밖으로 밀리던
   기존 로워서드·자동 챕터 좌표 문제도 확인해 수정했다.
+- 2026-09-03 Claude: B5 RC 준비. 로컬 빌드 결과는 위 표. Codex 확인 요청(apps/desktop 소유):
+  (1) `app.setName("Movie Desk")`로 userData가 `~/Library/Application Support/Movie Desk`가 되어,
+  cut_editor 시절 데이터(`…/cut_editor` 아래 OPFS·IndexedDB)는 `app://cut-editor` origin을 유지해도
+  보이지 않는다. 이 Mac에는 옛 폴더가 없어 재현 불가 — 사용자 Mac에 `…/Application Support/cut_editor`가
+  있으면 첫 실행 시 이관(복사 또는 `app.setPath("userData", legacy)`)이 필요. (2) `update-check.cjs`의
+  `compareVersions`가 prerelease 접미사를 무시해 0.4.0-rc.1과 0.4.0을 같게 봄 → RC 사용자가 정식 0.4.0을
+  안내받지 못한다. x.y.z가 같으면 접미사 있는 쪽을 낮게 두면 된다. (3) 코드 서명 identifier가 "Electron"
+  (ad-hoc, identity null) — 예상된 상태, Gatekeeper 우회 안내는 릴리스 노트에.
 - 2026-09-03 Claude: B15 후속(프록시·썸네일 샘플러). 확인 중 미디어 GC 경쟁을 잡았다: 로드 3초 뒤
   `collectMediaGarbage`가 시작 시점 프로젝트 스냅샷으로 keep 집합을 만들고 라이브러리 전체를 읽는 동안
   끝난 가져오기의 파일(lease 해제 후, `addMediaAsset` 전)을 지웠다(31MB 가져오기에서 재현). GC가 삭제
@@ -294,7 +302,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
 | B3 통합 | Claude | 완료 | feat/identity + B1을 main에 fast-forward, 푸시 (2026-09-03) |
 | B4 첫 실행 오프라인 | Codex | 구현·번들 스모크 완료 | arm64/x64 DMG에 MediaPipe·Whisper 포함, DNS 차단 새 프로필 기동 확인. RC 수동 기능 검증은 B5에서 반복 |
-| B5 RC | Claude 준비 · 사용자 태그 | 대기 | |
+| B5 RC | Claude 준비 · 사용자 태그 | 준비 완료, 태그 대기 | `claude/b5-rc` · 버전 0.4.0-rc.1 동기화(D2 스크립트), 릴리스와 같은 경로(`build:web` 모델 프리번들 → electron-builder)로 로컬 DMG 빌드 확인: arm64·x64 각 약 167~169MB, Info.plist 0.4.0-rc.1, mediapipe 36MB + whisper 41MB 동봉, ad-hoc 서명. 태그 `v0.4.0-rc.1` push 시 release.yml이 GitHub Release(초안)에 올림. 태그 전 Codex 확인 2건은 인계 메모 |
 | B6 도그푸딩 템플릿 | Codex | 완료, 통합됨 | `docs/dogfood/TEMPLATE.md` + `SET-01.md`. 세 축 완주 절차, 원본 안전, 지표 계산법, P0/P1/P2 판정 기준 고정 |
 | B7 도그푸딩 1회차 | 사용자 | 대기 | |
 | B8 P0 수정 | 배정 | 대기 | 영역별 |
