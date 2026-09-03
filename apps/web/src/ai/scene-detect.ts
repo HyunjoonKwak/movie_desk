@@ -1,12 +1,14 @@
+import { streamFramesAt } from "@/renderer/frame-sampler";
 import type { SceneCut } from "./types";
 
-// Lightweight scene cut detector. Walks the video at a coarse FPS, captures
-// frames into a small canvas, computes a normalised RGB histogram, and emits
-// a cut when consecutive frames differ by more than `threshold` (χ²-like).
+// Lightweight scene cut detector. Samples the video at a coarse FPS through
+// the shared frame sampler (one WebCodecs pass, media-element fallback),
+// computes a normalised RGB histogram per frame, and emits a cut when
+// consecutive frames differ by more than `threshold` (χ²-like).
 
-const FRAME_FPS = 2;          // sample at 2 fps — enough for cut detection
+const FRAME_FPS = 2; // sample at 2 fps — enough for cut detection
 const THUMB_SIZE = 64;
-const BUCKETS = 8;            // per channel
+const BUCKETS = 8; // per channel
 
 const histogram = (data: Uint8ClampedArray): Float32Array => {
   const h = new Float32Array(BUCKETS * 3);
@@ -29,7 +31,7 @@ const chiSquared = (a: Float32Array, b: Float32Array): number => {
     const ai = a[i]!;
     const bi = b[i]!;
     const denom = ai + bi;
-    if (denom > 0) s += ((ai - bi) ** 2) / denom;
+    if (denom > 0) s += (ai - bi) ** 2 / denom;
   }
   return s;
 };
@@ -37,58 +39,35 @@ const chiSquared = (a: Float32Array, b: Float32Array): number => {
 export const detectScenesFromBlob = async (
   blob: Blob,
   onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<readonly SceneCut[]> => {
-  const url = URL.createObjectURL(blob);
-  try {
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-    video.src = url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("video load failed"));
-    });
-
-    const canvas = document.createElement("canvas");
-    canvas.width = THUMB_SIZE;
-    canvas.height = THUMB_SIZE;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    if (!ctx) throw new Error("Canvas2D unavailable");
-
-    const duration = video.duration;
-    const samples = Math.max(2, Math.floor(duration * FRAME_FPS));
-    const cuts: SceneCut[] = [];
-    let prev: Float32Array | null = null;
-    const threshold = 0.45;
-
-    for (let i = 0; i < samples; i++) {
-      const t = (i / samples) * duration;
-      video.currentTime = t;
-      await new Promise<void>((resolve) => {
-        const onSeeked = () => {
-          video.removeEventListener("seeked", onSeeked);
-          resolve();
-        };
-        video.addEventListener("seeked", onSeeked);
-      });
-      ctx.drawImage(video, 0, 0, THUMB_SIZE, THUMB_SIZE);
-      const data = ctx.getImageData(0, 0, THUMB_SIZE, THUMB_SIZE).data;
-      const h = histogram(data);
+  const cuts: SceneCut[] = [];
+  const threshold = 0.45;
+  // Only the previous histogram is kept: a long video never accumulates frames.
+  let prev: Float32Array | null = null;
+  await streamFramesAt(
+    blob,
+    (durationMs) => {
+      const samples = Math.max(2, Math.floor((durationMs / 1000) * FRAME_FPS));
+      return Array.from({ length: samples }, (_, i) => (i / samples) * durationMs);
+    },
+    {
+      size: { width: THUMB_SIZE, height: THUMB_SIZE },
+      ...(signal ? { signal } : {}),
+      onProgress: (done, total) => {
+        if (done % 4 === 0) onProgress?.(done / total);
+      },
+    },
+    ({ atMs, image }) => {
+      const h = histogram(image.data);
       if (prev) {
         const diff = chiSquared(prev, h);
-        if (diff > threshold) {
-          cuts.push({ atMs: Math.round(t * 1000), score: diff });
-        }
+        if (diff > threshold) cuts.push({ atMs: Math.round(atMs), score: diff });
       }
       prev = h;
-      if (i % 4 === 0) onProgress?.(i / samples);
-    }
-    onProgress?.(1);
-    // Merge cuts that are within 800ms of each other (Whisper-style hysteresis).
-    return cuts.filter((c, i, arr) => i === 0 || c.atMs - arr[i - 1]!.atMs > 800);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+    },
+  );
+  onProgress?.(1);
+  // Merge cuts that are within 800ms of each other (Whisper-style hysteresis).
+  return cuts.filter((c, i, arr) => i === 0 || c.atMs - arr[i - 1]!.atMs > 800);
 };

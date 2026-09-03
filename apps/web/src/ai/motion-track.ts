@@ -1,8 +1,11 @@
 // Lightweight motion tracker. Given a video blob, a starting rectangle
-// (normalized 0..1), and a time range, it samples frames and follows the
-// template patch using a local normalized cross-correlation (NCC) search.
+// (normalized 0..1), and a time range, it samples frames through the shared
+// frame sampler and follows the template patch using a local normalized
+// cross-correlation (NCC) search.
 // Emits a list of normalized center points per timestamp; the caller turns
 // those into transform keyframes.
+
+import { streamFramesAt } from "@/renderer/frame-sampler";
 
 export interface TrackPoint {
   readonly atMs: number;
@@ -25,10 +28,9 @@ interface Gray {
 
 const SAMPLE_W = 320; // downscale width for tracking speed
 
-const toGray = (canvas: HTMLCanvasElement): Gray => {
-  const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
-  const { width, height } = canvas;
-  const img = ctx.getImageData(0, 0, width, height).data;
+const toGray = (image: ImageData): Gray => {
+  const { width, height } = image;
+  const img = image.data;
   const data = new Float32Array(width * height);
   for (let i = 0; i < width * height; i++) {
     data[i] = (img[i * 4]! * 0.299 + img[i * 4 + 1]! * 0.587 + img[i * 4 + 2]! * 0.114) / 255;
@@ -79,58 +81,47 @@ export const trackRegion = async (
   endMs: number,
   fps = 5,
   onProgress?: (pct: number) => void,
+  signal?: AbortSignal,
 ): Promise<readonly TrackPoint[]> => {
-  const url = URL.createObjectURL(blob);
-  try {
-    const video = document.createElement("video");
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-    video.src = url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("video load failed"));
-    });
+  const step = 1000 / fps;
+  const times: number[] = [Math.max(0, startMs)];
+  for (let tMs = startMs + step; tMs <= endMs; tMs += step) times.push(tMs);
 
-    const aspect = video.videoHeight / video.videoWidth || 0.5625;
-    const w = SAMPLE_W;
-    const h = Math.round(SAMPLE_W * aspect);
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+  // Tracker state survives across streamed frames; frames themselves do not.
+  const points: TrackPoint[] = [];
+  let template: Float32Array | null = null;
+  let cx = 0;
+  let cy = 0;
+  let pw = 0;
+  let ph = 0;
+  let searchR = 0;
 
-    const seek = (sec: number) =>
-      new Promise<void>((resolve) => {
-        const onSeeked = () => {
-          video.removeEventListener("seeked", onSeeked);
-          resolve();
-        };
-        video.addEventListener("seeked", onSeeked);
-        video.currentTime = sec;
-      });
-
-    const pw = Math.max(8, Math.round(region.w * w));
-    const ph = Math.max(8, Math.round(region.h * h));
-    let cx = (region.x + region.w / 2) * w;
-    let cy = (region.y + region.h / 2) * h;
-
-    // Seed template from the first frame.
-    await seek(Math.max(0, startMs / 1000));
-    ctx.drawImage(video, 0, 0, w, h);
-    let template = patchAt(toGray(canvas), cx, cy, pw, ph);
-    if (!template) return [];
-
-    const points: TrackPoint[] = [{ atMs: startMs, x: cx / w, y: cy / h }];
-    const step = 1000 / fps;
-    const searchR = Math.max(8, Math.round(pw * 0.6));
-
-    for (let tMs = startMs + step; tMs <= endMs; tMs += step) {
-      await seek(tMs / 1000);
-      ctx.drawImage(video, 0, 0, w, h);
-      const g = toGray(canvas);
-
+  await streamFramesAt(
+    blob,
+    times,
+    {
+      size: (sourceWidth, sourceHeight) => ({
+        width: SAMPLE_W,
+        height: Math.round(SAMPLE_W * (sourceHeight / sourceWidth || 0.5625)),
+      }),
+      ...(signal ? { signal } : {}),
+      onProgress: (done, total) => onProgress?.(done / total),
+    },
+    ({ atMs, image }) => {
+      const w = image.width;
+      const h = image.height;
+      const g = toGray(image);
+      if (!template) {
+        // Seed the template from the first frame.
+        pw = Math.max(8, Math.round(region.w * w));
+        ph = Math.max(8, Math.round(region.h * h));
+        cx = (region.x + region.w / 2) * w;
+        cy = (region.y + region.h / 2) * h;
+        searchR = Math.max(8, Math.round(pw * 0.6));
+        template = patchAt(g, cx, cy, pw, ph);
+        if (template) points.push({ atMs: startMs, x: cx / w, y: cy / h });
+        return;
+      }
       let best = -2;
       let bx = cx;
       let by = cy;
@@ -138,7 +129,7 @@ export const trackRegion = async (
         for (let dx = -searchR; dx <= searchR; dx += 2) {
           const cand = patchAt(g, cx + dx, cy + dy, pw, ph);
           if (!cand) continue;
-          const score = ncc(template!, cand);
+          const score = ncc(template, cand);
           if (score > best) {
             best = score;
             bx = cx + dx;
@@ -148,17 +139,13 @@ export const trackRegion = async (
       }
       cx = bx;
       cy = by;
-      points.push({ atMs: tMs, x: cx / w, y: cy / h });
+      points.push({ atMs, x: cx / w, y: cy / h });
 
       // Slowly adapt the template to handle gradual appearance changes.
       const refreshed = patchAt(g, cx, cy, pw, ph);
       if (refreshed && best > 0.5) template = refreshed;
-
-      onProgress?.((tMs - startMs) / Math.max(1, endMs - startMs));
-    }
-    onProgress?.(1);
-    return points;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+    },
+  );
+  onProgress?.(1);
+  return points;
 };

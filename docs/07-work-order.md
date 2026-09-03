@@ -59,6 +59,22 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B15 실측(Chrome 152, Apple Silicon, 60초 1080p H.264 GOP 30 합성 클립, 같은 프로젝트에서 교대 측정):
+
+  | 항목 | main(요소 seek) | B15 |
+  |---|---|---|
+  | 가져오기 → 자동 편집 분석 완료(샘플 36장, OPFS 복사·probe 포함) | 2.24초 · seek 49회 | 2.28초 · seek 11회 |
+  | 장면 감지(2fps, 120장) | 1.40초 · seek 120회 · 경계 15개 | 0.92초 · seek 0회 · 경계 15개 |
+  | 프레임 시각 정확도(색상이 시간 함수인 클립, ffmpeg `-ss` 기준) | 일치 | 일치 |
+
+  자동 편집 경로는 가져오기 비용이 지배해 동률, 밀도 높은 장면 감지는 35% 단축. 검토 중 잡은 결함 2건:
+  (1) 선형 디코더가 입력 chunk 기준 reorder 한계로 출력을 닫아 아직 나오지 않은 정답 프레임을 버리고
+  다음 run 프레임을 이전 요청에 배정(정확히 한 샘플 지연) → 입력 중단과 출력 수신을 분리.
+  (2) chunk 타임스탬프에 elst 지연(B-frame 인코더 67ms)이 남아 있었음 → 표시 시각으로 환산.
+- 2026-09-03 Claude: B15 Codex 1차 검토 반영. 발견: `mp4-decoder.ts`의 `description()`이 mp4box box의
+  `.value`를 기대했지만 존재하지 않아 항상 undefined → HEVC·out-of-band AVC가 WebCodecs configure에
+  실패하고 조용히 `<video>` 폴백(3881341, Codex 승인). B15는 A2/B11이 main에 통합된 뒤라
+  `claude/b15-frame-sampler`를 main에서 새로 시작해 3881341만 재적용했다. 실측 수치는 아래 표.
 - 2026-09-03 Codex: A2-a를 M3 통합 스택에 합치고, 동일 자산의 동시 cache build를 하나로
   합쳤다. 파생 캐시가 용량 부족·일시 오류로 저장되지 않아도 가져오기·미리보기·내보내기가
   실패하지 않고 원본으로 폴백하며 다음 요청에서 다시 만들 수 있게 보강했다.
@@ -246,7 +262,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B11 HEVC·.mov·회전 | Claude | 구현 완료, Codex 통합 검증 완료 | `claude/b11-hevc-mov` → `codex/m3-media-integration` · MOV 컨테이너 코덱·회전 판독, WebCodecs 회전, 미지원 코덱 폴백. 자동 테스트 통과, 실제 iPhone HDR/VFR 검증 대기 |
 | B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
 | B13~B14 리포트·컷 이유 | Codex | 대기 | |
-| B15 분석 디코더 공유 | Claude | 대기 | |
+| B15 분석 디코더 공유 | Claude | 핵심 구현 완료, Codex 재검토 대기 | `claude/b15-frame-sampler`(main + 3881341 재적용) · `renderer/frame-sampler.ts` `streamFramesAt`/`sampleFramesAt`: 요청 시각을 키프레임 표 기준 구간으로 묶어(GOP 하나를 통째로 건너뛸 수 있을 때만 seek) 디코더 하나로 순차 디코드(`linear-decoder.ts`, `mp4-demux.ts`), 프레임은 스트리밍(장면 감지는 이전 히스토그램만 보관), MP4가 아니거나 디코더 생성·configure 실패·중간 실패 시 남은 시각만 요소 seek 폴백. 각 요청은 그 시각에 화면에 떠 있는 프레임(요소 seek·ffmpeg와 동일 규약)으로 응답, 편집 리스트(elst) 지연 제거. 자동 편집 샘플러(프록시 → 원본 순서 유지)·장면 감지·모션 추적이 사용. 분석 큐 `reset()`이 진행 중 분석을 abort, 재분석은 enqueue. e2e `webcodecs-sampler.spec.ts`가 VP9 MP4로 실제 `VideoDecoder.configure`·프레임 출력을 검증. 실측은 인계 메모 표. 남은 일: 썸네일·프록시 생성도 같은 샘플러로, `sampleAudioRms`는 A2 variant로, AI 패널 취소 버튼 연결(UI, Codex) |
 | B16 시나리오 | Codex | 대기 | |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |

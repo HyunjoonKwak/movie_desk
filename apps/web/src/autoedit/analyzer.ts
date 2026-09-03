@@ -11,6 +11,7 @@ import { semanticScore } from "./semantic";
 export const analyzeAsset = async (
   asset: MediaAsset,
   onProgress?: (p: number) => void,
+  signal?: AbortSignal,
 ): Promise<AssetAnalysis | null> => {
   if (asset.kind === "image") {
     const frame = await samplePhoto(asset);
@@ -71,7 +72,8 @@ export const analyzeAsset = async (
   }
 
   // video
-  const sampled = await sampleVideo(asset, (p) => onProgress?.(p * 0.7));
+  const sampled = await sampleVideo(asset, (p) => onProgress?.(p * 0.7), signal);
+  if (signal?.aborted) return null;
   if (!sampled) return null;
   const lumas = sampled.frames.map((f) => toLuma(f.image));
   const smiles = await scoreSmiles(sampled.frames.map((f) => f.image));

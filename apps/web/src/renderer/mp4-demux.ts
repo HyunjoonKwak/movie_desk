@@ -15,7 +15,13 @@ export interface Mp4Sample {
   readonly data?: Uint8Array;
 }
 
+interface Mp4Edit {
+  readonly segment_duration: number;
+  readonly media_time: number;
+}
+
 interface Mp4TrackInfo {
+  readonly edits?: readonly Mp4Edit[];
   readonly id: number;
   readonly type?: string;
   readonly codec: string;
@@ -160,6 +166,31 @@ const decoderDescription = (file: Mp4File, trackId: number): Uint8Array | undefi
   } catch {
     return undefined;
   }
+};
+
+// Media time (ms) at which presentation starts. Encoders with B-frames write
+// an edit list that skips the initial reorder delay; sample `cts` values are
+// raw media time, so timestamps handed out to callers subtract this.
+export const presentationOffsetMs = (opened: OpenedMp4): number => {
+  const track = opened.videoTrack;
+  const edit = track?.edits?.find((entry) => entry.media_time >= 0);
+  if (!track || !edit || track.timescale <= 0) return 0;
+  return (edit.media_time * 1000) / track.timescale;
+};
+
+// Presentation times (ms) of the video track's sync samples, from the sample
+// table mp4box builds while parsing moov. Empty when unknown.
+export const syncSampleTimesMs = (opened: OpenedMp4): number[] => {
+  const track = opened.videoTrack;
+  if (!track) return [];
+  const trak = opened.file.getTrackById(track.id) as {
+    samples?: readonly { is_sync?: boolean; cts: number; timescale: number }[];
+  };
+  const offsetMs = presentationOffsetMs(opened);
+  const samples = trak.samples ?? [];
+  return samples
+    .filter((sample) => sample.is_sync)
+    .map((sample) => (sample.cts * 1000) / sample.timescale - offsetMs);
 };
 
 export const videoDecoderConfig = (opened: OpenedMp4): VideoDecoderConfig | null => {
