@@ -42,7 +42,7 @@ export interface AssetAnalysis {
   readonly aesthetic?: number; // P5: LAION head score normalised [0..1]
 }
 
-export type AnalysisStatus = "pending" | "running" | "done" | "failed";
+type AnalysisStatus = "pending" | "running" | "done" | "failed";
 
 export interface AnalysisEntry {
   readonly status: AnalysisStatus;

@@ -62,7 +62,7 @@ export const installFakeWebCodecs = (emitOn: "decode" | "flush"): FakeFrame[] =>
   return frames;
 };
 
-export const fakePacketReader = (packets: readonly DemuxPacket[]): PacketReader => ({
+const fakePacketReader = (packets: readonly DemuxPacket[]): PacketReader => ({
   keyPacketAt: async (timestampUs) => {
     let found: DemuxPacket | null = null;
     for (const packet of packets) {

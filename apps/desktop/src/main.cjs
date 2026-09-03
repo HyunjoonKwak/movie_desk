@@ -14,6 +14,7 @@ const { createDesktopImageImporter, isHeicMime } = require("./image-import.cjs")
 const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
 const { VolumeRootResolver } = require("./volume-root-resolver.cjs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
+const { adoptLegacyUserData } = require("./user-data.cjs");
 
 const isDev = !!process.env.MOVIE_DESK_DEV_URL;
 const DEV_URL = process.env.MOVIE_DESK_DEV_URL ?? "http://localhost:3000/editor";
@@ -21,6 +22,9 @@ const DEV_URL = process.env.MOVIE_DESK_DEV_URL ?? "http://localhost:3000/editor"
 // Proper product name for the application menu / dock (package.json's
 // lowercase `name` would otherwise leak into the UI).
 app.setName("Movie Desk");
+// Existing users have their projects under the pre-rename folder; keep
+// using it until the new one has data of its own (see user-data.cjs).
+adoptLegacyUserData(app, fs, path);
 // In a packaged build the web export lives at <Resources>/web (see
 // electron-builder.yml `extraResources`). Unpackaged runs read from the
 // repo's apps/web/out directory.

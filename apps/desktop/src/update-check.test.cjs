@@ -13,6 +13,16 @@ describe("compareVersions", () => {
     assert.equal(compareVersions("v0.2.2", "0.2.2"), 0);
     assert.ok(compareVersions("0.3.0-beta", "0.2.9") > 0);
   });
+  it("ranks a release candidate below the stable it precedes", () => {
+    assert.ok(compareVersions("0.4.0", "0.4.0-rc.1") > 0);
+    assert.ok(compareVersions("0.4.0-rc.1", "0.4.0") < 0);
+    assert.ok(compareVersions("0.4.0-rc.2", "0.4.0-rc.1") > 0);
+    assert.ok(compareVersions("0.4.0-rc.10", "0.4.0-rc.2") > 0);
+    assert.ok(compareVersions("0.4.0-rc.1", "0.4.0-rc") > 0);
+    assert.ok(compareVersions("0.4.0-beta.1", "0.4.0-rc.1") < 0);
+    assert.equal(compareVersions("v0.4.0-rc.1", "0.4.0-rc.1"), 0);
+    assert.ok(compareVersions("0.4.1-rc.1", "0.4.0") > 0);
+  });
 });
 
 describe("pickDmgAsset", () => {
@@ -52,8 +62,20 @@ describe("evaluateRelease", () => {
     assert.equal(r.notes, "notes");
   });
   it("reports current when already on the latest (or newer)", () => {
-    assert.equal(evaluateRelease({ currentVersion: "0.2.3", release, arch: "arm64" }).status, "current");
-    assert.equal(evaluateRelease({ currentVersion: "0.3.0", release, arch: "arm64" }).status, "current");
+    assert.equal(
+      evaluateRelease({ currentVersion: "0.2.3", release, arch: "arm64" }).status,
+      "current",
+    );
+    assert.equal(
+      evaluateRelease({ currentVersion: "0.3.0", release, arch: "arm64" }).status,
+      "current",
+    );
+  });
+  it("offers the stable release to a release-candidate install", () => {
+    const stable = { ...release, tag_name: "v0.2.3" };
+    const r = evaluateRelease({ currentVersion: "0.2.3-rc.1", release: stable, arch: "arm64" });
+    assert.equal(r.status, "update");
+    assert.equal(r.latestVersion, "0.2.3");
   });
   it("falls back to the release page when assets are missing", () => {
     const bare = { tag_name: "v9.9.9", html_url: "page" };
@@ -62,6 +84,9 @@ describe("evaluateRelease", () => {
     assert.equal(r.downloadUrl, "page");
   });
   it("errors on a malformed payload", () => {
-    assert.equal(evaluateRelease({ currentVersion: "0.2.2", release: {}, arch: "arm64" }).status, "error");
+    assert.equal(
+      evaluateRelease({ currentVersion: "0.2.2", release: {}, arch: "arm64" }).status,
+      "error",
+    );
   });
 });

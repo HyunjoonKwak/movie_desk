@@ -5,7 +5,7 @@ import type { ChapterBreak } from "./assembler";
 
 // Place-event clustering — 설계: 시간 간격 > 90분 또는 이동 거리 > 1km에서 분할.
 
-export interface PlaceEvent {
+interface PlaceEvent {
   readonly label: string; // "강릉" | "Day 2" | coord fallback
   readonly dayIndex: number; // 0-based trip day
   readonly startAt: number; // epoch ms

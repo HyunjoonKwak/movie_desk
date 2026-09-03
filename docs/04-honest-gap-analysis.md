@@ -53,7 +53,7 @@ Legend: ✅ shipped • 🟡 partial / needs work • ❌ missing
 | Capability | Status | Notes |
 | -- | :--: | -- |
 | WebGL2 compositor | ✅ | ~550 lines, ping-pong FBO, 22 shaders |
-| WebCodecs VideoDecoder for playback | ✅ | `mp4-decoder.ts` + mp4box demux |
+| WebCodecs VideoDecoder for playback | ✅ | `mp4-decoder.ts` + mediabunny demux (`mp4-demux.ts`) |
 | LRU VideoFrame cache | ✅ | `video-frame-cache.ts` (tested) |
 | WebGPU | ❌ | Future; WebGL2 is fine for now |
 | Texture pool / explicit GPU memory cap | ✅ | Bounded LRU caches with deterministic disposal |

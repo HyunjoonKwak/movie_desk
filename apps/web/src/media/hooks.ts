@@ -12,7 +12,7 @@ import { createMediaImportFailure } from "./import-errors";
 import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
 import { type MediaImportCandidate, toMediaImportCandidate } from "./folder-import";
 
-export type MediaImportInput = FileList | readonly File[] | readonly MediaImportCandidate[];
+type MediaImportInput = FileList | readonly File[] | readonly MediaImportCandidate[];
 
 export interface ImportState {
   importing: boolean;

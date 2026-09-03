@@ -1,6 +1,6 @@
 export const FACE_LANDMARKER_MODEL_PATH = "/mediapipe/models/face_landmarker.task";
 export const WHISPER_MODEL = "Xenova/whisper-base";
-export const WHISPER_RUNTIME_ROOT = "/whisper/ort";
+const WHISPER_RUNTIME_ROOT = "/whisper/ort";
 export type WhisperLanguage = "korean" | "english";
 
 export const whisperWasmPaths = (): { readonly mjs: string; readonly wasm: string } => {

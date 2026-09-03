@@ -9,7 +9,7 @@ import type { MusicRef } from "./types";
 // OPFS keys are FLAT file names: "/" is illegal in getFileHandle, hence
 // the "__" separator (same convention as media import's `${id}__${name}`).
 
-export const MUSIC_STORE_PREFIX = "music-store__";
+const MUSIC_STORE_PREFIX = "music-store__";
 
 export const musicStoreKey = (hash: string): string => `${MUSIC_STORE_PREFIX}${hash}`;
 

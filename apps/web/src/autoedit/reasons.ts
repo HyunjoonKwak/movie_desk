@@ -27,7 +27,7 @@ const MESSAGE_KEY: Record<CutReasonCode, MessageKey> = {
   "target-filled": "auto.cutReason.target-filled",
 };
 
-export const formatCutReason = (reason: CutReason, t: Translate): string => {
+const formatCutReason = (reason: CutReason, t: Translate): string => {
   if (reason.code === "interest") {
     return t(MESSAGE_KEY[reason.code], { score: Math.round(reason.score ?? 0) });
   }

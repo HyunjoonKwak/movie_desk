@@ -93,7 +93,7 @@ const readWindow = async (blob: Blob, start: number, end: number): Promise<Uint8
   new Uint8Array(await blob.slice(start, Math.min(end, blob.size)).arrayBuffer());
 
 // Videos: scan head+tail windows for mvhd creation time and ISO6709 GPS.
-export const extractVideoMeta = async (blob: Blob, fallbackMs?: number): Promise<CaptureMeta> => {
+const extractVideoMeta = async (blob: Blob, fallbackMs?: number): Promise<CaptureMeta> => {
   try {
     const head = await readWindow(blob, 0, SCAN_BYTES);
     const tail =
@@ -111,7 +111,7 @@ export const extractVideoMeta = async (blob: Blob, fallbackMs?: number): Promise
 };
 
 // Photos: EXIF DateTimeOriginal + GPS via exifr.
-export const extractPhotoMeta = async (blob: Blob, fallbackMs?: number): Promise<CaptureMeta> => {
+const extractPhotoMeta = async (blob: Blob, fallbackMs?: number): Promise<CaptureMeta> => {
   try {
     const data = (await exifr.parse(blob, {
       pick: ["DateTimeOriginal", "CreateDate", "latitude", "longitude"],

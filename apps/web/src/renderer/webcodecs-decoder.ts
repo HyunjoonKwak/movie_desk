@@ -18,7 +18,7 @@ const FRAME_TOLERANCE_US = 100_000; // 100ms
 // state alive. Scrubbing through a large library must not accumulate them,
 // so only the most recently used handles stay open; an evicted asset is
 // simply prepared again the next time a clip of it is rendered.
-export const MAX_DECODER_HANDLES = 8;
+const MAX_DECODER_HANDLES = 8;
 
 export interface FrameProvider {
   framesFor(assetId: string, atMs: number): VideoFrame | null;
