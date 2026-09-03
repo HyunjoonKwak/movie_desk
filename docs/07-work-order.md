@@ -59,6 +59,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B23. mediabunny는 MPL-2.0(mp4-muxer는 MIT). 파일 단위 카피레프트라 번들에 넣는 것은
+  문제없지만 라이브러리 파일을 수정하면 공개 의무가 생긴다 — 포크 금지 원칙만 지키면 된다. AAC 프라이밍
+  (약 46ms) 편집 리스트는 mp4-muxer 때와 같이 보존하지 않는다(오디오 variant가 원본보다 그만큼 길어짐,
+  기존 동작 동일). 다음 후보: mp4box 읽기도 mediabunny `Input`으로 통일(mp4-demux·container-info·remux 3곳).
 - 2026-09-03 Claude: B22. 내보내기 e2e를 쓰다가 dev 서버에서 내보내기가 항상 멈추는 결함을 찾았다(위 표).
   turbopack은 `typeof window`를 브라우저 타깃 상수로 접으므로 worker/메인 분기 가드에 쓰면 안 된다
   (컴파일 청크에 `//TURBOPACK unreachable`로 남는다). 2026-09-03 Codex가 프로덕션 webpack 빌드를
@@ -287,7 +291,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
 | B22 회귀 자동화 | Claude + Codex | 구현·검토 완료, main 통합 | `claude/b22-regression` · e2e `export.spec.ts`: VP9 프리셋 내보내기 → 다운로드 MP4 크기·성공 토스트, 렌더 중 취소 → 취소 토스트·다이얼로그 재사용, 스냅샷 저장 → 변경 → 복원. 작성 중 잡은 결함: (1) 오디오 mixer worker가 dev(turbopack)에서 영원히 무응답 → 내보내기가 "렌더링 99%"에서 멈추고 취소도 불가. 원인은 worker 진입 가드 `typeof window === "undefined"`를 turbopack이 상수로 접어 블록을 제거한 것. `WorkerGlobalScope` 검사로 교체, 5초 무응답 시 inline 폴백 + abort 연결. (2) 렌더 루프에 encoder 역압이 없어 1080p 프레임 수백 장이 큐에 쌓임 → `encodeQueueSize ≤ 8` 대기. (3) AAC는 `AudioEncoder` 존재만 보고 지원 여부를 안 물어 코덱 없는 Chromium에서 실패 → `isConfigSupported`. (4) 취소가 "내보내기 실패"로 표시 → `export.cancelled` 토스트. 단위 4개 추가. dev·프로덕션 Chromium e2e 통과 |
-| B23 muxer 교체 | Claude | 대기 | |
+| B23 muxer 교체 | Claude | 구현 완료, Codex 검토 대기 | `claude/b23-muxer` · 폐기된 `mp4-muxer`(레지스트리 deprecated, 후속 Mediabunny 지정)를 `mediabunny` 1.55.5(MPL-2.0, ESM·tree-shake)로 교체. `media/mux/mp4-writer.ts`가 4개 호출부(exporter, 오디오 variant remux, 프록시, 지도 전환)에 같은 표면(`addVideoChunk`/`addAudioChunk(Raw)`/`finalize`)을 제공, 트랙별 첫 패킷 0 재정렬(구 `firstTimestampBehavior: offset`)·fast start 유지. 동일성: 단위 라운드트립(fixture 패킷 수·타입·시작 0·구간 길이·moov<mdat), Chrome 내보내기 ffprobe 비교(VP9 300f + AAC 472f, 10.069s 동일). 주의: `finalize()`가 async가 됨. 지도 전환(Codex 파일)은 3줄 기계적 교체 |
 | B24 체크리스트 | Claude 자동화 · 사용자 완주 | 대기 | |
 | B25 v0.4.0 | 사용자 | 대기 | |
 | A1-a MediaSource 계약 | Claude | 완료, main 통합 | core 타입·fingerprint·cacheKey, zod 스키마(safe relativePath), OPFS adapter, resolver, 디코더 ByteSource(clampReadRange), 컴포지터 연결. Codex 검토 반영(77917f5). CI Node 22 |

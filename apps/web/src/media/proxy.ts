@@ -47,17 +47,14 @@ export const generateProxy = async (
     const durationSec = video.duration || asset.durationMs / 1000;
     const totalFrames = Math.max(1, Math.floor(durationSec * fps));
 
-    const { Muxer, ArrayBufferTarget } = await import("mp4-muxer");
+    const { Mp4Writer } = await import("@/media/mux/mp4-writer");
     const canvas = document.createElement("canvas");
     canvas.width = pw;
     canvas.height = ph;
     const ctx = canvas.getContext("2d")!;
 
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
+    const muxer = new Mp4Writer({
       video: { codec: "avc", width: pw, height: ph, frameRate: fps },
-      fastStart: "in-memory",
-      firstTimestampBehavior: "offset",
     });
     let encoderError: Error | null = null;
     encoder = new VideoEncoder({
@@ -100,10 +97,10 @@ export const generateProxy = async (
     }
     await encoder.flush();
     if (encoderError) throw encoderError;
-    muxer.finalize();
+    const buffer = await muxer.finalize();
     onProgress?.(1);
 
-    const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
+    const blob = new Blob([buffer], { type: "video/mp4" });
     const proxyPath = `${newId()}__proxy.mp4`;
     const releaseLease = leaseMediaKey(proxyPath);
     try {

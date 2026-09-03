@@ -1,4 +1,4 @@
-import { ArrayBufferTarget, Muxer } from "mp4-muxer";
+import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { newId, type MediaAsset } from "@movie-desk/core";
 import { writeMediaFile } from "@/persistence/opfs";
 import { leaseMediaKey } from "@/persistence/media-gc";
@@ -141,11 +141,8 @@ export const generateMapTransitionAsset = async (move: TravelMove): Promise<Medi
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    const muxer = new Muxer({
-      target: new ArrayBufferTarget(),
+    const muxer = new Mp4Writer({
       video: { codec: "avc", width: W, height: H, frameRate: FPS },
-      fastStart: "in-memory",
-      firstTimestampBehavior: "offset",
     });
     const encoder = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
@@ -171,9 +168,9 @@ export const generateMapTransitionAsset = async (move: TravelMove): Promise<Medi
     }
     await encoder.flush();
     encoder.close();
-    muxer.finalize();
+    const buffer = await muxer.finalize();
 
-    const blob = new Blob([muxer.target.buffer], { type: "video/mp4" });
+    const blob = new Blob([buffer], { type: "video/mp4" });
     const id = newId();
     const name = `map-${(move.label.split(" · ")[0] ?? "route").replace(/\s+/g, "")}.mp4`;
     const opfsPath = `${id}__${name}`;

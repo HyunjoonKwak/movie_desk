@@ -1,6 +1,6 @@
+import { Mp4Writer } from "@/media/mux/mp4-writer";
 import type { ByteSource } from "@/renderer/mp4-decoder";
 import { quietMp4BoxLogs } from "@/renderer/mp4box-log";
-import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 // Pulls the AAC track out of an MP4/MOV and writes it back as an audio-only
 // MP4 without touching the codec data. The result is what playback, waveform
@@ -120,9 +120,7 @@ const readMetadata = async (
 export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio | null> => {
   if (source.size === 0) return null;
   const MP4Box = await import("mp4box");
-  quietMp4BoxLogs(
-    (MP4Box as unknown as { Log: Parameters<typeof quietMp4BoxLogs>[0] }).Log,
-  );
+  quietMp4BoxLogs((MP4Box as unknown as { Log: Parameters<typeof quietMp4BoxLogs>[0] }).Log);
   const file = (MP4Box as unknown as { createFile: (keepMdat?: boolean) => Mp4File }).createFile(
     false,
   );
@@ -140,11 +138,8 @@ export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio 
 
   const sampleRate = track.audio.sample_rate;
   const channelCount = track.audio.channel_count;
-  const muxer = new Muxer({
-    target: new ArrayBufferTarget(),
+  const muxer = new Mp4Writer({
     audio: { codec: "aac", numberOfChannels: channelCount, sampleRate },
-    fastStart: "in-memory",
-    firstTimestampBehavior: "offset",
   });
 
   let sampleCount = 0;
@@ -195,8 +190,7 @@ export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio 
   }
   if (failed || sampleCount === 0) return null;
 
-  muxer.finalize();
-  const buffer = (muxer.target as ArrayBufferTarget).buffer;
+  const buffer = await muxer.finalize();
   return {
     blob: new Blob([buffer], { type: "audio/mp4" }),
     codec: track.codec,

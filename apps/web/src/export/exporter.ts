@@ -1,7 +1,7 @@
+import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
 import { useRangeStore } from "@/stores/range-store";
 import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
-import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
@@ -104,8 +104,7 @@ export class WebCodecsExporter implements Exporter {
         preset.audioCodec === "aac" &&
         (await aacEncoderSupported(preset.audioBitrateKbps));
 
-      const muxer = new Muxer({
-        target: new ArrayBufferTarget(),
+      const muxer = new Mp4Writer({
         video: {
           codec: codecForMuxer(preset.videoCodec),
           width: preset.width,
@@ -115,8 +114,6 @@ export class WebCodecsExporter implements Exporter {
         ...(includeAudio
           ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: 48_000 } }
           : {}),
-        fastStart: "in-memory",
-        firstTimestampBehavior: "offset",
       });
 
       encoder = new VideoEncoder({
@@ -259,9 +256,8 @@ export class WebCodecsExporter implements Exporter {
       if (this.cancelled) throw new ExportCancelledError();
       onProgress({ stage: "muxing", progress: 0.95 });
       await encoder.flush();
-      muxer.finalize();
+      const buffer = await muxer.finalize();
 
-      const { buffer } = muxer.target;
       onProgress({ stage: "finalizing", progress: 1 });
 
       const name = sanitizeName(project.name) || "export";
