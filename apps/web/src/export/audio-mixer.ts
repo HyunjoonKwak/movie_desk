@@ -369,13 +369,16 @@ export class ProjectAudioMixer {
         }
       }
 
-      const combined = await runCombineWorker({
-        voiceChannels,
-        musicChannels,
-        sampleRate: this.sampleRate,
-        initialDuckGain: duckGain,
-        ...(this.ducking ? { ducking: this.ducking } : {}),
-      });
+      const combined = await runCombineWorker(
+        {
+          voiceChannels,
+          musicChannels,
+          sampleRate: this.sampleRate,
+          initialDuckGain: duckGain,
+          ...(this.ducking ? { ducking: this.ducking } : {}),
+        },
+        options.signal,
+      );
       duckGain = combined.finalDuckGain;
       throwIfAborted(options.signal);
       yield {
@@ -423,33 +426,65 @@ export class ProjectAudioMixer {
 // Cached worker — created once on first export and reused across runs.
 let mixerWorker: Worker | null = null;
 let mixerRequestId = 0;
+// A worker that never answers (bundler bootstrap that cannot run, blocked
+// blob: URL, crashed thread) would otherwise hang the export forever. After
+// one silent timeout the mixer runs the combine inline for the rest of the
+// session. Combining a chunk is well under a millisecond of work.
+const WORKER_REPLY_TIMEOUT_MS = 5_000;
+let workerBroken = false;
+
 const getWorker = (): Worker | null => {
-  if (typeof Worker === "undefined") return null;
+  if (typeof Worker === "undefined" || workerBroken) return null;
   if (mixerWorker) return mixerWorker;
   try {
-    mixerWorker = new Worker(new URL("./audio-mixer-worker.ts", import.meta.url), {
-      type: "module",
-    });
+    // A classic worker: the dev bundler's worker bootstrap uses importScripts,
+    // which a module worker does not have, and the production bundler handles
+    // both kinds.
+    mixerWorker = new Worker(new URL("./audio-mixer-worker.ts", import.meta.url));
     return mixerWorker;
   } catch {
     return null;
   }
 };
 
-const runCombineWorker = async (req: {
+const abandonWorker = (): void => {
+  workerBroken = true;
+  mixerWorker?.terminate();
+  mixerWorker = null;
+};
+
+interface CombineRequest {
   voiceChannels: StereoChannels;
   musicChannels: StereoChannels;
   sampleRate: number;
   initialDuckGain?: number;
   ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
-}): Promise<{ channels: StereoChannels; finalDuckGain: number }> => {
+}
+
+const runCombineWorker = async (
+  req: CombineRequest,
+  signal?: AbortSignal,
+): Promise<{ channels: StereoChannels; finalDuckGain: number }> => {
   const w = getWorker();
   if (!w) {
-    // Tests / SSR / browsers without Worker — run inline.
+    // Tests / SSR / browsers without Worker / a worker given up on — run inline.
     return combineInlineStateful(req);
   }
+  // The buffers are transferred to the worker; keep copies so a timeout can
+  // still be served inline.
+  const retained: CombineRequest = {
+    ...req,
+    voiceChannels: [req.voiceChannels[0].slice(), req.voiceChannels[1].slice()],
+    musicChannels: [req.musicChannels[0].slice(), req.musicChannels[1].slice()],
+  };
   return new Promise<{ channels: StereoChannels; finalDuckGain: number }>((resolve, reject) => {
     const requestId = ++mixerRequestId;
+    const cleanup = () => {
+      clearTimeout(timer);
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
+      signal?.removeEventListener("abort", onAbort);
+    };
     const onMessage = (
       e: MessageEvent<{
         requestId?: number;
@@ -458,15 +493,25 @@ const runCombineWorker = async (req: {
       }>,
     ) => {
       if (e.data.requestId !== requestId) return;
-      w.removeEventListener("message", onMessage);
-      w.removeEventListener("error", onError);
+      cleanup();
       resolve({ channels: e.data.channels, finalDuckGain: e.data.finalDuckGain });
     };
     const onError = (err: ErrorEvent) => {
-      w.removeEventListener("message", onMessage);
-      w.removeEventListener("error", onError);
-      reject(err.error ?? new Error(err.message));
+      cleanup();
+      abandonWorker();
+      resolve(combineInlineStateful(retained));
+      void err;
     };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("Audio mixing cancelled", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      abandonWorker();
+      resolve(combineInlineStateful(retained));
+    }, WORKER_REPLY_TIMEOUT_MS);
+    signal?.addEventListener("abort", onAbort, { once: true });
     w.addEventListener("message", onMessage);
     w.addEventListener("error", onError);
     w.postMessage({ ...req, requestId }, [

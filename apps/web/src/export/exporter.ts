@@ -14,6 +14,48 @@ const isWebCodecsSupported = (): boolean =>
 // Renders project frames offscreen via the existing Compositor, encodes each
 // frame with WebCodecs VideoEncoder, mixes audio across all unmuted clips,
 // and muxes both into an MP4 (H.264 + AAC) or WebM.
+// Thrown when the user cancels; the dialog reports it as a cancel, not a failure.
+export class ExportCancelledError extends Error {
+  constructor(options?: ErrorOptions) {
+    super("Export cancelled", options);
+    this.name = "ExportCancelledError";
+  }
+}
+
+// AudioEncoder existing doesn't mean it can do AAC: Chromium builds without
+// platform or proprietary codecs expose the API but reject mp4a.40.2. Ask
+// first, so such builds still get a video-only file instead of a failed export.
+export const aacEncoderSupported = async (bitrateKbps: number): Promise<boolean> => {
+  if (typeof AudioEncoder === "undefined") return false;
+  try {
+    const support = await AudioEncoder.isConfigSupported({
+      codec: "mp4a.40.2",
+      sampleRate: 48_000,
+      numberOfChannels: 2,
+      bitrate: bitrateKbps * 1000,
+    });
+    return support.supported === true;
+  } catch {
+    return false;
+  }
+};
+
+const MAX_ENCODE_QUEUE = 8;
+
+const waitForEncoderQueue = async (encoder: VideoEncoder, limit: number): Promise<void> => {
+  while (encoder.encodeQueueSize > limit && encoder.state === "configured") {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(done, 50);
+      function done() {
+        clearTimeout(timer);
+        encoder.removeEventListener("dequeue", done);
+        resolve();
+      }
+      encoder.addEventListener("dequeue", done, { once: true });
+    });
+  }
+};
+
 export class WebCodecsExporter implements Exporter {
   private cancelled = false;
   private abortController: AbortController | null = null;
@@ -55,12 +97,12 @@ export class WebCodecsExporter implements Exporter {
       compositor.setPlayheadGetter(() => virtualPlayheadMs);
 
       // Include audio only when the preset wants AAC AND the browser can encode
-      // it. A browser without AudioEncoder (e.g. older Safari) degrades to a
-      // video-only export instead of failing the whole render.
+      // it. A browser without an AAC encoder (older Safari, codec-less
+      // Chromium) degrades to a video-only export instead of failing the render.
       const includeAudio =
         preset.container === "mp4" &&
         preset.audioCodec === "aac" &&
-        typeof AudioEncoder !== "undefined";
+        (await aacEncoderSupported(preset.audioBitrateKbps));
 
       const muxer = new Muxer({
         target: new ArrayBufferTarget(),
@@ -97,7 +139,7 @@ export class WebCodecsExporter implements Exporter {
 
       for (let f = 0; f < totalFrames; f++) {
         if (this.cancelled) {
-          throw new Error("Export cancelled");
+          throw new ExportCancelledError();
         }
         virtualPlayheadMs = rangeStart + framesToMs(f, preset.fps);
         // renderFrame keys off project.timeline.playhead for visibility, keyframes
@@ -116,6 +158,10 @@ export class WebCodecsExporter implements Exporter {
         } finally {
           frame.close();
         }
+        // Rendering outruns a software encoder many times over; without this
+        // every pending 1080p frame sits in memory and "rendering 99%" hides
+        // the real progress. Let the queue drain before decoding more.
+        await waitForEncoderQueue(encoder, MAX_ENCODE_QUEUE);
         if (f % 5 === 0) {
           const elapsedSec = (performance.now() - renderStartedAt) / 1000;
           const realisedFps = f / Math.max(0.01, elapsedSec);
@@ -172,7 +218,7 @@ export class WebCodecsExporter implements Exporter {
             for await (const chunk of mixer.chunks(mixOptions)) {
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
               for (let i = 0; i < totalSamples; i += encoderChunkSize) {
-                if (this.cancelled) throw new Error("Export cancelled");
+                if (this.cancelled) throw new ExportCancelledError();
                 const numberOfFrames = Math.min(encoderChunkSize, totalSamples - i);
                 const planar = packStereoPlanar(chunk.channels, i, numberOfFrames);
                 if (masterGain !== 1) {
@@ -201,7 +247,7 @@ export class WebCodecsExporter implements Exporter {
           }
         } catch (err) {
           if (this.cancelled || abortController.signal.aborted) {
-            throw new Error("Export cancelled", { cause: err });
+            throw new ExportCancelledError({ cause: err });
           }
           const message = err instanceof Error ? err.message : String(err);
           throw new Error(`Audio export failed: ${message}`, { cause: err });
@@ -210,7 +256,7 @@ export class WebCodecsExporter implements Exporter {
         }
       }
 
-      if (this.cancelled) throw new Error("Export cancelled");
+      if (this.cancelled) throw new ExportCancelledError();
       onProgress({ stage: "muxing", progress: 0.95 });
       await encoder.flush();
       muxer.finalize();
@@ -233,7 +279,9 @@ export class WebCodecsExporter implements Exporter {
 
   private async resolveProject(_projectId: string): Promise<{
     project: Project;
-    getAsset: (id: import("@movie-desk/core").ID) => import("@movie-desk/core").MediaAsset | undefined;
+    getAsset: (
+      id: import("@movie-desk/core").ID,
+    ) => import("@movie-desk/core").MediaAsset | undefined;
   }> {
     const { useProjectStore } = await import("@/stores/project-store");
     const project = useProjectStore.getState().project;

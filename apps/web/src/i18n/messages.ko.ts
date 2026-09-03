@@ -641,4 +641,5 @@ export const ko = {
     "music.importCors": "제공처가 직접 다운로드를 허용하지 않습니다 — 출처 페이지에서 받아 가져오세요",
     "music.restoreBed": "가져와서 깔기",
     "music.restoreMissing": "보관소에 파일이 없습니다 — 음원을 다시 연결하세요",
+    "export.cancelled": "내보내기를 취소했습니다",
 } as const;

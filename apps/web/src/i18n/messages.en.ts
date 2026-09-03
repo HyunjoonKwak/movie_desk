@@ -642,4 +642,5 @@ export const en = {
     "music.importCors": "The provider does not allow direct downloads — get it from the source page",
     "music.restoreBed": "Import & lay",
     "music.restoreMissing": "File missing from the store — relink the audio",
+    "export.cancelled": "Export cancelled",
 } as const;

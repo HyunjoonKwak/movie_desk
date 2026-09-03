@@ -9,7 +9,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
-import { WebCodecsExporter, downloadBlob } from "./exporter";
+import { ExportCancelledError, WebCodecsExporter, downloadBlob } from "./exporter";
 import { LoudnessMeter, type LoudnessResult } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
 import { PRESETS } from "./presets";
@@ -78,8 +78,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
       }
       onOpenChange(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      toast.error(t("export.failed", { msg }));
+      if (err instanceof ExportCancelledError) {
+        toast.info(t("export.cancelled"));
+      } else {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        toast.error(t("export.failed", { msg }));
+      }
     } finally {
       setRunning(false);
       setProgress(null);

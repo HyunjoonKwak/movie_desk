@@ -32,10 +32,7 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
     const threshold = 10 ** (ducking.thresholdDb / 20);
     let gain = finalDuckGain;
     for (let i = 0; i < totalSamples; i++) {
-      const voiceLevel = Math.max(
-        Math.abs(voiceChannels[0][i]!),
-        Math.abs(voiceChannels[1][i]!),
-      );
+      const voiceLevel = Math.max(Math.abs(voiceChannels[0][i]!), Math.abs(voiceChannels[1][i]!));
       const target = voiceLevel > threshold ? duckGain : 1;
       gain += (target - gain) * 0.002;
       accum[0][i] = voiceChannels[0][i]! + musicChannels[0][i]! * gain;
@@ -70,8 +67,14 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
 // true on the main thread (window), where importing this module for
 // combineInlineStateful used to hijack window.onmessage — every unrelated
 // window message (e.g. a postMessage from another window) then crashed into
-// combine(). `typeof window === "undefined"` is only true off the main thread.
-if (typeof self !== "undefined" && typeof window === "undefined" && "onmessage" in self) {
+// combine(). Don't test `typeof window` here: the dev bundler folds it to a
+// constant for browser targets and drops this whole block as unreachable,
+// leaving a worker that never answers. `WorkerGlobalScope` only exists off
+// the main thread and is not folded.
+const workerScope = (globalThis as { WorkerGlobalScope?: unknown }).WorkerGlobalScope;
+const inWorker =
+  typeof workerScope === "function" && self instanceof (workerScope as new () => object);
+if (inWorker && "onmessage" in self) {
   (self as unknown as Worker).onmessage = (e: MessageEvent<MixerWorkerRequest>) => {
     const result = combine(e.data);
     (self as unknown as Worker).postMessage(
