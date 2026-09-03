@@ -131,7 +131,6 @@ export class Compositor {
       }
     }
     this.textTextures.retain(graphicClipIds);
-    for (const id of this.decodePrepared) if (!assetIds.has(id)) this.decodePrepared.delete(id);
     this.decodeRetry.retain(assetIds);
     getFrameProvider().retain(
       new Set(
@@ -508,7 +507,6 @@ export class Compositor {
     return current;
   }
 
-  private readonly decodePrepared = new Set<string>();
   private readonly decodePreparing = new Set<string>();
   // Missing or unreadable sources retry with a growing delay (1 s → 30 s);
   // a changed asset record (relink, rebuilt proxy) retries at once.
@@ -527,9 +525,10 @@ export class Compositor {
     // upload it instead of seeking the <video>.
     if (asset.kind === "video") {
       const provider = getFrameProvider();
-      // Prepare the decoder once per asset, asynchronously.
+      // Prepare the decoder asynchronously; the provider says whether it
+      // still holds one (it evicts the least recently used handles).
       if (
-        !this.decodePrepared.has(asset.id) &&
+        !provider.has(asset.id) &&
         !this.decodePreparing.has(asset.id) &&
         this.decodeRetry.shouldTry(asset.id, asset)
       ) {
@@ -541,7 +540,6 @@ export class Compositor {
             const source = await resolveMediaSource(asset).catch(() => null);
             if (source && (await provider.prepare(asset.id, source))) {
               if (this.retainedAssetIds.has(asset.id)) {
-                this.decodePrepared.add(asset.id);
                 this.decodeRetry.succeed(asset.id);
               } else {
                 provider.forget(asset.id);
@@ -631,7 +629,6 @@ export class Compositor {
     this.textTextures.clear();
     this.bgMaskTextures.clear();
     this.bgMaskTime.clear();
-    this.decodePrepared.clear();
     this.decodePreparing.clear();
     this.decodeRetry.clear();
     this.retainedAssetIds.clear();

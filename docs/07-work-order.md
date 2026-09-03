@@ -59,6 +59,11 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-04 Claude: 살아 있는 `DecoderHandle` LRU 제한(`claude/decoder-handle-lru`). 프레임 provider가 준비된 자산을
+  최근 사용 순으로 최대 8개만 유지하고 넘치면 가장 오래된 것을 닫는다(각 핸들 = mediabunny Input + 4MiB 읽기 캐시
+  + 디코더). 컴포지터는 자체 `decodePrepared` 집합 대신 `provider.has(assetId)`를 물어 축출된 자산을 다음 렌더에서
+  다시 준비한다. 단위 테스트 3개(축출 순서·재준비·중복 방지), e2e 21 + chrome-hevc 1, Chrome 152 재생·스크럽
+  smoke(H.264 B-프레임 + HEVC .mov, configure/decode/frame 일치, 오류 0).
 - 2026-09-04 Claude: mp4box 읽기를 mediabunny `Input`으로 통일(`claude/mediabunny-demux`). `renderer/mp4-demux.ts`가
   유일한 ISO BMFF 데먹서가 되어 플레이헤드 디코더·선형 디코더·프레임 샘플러·`container-info`·오디오 remux가 모두
   같은 `openMp4` + `PacketReader`(키 패킷 탐색, 디코드 순서 순회, 키 시각 목록)를 쓴다. `mp4box` 의존성과

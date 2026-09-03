@@ -14,9 +14,17 @@ const isWebCodecsAvailable = (): boolean =>
 // instead of showing a far-off cached frame (the cache is a small per-asset LRU).
 const FRAME_TOLERANCE_US = 100_000; // 100ms
 
+// Every prepared asset keeps a demuxer (with its read cache) and decoder
+// state alive. Scrubbing through a large library must not accumulate them,
+// so only the most recently used handles stay open; an evicted asset is
+// simply prepared again the next time a clip of it is rendered.
+export const MAX_DECODER_HANDLES = 8;
+
 export interface FrameProvider {
   framesFor(assetId: string, atMs: number): VideoFrame | null;
   prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean>;
+  // Whether frames can currently be served or are being prepared.
+  has(assetId: string): boolean;
   retain(assetIds: ReadonlySet<string>): void;
   forget(assetId: string): void;
   dispose(): void;
@@ -24,21 +32,45 @@ export interface FrameProvider {
 
 class CachingFrameProvider implements FrameProvider {
   private readonly cache = new VideoFrameCache();
+  // Insertion order doubles as recency: touched handles move to the end.
   private readonly handles = new Map<string, DecoderHandle>();
   private readonly pending = new Map<string, Promise<boolean>>();
   private readonly epochs = new Map<string, number>();
   private readonly unsupported = new Set<string>();
   private disposed = false;
 
+  constructor(private readonly maxHandles = MAX_DECODER_HANDLES) {}
+
   framesFor(assetId: string, atMs: number): VideoFrame | null {
+    const handle = this.touch(assetId);
     const f = this.cache.nearest(assetId, Math.round(atMs * 1000), FRAME_TOLERANCE_US);
-    if (!f) void this.handles.get(assetId)?.request(Math.round(atMs * 1000));
+    if (!f) void handle?.request(Math.round(atMs * 1000));
     return f ? f.frame : null;
+  }
+
+  has(assetId: string): boolean {
+    return this.handles.has(assetId) || this.pending.has(assetId);
+  }
+
+  private touch(assetId: string): DecoderHandle | undefined {
+    const handle = this.handles.get(assetId);
+    if (handle) {
+      this.handles.delete(assetId);
+      this.handles.set(assetId, handle);
+    }
+    return handle;
+  }
+
+  private evictBeyondLimit(): void {
+    for (const assetId of this.handles.keys()) {
+      if (this.handles.size <= this.maxHandles) return;
+      this.forget(assetId);
+    }
   }
 
   async prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean> {
     if (this.disposed || !isWebCodecsAvailable()) return false;
-    if (this.handles.has(assetId)) return true;
+    if (this.touch(assetId)) return true;
     if (this.unsupported.has(assetId)) return false;
     const inflight = this.pending.get(assetId);
     if (inflight) return inflight;
@@ -53,6 +85,7 @@ class CachingFrameProvider implements FrameProvider {
           return false;
         }
         this.handles.set(assetId, handle);
+        this.evictBeyondLimit();
         return true;
       } catch (error) {
         if (error instanceof UnsupportedCodecError) this.unsupported.add(assetId);
@@ -94,3 +127,6 @@ export const getFrameProvider = (): FrameProvider => {
   if (!singleton) singleton = new CachingFrameProvider();
   return singleton;
 };
+
+export const createFrameProviderForTests = (maxHandles: number): FrameProvider =>
+  new CachingFrameProvider(maxHandles);
