@@ -24,10 +24,15 @@ export interface DecodeRun {
   readonly toMs: number;
 }
 
+type FrameVerdict = "continue" | "stop";
+
 export interface LinearDecodeOptions {
   readonly signal?: AbortSignal;
-  // Owns the frame: must close it (or keep it) and say whether the run is done.
-  readonly onFrame: (frame: VideoFrame, runIndex: number) => "continue" | "stop";
+  // Owns the frame: must close it (or keep it) and say whether the run is
+  // done. May answer asynchronously; feeding pauses until pending answers
+  // settle, so a slow consumer throttles the decoder instead of piling up
+  // frames.
+  readonly onFrame: (frame: VideoFrame, runIndex: number) => FrameVerdict | Promise<FrameVerdict>;
 }
 
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -104,15 +109,27 @@ export const decodeRunsInOrder = async (
   let outputsOpen = false;
   let feeding = false;
   let failed = false;
+  // Consumers that answer asynchronously chain here; feeding waits on it.
+  let backlog: Promise<void> = Promise.resolve();
+  const stopRun = () => {
+    outputsOpen = false;
+    feeding = false;
+  };
   const decoder = createDecoder(
     (frame) => {
       if (!outputsOpen) {
         frame.close();
         return;
       }
-      if (options.onFrame(frame, activeRun) === "stop") {
-        outputsOpen = false;
-        feeding = false;
+      const verdict = options.onFrame(frame, activeRun);
+      if (verdict instanceof Promise) {
+        backlog = backlog
+          .then(() => verdict)
+          .then((answer) => {
+            if (answer === "stop") stopRun();
+          });
+      } else if (verdict === "stop") {
+        stopRun();
       }
     },
     () => {
@@ -153,6 +170,7 @@ export const decodeRunsInOrder = async (
         }),
       );
       await waitForQueue(decoder);
+      await backlog;
     }
   };
 
@@ -195,6 +213,7 @@ export const decodeRunsInOrder = async (
     }
     // Emit what the decoder still holds; also resets it for the next keyframe.
     if (!failed) await decoder.flush().catch(() => undefined);
+    await backlog;
     outputsOpen = false;
   };
 

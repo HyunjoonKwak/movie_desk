@@ -21,14 +21,22 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   try {
     await writeMediaFile(opfsPath, file);
 
+    // Container display rotation (iPhone portrait). The <video> probe already
+    // reports rotated dimensions; WebCodecs frames need this to match.
+    let rotation: MediaAsset["rotation"];
+    if (probe.kind === "video") {
+      const container = await readMp4ContainerInfo(file).catch(() => null);
+      if (container && container.rotation !== 0) rotation = container.rotation;
+    }
+
     let thumbDataUrl: string | undefined;
     let filmstripDataUrl: string | undefined;
     let filmstripFrames: number | undefined;
     try {
       if (probe.kind === "image") thumbDataUrl = await makeImageThumb(file);
       else if (probe.kind === "video") {
-        thumbDataUrl = await makeVideoThumb(file);
-        const strip = await makeVideoFilmstrip(file);
+        thumbDataUrl = await makeVideoThumb(file, 0.1, rotation);
+        const strip = await makeVideoFilmstrip(file, 10, rotation);
         if (strip) {
           filmstripDataUrl = strip.dataUrl;
           filmstripFrames = strip.frames;
@@ -45,18 +53,14 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       // Build the audio-track variant now so the waveform, preview and export
       // all decode the small audio-only file instead of the whole original.
       const audio =
-        (await ensureAudioVariant({ opfsPath, sizeBytes: file.size, mime: probe.mime, kind: probe.kind })) ??
-        file;
+        (await ensureAudioVariant({
+          opfsPath,
+          sizeBytes: file.size,
+          mime: probe.mime,
+          kind: probe.kind,
+        })) ?? file;
       const peaks = await extractWaveformPeaks(audio);
       if (peaks) waveformPeaks = peaks;
-    }
-
-    // Container display rotation (iPhone portrait). The <video> probe already
-    // reports rotated dimensions; WebCodecs frames need this to match.
-    let rotation: MediaAsset["rotation"];
-    if (probe.kind === "video") {
-      const container = await readMp4ContainerInfo(file).catch(() => null);
-      if (container && container.rotation !== 0) rotation = container.rotation;
     }
 
     // Capture time + GPS for the auto-edit story engine (EXIF / mvhd / ISO6709).

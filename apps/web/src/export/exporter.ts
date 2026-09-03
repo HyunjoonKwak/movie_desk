@@ -1,3 +1,4 @@
+import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
 import { useRangeStore } from "@/stores/range-store";
@@ -37,22 +38,6 @@ export const aacEncoderSupported = async (bitrateKbps: number): Promise<boolean>
     return support.supported === true;
   } catch {
     return false;
-  }
-};
-
-const MAX_ENCODE_QUEUE = 8;
-
-const waitForEncoderQueue = async (encoder: VideoEncoder, limit: number): Promise<void> => {
-  while (encoder.encodeQueueSize > limit && encoder.state === "configured") {
-    await new Promise<void>((resolve) => {
-      const timer = setTimeout(done, 50);
-      function done() {
-        clearTimeout(timer);
-        encoder.removeEventListener("dequeue", done);
-        resolve();
-      }
-      encoder.addEventListener("dequeue", done, { once: true });
-    });
   }
 };
 
@@ -158,7 +143,7 @@ export class WebCodecsExporter implements Exporter {
         // Rendering outruns a software encoder many times over; without this
         // every pending 1080p frame sits in memory and "rendering 99%" hides
         // the real progress. Let the queue drain before decoding more.
-        await waitForEncoderQueue(encoder, MAX_ENCODE_QUEUE);
+        await waitForEncoderQueue(encoder);
         if (f % 5 === 0) {
           const elapsedSec = (performance.now() - renderStartedAt) / 1000;
           const realisedFps = f / Math.max(0.01, elapsedSec);

@@ -1,13 +1,20 @@
+import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
+import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import { leaseMediaKey } from "@/persistence/media-gc";
-import { acquireMediaUrl, writeMediaFile } from "@/persistence/opfs";
+import { writeMediaFile } from "@/persistence/opfs";
+import { streamFramesAt } from "@/renderer/frame-sampler";
 import { type MediaAsset, newId } from "@movie-desk/core";
 
-// Generate a low-res proxy of a video asset. We re-encode via WebCodecs and
-// the shared MP4 writer at a reduced resolution so the editor can scrub a lighter file.
-// Falls back to null if WebCodecs / decode isn't available. Export always
-// uses the original `opfsPath`, never the proxy.
+// Generate a low-res proxy of a video asset: one decode pass through the
+// shared frame sampler (WebCodecs when the container allows, media-element
+// seeks otherwise), then re-encoded through the shared MP4 writer at a reduced
+// resolution so the editor can scrub a lighter file. The sampler applies the
+// container rotation, so the proxy is stored upright. Falls back to null when
+// WebCodecs encoding or decoding is unavailable. Export always uses the
+// original `opfsPath`, never the proxy.
 
 const PROXY_WIDTH = 640;
+const PROXY_FPS = 24;
 
 const isSupported = () =>
   typeof window !== "undefined" && "VideoEncoder" in window && "VideoDecoder" in window;
@@ -19,102 +26,104 @@ export interface ProxyResult {
   releaseLease: () => void;
 }
 
+const proxySize = (sourceWidth: number, sourceHeight: number) => {
+  const aspect = sourceHeight / sourceWidth || 0.5625;
+  const width = Math.min(PROXY_WIDTH, sourceWidth || PROXY_WIDTH);
+  // Encoders want even dimensions.
+  const height = Math.max(2, Math.round((width * aspect) / 2) * 2);
+  return { width, height };
+};
+
 export const generateProxy = async (
   asset: MediaAsset,
   onProgress?: (pct: number) => void,
 ): Promise<ProxyResult | null> => {
   if (!isSupported() || asset.kind !== "video") return null;
-  const mediaLease = await acquireMediaUrl(asset.opfsPath);
-  if (!mediaLease) return null;
+  const source = await resolveMediaSource(asset).catch(() => null);
+  if (!source) return null;
+  const durationMs = asset.durationMs;
+  if (!(durationMs > 0)) return null;
 
-  const video = document.createElement("video");
+  const { Mp4Writer } = await import("@/media/mux/mp4-writer");
+  const totalFrames = Math.max(1, Math.floor((durationMs / 1000) * PROXY_FPS));
+  const times = Array.from({ length: totalFrames }, (_, f) => (f * 1000) / PROXY_FPS);
+
   let encoder: VideoEncoder | null = null;
+  let muxer: InstanceType<typeof Mp4Writer> | null = null;
+  let encoderError: Error | null = null;
+  let size: { width: number; height: number } | null = null;
+  let encoded = 0;
   try {
-    video.crossOrigin = "anonymous";
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
-    video.src = mediaLease.url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("video load failed"));
-    });
-
-    const aspect = video.videoHeight / video.videoWidth || 0.5625;
-    const pw = Math.min(PROXY_WIDTH, video.videoWidth || PROXY_WIDTH);
-    const ph = Math.round(pw * aspect);
-    const fps = 24;
-    const durationSec = video.duration || asset.durationMs / 1000;
-    const totalFrames = Math.max(1, Math.floor(durationSec * fps));
-
-    const { Mp4Writer } = await import("@/media/mux/mp4-writer");
-    const canvas = document.createElement("canvas");
-    canvas.width = pw;
-    canvas.height = ph;
-    const ctx = canvas.getContext("2d")!;
-
-    const muxer = new Mp4Writer({
-      video: { codec: "avc", width: pw, height: ph, frameRate: fps },
-    });
-    let encoderError: Error | null = null;
-    encoder = new VideoEncoder({
-      output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (error) => {
-        encoderError = error instanceof Error ? error : new Error(String(error));
+    await streamFramesAt(
+      source,
+      times,
+      {
+        size: (w, h) => {
+          size ??= proxySize(w, h);
+          return size;
+        },
+        ...(asset.rotation ? { rotation: asset.rotation } : {}),
+        onProgress: (done, total) => {
+          if (done % 8 === 0) onProgress?.(done / total);
+        },
       },
-    });
-    encoder.configure({
-      codec: "avc1.42001f",
-      width: pw,
-      height: ph,
-      bitrate: 1_500_000,
-      framerate: fps,
-    });
-
-    const seek = (sec: number) =>
-      new Promise<void>((resolve) => {
-        const onSeeked = () => {
-          video.removeEventListener("seeked", onSeeked);
-          resolve();
-        };
-        video.addEventListener("seeked", onSeeked);
-        video.currentTime = sec;
-      });
-
-    for (let f = 0; f < totalFrames; f++) {
-      await seek(f / fps);
-      ctx.drawImage(video, 0, 0, pw, ph);
-      const frame = new VideoFrame(canvas, {
-        timestamp: Math.round((f * 1_000_000) / fps),
-        duration: Math.round(1_000_000 / fps),
-      });
-      try {
-        encoder.encode(frame, { keyFrame: f % 48 === 0 });
-      } finally {
-        frame.close();
-      }
-      if (f % 8 === 0) onProgress?.(f / totalFrames);
-    }
-    await encoder.flush();
+      async ({ image }) => {
+        if (encoderError) throw encoderError;
+        if (!encoder || !muxer) {
+          const dims = size ?? proxySize(image.width, image.height);
+          muxer = new Mp4Writer({
+            video: { codec: "avc", width: dims.width, height: dims.height, frameRate: PROXY_FPS },
+          });
+          const writer = muxer;
+          encoder = new VideoEncoder({
+            output: (chunk, meta) => writer.addVideoChunk(chunk, meta),
+            error: (error) => {
+              encoderError = error instanceof Error ? error : new Error(String(error));
+            },
+          });
+          encoder.configure({
+            codec: "avc1.42001f",
+            width: dims.width,
+            height: dims.height,
+            bitrate: 1_500_000,
+            framerate: PROXY_FPS,
+          });
+        }
+        const frame = new VideoFrame(image.data, {
+          format: "RGBA",
+          codedWidth: image.width,
+          codedHeight: image.height,
+          timestamp: Math.round((encoded * 1_000_000) / PROXY_FPS),
+          duration: Math.round(1_000_000 / PROXY_FPS),
+        });
+        try {
+          encoder.encode(frame, { keyFrame: encoded % 48 === 0 });
+        } finally {
+          frame.close();
+        }
+        encoded += 1;
+        await waitForEncoderQueue(encoder);
+      },
+    );
+    if (!encoder || !muxer || encoded === 0) return null;
+    await (encoder as VideoEncoder).flush();
     if (encoderError) throw encoderError;
-    const buffer = await muxer.finalize();
+    const buffer = await (muxer as InstanceType<typeof Mp4Writer>).finalize();
     onProgress?.(1);
 
+    const dims = size ?? proxySize(PROXY_WIDTH, PROXY_WIDTH * 0.5625);
     const blob = new Blob([buffer], { type: "video/mp4" });
     const proxyPath = `${newId()}__proxy.mp4`;
     const releaseLease = leaseMediaKey(proxyPath);
     try {
       await writeMediaFile(proxyPath, new File([blob], proxyPath, { type: "video/mp4" }));
-      return { proxyPath, proxyWidth: pw, proxyHeight: ph, releaseLease };
+      return { proxyPath, proxyWidth: dims.width, proxyHeight: dims.height, releaseLease };
     } catch (error) {
       releaseLease();
       throw error;
     }
   } finally {
-    if (encoder?.state !== "closed") encoder?.close();
-    video.pause();
-    video.removeAttribute("src");
-    video.load();
-    mediaLease.release();
+    const open = encoder as VideoEncoder | null;
+    if (open && open.state !== "closed") open.close();
   }
 };

@@ -33,9 +33,10 @@ export interface FrameSampleOptions {
 
 export type SampleTimes = readonly number[] | ((durationMs: number) => readonly number[]);
 
-// Receives frames in time order. Copy what you need: the ImageData is the
-// caller's to keep or drop.
-export type SampleSink = (sample: SampledImage) => void;
+// Receives frames in time order; the ImageData is the caller's to keep or
+// drop. Returning a promise holds the decoder back until it settles, which
+// is how an encoder downstream throttles a much faster decoder.
+export type SampleSink = (sample: SampledImage) => void | Promise<void>;
 
 const DEFAULT_GAP_MS = 2500;
 
@@ -195,25 +196,32 @@ const sampleViaWebCodecs = async (
   const total = sortedUnique(timesMs).length;
   const last: { frame: VideoFrame | null } = { frame: null };
 
-  const deliver = (frame: VideoFrame, atMsList: readonly number[]): void => {
+  const deliver = (frame: VideoFrame, atMsList: readonly number[]): Promise<void> | undefined => {
     drawRotated(ctx, frame, rotation, size.width, size.height);
     const image = ctx.getImageData(0, 0, size.width, size.height);
+    const waits: Promise<void>[] = [];
     for (const atMs of atMsList) {
       served.add(atMs);
-      emit({ atMs, image });
+      const wait = emit({ atMs, image });
+      if (wait) waits.push(wait);
     }
     options.onProgress?.(served.size, total);
+    return waits.length > 0 ? Promise.all(waits).then(() => undefined) : undefined;
   };
 
   const keyframes = syncSampleTimesMs(opened);
   const runs = planSampleRuns(timesMs, options.gapMs ?? DEFAULT_GAP_MS, keyframes);
   const pickers = runs.map((run) => createSamplePicker(run));
-  const finishRun = (runIndex: number): void => {
+  const finishRun = (runIndex: number): Promise<void> | undefined => {
     // Requests past the last decoded frame (end of file) get that frame.
     const pending = pickers[runIndex]?.remaining() ?? [];
-    if (pending.length > 0 && last.frame && !options.signal?.aborted) deliver(last.frame, pending);
+    const wait =
+      pending.length > 0 && last.frame && !options.signal?.aborted
+        ? deliver(last.frame, pending)
+        : undefined;
     last.frame?.close();
     last.frame = null;
+    return wait;
   };
   let currentRun = -1;
   await decodeRunsInOrder(
@@ -225,21 +233,32 @@ const sampleViaWebCodecs = async (
     {
       ...(options.signal ? { signal: options.signal } : {}),
       onFrame: (frame, runIndex) => {
+        const waits: Promise<void>[] = [];
         if (runIndex !== currentRun) {
-          if (currentRun >= 0) finishRun(currentRun);
+          if (currentRun >= 0) {
+            const wait = finishRun(currentRun);
+            if (wait) waits.push(wait);
+          }
           currentRun = runIndex;
         }
         const picker = pickers[runIndex] as SamplePicker;
         const picked = picker.take(frame.timestamp);
-        if (picked.byPrevious.length > 0) deliver(last.frame ?? frame, picked.byPrevious);
-        if (picked.byCurrent.length > 0) deliver(frame, picked.byCurrent);
+        if (picked.byPrevious.length > 0) {
+          const wait = deliver(last.frame ?? frame, picked.byPrevious);
+          if (wait) waits.push(wait);
+        }
+        if (picked.byCurrent.length > 0) {
+          const wait = deliver(frame, picked.byCurrent);
+          if (wait) waits.push(wait);
+        }
         last.frame?.close();
         last.frame = frame;
-        return picker.done ? "stop" : "continue";
+        const verdict = (): "stop" | "continue" => (picker.done ? "stop" : "continue");
+        return waits.length > 0 ? Promise.all(waits).then(verdict) : verdict();
       },
     },
   );
-  if (currentRun >= 0) finishRun(currentRun);
+  if (currentRun >= 0) await finishRun(currentRun);
   last.frame?.close();
   return served;
 };
@@ -309,7 +328,7 @@ const sampleViaElement = async (
         if (options.signal?.aborted) break;
         await seekTo(element, atMs / 1000);
         ctx.drawImage(element, 0, 0, size.width, size.height);
-        emit({ atMs, image: ctx.getImageData(0, 0, size.width, size.height) });
+        await emit({ atMs, image: ctx.getImageData(0, 0, size.width, size.height) });
         done += 1;
         options.onProgress?.(done, requested.length);
       }
@@ -352,6 +371,8 @@ export const sampleFramesAt = async (
   options: FrameSampleOptions,
 ): Promise<readonly SampledImage[]> => {
   const out: SampledImage[] = [];
-  await streamFramesAt(input, times, options, (sample) => out.push(sample));
+  await streamFramesAt(input, times, options, (sample) => {
+    out.push(sample);
+  });
   return out;
 };

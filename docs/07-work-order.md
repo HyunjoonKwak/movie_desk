@@ -59,6 +59,12 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-03 Claude: B15 후속(프록시·썸네일 샘플러). 확인 중 미디어 GC 경쟁을 잡았다: 로드 3초 뒤
+  `collectMediaGarbage`가 시작 시점 프로젝트 스냅샷으로 keep 집합을 만들고 라이브러리 전체를 읽는 동안
+  끝난 가져오기의 파일(lease 해제 후, `addMediaAsset` 전)을 지웠다(31MB 가져오기에서 재현). GC가 삭제
+  직전 현재 프로젝트를 다시 보도록 수정(`persistence/media-gc.ts`, getter 인자). Codex 확인 요청:
+  `media/hooks.ts`가 배치 전체가 끝나기 전에 파일별 `releaseLease()`를 호출한다 — lease는 `addMediaAsset`
+  이후에 풀어야 GC와 무관하게 안전하다.
 - 2026-09-03 Claude: B23. mediabunny는 MPL-2.0(mp4-muxer는 MIT). 파일 단위 카피레프트라 번들에 넣는 것은
   문제없지만 라이브러리 파일을 수정하면 공개 의무가 생긴다 — 포크 금지 원칙만 지키면 된다. AAC 프라이밍
   (약 46ms) 편집 리스트는 mp4-muxer 때와 같이 보존하지 않는다(오디오 variant가 원본보다 그만큼 길어짐,
@@ -286,7 +292,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B12 Live Photo·폴더 | Codex | 1차 구현·B10/B11 통합 완료, main 통합 · 실기기 검증 대기 | 파일·폴더 선택 + 드롭 재귀, DCIM 상대경로 보존, 동일 폴더·동일 stem HEIC/JPEG+MOV 보수적 연결, 접근 실패 격리·안내. 실제 아이폰 pair identifier·대량 성능은 도그푸딩 게이트 |
 | B13 리포트 문구 | Codex | 1차 구현·화면 검증 완료 | 결과와 다음 행동 우선 구조, 진행·일부 실패·전체 실패 안내, 추천 이유·모드명 한국어/영어 분리. 도그푸딩 이해도 검증 대기 |
 | B14 컷 이유 | Codex | 구현·화면 검증 완료 | 선택·보류 사유 구조화 및 한국어/영어 표시, 자동 결정 누락 방지 테스트. 도그푸딩 이해도 검증 대기 |
-| B15 분석 디코더 공유 | Claude + Codex | 구현·검토 완료, main 통합 | 공유 WebCodecs 샘플러, 디코더·요소 fallback, 스트리밍 장면 감지, 분석 취소, 실제 디코더 E2E와 ffmpeg 시각 정확도 검증. 장면 감지 35% 단축. 남은 일: AI 패널 취소 버튼 연결 |
+| B15 분석 디코더 공유 | Claude + Codex | 구현·검토 완료, main 통합 | 공유 WebCodecs 샘플러, 디코더·요소 fallback, 스트리밍 장면 감지, 분석 취소, 실제 디코더 E2E와 ffmpeg 시각 정확도 검증. 장면 감지 35% 단축. 남은 일: AI 패널 취소 버튼 연결 · 후속(`claude/b15-proxy-sampler`): 프록시 생성·썸네일·필름스트립도 공용 샘플러로. 프록시 60초 1080p → 640p: 13.3초·seek 1,440회 → 3.3초·seek 0회. 가져오기 썸네일은 seek 0회, 회전 .mov 썸네일 세로 정상. 샘플러 sink가 async를 지원해 encoder 역압이 디코더까지 전달됨 |
 | B16 시나리오 | Codex | 대기 | |
 | B17 자동 편집 E2E | Claude | 완료, main 통합 | `claude/b17-autoedit-e2e` · 기존 기능 보호용 회귀 테스트, e2e 9개 통과 |
 | B18~B21 마무리·공유 | Codex | 대기 | |
