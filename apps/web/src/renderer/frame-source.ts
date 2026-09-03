@@ -4,6 +4,7 @@ import { resolveMediaSource } from "@/media/source/resolve-media-source";
 import { acquireMediaUrl } from "@/persistence/opfs";
 import type { MediaAsset } from "@movie-desk/core";
 import { BoundedResourceCache } from "./bounded-resource-cache";
+import { RetryBackoff } from "./retry-backoff";
 
 type Source = HTMLVideoElement | HTMLImageElement;
 const mediaUrlLeases = new WeakMap<Source, PlaybackLease>();
@@ -59,20 +60,20 @@ export class FrameSourcePool {
     releaseSource,
   );
   private readonly pending = new Map<string, Promise<Source | null>>();
-  private readonly retryAt = new Map<string, number>();
+  private readonly retry = new RetryBackoff();
   private retainedIds: ReadonlySet<string> | null = null;
 
   retain(assetIds: ReadonlySet<string>): void {
     this.retainedIds = assetIds;
     this.cache.retain(assetIds);
-    for (const id of this.retryAt.keys()) if (!assetIds.has(id)) this.retryAt.delete(id);
+    this.retry.retain(assetIds);
   }
 
   async get(asset: MediaAsset): Promise<Source | null> {
     if (this.retainedIds && !this.retainedIds.has(asset.id)) return null;
     const cached = this.cache.get(asset.id);
     if (cached) return cached;
-    if ((this.retryAt.get(asset.id) ?? 0) > Date.now()) return null;
+    if (!this.retry.shouldTry(asset.id)) return null;
     const inflight = this.pending.get(asset.id);
     if (inflight) return inflight;
     const promise = this.load(asset);
@@ -88,17 +89,16 @@ export class FrameSourcePool {
     if (loaded) {
       if (!this.retainedIds || this.retainedIds.has(asset.id)) {
         this.cache.set(asset.id, loaded);
-        this.retryAt.delete(asset.id);
+        this.retry.succeed(asset.id);
       } else {
         releaseSource(loaded);
         loaded = null;
       }
     } else {
       // Asset metadata can be restored before its file is readable (an import
-      // still writing to OPFS).
-      // Retry with a small backoff instead of permanently caching the miss or
-      // probing OPFS on every animation frame.
-      this.retryAt.set(asset.id, Date.now() + 1000);
+      // still writing to OPFS), so the first miss retries soon; a source that
+      // stays missing backs off instead of being probed every second.
+      this.retry.fail(asset.id);
     }
     return loaded;
   }
@@ -140,7 +140,7 @@ export class FrameSourcePool {
   dispose() {
     this.cache.clear();
     this.pending.clear();
-    this.retryAt.clear();
+    this.retry.clear();
     this.retainedIds = null;
   }
 }

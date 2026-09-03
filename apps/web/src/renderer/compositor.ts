@@ -24,6 +24,7 @@ import {
   isWipe,
 } from "@movie-desk/core";
 import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@movie-desk/core";
+import { RetryBackoff } from "./retry-backoff";
 import { BoundedResourceCache } from "./bounded-resource-cache";
 import {
   BACKDROP_BLEND_MODE,
@@ -131,8 +132,7 @@ export class Compositor {
     }
     this.textTextures.retain(graphicClipIds);
     for (const id of this.decodePrepared) if (!assetIds.has(id)) this.decodePrepared.delete(id);
-    for (const id of this.decodeRetryAt.keys())
-      if (!assetIds.has(id)) this.decodeRetryAt.delete(id);
+    this.decodeRetry.retain(assetIds);
     getFrameProvider().retain(
       new Set(
         project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id),
@@ -510,7 +510,8 @@ export class Compositor {
 
   private readonly decodePrepared = new Set<string>();
   private readonly decodePreparing = new Set<string>();
-  private readonly decodeRetryAt = new Map<string, number>();
+  // Missing or unreadable sources retry with a growing delay (1 s → 30 s).
+  private readonly decodeRetry = new RetryBackoff();
 
   private async uploadClipSource(clip: MediaClip, asset: MediaAsset): Promise<WebGLTexture | null> {
     // Map timeline time → source time. A frozen clip always shows one source
@@ -529,23 +530,23 @@ export class Compositor {
       if (
         !this.decodePrepared.has(asset.id) &&
         !this.decodePreparing.has(asset.id) &&
-        (this.decodeRetryAt.get(asset.id) ?? 0) <= Date.now()
+        this.decodeRetry.shouldTry(asset.id)
       ) {
         this.decodePreparing.add(asset.id);
         void (async () => {
           try {
-            // Offline/missing sources resolve to null and retry later, like a
-            // missing OPFS copy did before D1.
+            // Offline/missing sources resolve to null and retry later with
+            // backoff, like a missing OPFS copy did before D1.
             const source = await resolveMediaSource(asset).catch(() => null);
             if (source && (await provider.prepare(asset.id, source))) {
               if (this.retainedAssetIds.has(asset.id)) {
                 this.decodePrepared.add(asset.id);
-                this.decodeRetryAt.delete(asset.id);
+                this.decodeRetry.succeed(asset.id);
               } else {
                 provider.forget(asset.id);
               }
             } else {
-              this.decodeRetryAt.set(asset.id, Date.now() + 1000);
+              this.decodeRetry.fail(asset.id);
             }
           } finally {
             this.decodePreparing.delete(asset.id);
@@ -631,7 +632,7 @@ export class Compositor {
     this.bgMaskTime.clear();
     this.decodePrepared.clear();
     this.decodePreparing.clear();
-    this.decodeRetryAt.clear();
+    this.decodeRetry.clear();
     this.retainedAssetIds.clear();
     disposeLutTextures(this.gl);
     this.scratch.dispose();

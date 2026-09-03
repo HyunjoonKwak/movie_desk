@@ -11,7 +11,7 @@ export interface FakeFrame {
   close(): void;
 }
 
-export const SAMPLE_BYTES = 100;
+const SAMPLE_BYTES = 100;
 export const SAMPLE_COUNT = 4;
 
 const sampleAt = (index: number): Mp4Sample => ({

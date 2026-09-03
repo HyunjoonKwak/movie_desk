@@ -8,7 +8,7 @@ export interface ProbeResult {
   height?: number;
 }
 
-export class MediaProbeError extends Error {
+class MediaProbeError extends Error {
   readonly code: "UNSUPPORTED_MEDIA" | "DECODE_FAILED";
 
   constructor(code: MediaProbeError["code"], message: string) {
