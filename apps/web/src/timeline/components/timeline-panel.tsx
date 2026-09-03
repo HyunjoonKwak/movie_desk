@@ -274,8 +274,15 @@ export function TimelinePanel() {
             <summary className="btn-ghost cursor-pointer list-none px-1.5 py-0.5 text-2xs">
               <Plus className="size-3" /> {t("timeline.titleTpl")}
             </summary>
-            <div className="absolute left-0 z-30 mt-1 w-36 rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
-              {(["title", "subtitle", "lowerThird"] as const).map((k) => (
+            <div className="absolute left-0 z-30 mt-1 w-44 rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
+              {([
+                "title",
+                "subtitle",
+                "lowerThird",
+                "travelTitle",
+                "chapterCard",
+                "growthTitle",
+              ] as const).map((k) => (
                 <button
                   key={k}
                   type="button"

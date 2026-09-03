@@ -10,6 +10,7 @@ import {
   type MediaAsset,
   type Project,
 } from "@movie-desk/core";
+import { DEFAULT_TEXT_FONT } from "@/editor/fonts";
 import { MODE_PRESETS } from "./modes";
 import { beatSnap, timelineBeats } from "./reconform";
 import { planReframe } from "./reframe";
@@ -215,14 +216,15 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
           effects: [],
           keyframes: [],
           text: item.chapter,
-          font: "Inter, system-ui, sans-serif",
+          font: DEFAULT_TEXT_FONT,
           size: 64,
           color: "#ffffff",
+          weight: 700,
           align: "left",
           animIn: "slide-up",
           animOut: "fade",
           animMs: 400,
-          transform: { x: -0.28, y: -0.6, scale: 1, rotation: 0, opacity: 1 },
+          transform: { x: 0, y: -0.6, scale: 1, rotation: 0, opacity: 1 },
         } as Clip);
       }
     }
@@ -270,9 +272,10 @@ export const applyPlanToProject = (project: Project, opts: ApplyOptions): Projec
       effects: [],
       keyframes: [],
       text: opts.summary,
-      font: "Inter, system-ui, sans-serif",
+      font: DEFAULT_TEXT_FONT,
       size: 56,
       color: "#ffffff",
+      weight: 600,
       align: "center",
       animIn: "fade",
       animOut: "fade",

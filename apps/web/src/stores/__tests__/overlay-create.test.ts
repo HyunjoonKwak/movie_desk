@@ -200,4 +200,23 @@ describe("overlay-family clip creation sits above the primary video track", () =
     const kinds = overlay.clips.map((c) => c.kind);
     expect(kinds.indexOf("text")).toBeLessThan(kinds.indexOf("shape"));
   });
+
+  it.each(["travelTitle", "chapterCard", "growthTitle"] as const)(
+    "%s creates a grouped Korean title card",
+    (template) => {
+      setup();
+
+      useProjectStore.getState().addTitleTemplate(template);
+
+      const overlay = tracks().find((t) => t.kind === "overlay")!;
+      expect(overlay.clips).toHaveLength(2);
+      const [text, backing] = overlay.clips;
+      expect(text).toMatchObject({ kind: "text", groupId: expect.any(String) });
+      expect(backing).toMatchObject({ kind: "shape", groupId: text!.groupId });
+      if (text?.kind === "text") {
+        expect(text.font).toContain("Pretendard Variable");
+        expect(text.text).toMatch(/[가-힣]/);
+      }
+    },
+  );
 });

@@ -352,6 +352,12 @@ describe("applyPlanToProject", () => {
     expect(out.timeline.markers?.some((m) => m.label.includes("강릉"))).toBe(true);
     const autoT = out.timeline.tracks.find((t) => t.name === "AUTO T")!;
     expect(autoT.clips).toHaveLength(1);
+    expect(autoT.clips[0]).toMatchObject({
+      kind: "text",
+      font: expect.stringContaining("Pretendard Variable"),
+      weight: 700,
+      transform: { x: 0 },
+    });
     // music with end fade
     const autoM = out.timeline.tracks.find((t) => t.name === "AUTO M")!;
     expect(autoM.clips[0]!.keyframes.some((k) => k.target === "volume")).toBe(true);

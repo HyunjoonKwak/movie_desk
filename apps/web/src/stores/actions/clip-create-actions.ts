@@ -11,6 +11,7 @@ import {
   type TextAnimation,
   type Track,
 } from "@movie-desk/core";
+import { DEFAULT_TEXT_FONT } from "@/editor/fonts";
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 // Reserved lanes are owned by generators (SRT import wipes "Subtitles"
@@ -43,7 +44,13 @@ const resolveUpperTrack = (
 };
 
 // Which built-in title layout to drop at the playhead.
-export type TitleTemplate = "title" | "subtitle" | "lowerThird";
+export type TitleTemplate =
+  | "title"
+  | "subtitle"
+  | "lowerThird"
+  | "travelTitle"
+  | "chapterCard"
+  | "growthTitle";
 
 // Text / shape / adjustment clip creation plus inline text & shape editing.
 // Extracted from project-store so that file stays focused on timeline editing,
@@ -110,7 +117,7 @@ export const createClipCreateActions = <S extends ProjectMutating>(
         effects: [],
         keyframes: [],
         text,
-        font: "Inter, system-ui, sans-serif",
+        font: DEFAULT_TEXT_FONT,
         size: 96,
         color: "#ffffff",
       });
@@ -127,7 +134,7 @@ export const createClipCreateActions = <S extends ProjectMutating>(
         speed: 1,
         effects: [],
         keyframes: [],
-        font: "Inter, system-ui, sans-serif",
+        font: DEFAULT_TEXT_FONT,
         color: "#ffffff",
         animMs: 500,
       };
@@ -155,6 +162,114 @@ export const createClipCreateActions = <S extends ProjectMutating>(
           transform: { x: 0, y: -0.72, scale: 1, rotation: 0, opacity: 1 },
         });
       }
+      if (kind === "travelTitle") {
+        const groupId = newId();
+        const withText = addClip(proj, track.id, {
+          ...baseText,
+          id: newId(),
+          groupId,
+          text: "여행의 순간\n강릉 · 2026",
+          font: DEFAULT_TEXT_FONT,
+          size: 72,
+          weight: 700,
+          align: "left",
+          shadow: true,
+          shadowBlur: 18,
+          animIn: "slide-up",
+          animOut: "fade",
+          transform: { x: 0.1, y: 0.2, scale: 1, rotation: 0, opacity: 1 },
+        });
+        return addClip(withText, track.id, {
+          kind: "shape",
+          id: newId(),
+          groupId,
+          start: at,
+          duration: 4000,
+          speed: 1,
+          effects: [],
+          keyframes: [],
+          shape: "rect",
+          fill: "rgba(8,47,73,0.82)",
+          fillType: "linear",
+          fillColor2: "rgba(15,118,110,0.7)",
+          gradientAngle: 25,
+          stroke: "rgba(255,255,255,0.18)",
+          strokeWidth: 2,
+          cornerRadius: 24,
+          transform: { x: -0.12, y: 0.2, scale: 0.82, rotation: 0, opacity: 1 },
+        });
+      }
+      if (kind === "chapterCard") {
+        const groupId = newId();
+        const withText = addClip(proj, track.id, {
+          ...baseText,
+          id: newId(),
+          groupId,
+          text: "DAY 01\n강릉",
+          font: DEFAULT_TEXT_FONT,
+          size: 68,
+          weight: 700,
+          align: "left",
+          color: "#f8fafc",
+          shadow: false,
+          animIn: "fade",
+          animOut: "fade",
+          transform: { x: 0.12, y: 0, scale: 1, rotation: 0, opacity: 1 },
+        });
+        return addClip(withText, track.id, {
+          kind: "shape",
+          id: newId(),
+          groupId,
+          start: at,
+          duration: 4000,
+          speed: 1,
+          effects: [],
+          keyframes: [],
+          shape: "rect",
+          fill: "rgba(15,23,42,0.78)",
+          stroke: "#38d0c4",
+          strokeWidth: 4,
+          cornerRadius: 18,
+          transform: { x: -0.12, y: 0, scale: 0.7, rotation: 0, opacity: 1 },
+        });
+      }
+      if (kind === "growthTitle") {
+        const groupId = newId();
+        const withText = addClip(proj, track.id, {
+          ...baseText,
+          id: newId(),
+          groupId,
+          text: "우리의 성장 기록\n2026",
+          font: DEFAULT_TEXT_FONT,
+          size: 76,
+          weight: 700,
+          align: "center",
+          color: "#fff7ed",
+          shadow: true,
+          shadowBlur: 22,
+          animIn: "pop",
+          animOut: "fade",
+          transform: { x: 0, y: 0.04, scale: 1, rotation: 0, opacity: 1 },
+        });
+        return addClip(withText, track.id, {
+          kind: "shape",
+          id: newId(),
+          groupId,
+          start: at,
+          duration: 4000,
+          speed: 1,
+          effects: [],
+          keyframes: [],
+          shape: "rect",
+          fill: "rgba(120,53,15,0.5)",
+          fillType: "radial",
+          fillColor2: "rgba(69,10,10,0.75)",
+          stroke: "rgba(254,215,170,0.65)",
+          strokeWidth: 3,
+          cornerRadius: 28,
+          transform: { x: 0, y: 0.02, scale: 0.82, rotation: 0, opacity: 1 },
+        });
+      }
       // lower-third: a semi-transparent backing bar plus left-aligned text.
       // Same-start clips draw earliest-added on top (compositor reverses the
       // track-order list), so the text goes in FIRST, the bar behind it.
@@ -165,7 +280,7 @@ export const createClipCreateActions = <S extends ProjectMutating>(
         size: 40,
         align: "left",
         animIn: "slide-up",
-        transform: { x: -0.22, y: -0.58, scale: 1, rotation: 0, opacity: 1 },
+        transform: { x: 0.16, y: -0.58, scale: 1, rotation: 0, opacity: 1 },
       });
       return addClip(withText, track.id, {
         kind: "shape",

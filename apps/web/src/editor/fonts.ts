@@ -6,7 +6,14 @@ export interface FontOption {
   readonly value: string;
 }
 
+export const DEFAULT_TEXT_FONT =
+  "'Pretendard Variable', 'Apple SD Gothic Neo', sans-serif";
+
 export const FONT_OPTIONS: readonly FontOption[] = [
+  {
+    label: "Pretendard (한국어)",
+    value: DEFAULT_TEXT_FONT,
+  },
   { label: "Inter", value: "Inter, system-ui, sans-serif" },
   { label: "System UI", value: "system-ui, sans-serif" },
   { label: "Arial", value: "Arial, Helvetica, sans-serif" },
