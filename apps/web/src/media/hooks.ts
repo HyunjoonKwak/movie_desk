@@ -2,20 +2,15 @@
 
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { newId, type MediaAsset } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 import { importMediaFile } from "./import";
+import { runMediaImportBatch } from "./import-batch";
 import { useImportProgressStore } from "./import-progress-store";
 import { useImportFailureStore } from "./import-failure-store";
 import { createMediaImportFailure } from "./import-errors";
 import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
-import {
-  type MediaImportCandidate,
-  linkImportedLivePhotos,
-  planLivePhotoLinks,
-  toMediaImportCandidate,
-} from "./folder-import";
+import { type MediaImportCandidate, toMediaImportCandidate } from "./folder-import";
 
 export type MediaImportInput = FileList | readonly File[] | readonly MediaImportCandidate[];
 
@@ -44,55 +39,26 @@ export const useMediaImport = (): ImportState => {
       }
       setImporting(true);
       progress.start(candidates.length);
-      const livePhotoPlan = planLivePhotoLinks(candidates);
-      const imported: Array<{
-        asset: MediaAsset;
-        candidateIndex: number;
-      }> = [];
-      let done = 0;
-      let failed = 0;
       let desktopRequired = 0;
-      let cancelled = false;
       try {
-        for (const [candidateIndex, candidate] of candidates.entries()) {
-          if (useImportProgressStore.getState().cancelRequested) {
-            cancelled = true;
-            break;
-          }
-          const { file } = candidate;
-          useImportProgressStore.getState().beginFile(file.name);
-          try {
-            // process serially to keep memory bounded
-            if (isHeicFile(file)) {
-              const asset = await importDesktopHeicFile(file);
-              const alreadyImported = useProjectStore
-                .getState()
-                .project.mediaLibrary.some((candidate) => candidate.id === asset.id);
-              if (!alreadyImported) imported.push({ asset, candidateIndex });
-            } else {
-              const { asset, releaseLease } = await importMediaFile(file);
-              try {
-                imported.push({ asset, candidateIndex });
-              } finally {
-                releaseLease();
-              }
-            }
-            done++;
-            useImportProgressStore.getState().fileDone();
-          } catch (error) {
-            // One bad file must not abort the whole batch.
-            failed++;
+        const { done, failed, cancelled } = await runMediaImportBatch(candidates, {
+          importFile: importMediaFile,
+          importHeicFile: importDesktopHeicFile,
+          isHeicFile,
+          hasAsset: (assetId) =>
+            useProjectStore.getState().project.mediaLibrary.some((asset) => asset.id === assetId),
+          addMediaAsset,
+          isCancelRequested: () => useImportProgressStore.getState().cancelRequested,
+          onFileStart: (name) => useImportProgressStore.getState().beginFile(name),
+          onFileDone: () => useImportProgressStore.getState().fileDone(),
+          onFileFailed: (candidate, error) => {
             useImportFailureStore.getState().add(createMediaImportFailure(candidate, error));
             if (error instanceof DesktopHeicImportError && error.code === "DESKTOP_REQUIRED") {
-              desktopRequired++;
+              desktopRequired += 1;
             }
             useImportProgressStore.getState().fileFailed();
-          }
-        }
-
-        for (const asset of linkImportedLivePhotos(imported, livePhotoPlan, newId)) {
-          addMediaAsset(asset);
-        }
+          },
+        });
 
         const skipped = candidates.length - done - failed;
         if (cancelled) {

@@ -254,7 +254,14 @@ const sampleViaWebCodecs = async (
         last.frame?.close();
         last.frame = frame;
         const verdict = (): "stop" | "continue" => (picker.done ? "stop" : "continue");
-        return waits.length > 0 ? Promise.all(waits).then(verdict) : verdict();
+        if (waits.length === 0) return verdict();
+        return Promise.all(waits).then(verdict, (error: unknown) => {
+          // The decoder closes a frame whose verdict rejects; forget it so the
+          // end-of-run delivery never draws a closed frame.
+          last.frame?.close();
+          last.frame = null;
+          throw error;
+        });
       },
     },
   );

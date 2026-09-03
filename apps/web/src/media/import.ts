@@ -2,7 +2,7 @@ import { extractCaptureMeta } from "@/autoedit/metadata";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { writeMediaFile } from "@/persistence/opfs";
 import { type MediaAsset, newId } from "@movie-desk/core";
-import { ensureAudioVariant } from "./audio/audio-variant";
+import { audioVariantKey, ensureAudioVariant } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
 import { probeMedia } from "./probe";
 import { makeImageThumb, makeVideoFilmstrip, makeVideoThumb } from "./thumbnail";
@@ -17,7 +17,14 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   const probe = await probeMedia(file);
   const id = newId();
   const opfsPath = `${id}__${file.name}`;
-  const releaseLease = leaseMediaKey(opfsPath);
+  // Both files this import writes stay out of GC's reach until the caller
+  // has registered the asset; the batch releases them together.
+  const releaseOriginal = leaseMediaKey(opfsPath);
+  const releaseVariant = leaseMediaKey(audioVariantKey({ opfsPath, sizeBytes: file.size }));
+  const releaseLease = (): void => {
+    releaseOriginal();
+    releaseVariant();
+  };
   try {
     await writeMediaFile(opfsPath, file);
 

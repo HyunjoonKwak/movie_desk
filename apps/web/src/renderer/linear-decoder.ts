@@ -1,3 +1,4 @@
+import { type FrameVerdict, createFrameDelivery } from "./frame-delivery";
 import {
   type Mp4Sample,
   type OpenedMp4,
@@ -24,15 +25,19 @@ export interface DecodeRun {
   readonly toMs: number;
 }
 
-type FrameVerdict = "continue" | "stop";
+export type { FrameVerdict } from "./frame-delivery";
 
 export interface LinearDecodeOptions {
   readonly signal?: AbortSignal;
   // Owns the frame: must close it (or keep it) and say whether the run is
-  // done. May answer asynchronously; feeding pauses until pending answers
-  // settle, so a slow consumer throttles the decoder instead of piling up
-  // frames.
-  readonly onFrame: (frame: VideoFrame, runIndex: number) => FrameVerdict | Promise<FrameVerdict>;
+  // done. May answer asynchronously; frames are handed over one at a time
+  // and feeding pauses until pending answers settle, so a slow consumer
+  // throttles the decoder instead of piling up frames. Throwing or rejecting
+  // fails the pass and the frame is closed for it.
+  readonly onFrame: (
+    frame: VideoFrame,
+    runIndex: number,
+  ) => FrameVerdict | PromiseLike<FrameVerdict>;
 }
 
 const READ_CHUNK_BYTES = 1024 * 1024;
@@ -109,33 +114,25 @@ export const decodeRunsInOrder = async (
   let outputsOpen = false;
   let feeding = false;
   let failed = false;
-  // Consumers that answer asynchronously chain here; feeding waits on it.
-  let backlog: Promise<void> = Promise.resolve();
   const stopRun = () => {
     outputsOpen = false;
     feeding = false;
   };
-  const decoder = createDecoder(
-    (frame) => {
-      if (!outputsOpen) {
-        frame.close();
-        return;
-      }
-      const verdict = options.onFrame(frame, activeRun);
-      if (verdict instanceof Promise) {
-        backlog = backlog
-          .then(() => verdict)
-          .then((answer) => {
-            if (answer === "stop") stopRun();
-          });
-      } else if (verdict === "stop") {
-        stopRun();
-      }
+  // Every frame goes through this chain; feeding waits on it, so the sink
+  // never sees two frames at once and a slow answer holds the decoder back.
+  const delivery = createFrameDelivery<VideoFrame>(options.onFrame, {
+    isOpen: () => outputsOpen,
+    onStop: stopRun,
+    onFailure: () => {
+      failed = true;
+      stopRun();
     },
+  });
+  const decoder = createDecoder(
+    (frame) => delivery.deliver(frame, activeRun),
     () => {
       failed = true;
-      outputsOpen = false;
-      feeding = false;
+      stopRun();
     },
   );
   if (!decoder) return "unsupported";
@@ -152,8 +149,10 @@ export const decodeRunsInOrder = async (
     pending.push(...samples);
   };
 
+  const isAborted = (): boolean => options.signal?.aborted === true;
+
   const feed = async (toUs: number): Promise<void> => {
-    while (pending.length > 0 && feeding) {
+    while (pending.length > 0 && feeding && !isAborted()) {
       const sample = pending.shift() as Mp4Sample;
       if (!sample.data) continue;
       const timestamp = presentationUs(sample);
@@ -170,11 +169,12 @@ export const decodeRunsInOrder = async (
         }),
       );
       await waitForQueue(decoder);
-      await backlog;
+      await delivery.drain();
     }
   };
 
-  const decodeRun = async (index: number, run: DecodeRun): Promise<void> => {
+  // Resolves to whether the run was cut short by the abort signal.
+  const decodeRun = async (index: number, run: DecodeRun): Promise<boolean> => {
     activeRun = index;
     outputsOpen = true;
     feeding = true;
@@ -191,15 +191,14 @@ export const decodeRunsInOrder = async (
     let offset = Math.min(seek.offset, source.size);
     const end = runEndOffset(sampleTable, offset, toUs + offsetUs, source.size);
     try {
-      while (feeding && offset < end) {
-        if (options.signal?.aborted) return;
+      while (feeding && offset < end && !isAborted()) {
         const chunk = await source.read(offset, Math.min(READ_CHUNK_BYTES, end - offset));
         if (chunk.byteLength === 0) break;
         const suggested = file.appendBuffer(chunk, offset + chunk.byteLength >= source.size);
         offset = nextAppendOffset(offset, chunk.byteLength, suggested, source.size);
         await feed(toUs);
       }
-      if (feeding && end >= source.size) {
+      if (feeding && !isAborted() && end >= source.size) {
         file.flush();
         await feed(toUs);
       }
@@ -212,9 +211,14 @@ export const decodeRunsInOrder = async (
       }
     }
     // Emit what the decoder still holds; also resets it for the next keyframe.
-    if (!failed) await decoder.flush().catch(() => undefined);
-    await backlog;
+    // An aborted run skips this: closing the decoder drops those frames.
+    const aborted = isAborted();
+    if (!failed && !aborted) await decoder.flush().catch(() => undefined);
+    // Frames already queued for the sink are handed over or closed before the
+    // run ends, so none outlives its run or reaches the next one.
+    await delivery.drain();
     outputsOpen = false;
+    return aborted;
   };
 
   let stoppedEarly = false;
@@ -224,7 +228,10 @@ export const decodeRunsInOrder = async (
         stoppedEarly = true;
         break;
       }
-      await decodeRun(index, run);
+      if (await decodeRun(index, run)) {
+        stoppedEarly = true;
+        break;
+      }
       if (failed) break;
     }
   } catch {

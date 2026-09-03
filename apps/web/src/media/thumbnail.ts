@@ -72,13 +72,17 @@ export const makeVideoFilmstrip = async (
       },
     );
     if (sampled.length === 0 || tileW === 0) return null;
+    // The sampler collapses duplicate times (a clip shorter than the tile
+    // count, or one whose duration is unknown), so the strip is sized by the
+    // frames actually sampled, not the frames requested.
+    const drawn = sampled.slice(0, n);
     const canvas = document.createElement("canvas");
-    canvas.width = tileW * n;
+    canvas.width = tileW * drawn.length;
     canvas.height = STRIP_H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    sampled.slice(0, n).forEach((sample, i) => ctx.putImageData(sample.image, i * tileW, 0));
-    return { dataUrl: toWebp(canvas, 0.6), frames: n };
+    drawn.forEach((sample, i) => ctx.putImageData(sample.image, i * tileW, 0));
+    return { dataUrl: toWebp(canvas, 0.6), frames: drawn.length };
   } catch {
     return null;
   }
