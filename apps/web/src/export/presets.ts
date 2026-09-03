@@ -2,6 +2,18 @@ import type { ExportPreset } from "./types";
 
 export const PRESETS: readonly ExportPreset[] = [
   {
+    id: "family-720p",
+    name: "Family message 720p",
+    container: "mp4",
+    videoCodec: "h264",
+    audioCodec: "aac",
+    width: 1280,
+    height: 720,
+    fps: 30,
+    videoBitrateKbps: 2500,
+    audioBitrateKbps: 128,
+  },
+  {
     id: "youtube-1080p",
     name: "YouTube 1080p",
     container: "mp4",
@@ -23,6 +35,18 @@ export const PRESETS: readonly ExportPreset[] = [
     height: 2160,
     fps: 30,
     videoBitrateKbps: 35_000,
+    audioBitrateKbps: 192,
+  },
+  {
+    id: "tv-tablet-4k",
+    name: "TV / Tablet 4K",
+    container: "mp4",
+    videoCodec: "h264",
+    audioCodec: "aac",
+    width: 3840,
+    height: 2160,
+    fps: 30,
+    videoBitrateKbps: 25_000,
     audioBitrateKbps: 192,
   },
   {
@@ -53,3 +77,12 @@ export const PRESETS: readonly ExportPreset[] = [
     audioBitrateKbps: 128,
   },
 ];
+
+// A bitrate-based estimate cannot predict every encoder decision, but it is
+// useful before a long render and especially for message-size planning.
+// Reserve 2% for MP4 metadata and muxing overhead.
+export const estimateExportSizeMb = (preset: ExportPreset, durationMs: number): number => {
+  const payloadBits =
+    (preset.videoBitrateKbps + preset.audioBitrateKbps) * 1000 * (Math.max(0, durationMs) / 1000);
+  return (payloadBits / 8 / 1_000_000) * 1.02;
+};

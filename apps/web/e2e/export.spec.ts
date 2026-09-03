@@ -40,13 +40,34 @@ const seedTimeline = async (page: Page, presses: number): Promise<number> => {
 const openExportWithVp9 = async (page: Page) => {
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("YouTube 1080p").uncheck();
+  await dialog.getByLabel("Family message 720p").uncheck();
   await dialog.getByLabel("Web (VP9 · MP4)").check();
   return dialog;
 };
 
 test.beforeEach(async ({ page }) => {
   await configurePage(page);
+});
+
+test("explains sharing presets and keeps the dialog inside a compact viewport", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/editor");
+  await page.getByRole("button", { name: "Export", exact: true }).first().click();
+
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Recommended", { exact: true })).toBeVisible();
+  await expect(dialog.getByText(/Est\. 0 MB · \d+ MB\/min/).first()).toBeVisible();
+  await expect(dialog.getByLabel("Family message 720p")).toBeChecked();
+  await expect(dialog.getByLabel("TV / Tablet 4K")).not.toBeChecked();
+
+  const bounds = await dialog.boundingBox();
+  expect(bounds).not.toBeNull();
+  expect(bounds?.x).toBeGreaterThanOrEqual(0);
+  expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(390);
+  expect(bounds?.y).toBeGreaterThanOrEqual(0);
+  expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeLessThanOrEqual(844);
 });
 
 test("exports the timeline to a non-empty MP4 with the VP9 preset", async ({ page }) => {

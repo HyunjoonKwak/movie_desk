@@ -3,6 +3,7 @@
 import type { MessageKey } from "@/i18n/messages";
 import { useT } from "@/i18n/use-t";
 import { useProjectStore } from "@/stores/project-store";
+import { useRangeStore } from "@/stores/range-store";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, Download, Loader2, X } from "lucide-react";
 import { useRef, useState } from "react";
@@ -12,7 +13,7 @@ import { useDuckingStore } from "./ducking-store";
 import { ExportCancelledError, WebCodecsExporter, downloadBlob } from "./exporter";
 import { LoudnessMeter, type LoudnessResult } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
-import { PRESETS } from "./presets";
+import { PRESETS, estimateExportSizeMb } from "./presets";
 import type { ExportProgress } from "./types";
 
 interface Props {
@@ -34,9 +35,18 @@ const formatEta = (seconds: number): string => {
   return `${m}m ${s}s`;
 };
 
+const formatSize = (megabytes: number): string => {
+  if (megabytes <= 0) return "0 MB";
+  if (megabytes >= 1000) return `${(megabytes / 1000).toFixed(1)} GB`;
+  return `${Math.max(1, Math.round(megabytes))} MB`;
+};
+
 export function ExportDialog({ open, onOpenChange }: Props) {
   const projectId = useProjectStore((s) => s.project.id);
   const projectName = useProjectStore((s) => s.project.name);
+  const projectDuration = useProjectStore((s) => s.project.timeline.duration);
+  const rangeIn = useRangeStore((s) => s.inMs);
+  const rangeOut = useRangeStore((s) => s.outMs);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set([PRESETS[0]!.id]));
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [queueLabel, setQueueLabel] = useState("");
@@ -59,6 +69,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     });
   const exporterRef = useRef<WebCodecsExporter | null>(null);
   const t = useT();
+  const exportDuration = Math.max(0, (rangeOut ?? projectDuration) - (rangeIn ?? 0));
+  const presetName = (id: string) => t(`export.preset.${id}.name`);
 
   const handleExport = async () => {
     const queue = PRESETS.filter((p) => selectedIds.has(p.id));
@@ -67,7 +79,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     try {
       for (let i = 0; i < queue.length; i++) {
         const preset = queue[i]!;
-        setQueueLabel(queue.length > 1 ? `${preset.name} (${i + 1}/${queue.length})` : preset.name);
+        const label = presetName(preset.id);
+        setQueueLabel(queue.length > 1 ? `${label} (${i + 1}/${queue.length})` : label);
         setProgress({ stage: "preparing", progress: 0 });
         const exporter = new WebCodecsExporter();
         exporterRef.current = exporter;
@@ -135,7 +148,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-2xl">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[440px] max-w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-white/10 bg-panel-1 p-5 shadow-2xl">
           <div className="flex items-center justify-between">
             <Dialog.Title className="text-base font-medium text-ink-1">
               {t("export.title", { name: projectName })}
@@ -161,10 +174,26 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                   className="flex cursor-pointer items-center justify-between gap-2 rounded-md border border-white/5 bg-panel-2 px-3 py-2 text-sm hover:border-accent has-[input:checked]:border-accent"
                 >
                   <span>
-                    <span className="block font-medium text-ink-1">{p.name}</span>
+                    <span className="flex items-center gap-1.5 font-medium text-ink-1">
+                      {presetName(p.id)}
+                      {p.id === "family-720p" && (
+                        <span className="rounded bg-accent/20 px-1.5 py-0.5 text-3xs text-accent">
+                          {t("export.recommended")}
+                        </span>
+                      )}
+                    </span>
+                    <span className="block text-meta text-ink-2">
+                      {t(`export.preset.${p.id}.description`)}
+                    </span>
                     <span className="block text-meta text-ink-3">
                       {p.width}×{p.height} • {p.fps} fps • {p.videoCodec}/{p.audioCodec} •{" "}
                       {p.videoBitrateKbps} kbps
+                    </span>
+                    <span className="block text-meta text-ink-3">
+                      {t("export.sizeEstimate", {
+                        total: formatSize(estimateExportSizeMb(p, exportDuration)),
+                        perMinute: formatSize(estimateExportSizeMb(p, 60_000)),
+                      })}
                     </span>
                   </span>
                   <input
