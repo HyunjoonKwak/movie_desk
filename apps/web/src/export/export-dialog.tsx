@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import { ExportCancelledError, WebCodecsExporter, downloadBlob } from "./exporter";
+import { MissingMediaError } from "./preflight";
 import { LoudnessMeter, type LoudnessResult } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
 import { PRESETS, estimateExportSizeMb } from "./presets";
@@ -93,6 +94,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
     } catch (err) {
       if (err instanceof ExportCancelledError) {
         toast.info(t("export.cancelled"));
+      } else if (err instanceof MissingMediaError) {
+        toast.error(t("export.missingMedia", { names: err.missing.map((m) => m.name).join(", ") }));
       } else {
         const msg = err instanceof Error ? err.message : "Unknown error";
         toast.error(t("export.failed", { msg }));

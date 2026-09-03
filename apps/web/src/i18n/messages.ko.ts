@@ -667,4 +667,5 @@ export const ko = {
     "music.restoreBed": "가져와서 깔기",
     "music.restoreMissing": "보관소에 파일이 없습니다 — 음원을 다시 연결하세요",
     "export.cancelled": "내보내기를 취소했습니다",
+    "export.missingMedia": "내보낼 수 없습니다: 미디어가 없습니다 ({names}). 원본을 다시 연결하거나 해당 클립을 지운 뒤 다시 시도하세요.",
 } as const;

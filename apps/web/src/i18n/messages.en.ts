@@ -668,4 +668,5 @@ export const en = {
     "music.restoreBed": "Import & lay",
     "music.restoreMissing": "File missing from the store — relink the audio",
     "export.cancelled": "Export cancelled",
+    "export.missingMedia": "Cannot export: media is missing ({names}). Reconnect the originals or remove those clips, then try again.",
 } as const;

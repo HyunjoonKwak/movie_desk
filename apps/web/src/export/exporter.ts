@@ -7,6 +7,7 @@ import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
+import { MissingMediaError, findMissingMedia } from "./preflight";
 import type { ExportPreset, ExportProgress, ExportRequest, ExportResult, Exporter } from "./types";
 
 const isWebCodecsSupported = (): boolean =>
@@ -70,6 +71,11 @@ export class WebCodecsExporter implements Exporter {
     const totalFrames = Math.max(1, msToFrames(exportDurationMs, preset.fps));
 
     onProgress({ stage: "preparing", progress: 0 });
+
+    // Refuse to render black frames for media whose bytes are gone; the
+    // dialog names the files so the user can relink or drop the clips.
+    const missing = await findMissingMedia(project, getAsset, { start: rangeStart, end: rangeEnd });
+    if (missing.length > 0) throw new MissingMediaError(missing);
 
     const canvas = document.createElement("canvas");
     canvas.width = preset.width;
