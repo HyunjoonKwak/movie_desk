@@ -510,7 +510,8 @@ export class Compositor {
 
   private readonly decodePrepared = new Set<string>();
   private readonly decodePreparing = new Set<string>();
-  // Missing or unreadable sources retry with a growing delay (1 s → 30 s).
+  // Missing or unreadable sources retry with a growing delay (1 s → 30 s);
+  // a changed asset record (relink, rebuilt proxy) retries at once.
   private readonly decodeRetry = new RetryBackoff();
 
   private async uploadClipSource(clip: MediaClip, asset: MediaAsset): Promise<WebGLTexture | null> {
@@ -530,7 +531,7 @@ export class Compositor {
       if (
         !this.decodePrepared.has(asset.id) &&
         !this.decodePreparing.has(asset.id) &&
-        this.decodeRetry.shouldTry(asset.id)
+        this.decodeRetry.shouldTry(asset.id, asset)
       ) {
         this.decodePreparing.add(asset.id);
         void (async () => {
@@ -546,7 +547,7 @@ export class Compositor {
                 provider.forget(asset.id);
               }
             } else {
-              this.decodeRetry.fail(asset.id);
+              this.decodeRetry.fail(asset.id, asset);
             }
           } finally {
             this.decodePreparing.delete(asset.id);

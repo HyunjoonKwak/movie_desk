@@ -60,7 +60,10 @@ export class FrameSourcePool {
     releaseSource,
   );
   private readonly pending = new Map<string, Promise<Source | null>>();
-  private readonly retry = new RetryBackoff();
+  // Element loads also fail transiently (decoder budget while scrubbing), so
+  // the cap stays short; the asset record is the token, so a rebuilt proxy or
+  // a relinked source retries at once.
+  private readonly retry = new RetryBackoff(1_000, 5_000);
   private retainedIds: ReadonlySet<string> | null = null;
 
   retain(assetIds: ReadonlySet<string>): void {
@@ -73,7 +76,7 @@ export class FrameSourcePool {
     if (this.retainedIds && !this.retainedIds.has(asset.id)) return null;
     const cached = this.cache.get(asset.id);
     if (cached) return cached;
-    if (!this.retry.shouldTry(asset.id)) return null;
+    if (!this.retry.shouldTry(asset.id, asset)) return null;
     const inflight = this.pending.get(asset.id);
     if (inflight) return inflight;
     const promise = this.load(asset);
@@ -98,7 +101,7 @@ export class FrameSourcePool {
       // Asset metadata can be restored before its file is readable (an import
       // still writing to OPFS), so the first miss retries soon; a source that
       // stays missing backs off instead of being probed every second.
-      this.retry.fail(asset.id);
+      this.retry.fail(asset.id, asset);
     }
     return loaded;
   }

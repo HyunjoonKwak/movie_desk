@@ -1,5 +1,6 @@
 import path from "node:path";
 import { type Page, expect, test } from "@playwright/test";
+import { installDecoderStats, readDecoderStats } from "./decoder-stats";
 
 // Local Chrome-channel journey for HEVC .mov (B11 gate that CI cannot run:
 // Playwright's Chromium ships no HEVC decoder). An iPhone-style rotated
@@ -9,43 +10,12 @@ import { type Page, expect, test } from "@playwright/test";
 
 const FIXTURE = "hevc-rotated90.mov";
 
-interface DecoderStats {
-  readonly configures: readonly string[];
-  readonly frames: number;
-}
-
-declare global {
-  interface Window {
-    __hevcStats?: DecoderStats;
-  }
-}
-
 const configurePage = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
     localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "en" }, version: 0 }));
     localStorage.setItem("cut.persistence.welcomed", "1");
-    const stats = { configures: [] as string[], frames: 0 };
-    window.__hevcStats = stats;
-    const Native = window.VideoDecoder;
-    if (Native) {
-      class CountingDecoder extends Native {
-        constructor(init: VideoDecoderInit) {
-          super({
-            ...init,
-            output: (frame) => {
-              stats.frames += 1;
-              init.output(frame);
-            },
-          });
-        }
-        override configure(config: VideoDecoderConfig): void {
-          stats.configures.push(config.codec);
-          super.configure(config);
-        }
-      }
-      (window as unknown as { VideoDecoder: unknown }).VideoDecoder = CountingDecoder;
-    }
   });
+  await installDecoderStats(page);
 };
 
 test.beforeEach(async ({ page }) => {
@@ -83,7 +53,7 @@ test("imports a rotated HEVC .mov and analyses it through an HEVC VideoDecoder",
   await page.getByRole("button", { name: "Auto edit" }).click();
   await expect(page.getByText("1/1", { exact: true })).toBeVisible({ timeout: 90_000 });
 
-  const stats = await page.evaluate(() => window.__hevcStats);
+  const stats = await readDecoderStats(page);
   test.info().annotations.push({ type: "decoder-stats", description: JSON.stringify(stats) });
   expect(stats?.configures.some((codec) => /^(hvc1|hev1)/.test(codec))).toBe(true);
   expect(stats?.frames ?? 0).toBeGreaterThan(0);

@@ -60,8 +60,9 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 ### 인계 메모
 
 - 2026-09-03 Claude: 후속 3건(`claude/reliability-followups`). (1) 컴포지터와 요소 폴백 풀이 소스를 못 여는 자산을
-  1초마다 무한 재시도하던 것을 `renderer/retry-backoff.ts`(1초 → 2배씩 → 최대 30초, 성공 시 초기화)로 제한. 첫 실패는
-  종전처럼 1초 뒤 재시도라 "가져오기 중인 파일" 동작은 그대로. (2) knip 미사용 export 2건(`MediaProbeError`,
+  1초마다 무한 재시도하던 것을 `renderer/retry-backoff.ts`(1초 → 2배씩 → 디코더 경로 최대 30초, 요소 폴백은 일시 오류가
+  잦아 최대 5초, 성공 시 초기화)로 제한. 첫 실패는 종전처럼 1초 뒤 재시도라 "가져오기 중인 파일" 동작은 그대로이고,
+  실패 당시의 자산 레코드를 토큰으로 기억해 프록시 생성·재연결로 레코드가 바뀌면 즉시 다시 시도한다. (2) knip 미사용 export 2건(`MediaProbeError`,
   `SAMPLE_BYTES`)은 export 제거. (3) HEVC .mov 로컬 e2e: `pnpm test:e2e:chrome`이 설치된 Google Chrome
   (`channel: "chrome"`) 프로젝트로 `e2e/hevc-chrome.spec.ts`만 실행 — 회전 HEVC fixture가 90×160 표시 크기로
   들어오고 분석이 `hvc1` VideoDecoder로 프레임을 내는지 확인. CI의 chromium 프로젝트는 이 스펙을 무시한다.
