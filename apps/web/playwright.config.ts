@@ -17,7 +17,25 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } },
+      // Needs a browser with HEVC; runs in the local Chrome project below.
+      testIgnore: /hevc-chrome\.spec\.ts/,
     },
+    // Local-only: Playwright's Chromium has no HEVC, so the .mov / HEVC
+    // journey runs against the installed Google Chrome when asked for
+    // explicitly (`pnpm test:e2e:chrome`). CI never selects this project.
+    ...(process.env.PLAYWRIGHT_CHROME
+      ? [
+          {
+            name: "chrome-hevc",
+            use: {
+              ...devices["Desktop Chrome"],
+              channel: "chrome",
+              viewport: { width: 1440, height: 900 },
+            },
+            testMatch: /hevc-chrome\.spec\.ts/,
+          },
+        ]
+      : []),
   ],
   webServer: {
     command: "pnpm exec next dev --turbopack -H 127.0.0.1 -p 32119",

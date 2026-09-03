@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:chrome": "PLAYWRIGHT_CHROME=1 playwright test --project chrome-hevc",
     "format": "biome format --write src e2e playwright.config.ts",
     "knip": "pnpm --dir ../.. exec knip --workspace apps/web",
     "prebundle:mediapipe": "node scripts/download-mediapipe-models.mjs",
