@@ -483,7 +483,18 @@ ipcMain.handle("movie-desk:save-export", async (event, payload) => {
   });
   if (result.canceled || !result.filePath) return null;
   await fs.promises.writeFile(result.filePath, Buffer.from(bytes));
+  savedExports.add(result.filePath);
   return result.filePath;
+});
+
+// Only files this process wrote through the save panel can be revealed, so
+// the renderer cannot point Finder at arbitrary paths.
+const savedExports = new Set();
+ipcMain.handle("movie-desk:reveal-export", async (_event, filePath) => {
+  if (typeof filePath !== "string" || !savedExports.has(filePath)) return false;
+  if (!fs.existsSync(filePath)) return false;
+  shell.showItemInFolder(filePath);
+  return true;
 });
 
 // IPC: YouTube music-credit lookup for the music library. Main has no CORS,

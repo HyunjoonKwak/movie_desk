@@ -54,6 +54,16 @@ test("exports the timeline to a non-empty MP4 with the VP9 preset", async ({ pag
   const { size } = await import("node:fs/promises").then((fs) => fs.stat(path as string));
   expect(size).toBeGreaterThan(1024);
   await expect(page.getByText(/^Exported: .*\.mp4$/)).toBeVisible();
+
+  // The dialog stays open on a completion screen that says where the file
+  // went, and can go straight back to the presets for another export.
+  const done = dialog.locator("[data-export-complete]");
+  await expect(done.getByText("Export complete", { exact: true })).toBeVisible();
+  await expect(done.getByText(file.suggestedFilename(), { exact: true })).toBeVisible();
+  await expect(done.getByText("Saved to your browser's Downloads folder")).toBeVisible();
+  await dialog.getByRole("button", { name: "Export again" }).click();
+  await expect(dialog.getByLabel("Web (VP9 · MP4)")).toBeChecked();
+  await expect(dialog.getByRole("button", { name: "Export", exact: true })).toBeEnabled();
 });
 
 test("cancelling a running export reports a cancel and leaves the dialog usable", async ({

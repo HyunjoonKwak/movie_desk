@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("cutDesktop", {
   // Native save dialog → returns the chosen file path, or null on cancel.
   // Accepts a Uint8Array of encoded bytes; the main process writes the file.
   saveExport: async (payload) => ipcRenderer.invoke("movie-desk:save-export", payload),
+  // Shows a file saved through saveExport in Finder. Resolves false otherwise.
+  revealExport: async (filePath) => ipcRenderer.invoke("movie-desk:reveal-export", filePath),
   // YouTube music-credit text for the music library (desktop only — main
   // process fetch has no CORS). Returns parseable text or null.
   fetchMusicCredits: async (url) => ipcRenderer.invoke("movie-desk:fetch-music-credits", url),

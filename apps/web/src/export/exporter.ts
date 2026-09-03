@@ -311,29 +311,40 @@ const sanitizeName = (s: string): string => s.replace(/[^a-z0-9_\-]+/gi, "_").sl
 // Saves the encoded blob. In the desktop bundle we route through the
 // Electron preload bridge (native Save panel + filesystem write); on the
 // web we fall back to the standard anchor-download flow.
-export const downloadBlob = async (blob: Blob, filename: string): Promise<void> => {
-  const desktop =
-    typeof window !== "undefined"
-      ? (
-          window as unknown as {
-            cutDesktop?: {
-              saveExport?: (p: {
-                suggestedName: string;
-                bytes: Uint8Array;
-                mimeType?: string;
-              }) => Promise<string | null>;
-            };
-          }
-        ).cutDesktop
-      : undefined;
+// Where an export ended up: a file the desktop save panel wrote, a browser
+// download, or nothing because the save panel was dismissed.
+export type ExportDestination =
+  | { readonly kind: "file"; readonly path: string }
+  | { readonly kind: "download"; readonly name: string }
+  | { readonly kind: "cancelled" };
+
+interface DesktopExportBridge {
+  saveExport?: (p: {
+    suggestedName: string;
+    bytes: Uint8Array;
+    mimeType?: string;
+  }) => Promise<string | null>;
+  revealExport?: (path: string) => Promise<boolean>;
+}
+
+const desktopBridge = (): DesktopExportBridge | undefined =>
+  typeof window !== "undefined"
+    ? (window as unknown as { cutDesktop?: DesktopExportBridge }).cutDesktop
+    : undefined;
+
+// Saves the encoded blob. In the desktop bundle we route through the
+// Electron preload bridge (native Save panel + filesystem write); on the
+// web the browser downloads it.
+export const downloadBlob = async (blob: Blob, filename: string): Promise<ExportDestination> => {
+  const desktop = desktopBridge();
   if (desktop?.saveExport) {
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    await desktop.saveExport({
+    const path = await desktop.saveExport({
       suggestedName: filename,
       bytes,
       ...(blob.type ? { mimeType: blob.type } : {}),
     });
-    return;
+    return path ? { kind: "file", path } : { kind: "cancelled" };
   }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -343,4 +354,16 @@ export const downloadBlob = async (blob: Blob, filename: string): Promise<void> 
   a.click();
   document.body.removeChild(a);
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return { kind: "download", name: filename };
+};
+
+// Shows the saved file in Finder (desktop only). False when unavailable.
+export const revealExport = async (path: string): Promise<boolean> => {
+  const desktop = desktopBridge();
+  if (!desktop?.revealExport) return false;
+  try {
+    return await desktop.revealExport(path);
+  } catch {
+    return false;
+  }
 };

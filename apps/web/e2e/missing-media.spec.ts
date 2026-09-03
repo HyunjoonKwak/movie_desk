@@ -45,6 +45,8 @@ test("an export with missing media is refused by name and the dialog stays usabl
   await expect(page.getByText(/^Cannot export: media is missing \(pix\.png\)/)).toBeVisible({
     timeout: 30_000,
   });
+  await expect(dialog.getByText("Some media cannot be read", { exact: true })).toBeVisible();
+  await expect(dialog.getByText(/Projects → Export JSON/)).toBeVisible();
   await expect(page.getByText(/^Exported: /)).toHaveCount(0);
   // Give a download that raced the toast a moment to show up before asserting.
   await page.waitForTimeout(500);
