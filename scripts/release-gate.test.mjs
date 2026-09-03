@@ -26,11 +26,11 @@ test("parseArgs rejects unknown flags and missing values", () => {
 test("planSteps keeps CI order, honours --only/--skip and rejects unknown ids", () => {
   assert.deepEqual(
     planSteps().map((s) => s.id),
-    ["versions", "lint", "typecheck", "test", "audit", "build", "e2e"],
+    ["install", "versions", "lint", "typecheck", "test", "audit", "build", "browsers", "e2e"],
   );
   assert.deepEqual(
-    planSteps({ skip: ["e2e", "build"] }).map((s) => s.id),
-    ["versions", "lint", "typecheck", "test", "audit"],
+    planSteps({ skip: ["e2e", "build", "browsers"] }).map((s) => s.id),
+    ["install", "versions", "lint", "typecheck", "test", "audit"],
   );
   assert.deepEqual(
     planSteps({ only: ["test", "lint"] }).map((s) => s.id),

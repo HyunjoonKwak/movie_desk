@@ -28,7 +28,7 @@ test("an export with missing media is refused by name and the dialog stays usabl
 
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("YouTube 1080p").uncheck();
+  await dialog.getByLabel("Family message 720p").uncheck();
   await dialog.getByLabel("Web (VP9 · MP4)").check();
 
   let downloads = 0;
@@ -41,6 +41,8 @@ test("an export with missing media is refused by name and the dialog stays usabl
     timeout: 30_000,
   });
   await expect(page.getByText(/^Exported: /)).toHaveCount(0);
+  // Give a download that raced the toast a moment to show up before asserting.
+  await page.waitForTimeout(500);
   expect(downloads).toBe(0);
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("button", { name: "Export", exact: true })).toBeEnabled();

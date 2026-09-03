@@ -24,6 +24,11 @@ export const E2E_PORT = 32119;
 // Ordered like ci.yml: cheapest signal first, browser run last. `build` writes
 // to a private dist dir so the developer's `next dev` cache survives the gate.
 export const STEPS = [
+  {
+    id: "install",
+    label: "install (frozen lockfile)",
+    command: ["pnpm", "install", "--frozen-lockfile"],
+  },
   { id: "versions", label: "version policy", command: ["pnpm", "check:versions"] },
   { id: "lint", label: "lint", command: ["pnpm", "lint"] },
   { id: "typecheck", label: "typecheck", command: ["pnpm", "typecheck"] },
@@ -34,6 +39,11 @@ export const STEPS = [
     label: "web production build",
     command: ["pnpm", "--filter", "@movie-desk/web", "build"],
     env: { NEXT_DIST_DIR: ".next-gate" },
+  },
+  {
+    id: "browsers",
+    label: "playwright chromium",
+    command: ["pnpm", "--filter", "@movie-desk/web", "exec", "playwright", "install", "chromium"],
   },
   {
     id: "e2e",
@@ -172,11 +182,17 @@ if (isMain) {
     process.stderr.write(`${error.message}\n`);
     process.exit(2);
   }
-  const outcome = await runGate(steps, {
-    continueOnFailure: options.continueOnFailure,
-    run: (step) => runCommand(step, root),
-    log: (line) => process.stdout.write(line),
-  });
+  let outcome;
+  try {
+    outcome = await runGate(steps, {
+      continueOnFailure: options.continueOnFailure,
+      run: (step) => runCommand(step, root),
+      log: (line) => process.stdout.write(line),
+    });
+  } catch (error) {
+    process.stderr.write(`release gate crashed before a verdict: ${error.message}\n`);
+    process.exit(2);
+  }
   const summary = formatSummary(outcome);
   process.stdout.write(`\n${summary}`);
   if (options.report) writeFileSync(resolve(root, options.report), summary);

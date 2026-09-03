@@ -1,6 +1,12 @@
-import { type Clip, type ID, type MediaAsset, createEmptyProject } from "@movie-desk/core";
-import { describe, expect, it } from "vitest";
-import { MediaSourceError } from "../../media/source/media-source";
+import {
+  type Clip,
+  type ID,
+  type MediaAsset,
+  type Track,
+  createEmptyProject,
+} from "@movie-desk/core";
+import { describe, expect, it, vi } from "vitest";
+import { MediaSourceError, type RandomAccessMediaSource } from "../../media/source/media-source";
 import { MissingMediaError, findMissingMedia, referencedClips } from "../preflight";
 
 const asset = (id: string, name: string): MediaAsset => ({
@@ -41,86 +47,161 @@ const textClip = (id: string, start: number): Clip =>
     text: "title",
   }) as unknown as Clip;
 
-const projectWith = (clips: readonly Clip[], assets: readonly MediaAsset[]) => {
+const projectWith = (
+  tracks: readonly { clips: readonly Clip[]; muted?: boolean; solo?: boolean }[],
+  assets: readonly MediaAsset[] = [],
+) => {
   const base = createEmptyProject({ name: "preflight" });
-  const track = { ...base.timeline.tracks[0]!, clips: [...clips] };
+  const template = base.timeline.tracks[0]!;
   return {
     ...base,
     mediaLibrary: [...assets],
-    timeline: { ...base.timeline, tracks: [track], duration: 5_000 },
+    timeline: {
+      ...base.timeline,
+      tracks: tracks.map(
+        (t, i): Track => ({
+          ...template,
+          id: `t${i}` as ID,
+          clips: [...t.clips],
+          muted: t.muted ?? false,
+          solo: t.solo ?? false,
+        }),
+      ),
+      duration: 5_000,
+    },
   };
 };
 
+const source = (sizeBytes = 1, read = vi.fn(async () => new ArrayBuffer(1))) =>
+  ({
+    assetId: "x",
+    sizeBytes,
+    mime: "video/mp4",
+    read,
+    acquirePlaybackUrl: vi.fn(),
+  }) as unknown as RandomAccessMediaSource;
+
+const range = { start: 0, end: 5_000 };
+const ids = (project: ReturnType<typeof projectWith>, r = range) =>
+  referencedClips(project, r).map((ref) => ref.assetId);
+
 describe("referencedClips", () => {
   it("keeps enabled media clips inside the range, one per asset", () => {
-    const project = projectWith(
-      [
-        mediaClip("c1", "a", 0),
-        mediaClip("c2", "a", 1_000),
-        mediaClip("c3", "b", 4_000, { disabled: true }),
-        mediaClip("c4", "c", 9_000),
-        textClip("t1", 0),
-      ],
-      [],
-    );
-    expect(referencedClips(project, { start: 0, end: 5_000 }).map((r) => r.assetId)).toEqual(["a"]);
+    const project = projectWith([
+      {
+        clips: [
+          mediaClip("c1", "a", 0),
+          mediaClip("c2", "a", 1_000),
+          mediaClip("c3", "b", 4_000, { disabled: true }),
+          mediaClip("c4", "c", 9_000),
+          textClip("t1", 0),
+        ],
+      },
+    ]);
+    expect(ids(project)).toEqual(["a"]);
   });
 
   it("uses the export range, not the whole timeline", () => {
-    const project = projectWith([mediaClip("c1", "a", 0), mediaClip("c2", "b", 3_000)], []);
-    expect(referencedClips(project, { start: 2_500, end: 5_000 }).map((r) => r.assetId)).toEqual([
-      "b",
+    const project = projectWith([
+      { clips: [mediaClip("c1", "a", 0), mediaClip("c2", "b", 3_000)] },
     ]);
+    expect(ids(project, { start: 2_500, end: 5_000 })).toEqual(["b"]);
+  });
+
+  it("skips muted tracks and, while soloing, every non-solo track", () => {
+    const muted = projectWith([
+      { clips: [mediaClip("c1", "a", 0)], muted: true },
+      { clips: [mediaClip("c2", "b", 0)] },
+    ]);
+    expect(ids(muted)).toEqual(["b"]);
+
+    const soloed = projectWith([
+      { clips: [mediaClip("c1", "a", 0)] },
+      { clips: [mediaClip("c2", "b", 0)], solo: true },
+    ]);
+    expect(ids(soloed)).toEqual(["b"]);
   });
 });
 
 describe("findMissingMedia", () => {
-  const range = { start: 0, end: 5_000 };
+  const lib =
+    (...assets: MediaAsset[]) =>
+    (id: ID) =>
+      assets.find((a) => a.id === id);
 
-  it("reports nothing when every referenced asset resolves", async () => {
-    const project = projectWith([mediaClip("c1", "a", 0)], [asset("a", "trip.mp4")]);
-    const missing = await findMissingMedia(
-      project,
-      (id) => project.mediaLibrary.find((x) => x.id === id),
-      range,
-      async () => ({}),
+  it("reports nothing when every referenced asset resolves and reads", async () => {
+    const project = projectWith([{ clips: [mediaClip("c1", "a", 0)] }]);
+    const read = vi.fn(async () => new ArrayBuffer(1));
+    const missing = await findMissingMedia(project, lib(asset("a", "trip.mp4")), range, async () =>
+      source(1, read),
     );
     expect(missing).toEqual([]);
+    expect(read).toHaveBeenCalledWith(0, 1);
   });
 
   it("names the asset whose source is gone and keeps its source state", async () => {
-    const project = projectWith(
-      [mediaClip("c1", "a", 0), mediaClip("c2", "b", 1_000)],
-      [asset("a", "trip.mp4"), asset("b", "beach.mov")],
-    );
+    const project = projectWith([
+      { clips: [mediaClip("c1", "a", 0), mediaClip("c2", "b", 1_000)] },
+    ]);
     const missing = await findMissingMedia(
       project,
-      (id) => project.mediaLibrary.find((x) => x.id === id),
+      lib(asset("a", "trip.mp4"), asset("b", "beach.mov")),
       range,
       async (a) => {
         if (a.id === "b") throw new MediaSourceError("offline", "OPFS copy is missing");
-        return {};
+        return source();
       },
     );
     expect(missing).toEqual([{ assetId: "b", name: "beach.mov", state: "offline" }]);
   });
 
-  it("reports a clip whose asset left the library, using the clip label", async () => {
-    const project = projectWith([mediaClip("c1", "ghost", 0, { label: "Old clip" })], []);
+  it("treats a source that opens but cannot be read, or is empty, as missing", async () => {
+    const project = projectWith([
+      { clips: [mediaClip("c1", "a", 0), mediaClip("c2", "b", 1_000)] },
+    ]);
+    const missing = await findMissingMedia(
+      project,
+      lib(asset("a", "trip.mp4"), asset("b", "beach.mov")),
+      range,
+      async (a) =>
+        a.id === "a"
+          ? source(
+              1,
+              vi.fn(async () => {
+                throw new MediaSourceError("permission-denied", "range request returned HTTP 403");
+              }),
+            )
+          : source(0),
+    );
+    expect(missing).toEqual([
+      { assetId: "a", name: "trip.mp4", state: "permission-denied" },
+      { assetId: "b", name: "beach.mov", state: "changed" },
+    ]);
+  });
+
+  it("reports a clip whose asset left the library by label or timeline position", async () => {
+    const project = projectWith([
+      {
+        clips: [mediaClip("c1", "ghost", 0, { label: "Old clip" }), mediaClip("c2", "gone", 2_500)],
+      },
+    ]);
     const missing = await findMissingMedia(
       project,
       () => undefined,
       range,
-      async () => ({}),
+      async () => source(),
     );
-    expect(missing).toEqual([{ assetId: "ghost", name: "Old clip", state: "unknown" }]);
+    expect(missing).toEqual([
+      { assetId: "ghost", name: "Old clip", state: "unknown" },
+      { assetId: "gone", name: "clip @ 2.5s", state: "unknown" },
+    ]);
   });
 
   it("classifies non-source failures as unknown", async () => {
-    const project = projectWith([mediaClip("c1", "a", 0)], [asset("a", "trip.mp4")]);
+    const project = projectWith([{ clips: [mediaClip("c1", "a", 0)] }]);
     const missing = await findMissingMedia(
       project,
-      (id) => project.mediaLibrary.find((x) => x.id === id),
+      lib(asset("a", "trip.mp4")),
       range,
       async () => {
         throw new Error("boom");

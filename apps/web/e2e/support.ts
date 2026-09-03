@@ -21,23 +21,39 @@ export const configurePage = async (page: Page): Promise<void> => {
 
 // The media-bin card for a file, as opposed to the timeline clips that carry
 // the same name.
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 export const mediaCard = (page: Page, name = "pix.png") =>
-  page.getByRole("button", { name: new RegExp(`^${name.replace(".", "\\.")}`) }).first();
+  page.getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}`) }).first();
 
 export const clipCount = (page: Page): Promise<number> => page.locator("[data-clip]").count();
 
-// Imports one still image and appends it `presses` times. Returns how many
-// clips landed — the import itself may place the first one.
+// Imports one still image and appends it `presses` times. Returns the clip
+// count once it has settled: the import may place a clip itself and one
+// press can append more than one (known editor issue), so the number is
+// measured rather than assumed.
 export const seedTimeline = async (page: Page, presses: number): Promise<number> => {
   await page.goto("/editor");
   await page
     .locator(MEDIA_INPUT)
     .setInputFiles({ name: "pix.png", mimeType: "image/png", buffer: PNG });
+  await expect(mediaCard(page)).toBeVisible();
+  const placed = await clipCount(page);
   await mediaCard(page).click();
   for (let i = 0; i < presses; i++) await page.keyboard.press("e");
-  await expect.poll(() => clipCount(page)).toBeGreaterThanOrEqual(presses);
-  await page.waitForTimeout(300);
-  return clipCount(page);
+  await expect.poll(() => clipCount(page)).toBeGreaterThanOrEqual(placed + presses);
+  return settledClipCount(page);
+};
+
+// Waits until two reads 250 ms apart agree, then returns that count.
+export const settledClipCount = async (page: Page): Promise<number> => {
+  let count = await clipCount(page);
+  for (;;) {
+    await page.waitForTimeout(250);
+    const next = await clipCount(page);
+    if (next === count) return count;
+    count = next;
+  }
 };
 
 // Every key in the origin's OPFS root (the media store).

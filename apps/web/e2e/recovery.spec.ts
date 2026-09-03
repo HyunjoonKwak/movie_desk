@@ -29,19 +29,59 @@ const injectStoredProject = async (
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
           const db = open.result;
-          const tx = db.transaction(["projects", "meta"], "readwrite");
-          tx.objectStore("projects").put({ ...row, updatedAt: Date.now() });
-          if (activate) tx.objectStore("meta").put({ key: "activeProjectId", value: row.id });
-          tx.onerror = () => reject(tx.error);
-          tx.oncomplete = () => {
+          try {
+            if (
+              !db.objectStoreNames.contains("projects") ||
+              !db.objectStoreNames.contains("meta")
+            ) {
+              throw new Error(`${dbName} has not been opened by the app yet`);
+            }
+            const tx = db.transaction(["projects", "meta"], "readwrite");
+            tx.objectStore("projects").put({ ...row, updatedAt: Date.now() });
+            if (activate) tx.objectStore("meta").put({ key: "activeProjectId", value: row.id });
+            tx.onerror = () => reject(tx.error);
+            tx.oncomplete = () => {
+              db.close();
+              resolve();
+            };
+          } catch (error) {
             db.close();
-            resolve();
-          };
+            reject(error);
+          }
         };
       }),
     { dbName: LIBRARY_DB, row, activate },
   );
 };
+
+// The id the app will reopen on the next load, once its own mount-time write
+// has landed; null until then.
+const activeProjectId = (page: Page): Promise<string | null> =>
+  page.evaluate(
+    async (dbName) =>
+      new Promise<string | null>((resolve, reject) => {
+        const open = indexedDB.open(dbName);
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const db = open.result;
+          if (!db.objectStoreNames.contains("meta")) {
+            db.close();
+            resolve(null);
+            return;
+          }
+          const request = db
+            .transaction("meta", "readonly")
+            .objectStore("meta")
+            .get("activeProjectId");
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            db.close();
+            resolve((request.result as { value?: string } | undefined)?.value ?? null);
+          };
+        };
+      }),
+    LIBRARY_DB,
+  );
 
 const projectNameInput = (page: Page) => page.locator('header input[type="text"]').first();
 
@@ -50,8 +90,10 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("edits that were never explicitly saved survive an abrupt reload", async ({ page }) => {
-  const before = await persistedUpdateCount(page).catch(() => 0);
   const clips = await seedTimeline(page, 2);
+  // Baseline right before the last edit, so the poll below waits for that
+  // edit's IndexedDB write and not for the seeding writes that already landed.
+  const before = await persistedUpdateCount(page);
   await projectNameInput(page).fill("Recovered trip");
   await projectNameInput(page).press("Enter");
   await expect(page.getByText(/^Saved/)).toBeVisible();
@@ -80,14 +122,16 @@ test("a damaged project file is refused and the open project is untouched", asyn
     mimeType: "application/json",
     buffer: Buffer.from("{ this is not json"),
   });
-  await expect(page.getByText(/^Import failed/).first()).toBeVisible();
+  // Each failure carries its own reason: the JSON parser's for the first,
+  // the schema's for the second, so the two toasts are told apart.
+  await expect(page.getByText(/^Import failed: .*JSON/)).toBeVisible();
 
   await jsonInput.setInputFiles({
     name: "wrong-shape.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify({ schema: "cut_editor-project", version: 1, project: {} })),
   });
-  await expect(page.getByText(/^Import failed/)).toHaveCount(2);
+  await expect(page.getByText(/^Import failed: [\s\S]*invalid_type/)).toBeVisible();
 
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
@@ -117,6 +161,9 @@ test("a damaged saved project is reported and cannot replace the open project", 
 test("a damaged last-opened project falls back to a fresh project on load", async ({ page }) => {
   await page.goto("/editor");
   await expect(page.getByRole("button", { name: "Projects" })).toBeVisible();
+  // The app records its own active project on mount; inject only after that
+  // write has landed so it cannot overwrite the corrupt pointer.
+  await expect.poll(() => activeProjectId(page)).not.toBeNull();
   await injectStoredProject(
     page,
     { id: "broken-active", name: "Broken active", json: "not even json" },

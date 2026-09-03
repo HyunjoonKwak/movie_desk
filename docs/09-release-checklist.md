@@ -11,15 +11,17 @@ v0.4.0 계열 릴리스 전에 확인하는 항목이다. **자동 항목**은 `
 
 | 단계 | 명령 | 확인하는 것 |
 | --- | --- | --- |
+| install | `pnpm install --frozen-lockfile` | 락파일이 매니페스트와 맞는다 (CI의 첫 단계) |
 | version policy | `pnpm check:versions` | 네 매니페스트의 버전이 `apps/desktop/package.json`과 같다 (D2) |
 | lint | `pnpm lint` | biome lint(web·core·desktop) + 루트 `scripts/` `biome check` |
 | typecheck | `pnpm typecheck` | `tsc --noEmit` 전 워크스페이스 |
 | unit tests | `pnpm test` | vitest(web·core), node:test(desktop·scripts) |
 | OSV audit | `pnpm audit:prod` | 프로덕션 의존성에 알려진 취약점 0건 (네트워크 필요) |
 | web production build | `pnpm --filter @movie-desk/web build` | Next 프로덕션 빌드. `NEXT_DIST_DIR=.next-gate`라 `next dev` 캐시를 건드리지 않는다 |
+| playwright chromium | `playwright install chromium` | e2e가 쓸 브라우저가 있다 (있으면 즉시 통과) |
 | browser e2e | `pnpm test:e2e` | Playwright Chromium. 포트 32119가 비어 있어야 시작한다 (`lsof -ti :32119 \| xargs kill`) |
 
-옵션: `--continue`(첫 실패 뒤에도 끝까지 돌려 실패를 모두 보고), `--skip e2e,build`,
+옵션: `--continue`(첫 실패 뒤에도 끝까지 돌려 실패를 모두 보고), `--skip install,browsers,e2e,build`,
 `--only lint,test`, `--report gate.md`(요약 표를 파일로). 실패하면 종료 코드 1.
 
 ## 2. 자동화된 체크리스트 항목 (Playwright, `apps/web/e2e/`)
@@ -30,7 +32,7 @@ v0.4.0 계열 릴리스 전에 확인하는 항목이다. **자동 항목**은 `
 | 손상 프로젝트 파일 | `recovery.spec.ts` | 깨진 JSON·형식이 다른 JSON을 가져오면 "Import failed" 안내만 나오고 열린 프로젝트(이름·클립 수)는 변하지 않는다 |
 | 손상 저장 프로젝트 | `recovery.spec.ts` | 라이브러리의 손상 행을 열면 안내가 뜨고 현재 프로젝트가 유지된다. 마지막 프로젝트가 손상돼 있으면 새 프로젝트로 열고 가져오기가 계속 동작한다 |
 | 저장 공간 부족 | `storage-full.spec.ts` | 한 파일의 OPFS 쓰기가 `QuotaExceededError`로 실패하면 파일별로 "저장 공간 부족" 안내, 나머지 파일은 정상 가져오기, 부분 파일이 남지 않으며, 공간 확보 뒤 파일별 재시도가 성공한다 |
-| 누락 미디어 | `missing-media.spec.ts` | 클립이 참조하는 OPFS 파일을 지운 뒤 내보내면 파일 이름을 들어 거부하고, 다운로드가 생기지 않으며, 대화상자는 다시 쓸 수 있다 (`export/preflight.ts`) |
+| 누락 미디어 | `missing-media.spec.ts` | 클립이 참조하는 OPFS 파일을 지운 뒤 내보내면 파일 이름을 들어 거부하고, 다운로드가 생기지 않으며, 대화상자는 다시 쓸 수 있다. `export/preflight.ts`는 범위 안·음소거되지 않은(솔로 중이면 솔로) 트랙의 클립마다 소스를 열고 첫 1바이트를 읽는다 — OPFS 사본과 데스크톱 `media://` 참조 모두 실제 바이트로 확인 |
 | 내보내기·취소·스냅샷 | `export.spec.ts` | VP9 내보내기 결과 파일, 렌더 중 취소, 스냅샷 복원 (B22) |
 | 손상 미디어 파일 | `media-import-failure.spec.ts` | 디코드 불가 파일을 같은 배치의 정상 파일과 분리해 안내 (B9) |
 | 자동 편집 | `autoedit.spec.ts` | 분석 → 초안 → 타임라인 (B17) |
