@@ -32,12 +32,14 @@ export interface DemuxPacket {
 export interface PacketReader {
   // The key packet at or before `timestampUs`, else the first key packet.
   keyPacketAt(timestampUs: number): Promise<DemuxPacket | null>;
-  // The next packet in decode order.
+  // The next packet in decode order; throws for a packet this reader did
+  // not hand out.
   nextPacket(packet: DemuxPacket): Promise<DemuxPacket | null>;
   // Presentation times (ms) of every key packet.
   keyTimesMs(): Promise<number[]>;
-  // Every packet in decode order.
-  packets(): AsyncIterable<DemuxPacket>;
+  // Every packet in decode order, optionally from a packet this reader
+  // handed out. Preferred for long walks: the sink tunes its preloading.
+  packets(from?: DemuxPacket): AsyncIterable<DemuxPacket>;
 }
 
 interface VideoTrackInfo {
@@ -78,7 +80,7 @@ const toPacket = (packet: EncodedPacket): DemuxPacket => ({
 const packetReader = (track: InputTrack): PacketReader => {
   const sink = new EncodedPacketSink(track);
   // Our packets stay plain data; the mediabunny originals are kept aside so
-  // nextPacket can continue from them.
+  // nextPacket and packets(from) can continue from them.
   const originals = new WeakMap<DemuxPacket, EncodedPacket>();
   const wrap = (packet: EncodedPacket | null): DemuxPacket | null => {
     if (!packet) return null;
@@ -86,16 +88,18 @@ const packetReader = (track: InputTrack): PacketReader => {
     originals.set(out, packet);
     return out;
   };
+  const originalOf = (packet: DemuxPacket): EncodedPacket => {
+    const original = originals.get(packet);
+    if (!original) throw new Error("packet was not handed out by this reader");
+    return original;
+  };
   return {
     keyPacketAt: async (timestampUs) =>
       wrap(
         (await sink.getKeyPacket(Math.max(0, timestampUs) / 1_000_000)) ??
           (await sink.getFirstKeyPacket()),
       ),
-    nextPacket: async (packet) => {
-      const original = originals.get(packet);
-      return original ? wrap(await sink.getNextPacket(original)) : null;
-    },
+    nextPacket: async (packet) => wrap(await sink.getNextPacket(originalOf(packet))),
     keyTimesMs: async () => {
       const times: number[] = [];
       const options = { metadataOnly: true };
@@ -108,8 +112,9 @@ const packetReader = (track: InputTrack): PacketReader => {
       }
       return times;
     },
-    packets: async function* () {
-      for await (const packet of sink.packets()) yield toPacket(packet);
+    packets: async function* (from) {
+      const start = from ? originalOf(from) : undefined;
+      for await (const packet of sink.packets(start)) yield wrap(packet) as DemuxPacket;
     },
   };
 };
@@ -132,12 +137,21 @@ const audioInfo = async (track: InputAudioTrack): Promise<AudioTrackInfo> => ({
   packets: packetReader(track),
 });
 
+// Reads through a ByteSource are expensive on the desktop (each is a lease
+// plus a ranged media:// request), so the reader prefetches like a network
+// client and keeps a bounded cache: a full packet walk of a 7.7 MB file went
+// from one read per packet (246) to 18, and a set of playhead windows from
+// per-packet reads to 15, at 4 MiB. Smaller caches thrash on window reads.
+const READ_CACHE_BYTES = 4 * 1024 * 1024;
+
 const inputFor = (source: ByteSource): Input =>
   new Input({
     formats: [MP4, QTFF],
     source: new CustomSource({
       getSize: () => source.size,
       read: async (start, end) => new Uint8Array(await source.read(start, end - start)),
+      prefetchProfile: "network",
+      maxCacheSize: READ_CACHE_BYTES,
     }),
   });
 
@@ -148,11 +162,9 @@ export const openMp4 = async (source: ByteSource): Promise<OpenedMp4 | null> => 
   const input = inputFor(source);
   try {
     const format = await input.getFormat();
-    const [video, audio, durationSeconds] = await Promise.all([
-      input.getPrimaryVideoTrack(),
-      input.getPrimaryAudioTrack(),
-      input.computeDuration(),
-    ]);
+    const video = await input.getPrimaryVideoTrack();
+    const audio = await input.getPrimaryAudioTrack();
+    const durationSeconds = await input.computeDuration();
     return {
       source,
       container: format instanceof QuickTimeInputFormat ? "mov" : "mp4",

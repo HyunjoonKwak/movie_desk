@@ -136,32 +136,32 @@ export const decodeMp4ToCache = async (
     activeDecoder = decoder;
     decoder.configure(config);
 
-    // From the key packet before the playhead through the end of the window
-    // (plus reorder slack); frames outside the window are dropped on output.
-    let packet = await track.packets.keyPacketAt(timestampUs);
-    while (packet && !closed && requestGeneration === generation) {
-      if (packet.timestampUs > window.endUs + REORDER_SLACK_US) break;
-      try {
-        decoder.decode(toChunk(packet));
-      } catch {
-        // A corrupt packet should not poison the fallback video path.
-      }
-      packet = await track.packets.nextPacket(packet);
-    }
-
-    if (!closed && requestGeneration === generation) {
-      try {
-        await decoder.flush();
-      } catch {
-        // Decoder failures leave the HTMLVideoElement fallback in control.
-      }
-    }
-    if (decoderFailure) cache.forget(assetId);
-    if (activeDecoder === decoder) activeDecoder = null;
     try {
-      decoder.close();
-    } catch {
-      // Already closed after a decoder error.
+      // From the key packet before the playhead through the end of the
+      // window (plus reorder slack); frames outside the window are dropped
+      // on output. Reads can fail (a drive that went away): that counts as
+      // a decoder failure and the element fallback keeps the preview alive.
+      let packet = await track.packets.keyPacketAt(timestampUs);
+      while (packet && !closed && requestGeneration === generation) {
+        if (packet.timestampUs > window.endUs + REORDER_SLACK_US) break;
+        try {
+          decoder.decode(toChunk(packet));
+        } catch {
+          // A corrupt packet should not poison the fallback video path.
+        }
+        packet = await track.packets.nextPacket(packet);
+      }
+      if (!closed && requestGeneration === generation) await decoder.flush();
+    } catch (error) {
+      decoderFailure = error instanceof Error ? error : new Error(String(error));
+    } finally {
+      if (decoderFailure) cache.forget(assetId);
+      if (activeDecoder === decoder) activeDecoder = null;
+      try {
+        decoder.close();
+      } catch {
+        // Already closed after a decoder error.
+      }
     }
   };
 

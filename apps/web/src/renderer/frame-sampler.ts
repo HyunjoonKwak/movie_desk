@@ -365,9 +365,14 @@ export const streamFramesAt = async (
       try {
         const requested = typeof times === "function" ? times(opened.durationMs) : times;
         if (requested.length === 0) return;
+        remaining = requested;
         const served = await sampleViaWebCodecs(opened, requested, options, emit);
         remaining = remainingTimes(requested, served);
         if (remaining.length === 0 || options.signal?.aborted) return;
+      } catch {
+        // A demux read that failed mid-way (key packet table, a packet) is
+        // the fallback's job, like a decode failure; `remaining` still holds
+        // whatever WebCodecs did not serve.
       } finally {
         opened.dispose();
       }

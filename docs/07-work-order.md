@@ -68,6 +68,11 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   `brands`는 `container: "mp4" | "mov"`로 바뀜(소비자는 테스트뿐). 새 fixture `avc-bframes.mp4`(libx264 B-프레임 +
   편집 리스트)로 디코드 순서·표시 시각·키 패킷 탐색을 단위 테스트. 실제 Chrome 152: 1080p H.264(B-프레임)와
   회전 HEVC .mov 가져오기·분석·재생·스크럽에서 configure/decode/frame 수 일치, 디코더 오류 0.
+  리뷰 반영: `CustomSource`에 `prefetchProfile: "network"` + 4MiB 캐시(7.7MB 파일 전체 순회 읽기 246회 → 18회,
+  플레이헤드 창 12개 → 15회; 1MiB는 창 읽기가 210회로 스래싱), 플레이헤드 디코드 창의 읽기 실패를 디코더
+  실패로 처리해 `request()`가 reject되거나 디코더가 새지 않게 함, 선형 디코더는 `packets(from)` 제너레이터로
+  순회, 키 시각 조회 실패 시 요소 폴백, 다른 reader의 패킷은 예외. 남은 후속: 스크럽한 자산마다 살아 있는
+  `DecoderHandle`(= Input + 캐시)을 LRU로 제한(`webcodecs-decoder.ts`), `docs/04`의 "mp4box demux" 문구(Codex).
   knip의 `onnxruntime-web` unlisted 1건은 Codex의 `download-whisper.mjs`(B19).
 - 2026-09-03 통합: 사용자 승인으로 B5 RC 준비(0.4.0-rc.1 범프) → B24 릴리스 체크리스트 → 신뢰성 후속 3건을
   `main`에 fast-forward하고 푸시했다. 통합 head에서 `pnpm gate --continue` 9단계 전체 통과(단위 core 106 · web 376 ·

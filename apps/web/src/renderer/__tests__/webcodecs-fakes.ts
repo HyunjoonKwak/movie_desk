@@ -70,11 +70,16 @@ export const fakePacketReader = (packets: readonly DemuxPacket[]): PacketReader 
     }
     return found ?? packets.find((packet) => packet.type === "key") ?? null;
   },
-  nextPacket: async (packet) => packets[packet.sequence + 1] ?? null,
+  nextPacket: async (packet) => {
+    if (!packets.includes(packet)) throw new Error("packet was not handed out by this reader");
+    return packets[packet.sequence + 1] ?? null;
+  },
   keyTimesMs: async () =>
     packets.filter((packet) => packet.type === "key").map((packet) => packet.timestampUs / 1000),
-  packets: async function* () {
-    yield* packets;
+  packets: async function* (from) {
+    if (from && !packets.includes(from))
+      throw new Error("packet was not handed out by this reader");
+    yield* packets.slice(from ? from.sequence : 0);
   },
 });
 

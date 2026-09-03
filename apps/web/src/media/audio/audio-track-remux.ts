@@ -51,24 +51,30 @@ export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio 
       audio: { codec: "aac", numberOfChannels: channelCount, sampleRate },
     });
     let sampleCount = 0;
-    for await (const packet of track.packets.packets()) {
-      muxer.addAudioChunkRaw(
-        packet.data,
-        packet.type,
-        packet.timestampUs,
-        packet.durationUs,
-        sampleCount === 0
-          ? {
-              decoderConfig: {
-                codec: track.codec,
-                sampleRate,
-                numberOfChannels: channelCount,
-                description,
-              },
-            }
-          : undefined,
-      );
-      sampleCount += 1;
+    try {
+      for await (const packet of track.packets.packets()) {
+        muxer.addAudioChunkRaw(
+          packet.data,
+          packet.type,
+          packet.timestampUs,
+          packet.durationUs,
+          sampleCount === 0
+            ? {
+                decoderConfig: {
+                  codec: track.codec,
+                  sampleRate,
+                  numberOfChannels: channelCount,
+                  description,
+                },
+              }
+            : undefined,
+        );
+        sampleCount += 1;
+      }
+    } catch {
+      // A source that cannot be read to the end has no usable variant; muxer
+      // failures surface from finalize() below instead of hiding here.
+      return null;
     }
     if (sampleCount === 0) return null;
 
@@ -81,8 +87,6 @@ export const remuxAudioTrack = async (source: ByteSource): Promise<RemuxedAudio 
       sampleCount,
       durationMs: Math.round(track.durationMs),
     };
-  } catch {
-    return null;
   } finally {
     opened.dispose();
   }

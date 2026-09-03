@@ -27,8 +27,9 @@ export const readMp4ContainerInfo = async (
     const video = opened.videoTrack;
     return {
       container: opened.container,
-      videoCodec: video?.codec || null,
-      audioCodec: opened.audioTrack?.codec || null,
+      // "" means the track exists but its codec has no WebCodecs string.
+      videoCodec: video ? video.codec : null,
+      audioCodec: opened.audioTrack ? opened.audioTrack.codec : null,
       rotation: video?.rotation ?? 0,
       width: video?.codedWidth ?? null,
       height: video?.codedHeight ?? null,

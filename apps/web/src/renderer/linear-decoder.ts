@@ -118,23 +118,25 @@ export const decodeRunsInOrder = async (
     const toUs = run.toMs * 1000;
     // Packets arrive in decode order with presentation timestamps; feeding
     // stops at the first packet past the run (plus reorder slack).
-    let packet = await reader.keyPacketAt(Math.max(0, run.fromMs) * 1000);
-    while (packet && feeding && !isAborted()) {
-      if (packet.timestampUs > toUs + REORDER_SLACK_US) {
-        feeding = false;
-        break;
+    const first = await reader.keyPacketAt(Math.max(0, run.fromMs) * 1000);
+    if (first) {
+      for await (const packet of reader.packets(first)) {
+        if (!feeding || isAborted()) break;
+        if (packet.timestampUs > toUs + REORDER_SLACK_US) {
+          feeding = false;
+          break;
+        }
+        decoder.decode(
+          new EncodedVideoChunk({
+            type: packet.type,
+            timestamp: packet.timestampUs,
+            duration: packet.durationUs,
+            data: packet.data,
+          }),
+        );
+        await waitForQueue(decoder);
+        await delivery.drain();
       }
-      decoder.decode(
-        new EncodedVideoChunk({
-          type: packet.type,
-          timestamp: packet.timestampUs,
-          duration: packet.durationUs,
-          data: packet.data,
-        }),
-      );
-      await waitForQueue(decoder);
-      await delivery.drain();
-      packet = await reader.nextPacket(packet);
     }
     // Emit what the decoder still holds; also resets it for the next keyframe.
     // An aborted run skips this: closing the decoder drops those frames.

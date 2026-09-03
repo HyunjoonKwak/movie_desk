@@ -71,7 +71,25 @@ describe("openMp4", () => {
     expect(all).toHaveLength(15);
     expect(all.map((packet) => packet.sequence)).toEqual(all.map((_, i) => i));
     expect(Math.min(...all.map((packet) => packet.timestampUs))).toBe(0);
+
+    // A walk from a key packet continues in decode order from there.
+    const tail = midKey ? await collect(reader.packets(midKey)) : [];
+    expect(tail[0]?.sequence).toBe(midKey?.sequence);
+    expect(tail).toHaveLength(15 - (midKey?.sequence ?? 0));
+    // And the same packet objects can be continued with nextPacket.
+    expect((await reader.nextPacket(tail[0] as DemuxPacket))?.sequence).toBe(tail[1]?.sequence);
     opened?.dispose();
+  });
+
+  it("refuses to continue from a packet another reader handed out", async () => {
+    const a = await openMp4(toByteSource(fixture("avc-bframes.mp4")));
+    const b = await openMp4(toByteSource(fixture("avc-bframes.mp4")));
+    const foreign = await a?.videoTrack?.packets.keyPacketAt(0);
+    await expect(b?.videoTrack?.packets.nextPacket(foreign as DemuxPacket)).rejects.toThrow(
+      /not handed out/,
+    );
+    a?.dispose();
+    b?.dispose();
   });
 
   it("returns null for bytes that are not an ISO BMFF file", async () => {
