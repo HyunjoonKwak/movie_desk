@@ -134,7 +134,7 @@ const sourceRefSchema = z.discriminatedUnion("kind", [
     .passthrough(),
 ]);
 
-const mediaAssetSchema = z
+export const mediaAssetSchema = z
   .object({
     id: z.string(),
     name: z.string(),

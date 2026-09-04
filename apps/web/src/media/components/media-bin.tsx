@@ -5,6 +5,7 @@ import {
   CalendarDays,
   FolderOpen,
   FolderUp,
+  Link2,
   Music,
   Image as ImageIcon,
   Film,
@@ -40,8 +41,11 @@ import { fmtSec, formatBytes } from "@/media/format";
 import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
+import { canRelinkFromFile, compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
+import { countTrash, moveAssetToTrash } from "@/persistence/trash";
 import { ImportFailures } from "./import-failures";
 import { MissingBadge } from "./missing-badge";
+import { TrashDialog } from "./trash-dialog";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -50,8 +54,14 @@ export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const media = useProjectStore((s) => s.project.mediaLibrary);
+  const projectId = useProjectStore((s) => s.project.id);
   const activeAssetId = useMediaUiStore((s) => s.activeAssetId);
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
+  const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
+  const relinkInputRef = useRef<HTMLInputElement>(null);
+  const [relinking, setRelinking] = useState<MediaAsset | null>(null);
+  const [trashOpen, setTrashOpen] = useState(false);
+  const [trashCount, setTrashCount] = useState(0);
   const setAssetProxy = useProjectStore((s) => s.setAssetProxy);
   const { importing, importFiles } = useMediaImport();
   const sourceHealth = useSourceHealth(media);
@@ -203,19 +213,70 @@ export function MediaBin() {
     useProjectStore.getState().placeAsset(asset, "append");
   }, []);
 
+  const refreshTrashCount = useCallback(() => {
+    void countTrash(projectId)
+      .then(setTrashCount)
+      .catch(() => setTrashCount(0));
+  }, [projectId]);
+
+  useEffect(() => {
+    refreshTrashCount();
+  }, [refreshTrashCount]);
+
   const handleDelete = useCallback(
-    (asset: MediaAsset) => {
-      // Metadata-only delete: keep the OPFS blob (and proxy) so Undo can fully
-      // restore the clip and its media. Orphaned blobs are reclaimed by
-      // startup GC once no project — current or saved — references them.
+    async (asset: MediaAsset) => {
+      // Metadata-only delete: the record goes to the trash (which keeps its
+      // OPFS files alive for GC) so it can be restored later; Undo still
+      // brings the clips back immediately.
       try {
+        await moveAssetToTrash(projectId, asset);
         removeMediaAsset(asset.id);
-        toast.success(t("media.deleted", { name: asset.name }));
+        refreshTrashCount();
+        toast.success(t("media.movedToTrash", { name: asset.name }));
       } catch (err) {
         toast.error(`${t("media.deleteFailed")}: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [removeMediaAsset, t],
+    [projectId, refreshTrashCount, removeMediaAsset, t],
+  );
+
+  const applyRelink = useCallback(
+    async (asset: MediaAsset, file: File) => {
+      try {
+        const patch = await relinkAssetFromFile(asset, file);
+        relinkMediaAsset(asset.id, patch);
+        toast.success(t("media.relinked", { name: asset.name }));
+      } catch (err) {
+        toast.error(`${t("media.relinkFailed")}: ${err instanceof Error ? err.message : err}`);
+      }
+    },
+    [relinkMediaAsset, t],
+  );
+
+  const onRelinkFileChosen = useCallback(
+    (file: File | undefined) => {
+      const asset = relinking;
+      setRelinking(null);
+      if (!asset || !file) return;
+      const verdict = compareRelinkCandidate(asset, file);
+      if (verdict.ok) {
+        void applyRelink(asset, file);
+        return;
+      }
+      // Never swap in a look-alike silently: say what differs and let the
+      // user decide.
+      toast.warning(
+        t(verdict.reason === "size" ? "media.relinkMismatchSize" : "media.relinkMismatchName", {
+          expected: verdict.expected,
+          actual: verdict.actual,
+        }),
+        {
+          duration: 15_000,
+          action: { label: t("media.relinkAnyway"), onClick: () => void applyRelink(asset, file) },
+        },
+      );
+    },
+    [applyRelink, relinking, t],
   );
 
   const filtered = useMemo(() => {
@@ -557,6 +618,26 @@ export function MediaBin() {
                             )}
                           </button>
                         )}
+                        {sourceHealth[asset.id] && canRelinkFromFile(asset) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setRelinking(asset);
+                              const input = relinkInputRef.current;
+                              if (!input) return;
+                              // Set imperatively: the chooser opens before the
+                              // state above has rendered.
+                              input.accept = `${asset.kind}/*`;
+                              input.click();
+                            }}
+                            className="rounded bg-black/60 p-1 text-amber-200 hover:bg-amber-500/40 hover:text-white"
+                            title={t("media.relink")}
+                            data-relink={asset.id}
+                          >
+                            <Link2 className="size-3" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={(e) => {
@@ -610,6 +691,28 @@ export function MediaBin() {
           if (!asset || asset.kind === "image") return null;
           return <RangeEditor asset={asset} onClose={() => setRangeEditing(null)} />;
         })()}
+
+      <input
+        ref={relinkInputRef}
+        type="file"
+        className="hidden"
+        data-relink-input
+        onChange={(e) => {
+          onRelinkFileChosen(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <TrashDialog open={trashOpen} onOpenChange={setTrashOpen} onChanged={refreshTrashCount} />
+      <div className="flex items-center justify-between border-t border-line px-2 py-1 text-3xs text-ink-3">
+        <button
+          type="button"
+          className="flex items-center gap-1 rounded px-1 py-0.5 hover:bg-white/5 hover:text-ink-1"
+          onClick={() => setTrashOpen(true)}
+        >
+          <Trash2 className="size-3" aria-hidden />
+          {t("media.trash")} ({trashCount})
+        </button>
+      </div>
 
       {usage && usage.quotaBytes > 0 && (
         <div className="border-t border-line px-2 py-1.5 text-3xs text-ink-3">

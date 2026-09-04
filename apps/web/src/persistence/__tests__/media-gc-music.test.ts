@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   loadStoredProject: vi.fn(),
 }));
 
+vi.mock("../trash", () => ({ trashMediaKeys: async () => {} }));
 vi.mock("../opfs", () => ({
   deleteMediaFile: mocks.deleteMediaFile,
   listMediaKeys: mocks.listMediaKeys,

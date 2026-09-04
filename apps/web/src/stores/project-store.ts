@@ -87,6 +87,7 @@ interface ProjectStoreState {
   setResolution: (w: number, h: number) => void;
   addMediaAsset: (asset: MediaAsset) => void;
   removeMediaAsset: (assetId: ID) => void;
+  relinkMediaAsset: (assetId: ID, patch: { sizeBytes: number; mime: string }) => void;
   setAssetProxy: (
     assetId: ID,
     proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number },

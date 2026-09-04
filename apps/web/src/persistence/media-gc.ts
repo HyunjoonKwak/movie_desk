@@ -4,6 +4,7 @@ import { useMusicLibraryStore } from "@/stores/music-library-store";
 import type { Project } from "@movie-desk/core";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
+import { trashMediaKeys } from "./trash";
 
 const mediaLeases = new Map<string, number>();
 
@@ -73,6 +74,14 @@ export const collectMediaGarbage = async (current: Project | (() => Project)): P
   // Music files in the app-global store stay alive while a library ref
   // points at them — deleting the ref lets the next GC pass reap the file.
   for (const key of musicStoreKeepKeys(useMusicLibraryStore.getState().refs)) keep.add(key);
+  // Trashed assets can still be restored, so their files stay until the
+  // entry is gone or expired. If the trash cannot be read, nothing can be
+  // reaped safely this pass.
+  try {
+    await trashMediaKeys(keep);
+  } catch {
+    return 0;
+  }
   for (const row of await listProjectsLibrary()) {
     const result = await loadStoredProject(row.id);
     // A damaged row can't be parsed, but salvage any OPFS-key-shaped strings

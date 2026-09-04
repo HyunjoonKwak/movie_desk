@@ -12,6 +12,7 @@ const storage = vi.hoisted(() => ({
   deleted: [] as string[],
 }));
 
+vi.mock("@/persistence/trash", () => ({ trashMediaKeys: async () => {} }));
 vi.mock("@/persistence/opfs", () => ({
   listMediaKeys: async () => [...storage.keys],
   deleteMediaFile: async (key: string) => {

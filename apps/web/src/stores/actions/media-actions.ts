@@ -8,11 +8,15 @@ export interface MediaLibraryActions {
     proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number },
   ) => void;
   removeMediaAsset: (assetId: ID) => void;
+  // A relinked original: a fresh record so decoders and health checks retry.
+  relinkMediaAsset: (assetId: ID, patch: { sizeBytes: number; mime: string }) => void;
   // 사용 구간 지정 — undefined 전달 시 구간 해제(전체 사용).
   setAssetUseRange: (assetId: ID, range: { inMs: Ms; outMs: Ms } | undefined) => void;
 }
 
-export const createMediaActions = <S extends ProjectMutating>(set: SetFn<S>): MediaLibraryActions => ({
+export const createMediaActions = <S extends ProjectMutating>(
+  set: SetFn<S>,
+): MediaLibraryActions => ({
   addMediaAsset: (asset) =>
     runWith(set, "Import media", (p) => ({
       ...p,
@@ -48,6 +52,14 @@ export const createMediaActions = <S extends ProjectMutating>(set: SetFn<S>): Me
         if (outMs - inMs < 200) return a; // 최소 0.2초 미만 구간은 무시
         return { ...a, useInMs: inMs, useOutMs: outMs };
       }),
+    })),
+
+  relinkMediaAsset: (assetId, patch) =>
+    runWith(set, "Relink media", (p) => ({
+      ...p,
+      mediaLibrary: p.mediaLibrary.map((a) =>
+        a.id === assetId ? { ...a, sizeBytes: patch.sizeBytes, mime: patch.mime } : a,
+      ),
     })),
 
   removeMediaAsset: (assetId) =>
