@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MediaSourceError, type RandomAccessMediaSource } from "../source/media-source";
 import { probeAssetSource } from "../source/probe-source";
 import { configureSourceHealthForTests, useSourceHealthStore } from "../source-health-store";
+import { selectMissing } from "../use-source-health";
 
 const asset = (id: string, extra: Partial<MediaAsset> = {}): MediaAsset => ({
   id: id as ID,
@@ -161,8 +162,34 @@ describe("source health store", () => {
     });
     await useSourceHealthStore
       .getState()
-      .check(Array.from({ length: 10 }, (_, i) => asset(`a${i}`)));
+      .check(Array.from({ length: 40 }, (_, i) => asset(`a${i}`)));
     expect(peak).toBeLessThanOrEqual(4);
-    expect(Object.keys(useSourceHealthStore.getState().entries)).toHaveLength(10);
+    // 40 > FLUSH_EVERY: the mid-pass flush and the final flush both land.
+    expect(Object.keys(useSourceHealthStore.getState().entries)).toHaveLength(40);
+  });
+});
+
+describe("selectMissing", () => {
+  const a = asset("a");
+  const b = asset("b");
+  const entry = (health: "ok" | "offline" | "permission-denied") => ({ health });
+
+  it("returns the previous map while the missing subset is unchanged", () => {
+    const first = selectMissing({ a: entry("ok"), b: entry("offline") }, [a, b], {});
+    expect(first).toEqual({ b: "offline" });
+    const again = selectMissing({ a: entry("ok"), b: entry("offline") }, [a, b], first);
+    expect(again).toBe(first);
+  });
+
+  it("returns a new map when an asset recovers or its state changes", () => {
+    const first = selectMissing({ b: entry("offline") }, [a, b], {});
+    expect(selectMissing({ b: entry("ok") }, [a, b], first)).toEqual({});
+    expect(selectMissing({ b: entry("permission-denied") }, [a, b], first)).toEqual({
+      b: "permission-denied",
+    });
+    expect(selectMissing({ a: entry("offline"), b: entry("offline") }, [a, b], first)).toEqual({
+      a: "offline",
+      b: "offline",
+    });
   });
 });

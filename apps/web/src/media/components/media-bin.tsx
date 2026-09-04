@@ -51,6 +51,9 @@ import { MediaCard } from "./media-card";
 import { TrashDialog } from "./trash-dialog";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
+// Measured card heights (incl. the li padding) per thumbnail size, used as
+// the placeholder for cards that are not rendered yet.
+const CARD_HEIGHT_BY_SIZE: readonly [number, number, number] = [78, 113, 198];
 
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -130,6 +133,10 @@ export function MediaBin() {
   );
   const pinned = useAutoEditStore((s) => s.pinned);
   const excluded = useAutoEditStore((s) => s.excluded);
+  // Marks are arrays in the auto-edit store; a Set keeps the per-card lookup
+  // constant with a thousand cards.
+  const pinnedSet = useMemo(() => new Set<string>(pinned), [pinned]);
+  const excludedSet = useMemo(() => new Set<string>(excluded), [excluded]);
 
   const toLocal = useCallback((e: React.PointerEvent) => {
     const el = listRef.current!;
@@ -631,7 +638,7 @@ export function MediaBin() {
 
         <ul
           className={cn(
-            "grid gap-2",
+            "grid gap-1",
             thumbSize === 0 ? "grid-cols-3" : thumbSize === 2 ? "grid-cols-1" : "grid-cols-2",
           )}
         >
@@ -651,12 +658,15 @@ export function MediaBin() {
                     asset={asset}
                     isSelected={selected.has(asset.id)}
                     isActive={activeAssetId === asset.id}
-                    isPinned={pinned.includes(asset.id)}
-                    isExcluded={excluded.includes(asset.id)}
+                    isPinned={pinnedSet.has(asset.id)}
+                    isExcluded={excludedSet.has(asset.id)}
                     selectionMode={selected.size > 0}
                     health={sourceHealth[asset.id]}
                     rangeEditing={rangeEditing === asset.id}
                     proxy={proxying === null ? "idle" : proxying === asset.id ? "self" : "busy"}
+                    estimatedHeight={
+                      CARD_HEIGHT_BY_SIZE[thumbSize as 0 | 1 | 2] ?? CARD_HEIGHT_BY_SIZE[1]
+                    }
                     onToggleSelect={toggleSelect}
                     onAdd={addToTimeline}
                     onToggleRange={toggleRangeEditing}

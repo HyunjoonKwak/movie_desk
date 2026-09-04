@@ -26,6 +26,9 @@ export interface MediaCardProps {
   readonly health: SourceHealth | undefined;
   readonly rangeEditing: boolean;
   readonly proxy: "idle" | "busy" | "self";
+  // Placeholder height for a card that is not rendered yet, so the scroll
+  // height does not jump as cards come into view; depends on the grid size.
+  readonly estimatedHeight: number;
   readonly onToggleSelect: (assetId: MediaAsset["id"]) => void;
   readonly onAdd: (asset: MediaAsset) => void;
   readonly onToggleRange: (assetId: MediaAsset["id"]) => void;
@@ -37,6 +40,9 @@ export interface MediaCardProps {
 // One library card. Memoised: with a thousand assets on screen, a health
 // flush or a selection change must not re-render every card, and offscreen
 // cards skip layout and paint (content-visibility) until scrolled into view.
+// content-visibility clips paint to the li's padding box, so the li keeps
+// 4 px of padding for the selection ring and the focus outline (2 px at
+// 2 px offset) that the button paints outside its border.
 export const MediaCard = memo(function MediaCard({
   asset,
   isSelected,
@@ -47,6 +53,7 @@ export const MediaCard = memo(function MediaCard({
   health,
   rangeEditing,
   proxy,
+  estimatedHeight,
   onToggleSelect,
   onAdd,
   onToggleRange,
@@ -59,9 +66,9 @@ export const MediaCard = memo(function MediaCard({
   const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
   return (
     <li
-      className="group relative"
+      className="group relative p-1"
       data-asset-card={asset.id}
-      style={{ contentVisibility: "auto", containIntrinsicSize: "auto 140px" }}
+      style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${estimatedHeight}px` }}
     >
       <button
         type="button"
@@ -153,7 +160,7 @@ export const MediaCard = memo(function MediaCard({
           <span className="truncate text-meta text-ink-1">{asset.name}</span>
         </div>
       </button>
-      <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
+      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
         {asset.kind !== "image" && (
           <button
             type="button"
@@ -163,7 +170,7 @@ export const MediaCard = memo(function MediaCard({
             }}
             className={cn(
               "rounded bg-black/60 p-1 hover:bg-amber-500/40 hover:text-white",
-              hasRange || rangeEditing ? "text-amber-300" : "text-ink-1",
+              hasRange ? "text-amber-300" : "text-ink-1",
             )}
             title={t("media.range")}
           >

@@ -36,19 +36,30 @@ export const useSourceHealth = (
   // Only the missing subset. The same object is returned while that subset
   // is unchanged, so a probe pass over a thousand healthy assets does not
   // re-render the whole media bin on every flush.
-  const previous = useRef<Readonly<Record<string, SourceHealth>>>({});
+  const previous = useRef<MissingMap>({});
   return useMemo(() => {
-    const health: Record<string, SourceHealth> = {};
-    for (const asset of assets) {
-      const entry = entries[asset.id];
-      if (entry && isSourceMissing(entry.health)) health[asset.id] = entry.health;
-    }
-    const before = previous.current;
-    const keys = Object.keys(health);
-    const same =
-      keys.length === Object.keys(before).length && keys.every((id) => before[id] === health[id]);
-    if (same) return before;
-    previous.current = health;
-    return health;
+    const next = selectMissing(entries, assets, previous.current);
+    previous.current = next;
+    return next;
   }, [assets, entries]);
+};
+
+export type MissingMap = Readonly<Record<string, SourceHealth>>;
+
+// The missing subset of `assets`; returns `previous` itself when nothing
+// in that subset changed (same ids, same states).
+export const selectMissing = (
+  entries: Readonly<Record<string, { readonly health: SourceHealth }>>,
+  assets: readonly MediaAsset[],
+  previous: MissingMap,
+): MissingMap => {
+  const health: Record<string, SourceHealth> = {};
+  for (const asset of assets) {
+    const entry = entries[asset.id];
+    if (entry && isSourceMissing(entry.health)) health[asset.id] = entry.health;
+  }
+  const keys = Object.keys(health);
+  const same =
+    keys.length === Object.keys(previous).length && keys.every((id) => previous[id] === health[id]);
+  return same ? previous : health;
 };

@@ -20,8 +20,16 @@ const arg = (name, fallback) => {
   const index = process.argv.indexOf(`--${name}`);
   return index === -1 ? fallback : process.argv[index + 1];
 };
-const TOTAL = Number(arg("assets", "1000"));
-const VIDEOS = Number(arg("videos", "200"));
+const positive = (name, fallback) => {
+  const value = Number(arg(name, fallback));
+  if (!Number.isInteger(value) || value < 0) {
+    console.error(`--${name} must be a non-negative integer`);
+    process.exit(2);
+  }
+  return value;
+};
+const TOTAL = positive("assets", "1000");
+const VIDEOS = Math.min(positive("videos", "200"), TOTAL);
 const OUT = arg("out", null);
 const BASE = arg("url", "http://127.0.0.1:3000");
 
@@ -40,6 +48,16 @@ const files = Array.from({ length: TOTAL }, (_, i) =>
 const ms = (n) => `${Math.round(n)} ms`;
 const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
 
+// Waits for `read()` to reach `target`, failing instead of hanging.
+const untilAtLeast = async (read, target, timeoutMs) => {
+  const start = performance.now();
+  while ((await read()) < target) {
+    if (performance.now() - start > timeoutMs) throw new Error(`timed out waiting for ${target}`);
+    await page.waitForTimeout(250);
+  }
+};
+
+// A fresh, ephemeral browser context: never the user's Chrome profile.
 const browser = await chromium.launch({ channel: "chrome" });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
@@ -92,80 +110,82 @@ const untilStable = async (read, { settleMs = 1500, timeoutMs = 600_000 } = {}) 
 };
 
 const result = { assets: TOTAL, videos: VIDEOS };
-await page.goto(`${BASE}/editor`);
-const startInput = page.getByTestId("new-project-start").getByTestId("media-file-input");
-await startInput.waitFor({ state: "attached" });
+try {
+  await page.goto(`${BASE}/editor`);
+  const startInput = page.getByTestId("new-project-start").getByTestId("media-file-input");
+  await startInput.waitFor({ state: "attached" });
 
-// 1. Import throughput.
-let t0 = performance.now();
-await startInput.setInputFiles(files);
-await page.locator("[data-asset-card]").first().waitFor({ timeout: 120_000 });
-while ((await cardCount()) < TOTAL) await page.waitForTimeout(500);
-result.importMs = performance.now() - t0;
-result.importPerAssetMs = result.importMs / TOTAL;
-await page.waitForTimeout(2_000);
-result.heapAfterImport = await heap();
-result.fileOpensDuringImport = await page.evaluate(() => window.__bench.fileOpens);
+  // 1. Import throughput.
+  let t0 = performance.now();
+  await startInput.setInputFiles(files);
+  await page.locator("[data-asset-card]").first().waitFor({ timeout: 120_000 });
+  await untilAtLeast(cardCount, TOTAL, Math.max(120_000, TOTAL * 200));
+  result.importMs = performance.now() - t0;
+  result.importPerAssetMs = result.importMs / TOTAL;
+  await page.waitForTimeout(2_000);
+  result.heapAfterImport = await heap();
+  result.fileOpensDuringImport = await page.evaluate(() => window.__bench.fileOpens);
 
-// 2. Persisted project size (the debounced library row holds the whole project).
-await page.waitForTimeout(1_000);
-result.libraryRowBytes = await libraryRowBytes();
+  // 2. Persisted project size (the debounced library row holds the whole project).
+  await page.waitForTimeout(1_000);
+  result.libraryRowBytes = await libraryRowBytes();
 
-// 3. Search latency: type a query, wait for the match count to update.
-const search = page.getByPlaceholder("Search media…");
-await page.getByRole("button", { name: "Filters" }).click();
-const count = page.getByTestId("media-match-count");
-t0 = performance.now();
-await search.fill("clip-01");
-await count.filter({ hasText: /^\d+ of \d+$/ }).waitFor();
-await page.waitForFunction(
-  (n) =>
-    !document
-      .querySelector('[data-testid="media-match-count"]')
-      ?.textContent?.startsWith(`${n} of`),
-  TOTAL,
-);
-result.searchMs = performance.now() - t0;
-await search.fill("");
-t0 = performance.now();
-await page.getByLabel("Length").selectOption("short"); // videos only; images have no length
-await page.waitForFunction(
-  (n) =>
-    !document
-      .querySelector('[data-testid="media-match-count"]')
-      ?.textContent?.startsWith(`${n} of`),
-  TOTAL,
-);
-result.filterMs = performance.now() - t0;
-await page.getByRole("button", { name: "Reset", exact: true }).click();
+  // 3. Search latency: type a query, wait for the match count to update.
+  const search = page.getByPlaceholder("Search media…");
+  await page.getByRole("button", { name: "Filters" }).click();
+  const count = page.getByTestId("media-match-count");
+  t0 = performance.now();
+  await search.fill("clip-01");
+  await count.filter({ hasText: /^\d+ of \d+$/ }).waitFor();
+  await page.waitForFunction(
+    (n) =>
+      !document
+        .querySelector('[data-testid="media-match-count"]')
+        ?.textContent?.startsWith(`${n} of`),
+    TOTAL,
+  );
+  result.searchMs = performance.now() - t0;
+  await search.fill("");
+  t0 = performance.now();
+  await page.getByLabel("Length").selectOption("short"); // videos only; images have no length
+  await page.waitForFunction(
+    (n) =>
+      !document
+        .querySelector('[data-testid="media-match-count"]')
+        ?.textContent?.startsWith(`${n} of`),
+    TOTAL,
+  );
+  result.filterMs = performance.now() - t0;
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
 
-// 4. Source-health pass on window focus: every asset opens its OPFS file once.
-await page.waitForTimeout(11_000); // past the forced-pass throttle
-const opensBefore = await page.evaluate(() => window.__bench.fileOpens);
-t0 = performance.now();
-await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-const probe = await untilStable(() => page.evaluate(() => window.__bench.fileOpens), {
-  settleMs: 1_000,
-});
-result.healthPassMs = probe.elapsed;
-result.healthPassOpens = probe.value - opensBefore;
+  // 4. Source-health pass on window focus: every asset opens its OPFS file once.
+  await page.waitForTimeout(11_000); // past the forced-pass throttle
+  const opensBefore = await page.evaluate(() => window.__bench.fileOpens);
+  t0 = performance.now();
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  const probe = await untilStable(() => page.evaluate(() => window.__bench.fileOpens), {
+    settleMs: 1_000,
+  });
+  result.healthPassMs = probe.elapsed;
+  result.healthPassOpens = probe.value - opensBefore;
 
-// 5. Reload → library restored (row parse + Yjs sync) → all cards back.
-t0 = performance.now();
-await page.reload();
-while ((await cardCount()) < TOTAL) await page.waitForTimeout(250);
-result.reloadToReadyMs = performance.now() - t0;
-result.heapAfterReload = await heap();
+  // 5. Reload → library restored (row parse + Yjs sync) → all cards back.
+  t0 = performance.now();
+  await page.reload();
+  await untilAtLeast(cardCount, TOTAL, 120_000);
+  result.reloadToReadyMs = performance.now() - t0;
+  result.heapAfterReload = await heap();
 
-// 6. Single edit cost with a large library: rename the project and wait for the save badge.
-t0 = performance.now();
-const nameInput = page.locator('header input[type="text"]').first();
-await nameInput.fill("bench");
-await nameInput.press("Enter");
-await page.getByText(/^Saved/).waitFor();
-result.renameToSavedMs = performance.now() - t0;
-
-await browser.close();
+  // 6. Single edit cost with a large library: rename the project and wait for the save badge.
+  t0 = performance.now();
+  const nameInput = page.locator('header input[type="text"]').first();
+  await nameInput.fill("bench");
+  await nameInput.press("Enter");
+  await page.getByText(/^Saved/).waitFor();
+  result.renameToSavedMs = performance.now() - t0;
+} finally {
+  await browser.close();
+}
 
 const rows = [
   ["assets", `${TOTAL} (${VIDEOS} video, ${TOTAL - VIDEOS} image)`],
