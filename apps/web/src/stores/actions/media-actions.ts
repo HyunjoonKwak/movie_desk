@@ -8,7 +8,28 @@ export interface RelinkAssetPatch {
   readonly width?: number;
   readonly height?: number;
   readonly rotation?: SourceRotation;
+  // null clears the field (the new file has none); undefined leaves it.
+  readonly videoCodec?: string | null;
+  readonly audioCodec?: string | null;
+  readonly thumbDataUrl?: string | null;
+  readonly filmstripDataUrl?: string | null;
+  readonly filmstripFrames?: number | null;
+  readonly waveformPeaks?: readonly number[] | null;
 }
+
+// Applies an optional-or-null patch field immutably.
+const withNullable = <K extends keyof MediaAsset>(
+  asset: MediaAsset,
+  key: K,
+  value: MediaAsset[K] | null | undefined,
+): MediaAsset => {
+  if (value === undefined) return asset;
+  if (value === null) {
+    const { [key]: _dropped, ...rest } = asset;
+    return rest as MediaAsset;
+  }
+  return { ...asset, [key]: value };
+};
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface MediaLibraryActions {
@@ -70,9 +91,8 @@ export const createMediaActions = <S extends ProjectMutating>(
       mediaLibrary: p.mediaLibrary.map((a) => {
         if (a.id !== assetId) return a;
         const { proxyPath: _p, proxyWidth: _w, proxyHeight: _h, ...withoutProxy } = a;
-        const base = patch.dropProxy ? (withoutProxy as MediaAsset) : a;
-        return {
-          ...base,
+        let next: MediaAsset = {
+          ...(patch.dropProxy ? (withoutProxy as MediaAsset) : a),
           sizeBytes: patch.sizeBytes,
           mime: patch.mime,
           ...(patch.durationMs !== undefined ? { durationMs: patch.durationMs } : {}),
@@ -80,6 +100,13 @@ export const createMediaActions = <S extends ProjectMutating>(
           ...(patch.height !== undefined ? { height: patch.height } : {}),
           ...(patch.rotation !== undefined ? { rotation: patch.rotation } : {}),
         };
+        next = withNullable(next, "videoCodec", patch.videoCodec);
+        next = withNullable(next, "audioCodec", patch.audioCodec);
+        next = withNullable(next, "thumbDataUrl", patch.thumbDataUrl);
+        next = withNullable(next, "filmstripDataUrl", patch.filmstripDataUrl);
+        next = withNullable(next, "filmstripFrames", patch.filmstripFrames);
+        next = withNullable(next, "waveformPeaks", patch.waveformPeaks);
+        return next;
       }),
     })),
 

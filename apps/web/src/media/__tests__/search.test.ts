@@ -2,10 +2,12 @@ import type { ID, MediaAsset } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_FILTERS,
+  audioPresence,
   buildSearchIndex,
   collectPlaces,
   durationClass,
   hasActiveFilters,
+  msUntilNextMidnight,
   resolutionClass,
   searchAssets,
 } from "../search";
@@ -66,7 +68,7 @@ const library = [
   }),
 ];
 
-const index = buildSearchIndex(library, geocode, "ko", NOW);
+const index = buildSearchIndex(library, geocode, "ko");
 const search = (query: string, filters = DEFAULT_FILTERS) =>
   searchAssets(index, library, query, filters, NOW).map((a) => a.id);
 
@@ -87,6 +89,9 @@ describe("free text", () => {
     expect(search("hvc1")).toEqual(["beach"]);
     expect(search("4k")).toEqual(["beach", "still"]);
     expect(search("audio")).toEqual(["song"]);
+    expect(search("오디오")).toEqual(["song"]);
+    expect(search("사진")).toEqual(["still"]);
+    expect(search("2026-09")).toEqual(["beach"]);
     expect(search("서울 avc1")).toEqual(["cafe"]);
     expect(search("서울 hvc1")).toEqual([]);
     expect(search("")).toHaveLength(4);
@@ -104,6 +109,48 @@ describe("filters", () => {
     expect(search("", { ...DEFAULT_FILTERS, period: "week" })).toEqual(["beach"]);
     expect(search("", { ...DEFAULT_FILTERS, period: "year" })).toEqual(["beach", "cafe"]);
     expect(search("mov", { ...DEFAULT_FILTERS, period: "week", place: "강릉" })).toEqual(["beach"]);
+  });
+
+  it("treats a video with no codec and no waveform as unknown, not silent", () => {
+    const unknown = asset("old", { name: "old.mp4" });
+    expect(audioPresence(unknown)).toBeNull();
+    // Container read, no audio track reported.
+    expect(audioPresence(asset("mute", { videoCodec: "avc1.640028" }))).toBe(false);
+    expect(audioPresence(asset("peaks", { waveformPeaks: [0.2] }))).toBe(true);
+    const all = [...library, unknown];
+    const idx = buildSearchIndex(all, geocode, "ko");
+    const ids = (audio: "with" | "without") =>
+      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, audio }, NOW).map((a) => a.id);
+    expect(ids("with")).not.toContain("old");
+    expect(ids("without")).not.toContain("old");
+  });
+
+  it("uses calendar boundaries for periods", () => {
+    const midnight = new Date(2026, 8, 4, 0, 0, 0).getTime();
+    const edge = asset("edge", { capturedAt: midnight });
+    const before = asset("before", { capturedAt: midnight - 1 });
+    const early = asset("early", { capturedAt: new Date(2026, 8, 1).getTime() });
+    const lastMonth = asset("lastMonth", { capturedAt: new Date(2026, 7, 20).getTime() });
+    const all = [edge, before, early, lastMonth];
+    const idx = buildSearchIndex(all, geocode, "ko");
+    const ids = (period: "today" | "week" | "month" | "year") =>
+      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, period }, NOW).map((a) => a.id);
+    expect(ids("today")).toEqual(["edge"]);
+    expect(ids("week")).toEqual(["edge", "before", "early"]);
+    expect(ids("month")).toEqual(["edge", "before", "early"]);
+    expect(ids("year")).toEqual(["edge", "before", "early", "lastMonth"]);
+    expect(msUntilNextMidnight(NOW)).toBe(12 * 60 * 60 * 1000);
+  });
+
+  it("reuses an entry for an unchanged record and rebuilds it for a new one", () => {
+    const a = asset("a");
+    const first = buildSearchIndex([a], geocode, "ko").get("a");
+    const second = buildSearchIndex([a], geocode, "ko").get("a");
+    expect(second).toBe(first);
+    const edited = { ...a, name: "renamed.mp4" };
+    const third = buildSearchIndex([edited], geocode, "ko").get("a");
+    expect(third).not.toBe(first);
+    expect(third?.text).toContain("renamed");
   });
 
   it("reports whether anything is active and lists places once", () => {

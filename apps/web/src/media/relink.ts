@@ -5,6 +5,8 @@ import type { MediaAsset, SourceRotation } from "@movie-desk/core";
 import { audioVariantKey } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
 import { probeMedia } from "./probe";
+import { makeImageThumb, makeVideoFilmstrip, makeVideoThumb } from "./thumbnail";
+import { extractWaveformPeaks } from "./waveform";
 
 // Relinking a missing asset: the user points at a file, we make sure it is
 // the same media (size first; the D1 rule is never to swap in a look-alike
@@ -42,16 +44,23 @@ export const compareRelinkCandidate = (asset: MediaAsset, file: File): RelinkVer
     : { ok: false, reason: "name", expected: asset.name, actual: file.name };
 };
 
+// What a relink changes on the record. For a file that is not the imported
+// one, everything derived from the old bytes is replaced or dropped: proxy,
+// duration, dimensions, rotation, codecs, thumbnail, filmstrip, waveform.
 export interface RelinkPatch {
   readonly sizeBytes: number;
   readonly mime: string;
-  // Only when the file is not the one that was imported: the proxy, duration,
-  // dimensions and rotation belonged to the old bytes.
   readonly dropProxy: boolean;
   readonly durationMs?: number;
   readonly width?: number;
   readonly height?: number;
   readonly rotation?: SourceRotation;
+  readonly videoCodec?: string | null; // null clears a codec the new file lacks
+  readonly audioCodec?: string | null;
+  readonly thumbDataUrl?: string | null;
+  readonly filmstripDataUrl?: string | null;
+  readonly filmstripFrames?: number | null;
+  readonly waveformPeaks?: readonly number[] | null;
 }
 
 export interface RelinkDependencies {
@@ -59,6 +68,10 @@ export interface RelinkDependencies {
   readonly remove: (key: string) => Promise<void>;
   readonly probe: typeof probeMedia;
   readonly containerInfo: typeof readMp4ContainerInfo;
+  readonly imageThumb: typeof makeImageThumb;
+  readonly videoThumb: typeof makeVideoThumb;
+  readonly filmstrip: typeof makeVideoFilmstrip;
+  readonly waveform: typeof extractWaveformPeaks;
 }
 
 const defaultDependencies: RelinkDependencies = {
@@ -66,6 +79,47 @@ const defaultDependencies: RelinkDependencies = {
   remove: deleteMediaFile,
   probe: probeMedia,
   containerInfo: readMp4ContainerInfo,
+  imageThumb: makeImageThumb,
+  videoThumb: makeVideoThumb,
+  filmstrip: makeVideoFilmstrip,
+  waveform: extractWaveformPeaks,
+};
+
+// Best-effort derived visuals for the new bytes; a failure leaves the field
+// cleared rather than showing the old file's picture.
+const derivedFacts = async (
+  file: File,
+  kind: MediaAsset["kind"],
+  rotation: SourceRotation | undefined,
+  deps: RelinkDependencies,
+): Promise<
+  Pick<RelinkPatch, "thumbDataUrl" | "filmstripDataUrl" | "filmstripFrames" | "waveformPeaks">
+> => {
+  let thumbDataUrl: string | null = null;
+  let filmstripDataUrl: string | null = null;
+  let filmstripFrames: number | null = null;
+  let waveformPeaks: readonly number[] | null = null;
+  try {
+    if (kind === "image") thumbDataUrl = await deps.imageThumb(file);
+    else if (kind === "video") {
+      thumbDataUrl = await deps.videoThumb(file, 0.1, rotation);
+      const strip = await deps.filmstrip(file, 10, rotation);
+      if (strip) {
+        filmstripDataUrl = strip.dataUrl;
+        filmstripFrames = strip.frames;
+      }
+    }
+  } catch {
+    thumbDataUrl = null;
+  }
+  if (kind !== "image") {
+    try {
+      waveformPeaks = (await deps.waveform(file)) ?? null;
+    } catch {
+      waveformPeaks = null;
+    }
+  }
+  return { thumbDataUrl, filmstripDataUrl, filmstripFrames, waveformPeaks };
 };
 
 // Writes the chosen file under the asset's key (never leaving it
@@ -88,14 +142,19 @@ export const relinkAssetFromFile = async (
     if (asset.proxyPath) await deps.remove(asset.proxyPath);
     const probe = await deps.probe(file).catch(() => null);
     const container =
-      probe?.kind === "video" ? await deps.containerInfo(file).catch(() => null) : null;
+      probe && probe.kind !== "image" ? await deps.containerInfo(file).catch(() => null) : null;
+    const rotation = container?.rotation;
+    const visuals = await derivedFacts(file, probe?.kind ?? asset.kind, rotation, deps);
     return {
       ...base,
       dropProxy: true,
       ...(probe ? { durationMs: probe.durationMs } : {}),
       ...(probe?.width !== undefined ? { width: probe.width } : {}),
       ...(probe?.height !== undefined ? { height: probe.height } : {}),
-      ...(container ? { rotation: container.rotation } : {}),
+      ...(rotation !== undefined ? { rotation } : {}),
+      videoCodec: container?.videoCodec ?? null,
+      audioCodec: container?.audioCodec ?? null,
+      ...visuals,
     };
   } finally {
     release();

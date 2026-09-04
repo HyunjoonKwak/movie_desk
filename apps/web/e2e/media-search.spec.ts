@@ -30,7 +30,7 @@ test("free text and filters narrow the library and can be reset", async ({ page 
   await page.getByLabel("Resolution").selectOption("sd");
   await expect(page.getByTestId("media-match-count")).toHaveText("1 of 2");
 
-  await page.getByRole("button", { name: "Reset" }).click();
+  await page.getByRole("button", { name: "Reset", exact: true }).click();
   await expect(page.getByTestId("media-match-count")).toHaveText("2 of 2");
   await expect(mediaCard(page, "beach.png")).toBeVisible();
   await expect(search).toHaveValue("");

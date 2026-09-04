@@ -36,6 +36,7 @@ import {
   buildSearchIndex,
   collectPlaces,
   hasActiveFilters,
+  msUntilNextMidnight,
   searchAssets,
 } from "@/media/search";
 import { useLocaleStore } from "@/i18n/store";
@@ -318,11 +319,25 @@ export function MediaBin() {
     [media, locale],
   );
   const places = useMemo(() => collectPlaces(searchIndex), [searchIndex]);
+  // Period filters compare against a clock that ticks at local midnight, so
+  // "Today" does not keep showing yesterday in a window left open.
+  const [today, setToday] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setTimeout(() => setToday(Date.now()), msUntilNextMidnight(today) + 1_000);
+    return () => clearTimeout(timer);
+  }, [today]);
+  // A place that left the library (trashed, other project) must not keep
+  // filtering from a select that no longer offers it.
+  useEffect(() => {
+    if (filters.place !== null && !places.includes(filters.place)) {
+      setFilters((f) => ({ ...f, place: null }));
+    }
+  }, [filters.place, places]);
   const filtered = useMemo(
-    () => searchAssets(searchIndex, media, query, filters),
-    [searchIndex, media, query, filters],
+    () => searchAssets(searchIndex, media, query, filters, today),
+    [searchIndex, media, query, filters, today],
   );
-  const filtersActive = hasActiveFilters({ ...filters, kind: "all" });
+  const filtersActive = hasActiveFilters(filters);
 
   // "던져 놓으면 정리된다": capture order and day groups are the default view.
   const mediaOrder = useViewStore((s) => s.mediaOrder);
@@ -483,7 +498,7 @@ export function MediaBin() {
                     type="button"
                     className="rounded px-1 py-0.5 hover:text-ink-1"
                     onClick={() => {
-                      setFilters((f) => ({ ...DEFAULT_FILTERS, kind: f.kind }));
+                      setFilters(DEFAULT_FILTERS);
                       setQuery("");
                     }}
                   >

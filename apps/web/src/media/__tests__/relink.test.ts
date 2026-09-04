@@ -71,6 +71,10 @@ describe("relinkAssetFromFile", () => {
           width: 640,
           height: 360,
         }),
+        imageThumb: async () => "data:image/png;base64,thumb",
+        videoThumb: async () => "data:image/png;base64,vthumb",
+        filmstrip: async () => ({ dataUrl: "data:image/png;base64,strip", frames: 10 }),
+        waveform: async () => [0.5, 0.25],
       },
     };
   };
@@ -98,6 +102,12 @@ describe("relinkAssetFromFile", () => {
       width: 640,
       height: 360,
       rotation: 90,
+      videoCodec: "avc1",
+      audioCodec: null,
+      thumbDataUrl: "data:image/png;base64,vthumb",
+      filmstripDataUrl: "data:image/png;base64,strip",
+      filmstripFrames: 10,
+      waveformPeaks: [0.5, 0.25],
     });
     expect(calls.removed).toContain("a__proxy.mp4");
   });
