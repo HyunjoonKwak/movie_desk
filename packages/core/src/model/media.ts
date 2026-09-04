@@ -27,28 +27,30 @@ export interface MediaAsset {
   readonly durationMs: Ms;
   readonly width?: number;
   readonly height?: number;
-  readonly opfsPath: string;       // key into OPFS file store (full-res original)
-  readonly sourceRef?: SourceRef;  // D1: where the bytes live; absent = legacy OPFS copy
+  readonly opfsPath: string; // key into OPFS file store (full-res original)
+  readonly sourceRef?: SourceRef; // D1: where the bytes live; absent = legacy OPFS copy
   readonly rotation?: SourceRotation; // container display rotation (tkhd); frames decode unrotated
-  readonly sizeBytes?: number;     // full-res byte length; lets a peer detect an
-                                   // incomplete/partial OPFS file (e.g. a media
-                                   // transfer interrupted by a crash) instead of
-                                   // trusting mere existence
-  readonly proxyPath?: string;     // optional low-res proxy in OPFS
-  readonly proxyWidth?: number;    // proxy resolution
+  readonly videoCodec?: string; // WebCodecs codec string read at import (e.g. "hvc1.1.6.L93.B0")
+  readonly audioCodec?: string; // e.g. "mp4a.40.2"; searchable, re-readable from the source
+  readonly sizeBytes?: number; // full-res byte length; lets a peer detect an
+  // incomplete/partial OPFS file (e.g. a media
+  // transfer interrupted by a crash) instead of
+  // trusting mere existence
+  readonly proxyPath?: string; // optional low-res proxy in OPFS
+  readonly proxyWidth?: number; // proxy resolution
   readonly proxyHeight?: number;
-  readonly thumbDataUrl?: string;  // small preview for media bin
-  readonly capturedAt?: number;    // capture time (EXIF DateTimeOriginal / mvhd
-                                   // creation_time), epoch ms; import falls back
-                                   // to File.lastModified when absent
-  readonly gpsLat?: number;        // capture GPS, decimal degrees (EXIF / ISO6709)
+  readonly thumbDataUrl?: string; // small preview for media bin
+  readonly capturedAt?: number; // capture time (EXIF DateTimeOriginal / mvhd
+  // creation_time), epoch ms; import falls back
+  // to File.lastModified when absent
+  readonly gpsLat?: number; // capture GPS, decimal degrees (EXIF / ISO6709)
   readonly gpsLon?: number;
   readonly sourceImageMetadata?: SourceImageMetadata; // preserved source facts; previews are disposable
   readonly livePhoto?: LivePhotoLink; // strict same-folder still + MOV pair; both originals remain usable
-  readonly useInMs?: Ms;           // user-marked usable range within the source —
-  readonly useOutMs?: Ms;          // auto-edit candidates and timeline adds respect it
+  readonly useInMs?: Ms; // user-marked usable range within the source —
+  readonly useOutMs?: Ms; // auto-edit candidates and timeline adds respect it
   readonly filmstripDataUrl?: string; // wide multi-frame strip over full source
-  readonly filmstripFrames?: number;  // number of frames in the strip
+  readonly filmstripFrames?: number; // number of frames in the strip
   readonly waveformPeaks?: readonly number[]; // downsampled abs-max peaks
   readonly importedAt: number;
 }

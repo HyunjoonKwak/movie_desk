@@ -28,12 +28,17 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   try {
     await writeMediaFile(opfsPath, file);
 
-    // Container display rotation (iPhone portrait). The <video> probe already
-    // reports rotated dimensions; WebCodecs frames need this to match.
+    // Container facts (iPhone portrait rotation, codec strings). The <video>
+    // probe already reports rotated dimensions; WebCodecs frames need the
+    // rotation to match, and the codecs make the library searchable.
     let rotation: MediaAsset["rotation"];
-    if (probe.kind === "video") {
+    let videoCodec: string | undefined;
+    let audioCodec: string | undefined;
+    if (probe.kind === "video" || probe.kind === "audio") {
       const container = await readMp4ContainerInfo(file).catch(() => null);
-      if (container && container.rotation !== 0) rotation = container.rotation;
+      if (container?.rotation) rotation = container.rotation;
+      if (container?.videoCodec) videoCodec = container.videoCodec;
+      if (container?.audioCodec) audioCodec = container.audioCodec;
     }
 
     let thumbDataUrl: string | undefined;
@@ -93,6 +98,8 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(filmstripFrames !== undefined ? { filmstripFrames } : {}),
       ...(waveformPeaks ? { waveformPeaks } : {}),
       ...(rotation ? { rotation } : {}),
+      ...(videoCodec ? { videoCodec } : {}),
+      ...(audioCodec ? { audioCodec } : {}),
       importedAt: Date.now(),
     };
 

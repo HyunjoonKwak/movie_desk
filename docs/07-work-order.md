@@ -59,6 +59,12 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-04 Claude: A2 메타데이터 인덱스·복합 검색 1차(`claude/a2-search`). `media/search.ts`가 라이브러리에서 검색
+  인덱스(이름·촬영일·장소(역지오코딩)·코덱·MIME·해상도 등급·카메라·Live)를 만들고, 자유 텍스트(토큰 AND)와 필터(기간·
+  길이·해상도·오디오 유무·장소·종류)를 결합한다. 가져오기에서 컨테이너의 `videoCodec`·`audioCodec`을 자산에 저장
+  (core `MediaAsset` optional 필드, 스키마는 passthrough). 미디어 패널 검색창 옆 필터 버튼 → 필터 패널, "n개 중 m개"
+  표시와 초기화. 태그·평점·컬렉션(A3)은 아직 없고, 인덱스는 메모리(라이브러리 변경 시 재생성)라 A5의 1,000개 측정에서
+  비용을 본다.
 - 2026-09-04 Claude: A4 누락 재연결·휴지통 1차(`claude/a4-relink-trash`). 재연결: 누락 배지가 붙은 OPFS 원본 자산 카드의
   "다시 연결"로 파일을 고르면 크기(없으면 이름)로 같은 미디어인지 확인하고 같은 OPFS 키에 다시 써서 클립을 그대로
   살린다. 크기가 다르면 D1 규칙대로 조용히 바꾸지 않고 차이를 보여 준 뒤 "그래도 연결"을 눌러야 한다. 재연결된
@@ -390,5 +396,6 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, main 통합 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
 | A1-c helper 계약 | Codex | 완료, main 통합 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
 | A1-d 렌더러 disk adapter | Claude + Codex | 완료, main 통합 | `26e3058` + `4760e18`. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록. `<img>/<video>` fallback도 공통 resolver를 사용하며 오류 응답 CORS·상태 헤더를 노출. 읽기 lease 재사용은 프로파일링 뒤 최적화 |
+| A2 메타데이터 인덱스·검색 | Claude | 1차 구현(`claude/a2-search`) | 자유 텍스트 + 기간·길이·해상도·오디오·장소·종류 필터, 코덱 저장. 태그·평점은 A3 |
 | A4 누락 재연결·휴지통 | Claude | 1차 구현(OPFS 원본 재연결 + 휴지통) | 데스크톱 참조 파일 재연결과 카탈로그 백업/복원은 다음 배치. e2e 3개(같은 크기 재연결, 다른 크기 확인 후 연결, 삭제→휴지통→복원) |
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |

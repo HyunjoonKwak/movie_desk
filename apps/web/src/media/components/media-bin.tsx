@@ -3,6 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  Filter,
   FolderOpen,
   FolderUp,
   Link2,
@@ -28,6 +29,16 @@ import { useImportProgressStore } from "@/media/import-progress-store";
 import { useAutoEditStore } from "@/autoedit/autoedit-store";
 import { reverseGeocode } from "@/autoedit/geocode";
 import { groupByDay, sortAssets } from "@/media/organize";
+import {
+  DEFAULT_FILTERS,
+  type MediaFilters,
+  RESOLUTION_LABEL,
+  buildSearchIndex,
+  collectPlaces,
+  hasActiveFilters,
+  searchAssets,
+} from "@/media/search";
+import { useLocaleStore } from "@/i18n/store";
 import { useViewStore } from "@/stores/view-store";
 import { MediaGroupHeader } from "./media-group-header";
 import type { ID } from "@movie-desk/core";
@@ -98,7 +109,14 @@ export function MediaBin() {
   );
 
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<MediaKind | "all">("all");
+  const [filters, setFilters] = useState<MediaFilters>(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const locale = useLocaleStore((s) => s.locale);
+  const filter = filters.kind;
+  const setFilter = useCallback(
+    (kind: MediaFilters["kind"]) => setFilters((f) => ({ ...f, kind })),
+    [],
+  );
   const [usage, setUsage] = useState<{ usageBytes: number; quotaBytes: number } | null>(null);
 
   // 썸네일 크기 (0=S, 1=M, 2=L) — localStorage에 유지.
@@ -293,14 +311,18 @@ export function MediaBin() {
     [applyRelink, relinking, t],
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return media.filter(
-      (a) =>
-        (filter === "all" || a.kind === filter) &&
-        (q.length === 0 || a.name.toLowerCase().includes(q)),
-    );
-  }, [media, query, filter]);
+  // The index is rebuilt only when the library changes; each keystroke or
+  // filter change is a pass over precomputed text.
+  const searchIndex = useMemo(
+    () => buildSearchIndex(media, reverseGeocode, locale),
+    [media, locale],
+  );
+  const places = useMemo(() => collectPlaces(searchIndex), [searchIndex]);
+  const filtered = useMemo(
+    () => searchAssets(searchIndex, media, query, filters),
+    [searchIndex, media, query, filters],
+  );
+  const filtersActive = hasActiveFilters({ ...filters, kind: "all" });
 
   // "던져 놓으면 정리된다": capture order and day groups are the default view.
   const mediaOrder = useViewStore((s) => s.mediaOrder);
@@ -359,9 +381,118 @@ export function MediaBin() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("media.search")}
-              className="w-full rounded bg-white/5 py-1 pl-7 pr-2 text-xs text-ink-1 outline-none focus:bg-white/10"
+              className="w-full rounded bg-white/5 py-1 pl-7 pr-8 text-xs text-ink-1 outline-none focus:bg-white/10"
             />
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((open) => !open)}
+              aria-pressed={filtersOpen}
+              aria-label={t("media.filters")}
+              title={t("media.filters")}
+              className={cn(
+                "absolute right-1 rounded p-1",
+                filtersActive || filtersOpen ? "text-accent" : "text-ink-3 hover:text-ink-1",
+              )}
+            >
+              <Filter className="size-3" />
+            </button>
           </label>
+          {filtersOpen && (
+            <div className="grid grid-cols-2 gap-1" data-testid="media-filters">
+              <select
+                value={filters.period}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, period: e.target.value as MediaFilters["period"] }))
+                }
+                aria-label={t("media.filterPeriod")}
+                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
+              >
+                <option value="any">{t("media.filterPeriodAny")}</option>
+                <option value="today">{t("media.filterPeriodToday")}</option>
+                <option value="week">{t("media.filterPeriodWeek")}</option>
+                <option value="month">{t("media.filterPeriodMonth")}</option>
+                <option value="year">{t("media.filterPeriodYear")}</option>
+              </select>
+              <select
+                value={filters.duration}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    duration: e.target.value as MediaFilters["duration"],
+                  }))
+                }
+                aria-label={t("media.filterDuration")}
+                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
+              >
+                <option value="any">{t("media.filterDurationAny")}</option>
+                <option value="short">{t("media.filterDurationShort")}</option>
+                <option value="medium">{t("media.filterDurationMedium")}</option>
+                <option value="long">{t("media.filterDurationLong")}</option>
+              </select>
+              <select
+                value={filters.resolution}
+                onChange={(e) =>
+                  setFilters((f) => ({
+                    ...f,
+                    resolution: e.target.value as MediaFilters["resolution"],
+                  }))
+                }
+                aria-label={t("media.filterResolution")}
+                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
+              >
+                <option value="any">{t("media.filterResolutionAny")}</option>
+                {(["uhd", "fhd", "hd", "sd"] as const).map((r) => (
+                  <option key={r} value={r}>
+                    {RESOLUTION_LABEL[r]}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={filters.audio}
+                onChange={(e) =>
+                  setFilters((f) => ({ ...f, audio: e.target.value as MediaFilters["audio"] }))
+                }
+                aria-label={t("media.filterAudio")}
+                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
+              >
+                <option value="any">{t("media.filterAudioAny")}</option>
+                <option value="with">{t("media.filterAudioWith")}</option>
+                <option value="without">{t("media.filterAudioWithout")}</option>
+              </select>
+              {places.length > 0 && (
+                <select
+                  value={filters.place ?? ""}
+                  onChange={(e) => setFilters((f) => ({ ...f, place: e.target.value || null }))}
+                  aria-label={t("media.filterPlace")}
+                  className="col-span-2 min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
+                >
+                  <option value="">{t("media.filterPlaceAny")}</option>
+                  {places.map((place) => (
+                    <option key={place} value={place}>
+                      {place}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <div className="col-span-2 flex items-center justify-between text-3xs text-ink-3">
+                <span data-testid="media-match-count">
+                  {t("media.matchCount", { shown: filtered.length, total: media.length })}
+                </span>
+                {(filtersActive || query) && (
+                  <button
+                    type="button"
+                    className="rounded px-1 py-0.5 hover:text-ink-1"
+                    onClick={() => {
+                      setFilters((f) => ({ ...DEFAULT_FILTERS, kind: f.kind }));
+                      setQuery("");
+                    }}
+                  >
+                    {t("media.filterReset")}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-1">
             {KIND_FILTERS.map((k) => (
               <button
