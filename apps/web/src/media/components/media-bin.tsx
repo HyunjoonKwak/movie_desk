@@ -6,14 +6,7 @@ import {
   Filter,
   FolderOpen,
   FolderUp,
-  Link2,
-  Music,
-  Image as ImageIcon,
-  Film,
-  Layers,
-  Loader2,
   Pin,
-  Scissors,
   Search,
   Trash2,
   X,
@@ -23,7 +16,6 @@ import {
 import { toast } from "sonner";
 import { useMediaUiStore } from "@/stores/media-ui-store";
 import { useProjectStore } from "@/stores/project-store";
-import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { useMediaImport } from "@/media/hooks";
 import { useImportProgressStore } from "@/media/import-progress-store";
 import { useAutoEditStore } from "@/autoedit/autoedit-store";
@@ -46,20 +38,18 @@ import type { ID } from "@movie-desk/core";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type { MediaAsset, MediaKind } from "@movie-desk/core";
-import type { SourceHealth } from "@/media/source/probe-source";
 import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
-import { fmtSec, formatBytes } from "@/media/format";
+import { formatBytes } from "@/media/format";
 import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
-import { canRelinkFromFile, compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
+import { compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
 import { countTrash, moveAssetToTrash, reconcileTrash } from "@/persistence/trash";
 import { ImportFailures } from "./import-failures";
-import { MissingBadge } from "./missing-badge";
+import { MediaCard } from "./media-card";
 import { TrashDialog } from "./trash-dialog";
 
-const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 
 export function MediaBin() {
@@ -282,6 +272,30 @@ export function MediaBin() {
     },
     [relinkMediaAsset, t],
   );
+
+  const toggleRangeEditing = useCallback((assetId: ID) => {
+    setRangeEditing((current) => (current === assetId ? null : assetId));
+  }, []);
+  const makeProxyStable = useCallback(
+    (asset: MediaAsset) => {
+      void makeProxy(asset);
+    },
+    [makeProxy],
+  );
+  const deleteStable = useCallback(
+    (asset: MediaAsset) => {
+      void handleDelete(asset);
+    },
+    [handleDelete],
+  );
+  const startRelink = useCallback((asset: MediaAsset) => {
+    setRelinking(asset);
+    const input = relinkInputRef.current;
+    if (!input) return;
+    // Set imperatively: the chooser opens before the state above has rendered.
+    input.accept = `${asset.kind}/*`;
+    input.click();
+  }, []);
 
   const onRelinkFileChosen = useCallback(
     (file: File | undefined) => {
@@ -631,188 +645,26 @@ export function MediaBin() {
                     onToggle={() => toggleGroupSelect(group.assets.map((a) => a.id))}
                   />
                 )}
-                {group.assets.map((asset) => {
-                  const Icon = KIND_ICON[asset.kind];
-                  const isSelected = selected.has(asset.id);
-                  const isActive = activeAssetId === asset.id;
-                  const isPinned = pinned.includes(asset.id);
-                  const isExcluded = excluded.includes(asset.id);
-                  const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
-                  return (
-                    <li key={asset.id} className="group relative" data-asset-card={asset.id}>
-                      <button
-                        type="button"
-                        aria-current={isActive ? "true" : undefined}
-                        onClick={(e) => {
-                          // Any interaction makes this the E/W/D/Q source asset.
-                          useMediaUiStore.getState().setActiveAssetId(asset.id);
-                          if (e.metaKey || e.ctrlKey || e.shiftKey) {
-                            toggleSelect(asset.id);
-                            return;
-                          }
-                          if (selected.size > 0) {
-                            // 선택 모드 중에는 클릭이 선택 토글로 동작 (실수로 타임라인 추가 방지)
-                            toggleSelect(asset.id);
-                            return;
-                          }
-                          addToTimeline(asset);
-                        }}
-                        draggable
-                        onDragStart={(e) => {
-                          // Tracks read the dragged asset from the UI store —
-                          // dataTransfer is set too for completeness.
-                          e.dataTransfer.setData("application/x-cut-asset", asset.id);
-                          e.dataTransfer.effectAllowed = "copy";
-                          useTimelineUiStore.getState().setDragAssetId(asset.id);
-                          useMediaUiStore.getState().setActiveAssetId(asset.id);
-                        }}
-                        onDragEnd={() => useTimelineUiStore.getState().setDragAssetId(null)}
-                        className={cn(
-                          "w-full overflow-hidden rounded-md border text-left transition",
-                          isSelected
-                            ? "border-accent ring-2 ring-accent/60"
-                            : isActive
-                              ? "border-accent/50 ring-1 ring-accent/30"
-                              : "border-line hover:border-accent",
-                          isExcluded ? "opacity-45" : "bg-panel-2",
-                        )}
-                        title={t("media.clickToAdd")}
-                      >
-                        <div className="relative aspect-video bg-black">
-                          {asset.thumbDataUrl ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={asset.thumbDataUrl}
-                              alt={asset.name}
-                              className="size-full object-cover"
-                            />
-                          ) : (
-                            <div className="flex size-full items-center justify-center text-ink-3">
-                              <Icon className="size-6" />
-                            </div>
-                          )}
-                          {asset.width && asset.height && (
-                            <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
-                              {asset.width}×{asset.height}
-                            </span>
-                          )}
-                          {asset.proxyPath && (
-                            <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
-                              PROXY
-                            </span>
-                          )}
-                          {asset.livePhoto && (
-                            <span
-                              className="absolute right-1 top-1 rounded bg-black/70 px-1 py-0.5 text-3xs font-medium text-white"
-                              title={t(
-                                asset.livePhoto.role === "still"
-                                  ? "media.livePhotoStill"
-                                  : "media.livePhotoMotion",
-                              )}
-                            >
-                              LIVE
-                            </span>
-                          )}
-                          <div className="absolute left-1 top-1 flex flex-col items-start gap-0.5">
-                            {sourceHealth[asset.id] && (
-                              <MissingBadge health={sourceHealth[asset.id] as SourceHealth} />
-                            )}
-                            {isPinned && (
-                              <span className="flex items-center gap-0.5 rounded bg-accent/90 px-1 py-0.5 text-3xs font-medium text-accent-fg">
-                                <Pin className="size-2.5" />
-                                {t("media.markUse")}
-                              </span>
-                            )}
-                            {isExcluded && (
-                              <span className="flex items-center gap-0.5 rounded bg-red-500/85 px-1 py-0.5 text-3xs font-medium text-white">
-                                <X className="size-2.5" />
-                                {t("media.markSkip")}
-                              </span>
-                            )}
-                            {hasRange && (
-                              <span className="flex items-center gap-0.5 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-amber-300">
-                                <Scissors className="size-2.5" />
-                                {fmtSec(asset.useInMs ?? 0)}–
-                                {fmtSec(asset.useOutMs ?? asset.durationMs)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5 px-2 py-1.5">
-                          <Icon className="size-3 shrink-0 text-ink-3" />
-                          <span className="truncate text-meta text-ink-1">{asset.name}</span>
-                        </div>
-                      </button>
-                      <div className="absolute right-1 top-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
-                        {asset.kind !== "image" && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRangeEditing(rangeEditing === asset.id ? null : asset.id);
-                            }}
-                            className={cn(
-                              "rounded bg-black/60 p-1 hover:bg-amber-500/40 hover:text-white",
-                              hasRange ? "text-amber-300" : "text-ink-1",
-                            )}
-                            title={t("media.range")}
-                          >
-                            <Scissors className="size-3" />
-                          </button>
-                        )}
-                        {asset.kind === "video" && !asset.proxyPath && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              void makeProxy(asset);
-                            }}
-                            disabled={proxying !== null}
-                            className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40 hover:text-white disabled:opacity-50"
-                            title={t("media.proxy")}
-                          >
-                            {proxying === asset.id ? (
-                              <Loader2 className="size-3 animate-spin" />
-                            ) : (
-                              <Layers className="size-3" />
-                            )}
-                          </button>
-                        )}
-                        {sourceHealth[asset.id] && canRelinkFromFile(asset) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setRelinking(asset);
-                              const input = relinkInputRef.current;
-                              if (!input) return;
-                              // Set imperatively: the chooser opens before the
-                              // state above has rendered.
-                              input.accept = `${asset.kind}/*`;
-                              input.click();
-                            }}
-                            className="rounded bg-black/60 p-1 text-amber-200 hover:bg-amber-500/40 hover:text-white"
-                            title={t("media.relink")}
-                            data-relink={asset.id}
-                          >
-                            <Link2 className="size-3" />
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            void handleDelete(asset);
-                          }}
-                          className="rounded bg-black/60 p-1 text-ink-1 hover:bg-red-500/40 hover:text-red-200"
-                          title={t("media.delete")}
-                        >
-                          <Trash2 className="size-3" />
-                        </button>
-                      </div>
-                    </li>
-                  );
-                })}
+                {group.assets.map((asset) => (
+                  <MediaCard
+                    key={asset.id}
+                    asset={asset}
+                    isSelected={selected.has(asset.id)}
+                    isActive={activeAssetId === asset.id}
+                    isPinned={pinned.includes(asset.id)}
+                    isExcluded={excluded.includes(asset.id)}
+                    selectionMode={selected.size > 0}
+                    health={sourceHealth[asset.id]}
+                    rangeEditing={rangeEditing === asset.id}
+                    proxy={proxying === null ? "idle" : proxying === asset.id ? "self" : "busy"}
+                    onToggleSelect={toggleSelect}
+                    onAdd={addToTimeline}
+                    onToggleRange={toggleRangeEditing}
+                    onMakeProxy={makeProxyStable}
+                    onRelink={startRelink}
+                    onDelete={deleteStable}
+                  />
+                ))}
               </Fragment>
             ),
           )}

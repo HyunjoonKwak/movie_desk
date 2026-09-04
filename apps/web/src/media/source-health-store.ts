@@ -37,7 +37,7 @@ const DEFAULT_MAX_AGE_MS = 60_000;
 // A forced pass (window focus) costs a read per asset — on the desktop a
 // lease plus a ranged request — so bursts of focus events share one pass.
 export const FORCE_THROTTLE_MS = 10_000;
-const FLUSH_EVERY = 8;
+const FLUSH_EVERY = 32;
 
 let prober: (asset: MediaAsset) => Promise<SourceHealth> = probeAssetSource;
 let clock: () => number = () => Date.now();

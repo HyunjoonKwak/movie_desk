@@ -1,7 +1,7 @@
 "use client";
 
 import type { MediaAsset } from "@movie-desk/core";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { type SourceHealth, isSourceMissing } from "./source/probe-source";
 import { useSourceHealthStore } from "./source-health-store";
 
@@ -33,13 +33,22 @@ export const useSourceHealth = (
     };
   }, [assets, check]);
 
-  // Only the missing subset, rebuilt when a probe result or the list changes.
+  // Only the missing subset. The same object is returned while that subset
+  // is unchanged, so a probe pass over a thousand healthy assets does not
+  // re-render the whole media bin on every flush.
+  const previous = useRef<Readonly<Record<string, SourceHealth>>>({});
   return useMemo(() => {
     const health: Record<string, SourceHealth> = {};
     for (const asset of assets) {
       const entry = entries[asset.id];
       if (entry && isSourceMissing(entry.health)) health[asset.id] = entry.health;
     }
+    const before = previous.current;
+    const keys = Object.keys(health);
+    const same =
+      keys.length === Object.keys(before).length && keys.every((id) => before[id] === health[id]);
+    if (same) return before;
+    previous.current = health;
     return health;
   }, [assets, entries]);
 };
