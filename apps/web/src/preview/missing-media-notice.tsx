@@ -20,8 +20,11 @@ export function MissingMediaNotice() {
   const check = useSourceHealthStore((s) => s.check);
   const t = useT();
 
+  const byId = useMemo(
+    () => new Map(project.mediaLibrary.map((asset) => [asset.id, asset])),
+    [project.mediaLibrary],
+  );
   const assetsAtPlayhead = useMemo(() => {
-    const byId = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
     const seen = new Set<string>();
     const assets: MediaAsset[] = [];
     for (const clip of clipsAt(project.timeline, playhead)) {
@@ -31,11 +34,16 @@ export function MissingMediaNotice() {
       if (asset) assets.push(asset);
     }
     return assets;
-  }, [project, playhead]);
+  }, [project.timeline, playhead, byId]);
 
+  // Only assets never checked yet: the playhead moves every frame during
+  // playback, and the library hook already keeps checked entries fresh.
+  const unchecked = assetsAtPlayhead.filter((asset) => !entries[asset.id]);
+  const uncheckedKey = unchecked.map((asset) => asset.id).join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run only when the set of unchecked ids changes, not on every array identity.
   useEffect(() => {
-    if (assetsAtPlayhead.length > 0) void check(assetsAtPlayhead);
-  }, [assetsAtPlayhead, check]);
+    if (unchecked.length > 0) void check(unchecked);
+  }, [uncheckedKey, check]);
 
   const missing = assetsAtPlayhead.filter((asset) => isSourceMissing(entries[asset.id]?.health));
   if (missing.length === 0) return null;

@@ -78,4 +78,25 @@ test("removed media waits in the trash and can be restored", async ({ page }) =>
   await page.keyboard.press("Escape");
   await expect(mediaCard(page)).toBeVisible();
   await expect(page.getByRole("button", { name: /^Trash \(0\)$/ })).toBeVisible();
+  // Restore brings the record back, not the clips: those are Undo's job.
+  expect(await clipCount(page)).toBe(0);
+});
+
+test("a missing badge survives the preview checking only the clip under the playhead", async ({
+  page,
+}) => {
+  await seedTimeline(page, 1);
+  await page
+    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
+    .setInputFiles({ name: "other.png", mimeType: "image/png", buffer: PNG });
+  await expect(mediaCard(page, "other.png")).toBeVisible();
+  await removeOpfsKey(page, "__other.png");
+  await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+  await expect(mediaCard(page, "other.png").locator("[data-missing]")).toBeVisible({
+    timeout: 15_000,
+  });
+  // The playhead sits on pix.png, so the preview asks about that asset only.
+  await page.keyboard.press("Home");
+  await page.waitForTimeout(1_000);
+  await expect(mediaCard(page, "other.png").locator("[data-missing]")).toBeVisible();
 });

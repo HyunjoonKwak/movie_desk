@@ -5,10 +5,12 @@
 
 import Dexie, { type Table } from "dexie";
 import type { ID, MediaAsset } from "@movie-desk/core";
+import { audioVariantKey } from "@/media/audio/audio-variant";
 import { mediaAssetSchema } from "./project-export";
 
 export interface TrashEntry {
-  readonly id: string; // asset id
+  readonly id: string; // `${projectId}:${assetId}` — the same asset id can exist in two projects
+  readonly assetId: string;
   readonly projectId: string;
   readonly name: string;
   readonly kind: MediaAsset["kind"];
@@ -17,6 +19,9 @@ export interface TrashEntry {
 }
 
 export const TRASH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+
+export const trashEntryId = (projectId: string, assetId: string): string =>
+  `${projectId}:${assetId}`;
 
 class TrashDB extends Dexie {
   trash!: Table<TrashEntry, string>;
@@ -35,7 +40,8 @@ const getDb = () => {
 
 export const moveAssetToTrash = async (projectId: ID, asset: MediaAsset): Promise<void> => {
   await getDb().trash.put({
-    id: asset.id,
+    id: trashEntryId(projectId, asset.id),
+    assetId: asset.id,
     projectId,
     name: asset.name,
     kind: asset.kind,
@@ -69,6 +75,18 @@ export const emptyTrash = async (projectId: ID): Promise<void> => {
   await getDb().trash.where("projectId").equals(projectId).delete();
 };
 
+// Drops rows for assets that are back in the library (Undo after a delete),
+// so the count and the list only show what is really gone.
+export const reconcileTrash = async (
+  projectId: ID,
+  presentAssetIds: ReadonlySet<string>,
+): Promise<void> => {
+  const rows = await listTrash(projectId);
+  for (const row of rows) {
+    if (presentAssetIds.has(row.assetId)) await getDb().trash.delete(row.id);
+  }
+};
+
 // Every OPFS key a trash entry still needs, dropping entries past retention
 // on the way (their files become garbage for this pass).
 export const trashMediaKeys = async (keep: Set<string>, now = Date.now()): Promise<void> => {
@@ -79,11 +97,12 @@ export const trashMediaKeys = async (keep: Set<string>, now = Date.now()): Promi
       continue;
     }
     try {
-      const asset = JSON.parse(row.json) as Partial<MediaAsset>;
+      const asset = JSON.parse(row.json) as MediaAsset;
       if (asset.opfsPath) keep.add(asset.opfsPath);
       if (asset.proxyPath) keep.add(asset.proxyPath);
+      if (asset.kind !== "image" && asset.opfsPath) keep.add(audioVariantKey(asset));
     } catch {
-      // A damaged row keeps nothing alive; it is removed at restore time.
+      // A damaged row keeps nothing alive; the dialog reports it on restore.
     }
   }
 };

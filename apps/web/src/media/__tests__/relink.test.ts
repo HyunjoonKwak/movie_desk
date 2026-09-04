@@ -1,17 +1,6 @@
 import type { ID, MediaAsset } from "@movie-desk/core";
 import { describe, expect, it, vi } from "vitest";
 
-const opfs = vi.hoisted(() => ({ writes: [] as string[], deletes: [] as string[] }));
-vi.mock("@/persistence/opfs", () => ({
-  writeMediaFile: async (key: string) => {
-    opfs.writes.push(key);
-    return key;
-  },
-  deleteMediaFile: async (key: string) => {
-    opfs.deletes.push(key);
-  },
-}));
-
 import { isMediaKeyLeased } from "@/persistence/media-gc";
 import { canRelinkFromFile, compareRelinkCandidate, relinkAssetFromFile } from "../relink";
 
@@ -55,12 +44,80 @@ describe("compareRelinkCandidate", () => {
 });
 
 describe("relinkAssetFromFile", () => {
-  it("writes under the asset's key, drops the stale audio variant and releases its lease", async () => {
+  const deps = () => {
+    const calls = { replaced: [] as string[], removed: [] as string[] };
+    return {
+      calls,
+      deps: {
+        replace: async (key: string) => {
+          calls.replaced.push(key);
+          return key;
+        },
+        remove: async (key: string) => {
+          calls.removed.push(key);
+        },
+        probe: async () => ({
+          kind: "video" as const,
+          mime: "video/mp4",
+          durationMs: 4200,
+          width: 640,
+          height: 360,
+        }),
+        containerInfo: async () => ({
+          container: "mp4" as const,
+          videoCodec: "avc1",
+          audioCodec: null,
+          rotation: 90 as const,
+          width: 640,
+          height: 360,
+        }),
+      },
+    };
+  };
+
+  it("replaces the bytes under the asset's key, drops the stale audio variant, keeps the proxy for an identical file", async () => {
+    const a = asset({ proxyPath: "a__proxy.mp4" });
+    const { calls, deps: d } = deps();
+    const patch = await relinkAssetFromFile(a, file("trip.mp4", 1000), { identical: true }, d);
+    expect(patch).toEqual({ sizeBytes: 1000, mime: "video/mp4", dropProxy: false });
+    expect(calls.replaced).toEqual(["a__trip.mp4"]);
+    expect(calls.removed.some((key) => key.startsWith("cache__"))).toBe(true);
+    expect(calls.removed).not.toContain("a__proxy.mp4");
+    expect(isMediaKeyLeased("a__trip.mp4")).toBe(false);
+  });
+
+  it("drops the proxy and re-reads the facts for a file that is not the imported one", async () => {
+    const a = asset({ proxyPath: "a__proxy.mp4" });
+    const { calls, deps: d } = deps();
+    const patch = await relinkAssetFromFile(a, file("other.mp4", 2048), { identical: false }, d);
+    expect(patch).toEqual({
+      sizeBytes: 2048,
+      mime: "video/mp4",
+      dropProxy: true,
+      durationMs: 4200,
+      width: 640,
+      height: 360,
+      rotation: 90,
+    });
+    expect(calls.removed).toContain("a__proxy.mp4");
+  });
+
+  it("releases the GC lease when the write fails", async () => {
     const a = asset();
-    const patch = await relinkAssetFromFile(a, file("trip.mp4", 1000));
-    expect(patch).toEqual({ sizeBytes: 1000, mime: "video/mp4" });
-    expect(opfs.writes).toEqual(["a__trip.mp4"]);
-    expect(opfs.deletes.some((key) => key.startsWith("cache__"))).toBe(true);
+    const { deps: d } = deps();
+    await expect(
+      relinkAssetFromFile(
+        a,
+        file("trip.mp4", 1000),
+        { identical: true },
+        {
+          ...d,
+          replace: async () => {
+            throw new Error("quota");
+          },
+        },
+      ),
+    ).rejects.toThrow("quota");
     expect(isMediaKeyLeased("a__trip.mp4")).toBe(false);
   });
 

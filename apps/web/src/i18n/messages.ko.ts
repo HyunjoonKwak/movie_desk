@@ -704,4 +704,5 @@ export const ko = {
     "media.trashDamaged": "\"{name}\"을(를) 복원할 수 없습니다. 항목이 손상됐습니다",
     "media.trashDeleteForever": "영구 삭제",
     "media.trashEmptyAll": "비우기",
+    "media.trashUnavailable": "이 세션에서는 휴지통을 쓸 수 없어 \"{name}\"을(를) 삭제하지 않았습니다.",
 } as const;

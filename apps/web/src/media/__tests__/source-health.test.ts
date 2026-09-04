@@ -108,6 +108,19 @@ describe("source health store", () => {
     expect(useSourceHealthStore.getState().entries.a?.health).toBe("ok");
   });
 
+  it("keeps entries for assets outside a subset check and prunes only when asked", async () => {
+    configureSourceHealthForTests({ probe: async (a) => (a.id === "b" ? "offline" : "ok") });
+    const a = asset("a");
+    const b = asset("b");
+    await useSourceHealthStore.getState().check([a, b], { prune: true });
+    // The preview asks about the clip under the playhead only.
+    await useSourceHealthStore.getState().check([a]);
+    expect(useSourceHealthStore.getState().entries.b?.health).toBe("offline");
+    // The library hook, with the asset gone, prunes it.
+    await useSourceHealthStore.getState().check([a], { prune: true });
+    expect(useSourceHealthStore.getState().entries.b).toBeUndefined();
+  });
+
   it("drops entries for assets that left the library and throttles forced passes", async () => {
     const probed: string[] = [];
     let now = 0;
@@ -120,8 +133,8 @@ describe("source health store", () => {
     });
     const a = asset("a");
     const b = asset("b");
-    await useSourceHealthStore.getState().check([a, b]);
-    await useSourceHealthStore.getState().check([a]);
+    await useSourceHealthStore.getState().check([a, b], { prune: true });
+    await useSourceHealthStore.getState().check([a], { prune: true });
     expect(Object.keys(useSourceHealthStore.getState().entries)).toEqual(["a"]);
 
     await useSourceHealthStore.getState().check([a], { force: true });

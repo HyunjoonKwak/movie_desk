@@ -1,4 +1,14 @@
-import type { ID, MediaAsset, Ms } from "@movie-desk/core";
+import type { ID, MediaAsset, Ms, SourceRotation } from "@movie-desk/core";
+
+export interface RelinkAssetPatch {
+  readonly sizeBytes: number;
+  readonly mime: string;
+  readonly dropProxy: boolean;
+  readonly durationMs?: number;
+  readonly width?: number;
+  readonly height?: number;
+  readonly rotation?: SourceRotation;
+}
 import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface MediaLibraryActions {
@@ -9,7 +19,7 @@ export interface MediaLibraryActions {
   ) => void;
   removeMediaAsset: (assetId: ID) => void;
   // A relinked original: a fresh record so decoders and health checks retry.
-  relinkMediaAsset: (assetId: ID, patch: { sizeBytes: number; mime: string }) => void;
+  relinkMediaAsset: (assetId: ID, patch: RelinkAssetPatch) => void;
   // 사용 구간 지정 — undefined 전달 시 구간 해제(전체 사용).
   setAssetUseRange: (assetId: ID, range: { inMs: Ms; outMs: Ms } | undefined) => void;
 }
@@ -57,9 +67,20 @@ export const createMediaActions = <S extends ProjectMutating>(
   relinkMediaAsset: (assetId, patch) =>
     runWith(set, "Relink media", (p) => ({
       ...p,
-      mediaLibrary: p.mediaLibrary.map((a) =>
-        a.id === assetId ? { ...a, sizeBytes: patch.sizeBytes, mime: patch.mime } : a,
-      ),
+      mediaLibrary: p.mediaLibrary.map((a) => {
+        if (a.id !== assetId) return a;
+        const { proxyPath: _p, proxyWidth: _w, proxyHeight: _h, ...withoutProxy } = a;
+        const base = patch.dropProxy ? (withoutProxy as MediaAsset) : a;
+        return {
+          ...base,
+          sizeBytes: patch.sizeBytes,
+          mime: patch.mime,
+          ...(patch.durationMs !== undefined ? { durationMs: patch.durationMs } : {}),
+          ...(patch.width !== undefined ? { width: patch.width } : {}),
+          ...(patch.height !== undefined ? { height: patch.height } : {}),
+          ...(patch.rotation !== undefined ? { rotation: patch.rotation } : {}),
+        };
+      }),
     })),
 
   removeMediaAsset: (assetId) =>

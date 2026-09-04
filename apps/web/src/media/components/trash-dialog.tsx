@@ -5,6 +5,7 @@ import { RotateCcw, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useT } from "@/i18n/use-t";
+import { collectMediaGarbage } from "@/persistence/media-gc";
 import {
   type TrashEntry,
   deleteTrashEntry,
@@ -13,7 +14,6 @@ import {
   readTrashedAsset,
 } from "@/persistence/trash";
 import { useProjectStore } from "@/stores/project-store";
-import type { ID } from "@movie-desk/core";
 
 // Removed media for this project. Restore puts the record back in the
 // library (its file was kept); delete-for-good lets the next GC reap it.
@@ -40,29 +40,41 @@ export function TrashDialog({
     if (open) void refresh();
   }, [open, refresh]);
 
+  // The row is the only thing keeping the file alive, so it goes last: the
+  // record is back in the project (and persisted by the live doc) first. A
+  // damaged row stays where it is rather than losing the file too.
   const restore = async (row: TrashEntry) => {
     const asset = await readTrashedAsset(row.id);
-    await deleteTrashEntry(row.id);
     if (!asset) {
       toast.error(t("media.trashDamaged", { name: row.name }));
-    } else if (useProjectStore.getState().project.mediaLibrary.some((a) => a.id === asset.id)) {
-      toast.info(t("media.trashAlreadyPresent", { name: row.name }));
-    } else {
+      return;
+    }
+    if (!useProjectStore.getState().project.mediaLibrary.some((a) => a.id === asset.id)) {
       addMediaAsset(asset);
       toast.success(t("media.trashRestored", { name: asset.name }));
+    } else {
+      toast.info(t("media.trashAlreadyPresent", { name: row.name }));
     }
+    await deleteTrashEntry(row.id);
     await refresh();
     onChanged();
   };
 
+  // Purging frees the files now instead of at the next launch.
+  const reclaim = async () => {
+    await collectMediaGarbage(() => useProjectStore.getState().project).catch(() => 0);
+  };
+
   const remove = async (row: TrashEntry) => {
     await deleteTrashEntry(row.id);
+    await reclaim();
     await refresh();
     onChanged();
   };
 
   const clear = async () => {
-    await emptyTrash(projectId as ID);
+    await emptyTrash(projectId);
+    await reclaim();
     await refresh();
     onChanged();
   };

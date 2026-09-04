@@ -13,8 +13,9 @@ import {
   setActiveProjectId,
   upsertProject,
 } from "@/persistence/project-library";
+import { emptyTrash } from "@/persistence/trash";
 import { useProjectStore } from "@/stores/project-store";
-import { type Project, createEmptyProject } from "@movie-desk/core";
+import { type ID, type Project, createEmptyProject } from "@movie-desk/core";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Download, FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -119,6 +120,8 @@ export function ProjectMenu() {
 
   const onDelete = async (id: string) => {
     await deleteStoredProject(id);
+    // Its trash rows would otherwise pin files for 30 days.
+    await emptyTrash(id as ID).catch(() => undefined);
     await refresh();
   };
 

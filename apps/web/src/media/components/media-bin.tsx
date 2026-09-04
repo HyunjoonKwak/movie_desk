@@ -42,7 +42,7 @@ import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
 import { canRelinkFromFile, compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
-import { countTrash, moveAssetToTrash } from "@/persistence/trash";
+import { countTrash, moveAssetToTrash, reconcileTrash } from "@/persistence/trash";
 import { ImportFailures } from "./import-failures";
 import { MissingBadge } from "./missing-badge";
 import { TrashDialog } from "./trash-dialog";
@@ -219,9 +219,13 @@ export function MediaBin() {
       .catch(() => setTrashCount(0));
   }, [projectId]);
 
+  // Undo after a delete puts the record back; its trash row must go with it.
   useEffect(() => {
-    refreshTrashCount();
-  }, [refreshTrashCount]);
+    const present = new Set<string>(media.map((asset) => asset.id));
+    void reconcileTrash(projectId, present)
+      .catch(() => undefined)
+      .then(refreshTrashCount);
+  }, [media, projectId, refreshTrashCount]);
 
   const handleDelete = useCallback(
     async (asset: MediaAsset) => {
@@ -230,6 +234,13 @@ export function MediaBin() {
       // brings the clips back immediately.
       try {
         await moveAssetToTrash(projectId, asset);
+      } catch {
+        // No trash store (private mode, storage off): keep the asset rather
+        // than delete it with nothing to restore from.
+        toast.error(t("media.trashUnavailable", { name: asset.name }));
+        return;
+      }
+      try {
         removeMediaAsset(asset.id);
         refreshTrashCount();
         toast.success(t("media.movedToTrash", { name: asset.name }));
@@ -241,9 +252,9 @@ export function MediaBin() {
   );
 
   const applyRelink = useCallback(
-    async (asset: MediaAsset, file: File) => {
+    async (asset: MediaAsset, file: File, identical: boolean) => {
       try {
-        const patch = await relinkAssetFromFile(asset, file);
+        const patch = await relinkAssetFromFile(asset, file, { identical });
         relinkMediaAsset(asset.id, patch);
         toast.success(t("media.relinked", { name: asset.name }));
       } catch (err) {
@@ -260,7 +271,7 @@ export function MediaBin() {
       if (!asset || !file) return;
       const verdict = compareRelinkCandidate(asset, file);
       if (verdict.ok) {
-        void applyRelink(asset, file);
+        void applyRelink(asset, file, true);
         return;
       }
       // Never swap in a look-alike silently: say what differs and let the
@@ -272,7 +283,10 @@ export function MediaBin() {
         }),
         {
           duration: 15_000,
-          action: { label: t("media.relinkAnyway"), onClick: () => void applyRelink(asset, file) },
+          action: {
+            label: t("media.relinkAnyway"),
+            onClick: () => void applyRelink(asset, file, false),
+          },
         },
       );
     },

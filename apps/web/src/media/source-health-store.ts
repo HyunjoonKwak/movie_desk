@@ -20,12 +20,15 @@ export interface CheckOptions {
   readonly maxAgeMs?: number;
   // Re-probe everything, at most once per FORCE_THROTTLE_MS.
   readonly force?: boolean;
+  // `assets` is the whole library: drop entries for anything not in it.
+  // Callers passing a subset (the preview) must leave this off.
+  readonly prune?: boolean;
 }
 
 interface SourceHealthState {
   readonly entries: Readonly<Record<string, HealthEntry>>;
-  // Probes what is due among `assets` and drops entries for assets that are
-  // no longer in the list. Concurrent calls never probe the same asset twice.
+  // Probes what is due among `assets`. Concurrent calls never probe the same
+  // asset twice.
   check: (assets: readonly MediaAsset[], options?: CheckOptions) => Promise<void>;
 }
 
@@ -78,7 +81,7 @@ export const useSourceHealthStore = create<SourceHealthState>((set, get) => ({
       if (now - lastForcedAt < FORCE_THROTTLE_MS) force = false;
       else lastForcedAt = now;
     }
-    const pruned = withoutStale(get().entries, assets);
+    const pruned = options.prune ? withoutStale(get().entries, assets) : get().entries;
     if (pruned !== get().entries) set({ entries: pruned });
 
     const maxAgeMs = options.maxAgeMs ?? DEFAULT_MAX_AGE_MS;

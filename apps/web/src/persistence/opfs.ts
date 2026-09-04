@@ -121,6 +121,37 @@ export const writeMediaFile = async (key: string, file: File): Promise<string> =
   }
 };
 
+// Replaces the bytes behind `key` without ever leaving it half-written: the
+// new file is written under a temporary key first, and only once that
+// succeeded does it take the key's place (a rename where the browser
+// supports it, a copy otherwise). A failure leaves the previous file intact
+// and the temporary copy for startup GC to reap.
+export const replaceMediaFile = async (key: string, file: File): Promise<string> => {
+  revokeMediaUrl(key);
+  if (!supportsOpfs()) {
+    inMemory.set(key, file);
+    return key;
+  }
+  const tempKey = `${key}.replace-tmp`;
+  await writeMediaFile(tempKey, file);
+  const root = await getRoot();
+  const temp = (await root.getFileHandle(tempKey)) as FileSystemFileHandle & {
+    move?: (name: string) => Promise<void>;
+  };
+  if (typeof temp.move === "function") {
+    try {
+      await root.removeEntry(key);
+    } catch {
+      // Nothing to replace.
+    }
+    await temp.move(key);
+  } else {
+    await writeMediaFile(key, await temp.getFile());
+    await root.removeEntry(tempKey);
+  }
+  return key;
+};
+
 export const readMediaFile = async (key: string): Promise<Blob | null> => {
   if (!supportsOpfs()) return inMemory.get(key) ?? null;
   try {

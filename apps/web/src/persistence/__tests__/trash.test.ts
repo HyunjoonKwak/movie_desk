@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 interface Row {
   id: string;
+  assetId: string;
   projectId: string;
   name: string;
   kind: string;
@@ -62,13 +63,15 @@ vi.mock("dexie", () => {
 });
 
 import {
-  TRASH_RETENTION_MS,
   countTrash,
   deleteTrashEntry,
   emptyTrash,
   listTrash,
   moveAssetToTrash,
   readTrashedAsset,
+  reconcileTrash,
+  TRASH_RETENTION_MS,
+  trashEntryId,
   trashMediaKeys,
 } from "../trash";
 
@@ -99,31 +102,48 @@ describe("trash", () => {
 
     expect(await countTrash(project)).toBe(2);
     expect((await listTrash(project)).map((row) => row.name)).toEqual(["b.mp4", "a.mp4"]);
-    const restored = await readTrashedAsset("b");
+    const restored = await readTrashedAsset(trashEntryId(project, "b"));
     expect(restored?.proxyPath).toBe("b__proxy.mp4");
-    await deleteTrashEntry("b");
+    await deleteTrashEntry(trashEntryId(project, "b"));
     expect(await countTrash(project)).toBe(1);
     await emptyTrash(project);
     expect(await countTrash(project)).toBe(0);
     expect(await countTrash("other" as ID)).toBe(1);
   });
 
+  it("keeps the same asset id apart across projects", async () => {
+    await moveAssetToTrash(project, asset("shared"));
+    await moveAssetToTrash("copy" as ID, asset("shared", { name: "copy.mp4" }));
+    expect(await countTrash(project)).toBe(1);
+    expect(await countTrash("copy" as ID)).toBe(1);
+    expect((await readTrashedAsset(trashEntryId("copy", "shared")))?.name).toBe("copy.mp4");
+  });
+
+  it("drops rows for assets that are back in the library", async () => {
+    await moveAssetToTrash(project, asset("a"));
+    await moveAssetToTrash(project, asset("b"));
+    await reconcileTrash(project, new Set(["a"]));
+    expect((await listTrash(project)).map((row) => row.assetId)).toEqual(["b"]);
+  });
+
   it("returns null for a damaged row", async () => {
-    rows.set("bad", {
-      id: "bad",
+    rows.set("p1:bad", {
+      id: "p1:bad",
+      assetId: "bad",
       projectId: project,
       name: "x",
       kind: "video",
       deletedAt: 1,
       json: "{nope",
     });
-    expect(await readTrashedAsset("bad")).toBeNull();
+    expect(await readTrashedAsset("p1:bad")).toBeNull();
   });
 
   it("keeps trashed files alive for GC until the entry expires", async () => {
     const now = 1_000_000;
     rows.set("fresh", {
       id: "fresh",
+      assetId: "fresh",
       projectId: project,
       name: "f",
       kind: "video",
@@ -132,6 +152,7 @@ describe("trash", () => {
     });
     rows.set("old", {
       id: "old",
+      assetId: "old",
       projectId: project,
       name: "o",
       kind: "video",
@@ -140,7 +161,11 @@ describe("trash", () => {
     });
     const keep = new Set<string>();
     await trashMediaKeys(keep, now);
-    expect([...keep].sort()).toEqual(["fresh__fresh.mp4", "fresh__proxy.mp4"]);
+    expect([...keep].filter((key) => !key.startsWith("cache__")).sort()).toEqual([
+      "fresh__fresh.mp4",
+      "fresh__proxy.mp4",
+    ]);
+    expect([...keep].some((key) => key.startsWith("cache__"))).toBe(true);
     expect(rows.has("old")).toBe(false);
   });
 });

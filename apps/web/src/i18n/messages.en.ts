@@ -705,4 +705,5 @@ export const en = {
     "media.trashDamaged": "\"{name}\" could not be restored: the entry is damaged",
     "media.trashDeleteForever": "Delete forever",
     "media.trashEmptyAll": "Empty trash",
+    "media.trashUnavailable": "The trash is unavailable in this session, so \"{name}\" was kept.",
 } as const;

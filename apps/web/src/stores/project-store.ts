@@ -68,7 +68,7 @@ import { type TitleTemplate, createClipCreateActions } from "./actions/clip-crea
 import { createEffectActions } from "./actions/effect-actions";
 import { createKeyframeActions } from "./actions/keyframe-actions";
 import { createMarkerActions } from "./actions/marker-actions";
-import { createMediaActions } from "./actions/media-actions";
+import { type RelinkAssetPatch, createMediaActions } from "./actions/media-actions";
 import { createMusicActions } from "./actions/music-actions";
 import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
 import { createTrackActions } from "./actions/track-actions";
@@ -87,7 +87,7 @@ interface ProjectStoreState {
   setResolution: (w: number, h: number) => void;
   addMediaAsset: (asset: MediaAsset) => void;
   removeMediaAsset: (assetId: ID) => void;
-  relinkMediaAsset: (assetId: ID, patch: { sizeBytes: number; mime: string }) => void;
+  relinkMediaAsset: (assetId: ID, patch: RelinkAssetPatch) => void;
   setAssetProxy: (
     assetId: ID,
     proxy: { proxyPath: string; proxyWidth: number; proxyHeight: number },

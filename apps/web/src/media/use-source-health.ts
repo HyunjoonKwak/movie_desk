@@ -17,13 +17,13 @@ export const useSourceHealth = (
   const check = useSourceHealthStore((s) => s.check);
 
   useEffect(() => {
-    void check(assets);
+    void check(assets, { prune: true });
   }, [assets, check]);
 
   useEffect(() => {
     const recheck = () => {
       if (document.visibilityState === "hidden") return;
-      void check(assets, { force: true });
+      void check(assets, { force: true, prune: true });
     };
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
