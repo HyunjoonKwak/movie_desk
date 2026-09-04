@@ -22,10 +22,18 @@ import { MusicPanel } from "@/music/components/music-panel";
 import { ProjectInspectorPanel } from "./project-inspector-panel";
 import { useT } from "@/i18n/use-t";
 
-type Tab = "inspector" | "auto" | "subs" | "music" | "scopes" | "multicam" | "markers" | "inspect";
+export type RightPanelTab =
+  | "inspector"
+  | "auto"
+  | "subs"
+  | "music"
+  | "scopes"
+  | "multicam"
+  | "markers"
+  | "inspect";
 
-export function RightPanel() {
-  const [tab, setTab] = useState<Tab>("inspector");
+export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPanelTab }) {
+  const [tab, setTab] = useState<RightPanelTab>(initialTab);
   const t = useT();
 
   return (

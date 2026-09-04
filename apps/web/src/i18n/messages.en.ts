@@ -450,6 +450,32 @@ export const en = {
     "project.corrupt": "This saved project is damaged and could not be opened",
     "project.activeCorrupt": "The last project is damaged. Opened a new project instead",
 
+    // New-project start
+    "start.eyebrow": "New project",
+    "start.title": "How would you like to start?",
+    "start.description":
+      "Choose a starting point, not a limited mode. Every path opens the same complete editing workspace.",
+    "start.organize.badge": "Recommended for footage",
+    "start.organize.title": "Import and organize",
+    "start.organize.description":
+      "Add photos and videos, then browse them in capture order with automatic day groups.",
+    "start.organize.files": "Import files",
+    "start.organize.folder": "Choose folder",
+    "start.importing": "Importing…",
+    "start.manual.title": "Edit manually",
+    "start.manual.description":
+      "Open an empty timeline and start with the full set of professional editing tools.",
+    "start.manual.detail": "The familiar empty editor stays available with no guided steps.",
+    "start.manual.action": "Open empty editor",
+    "start.guided.title": "Build a guided draft",
+    "start.guided.description":
+      "Review your footage, get a suggested direction, and create an editable first cut.",
+    "start.guided.detail":
+      "You decide what to use or exclude. Suggestions never overwrite your manual edits.",
+    "start.guided.action": "Start guided draft",
+    "start.local": "Your media and analysis stay on this device.",
+    "start.switchLater": "You can use every workflow and tool after you start.",
+
     // Context menu
     "ctx.split": "Split at playhead",
     "ctx.duplicate": "Duplicate",

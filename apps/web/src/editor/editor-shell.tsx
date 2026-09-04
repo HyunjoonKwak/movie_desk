@@ -1,11 +1,13 @@
 "use client";
 
 import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
+import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
 import { useIsDesktopApp } from "@/hooks/use-is-desktop-app";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { MediaBin } from "@/media/components/media-bin";
 import { collectMediaGarbage } from "@/persistence/media-gc";
@@ -15,12 +17,13 @@ import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelinePanel } from "@/timeline/components/timeline-panel";
-import { FolderOpen, Sliders, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { FolderOpen, Sliders, Wand2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
 import { InspectorPanel } from "./inspector-panel";
-import { RightPanel } from "./right-panel";
+import { NewProjectStart, type NewProjectPath } from "./new-project-start";
+import { RightPanel, type RightPanelTab } from "./right-panel";
 import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
 import { TopBar } from "./top-bar";
 
@@ -32,6 +35,17 @@ export function EditorShell() {
   useAutoAnalysis();
   const isMobile = useIsBelow(900);
   const isDesktopApp = useIsDesktopApp();
+  const projectId = useProjectStore((state) => state.project.id);
+  // Hydration replaces this bootstrap project when a saved project exists.
+  // Identity lets C1 recognize only the genuinely fresh editor without
+  // changing persistence behavior or reopening guidance for saved empties.
+  const bootstrapProjectId = useRef(projectId);
+  const [requestedStartProjectId, setRequestedStartProjectId] = useState<string | null>(null);
+  const [completedStartIds, setCompletedStartIds] = useState<ReadonlySet<string>>(new Set());
+  const [entry, setEntry] = useState<{ projectId: string; path: NewProjectPath }>({
+    projectId,
+    path: "manual",
+  });
 
   // Reclaim OPFS blobs no project references, shortly after load so the active
   // project has settled. Undo-safe: deletion keeps blobs, GC only reaps ones
@@ -52,7 +66,47 @@ export function EditorShell() {
     );
   }
 
-  if (isMobile) return <MobileShell />;
+  const showFreshStart =
+    bootstrapProjectId.current === projectId && !completedStartIds.has(projectId);
+  const showStart = showFreshStart || requestedStartProjectId === projectId;
+  const activePath = entry.projectId === projectId ? entry.path : "manual";
+  const onNewProject = (id: string) => {
+    setEntry({ projectId: id, path: "manual" });
+    setRequestedStartProjectId(id);
+  };
+  const onChooseStart = (path: NewProjectPath) => {
+    setEntry({ projectId, path });
+    setCompletedStartIds((current) => new Set(current).add(projectId));
+    setRequestedStartProjectId(null);
+  };
+
+  if (showStart) {
+    return (
+      <div className="flex h-full flex-col bg-panel-0 text-ink-1">
+        <CommandPalette />
+        <ShortcutCheatsheet />
+        <header
+          className={cn(
+            "h-12 shrink-0 border-b border-line bg-panel-1",
+            isDesktopApp && "app-region-drag pl-[72px]",
+          )}
+        >
+          <TopBar onNewProject={onNewProject} />
+        </header>
+        <NewProjectStart onChoose={onChooseStart} />
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <MobileShell
+        onNewProject={onNewProject}
+        initialDrawer={activePath === "guided" ? "auto" : null}
+      />
+    );
+  }
+  const initialRightTab: RightPanelTab = activePath === "guided" ? "auto" : "inspector";
   return (
     <div className="flex h-full flex-col bg-panel-0 text-ink-1">
       <CommandPalette />
@@ -65,7 +119,7 @@ export function EditorShell() {
           isDesktopApp && "app-region-drag pl-[72px]",
         )}
       >
-        <TopBar />
+        <TopBar onNewProject={onNewProject} />
       </header>
       {/* Resizable workspace, FCP-style: browser | viewer | inspector on
           top, timeline below. Split ratios persist via autoSaveId. */}
@@ -103,7 +157,7 @@ export function EditorShell() {
               collapsedSize={0}
               className="overflow-hidden border-l border-line bg-panel-1"
             >
-              <RightPanel />
+              <RightPanel initialTab={initialRightTab} />
             </Panel>
           </PanelGroup>
         </Panel>
@@ -129,14 +183,23 @@ function ResizeHandle({ orientation }: { orientation: "vertical" | "horizontal" 
   );
 }
 
-function MobileShell() {
-  const [drawer, setDrawer] = useState<"media" | "inspector" | null>(null);
+type MobileDrawer = "media" | "auto" | "inspector";
+
+function MobileShell({
+  onNewProject,
+  initialDrawer,
+}: {
+  onNewProject: (projectId: string) => void;
+  initialDrawer: MobileDrawer | null;
+}) {
+  const [drawer, setDrawer] = useState<MobileDrawer | null>(initialDrawer);
+  const t = useT();
   return (
     <div className="flex h-full flex-col bg-panel-0 text-ink-1">
       <CommandPalette />
       <ShortcutCheatsheet />
       <header className="h-12 border-b border-line bg-panel-1">
-        <TopBar />
+        <TopBar onNewProject={onNewProject} />
       </header>
       <main className="flex-1 overflow-hidden bg-panel-0">
         <ErrorBoundary label="Preview">
@@ -154,13 +217,26 @@ function MobileShell() {
           type="button"
           onClick={() => setDrawer("media")}
           className="btn-ghost flex-1 justify-center"
+          aria-label={t("media.title")}
+          title={t("media.title")}
         >
           <FolderOpen className="size-5" />
         </button>
         <button
           type="button"
+          onClick={() => setDrawer("auto")}
+          className="btn-ghost flex-1 justify-center"
+          aria-label={t("auto.tab")}
+          title={t("auto.tab")}
+        >
+          <Wand2 className="size-5" />
+        </button>
+        <button
+          type="button"
           onClick={() => setDrawer("inspector")}
           className="btn-ghost flex-1 justify-center"
+          aria-label={t("inspector.title")}
+          title={t("inspector.title")}
         >
           <Sliders className="size-5" />
         </button>
@@ -170,7 +246,11 @@ function MobileShell() {
         <div className="fixed inset-0 z-50 flex flex-col bg-panel-0">
           <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
             <span className="text-sm font-medium text-ink-1">
-              {drawer === "media" ? "Media" : "Inspector"}
+              {drawer === "media"
+                ? t("media.title")
+                : drawer === "auto"
+                  ? t("auto.tab")
+                  : t("inspector.title")}
             </span>
             <button
               type="button"
@@ -181,7 +261,13 @@ function MobileShell() {
             </button>
           </div>
           <div className="flex-1 overflow-hidden">
-            {drawer === "media" ? <MediaBin /> : <InspectorPanel />}
+            {drawer === "media" ? (
+              <MediaBin />
+            ) : drawer === "auto" ? (
+              <AutoEditPanel />
+            ) : (
+              <InspectorPanel />
+            )}
           </div>
         </div>
       )}

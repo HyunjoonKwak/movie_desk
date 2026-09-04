@@ -27,7 +27,7 @@ interface StoredRow {
   updatedAt: number;
 }
 
-export function ProjectMenu() {
+export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) => void }) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<StoredRow[]>([]);
   const projectId = useProjectStore((s) => s.project.id);
@@ -99,6 +99,7 @@ export function ProjectMenu() {
     await upsertProject(fresh);
     await setActiveProjectId(fresh.id);
     setOpen(false);
+    onNewProject?.(fresh.id);
     toast.success(t("project.created"));
   };
 

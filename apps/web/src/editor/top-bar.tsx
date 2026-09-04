@@ -13,8 +13,9 @@ import { SnapshotMenu } from "./snapshot-menu";
 import { useT } from "@/i18n/use-t";
 import { LanguageToggle } from "@/i18n/language-toggle";
 import { useAppVersion } from "@/hooks/use-app-version";
+import type { ID } from "@movie-desk/core";
 
-export function TopBar() {
+export function TopBar({ onNewProject }: { onNewProject?: (projectId: ID) => void }) {
   const projectName = useProjectStore((s) => s.project.name);
   const renameProject = useProjectStore((s) => s.renameProject);
   const undo = useProjectStore((s) => s.undo);
@@ -144,7 +145,7 @@ export function TopBar() {
           </button>
         </div>
         <div className="toolbar-cluster">
-          <ProjectMenu />
+          <ProjectMenu {...(onNewProject ? { onNewProject } : {})} />
           <span className="hidden xl:block">
             <SnapshotMenu />
           </span>

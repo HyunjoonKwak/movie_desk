@@ -450,6 +450,31 @@ export const ko = {
     "project.corrupt": "저장된 프로젝트가 손상되어 열 수 없습니다",
     "project.activeCorrupt": "마지막 프로젝트가 손상되어 새 프로젝트를 열었습니다",
 
+    // 새 프로젝트 출발점
+    "start.eyebrow": "새 프로젝트",
+    "start.title": "어떻게 시작할까요?",
+    "start.description":
+      "기능이 제한된 모드가 아니라 시작점만 고르세요. 어느 길이든 같은 완전한 편집 작업 공간으로 이어집니다.",
+    "start.organize.badge": "촬영본이 많을 때 추천",
+    "start.organize.title": "가져오고 정리하기",
+    "start.organize.description":
+      "사진과 영상을 추가하면 촬영 시간순으로 정리하고 날짜별로 묶어서 보여 줍니다.",
+    "start.organize.files": "파일 가져오기",
+    "start.organize.folder": "폴더 선택",
+    "start.importing": "가져오는 중…",
+    "start.manual.title": "직접 편집하기",
+    "start.manual.description": "빈 타임라인과 모든 전문 편집 도구를 바로 엽니다.",
+    "start.manual.detail": "안내 단계 없이 익숙한 빈 편집기를 그대로 사용할 수 있습니다.",
+    "start.manual.action": "빈 편집기 열기",
+    "start.guided.title": "안내형 초안 만들기",
+    "start.guided.description":
+      "촬영본을 살펴본 뒤 어울리는 방향을 추천받고, 자유롭게 고칠 수 있는 첫 초안을 만듭니다.",
+    "start.guided.detail":
+      "사용하거나 제외할 장면은 직접 결정합니다. 제안이 수동 편집을 덮어쓰지 않습니다.",
+    "start.guided.action": "안내 시작하기",
+    "start.local": "미디어와 분석 결과는 이 기기 안에만 보관됩니다.",
+    "start.switchLater": "시작한 뒤에는 모든 흐름과 도구를 함께 사용할 수 있습니다.",
+
     // Context menu
     "ctx.split": "재생 위치에서 분할",
     "ctx.duplicate": "복제",
