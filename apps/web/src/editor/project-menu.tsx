@@ -1,7 +1,11 @@
 "use client";
 
 import { useT } from "@/i18n/use-t";
-import { downloadProjectJson, parseProjectExport } from "@/persistence/project-export";
+import {
+  ProjectVersionError,
+  downloadProjectJson,
+  parseProjectExport,
+} from "@/persistence/project-export";
 import {
   deleteStoredProject,
   listProjectsLibrary,
@@ -130,6 +134,15 @@ export function ProjectMenu() {
       setOpen(false);
       toast.success(t("project.imported", { name: env.project.name }));
     } catch (err) {
+      if (err instanceof ProjectVersionError) {
+        toast.error(
+          t(err.direction === "older" ? "project.importOlder" : "project.importNewer", {
+            file: err.fileVersion,
+            app: err.appVersion,
+          }),
+        );
+        return;
+      }
       toast.error(`${t("project.importFailed")}: ${err instanceof Error ? err.message : err}`);
     }
   };

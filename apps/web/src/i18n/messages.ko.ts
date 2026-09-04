@@ -683,4 +683,8 @@ export const ko = {
     "export.close": "완료",
     "export.missingTitle": "읽을 수 없는 미디어가 있습니다",
     "export.missingHint": "원본이 든 드라이브를 다시 연결하거나 해당 클립을 지운 뒤 다시 내보내세요. 그동안 편집본을 지키려면 프로젝트 → JSON 내보내기로 백업하세요.",
+    "preview.missingMedia": "누락 미디어: {names}",
+    "preview.missingHint": "원본을 다시 연결하면 이 프레임이 다시 보입니다.",
+    "project.importOlder": "이 프로젝트 파일은 오래된 형식(v{file})이라 이 앱(v{app})에서 열 수 없습니다.",
+    "project.importNewer": "이 프로젝트 파일은 더 새로운 Movie Desk가 필요합니다(파일 v{file}, 현재 앱 v{app}). 앱을 업데이트한 뒤 다시 시도하세요.",
 } as const;

@@ -11,6 +11,7 @@ import { Clapperboard } from "lucide-react";
 import "@/renderer/bench";
 import { useT } from "@/i18n/use-t";
 import { GuidesOverlay } from "./guides-overlay";
+import { MissingMediaNotice } from "./missing-media-notice";
 import { PreviewControls } from "./preview-controls";
 import { RegionOverlay } from "./region-overlay";
 
@@ -155,6 +156,7 @@ export function PreviewViewport() {
         <canvas ref={canvasRef} data-preview-canvas className="size-full" />
         <RegionOverlay />
         <GuidesOverlay />
+        <MissingMediaNotice />
         {project.mediaLibrary.length === 0 && (
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(96,93,255,0.08),transparent_55%)] px-8 text-center">
             <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-line-strong bg-panel-2 text-accent">

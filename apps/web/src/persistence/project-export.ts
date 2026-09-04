@@ -201,19 +201,33 @@ export const toProjectExport = (project: Project): ProjectExport => ({
   project: { ...project, timeline: { ...project.timeline, magnetic: true } } as Project,
 });
 
+// A project file from another app version. The UI translates it; the message
+// stays readable for logs and tests.
+export class ProjectVersionError extends Error {
+  constructor(
+    readonly direction: "older" | "newer",
+    readonly fileVersion: number,
+    readonly appVersion: number,
+  ) {
+    super(
+      direction === "older"
+        ? `This project uses an unsupported older format (file v${fileVersion}, this app v${appVersion}).`
+        : `This project needs a newer version of the app (file v${fileVersion}, this app v${appVersion}).`,
+    );
+    this.name = "ProjectVersionError";
+  }
+}
+
 export const parseProjectExport = (raw: unknown): ProjectExport => {
   const env = exportSchema.parse(raw);
   // Refuse a file written by a newer app version rather than silently importing
   // a format we don't understand. Older versions would migrate here; v1 is
   // currently the only version.
   if (env.version !== PROJECT_VERSION) {
-    if (env.version < PROJECT_VERSION) {
-      throw new Error(
-        `This project uses an unsupported older format (file v${env.version}, this app v${PROJECT_VERSION}).`,
-      );
-    }
-    throw new Error(
-      `This project needs a newer version of the app (file v${env.version}, this app v${PROJECT_VERSION}).`,
+    throw new ProjectVersionError(
+      env.version < PROJECT_VERSION ? "older" : "newer",
+      env.version,
+      PROJECT_VERSION,
     );
   }
   return env;

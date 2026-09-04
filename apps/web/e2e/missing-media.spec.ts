@@ -30,6 +30,8 @@ test("an export with missing media is refused by name and the dialog stays usabl
   await expect(mediaCard(page).locator("[data-missing]")).toHaveText("Missing", {
     timeout: 15_000,
   });
+  // The preview names the file under the playhead instead of going black.
+  await expect(page.locator("[data-preview-missing]")).toContainText("pix.png");
 
   await page.getByRole("button", { name: "Export", exact: true }).first().click();
   const dialog = page.getByRole("dialog");

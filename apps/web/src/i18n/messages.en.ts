@@ -684,4 +684,8 @@ export const en = {
     "export.close": "Done",
     "export.missingTitle": "Some media cannot be read",
     "export.missingHint": "Reconnect the drive that holds these originals, or remove their clips, then export again. To keep a copy of the edit meanwhile, use Projects → Export JSON.",
+    "preview.missingMedia": "Missing media: {names}",
+    "preview.missingHint": "Reconnect the originals to see this frame again.",
+    "project.importOlder": "This project file uses an older format (v{file}) this app (v{app}) cannot open.",
+    "project.importNewer": "This project file needs a newer Movie Desk (file v{file}, this app v{app}). Update the app and try again.",
 } as const;

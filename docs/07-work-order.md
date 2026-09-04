@@ -59,6 +59,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-04 Claude: 도그푸딩 병행 잔여(`claude/preview-missing-followups`). 프리뷰가 누락 자산을 검은 프레임으로만
+  보여주던 것을 플레이헤드 아래 클립의 누락 파일 이름을 띄우는 오버레이로 보완(`preview/missing-media-notice.tsx`,
+  미디어 패널이 숨겨져 있어도 소스 상태를 직접 확인). FrameSourcePool backoff·스냅샷 저장/복원 단위 테스트 추가,
+  프로젝트 파일 버전 불일치 메시지를 `ProjectVersionError` + i18n으로. `docs/06` 기준선을 2026-09-04로 갱신.
 - 2026-09-04 Claude: Codex 사용량 제한으로 Codex 몫을 모두 인수(`claude/codex-handover`). (1) 데스크톱: 옛
   `~/Library/Application Support/cut_editor` 데이터는 그 자리에서 그대로 채택(`user-data.cjs`: 첫 실행에 한 번 결정해
   `Movie Desk/user-data-location.json`에 고정, 근거는 우리 origin의 IndexedDB 폴더 `app_cut-editor_0.indexeddb.leveldb`
