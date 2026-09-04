@@ -4,6 +4,8 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useMediaImport } from "@/media/hooks";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
+import { useImportFailureStore } from "@/media/import-failure-store";
+import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 
 // Window-level drag-and-drop guard. Without it, dropping a file outside a
@@ -13,7 +15,7 @@ import { t } from "@/i18n/use-t";
 // entries are recursively expanded so a camera DCIM folder behaves like the
 // same files selected individually.
 
-export const useGlobalFileDrop = (): void => {
+export const useGlobalFileDrop = (onImportHandled?: () => void): void => {
   const { importFiles } = useMediaImport();
 
   useEffect(() => {
@@ -27,7 +29,13 @@ export const useGlobalFileDrop = (): void => {
       if (collected.unreadablePaths.length > 0) {
         toast.warning(t("media.folderUnreadable", { n: collected.unreadablePaths.length }));
       }
-      if (collected.candidates.length > 0) await importFiles(collected.candidates);
+      if (collected.candidates.length === 0) return;
+      const mediaBefore = useProjectStore.getState().project.mediaLibrary.length;
+      const failuresBefore = useImportFailureStore.getState().failures.length;
+      await importFiles(collected.candidates);
+      const mediaAfter = useProjectStore.getState().project.mediaLibrary.length;
+      const failuresAfter = useImportFailureStore.getState().failures.length;
+      if (mediaAfter > mediaBefore || failuresAfter > failuresBefore) onImportHandled?.();
     };
     window.addEventListener("dragover", onDragOver);
     window.addEventListener("drop", onDrop);
@@ -35,5 +43,5 @@ export const useGlobalFileDrop = (): void => {
       window.removeEventListener("dragover", onDragOver);
       window.removeEventListener("drop", onDrop);
     };
-  }, [importFiles]);
+  }, [importFiles, onImportHandled]);
 };

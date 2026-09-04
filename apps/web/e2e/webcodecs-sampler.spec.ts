@@ -1,6 +1,7 @@
 import path from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { installDecoderStats, readDecoderStats } from "./decoder-stats";
+import { importMediaFiles } from "./support";
 
 // Smoke for the shared analysis frame sampler (B15): importing an MP4 must
 // analyse it through a real VideoDecoder — configure() accepted and frames
@@ -26,9 +27,7 @@ test("analysis decodes an MP4 through a real VideoDecoder", async ({ page }) => 
   const fixtureDir = path.join(test.info().project.testDir, "fixtures");
 
   await page.goto("/editor");
-  await page
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles(path.join(fixtureDir, FIXTURE));
+  await importMediaFiles(page, path.join(fixtureDir, FIXTURE));
   await expect(page.getByText(FIXTURE, { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Auto edit" }).click();

@@ -1,9 +1,9 @@
 import { type Page, expect, test } from "@playwright/test";
 import {
   PNG,
-  MEDIA_INPUT,
   clipCount,
   configurePage,
+  importMediaFiles,
   mediaCard,
   persistedUpdateCount,
   seedTimeline,
@@ -176,8 +176,6 @@ test("a damaged last-opened project falls back to a fresh project on load", asyn
     page.getByText("The last project is damaged. Opened a new project instead", { exact: true }),
   ).toBeVisible();
   // The editor stays usable: a fresh import still lands in the media bin.
-  await page
-    .locator(MEDIA_INPUT)
-    .setInputFiles({ name: "pix.png", mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: "pix.png", mimeType: "image/png", buffer: PNG });
   await expect(mediaCard(page)).toBeVisible();
 });

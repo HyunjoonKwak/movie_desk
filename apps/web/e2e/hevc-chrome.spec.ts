@@ -1,6 +1,7 @@
 import path from "node:path";
 import { type Page, expect, test } from "@playwright/test";
 import { installDecoderStats, readDecoderStats } from "./decoder-stats";
+import { importMediaFiles } from "./support";
 
 // Local Chrome-channel journey for HEVC .mov (B11 gate that CI cannot run:
 // Playwright's Chromium ships no HEVC decoder). An iPhone-style rotated
@@ -45,7 +46,7 @@ test("imports a rotated HEVC .mov and analyses it through an HEVC VideoDecoder",
   });
   test.skip(!supported, "this Chrome build has no HEVC decoder");
 
-  await page.locator('input[type="file"][accept="video/*,audio/*,image/*"]').setInputFiles(fixture);
+  await importMediaFiles(page, fixture);
   await expect(page.getByText(FIXTURE, { exact: true })).toBeVisible();
   // 160×90 source with a 90° display matrix: the library shows the display size.
   await expect(page.getByText("90×160", { exact: true })).toBeVisible();

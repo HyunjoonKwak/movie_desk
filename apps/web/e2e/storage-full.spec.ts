@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MEDIA_INPUT, PNG, configurePage, mediaCard, opfsKeys } from "./support";
+import { PNG, configurePage, importMediaFiles, mediaCard, opfsKeys } from "./support";
 
 // Release checklist (B24): running out of storage mid-import is explained per
 // file, never takes the other files down, leaves no partial copy behind and
@@ -31,7 +31,7 @@ test("a full disk fails one file with a storage message, keeps the rest and retr
   page,
 }) => {
   await page.goto("/editor");
-  await page.locator(MEDIA_INPUT).setInputFiles([
+  await importMediaFiles(page, [
     { name: "good.png", mimeType: "image/png", buffer: PNG },
     { name: "huge.png", mimeType: "image/png", buffer: PNG },
   ]);

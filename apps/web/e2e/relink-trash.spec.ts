@@ -1,5 +1,13 @@
 import { type Page, expect, test } from "@playwright/test";
-import { PNG, clipCount, configurePage, mediaCard, opfsKeys, seedTimeline } from "./support";
+import {
+  PNG,
+  clipCount,
+  configurePage,
+  importMediaFiles,
+  mediaCard,
+  opfsKeys,
+  seedTimeline,
+} from "./support";
 
 // Library safety (A4): a missing original can be relinked from a file, a
 // look-alike is not swapped in silently, and removed media waits in the
@@ -86,9 +94,7 @@ test("a missing badge survives the preview checking only the clip under the play
   page,
 }) => {
   await seedTimeline(page, 1);
-  await page
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles({ name: "other.png", mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: "other.png", mimeType: "image/png", buffer: PNG });
   await expect(mediaCard(page, "other.png")).toBeVisible();
   await removeOpfsKey(page, "__other.png");
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { importMediaFiles } from "./support";
 
 // Rubber-band selection is pointer-driven, so the unit suite (vitest, node
 // environment) cannot reach it — the whole gesture shipped broken because the
@@ -24,9 +25,7 @@ const configurePage = async (page: Page): Promise<void> => {
 // track below it, so a band can be aimed at some clips and away from others.
 const seedTimeline = async (page: Page): Promise<void> => {
   await page.goto("/editor");
-  await page
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles({ name: "pix.png", mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: "pix.png", mimeType: "image/png", buffer: PNG });
   await page.getByText("pix.png", { exact: true }).click();
   for (let i = 0; i < 3; i++) {
     await page.keyboard.press("e"); // append to the timeline

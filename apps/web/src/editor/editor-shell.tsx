@@ -18,18 +18,22 @@ import { useAudioPlayback } from "@/preview/use-audio-playback";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelinePanel } from "@/timeline/components/timeline-panel";
 import { FolderOpen, Sliders, Wand2, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
 import { InspectorPanel } from "./inspector-panel";
 import { NewProjectStart, type NewProjectPath } from "./new-project-start";
+import {
+  clearNewProjectStartPending,
+  isNewProjectStartPending,
+  markNewProjectStartPending,
+} from "./new-project-start-state";
 import { RightPanel, type RightPanelTab } from "./right-panel";
 import { ShortcutCheatsheet } from "./shortcut-cheatsheet";
 import { TopBar } from "./top-bar";
 
 export function EditorShell() {
   useKeyboardShortcuts();
-  useGlobalFileDrop();
   const persistenceReady = useLocalPersistence();
   useAudioPlayback();
   useAutoAnalysis();
@@ -46,6 +50,40 @@ export function EditorShell() {
     projectId,
     path: "manual",
   });
+
+  const showFreshStart =
+    bootstrapProjectId.current === projectId && !completedStartIds.has(projectId);
+  const showStart =
+    showFreshStart || requestedStartProjectId === projectId || isNewProjectStartPending(projectId);
+  const showStartRef = useRef(showStart);
+  showStartRef.current = showStart;
+  const activePath = entry.projectId === projectId ? entry.path : "manual";
+  const onNewProject = useCallback((id: string) => {
+    markNewProjectStartPending(id);
+    setEntry({ projectId: id, path: "manual" });
+    setRequestedStartProjectId(id);
+  }, []);
+  const onChooseStart = useCallback(
+    (path: NewProjectPath) => {
+      clearNewProjectStartPending(projectId);
+      setEntry({ projectId, path });
+      setCompletedStartIds((current) => new Set(current).add(projectId));
+      setRequestedStartProjectId(null);
+    },
+    [projectId],
+  );
+  const onGlobalImportHandled = useCallback(() => {
+    if (showStartRef.current) onChooseStart("organize");
+  }, [onChooseStart]);
+  useGlobalFileDrop(onGlobalImportHandled);
+
+  // Persist only projects that actually reached the start screen. Existing
+  // saved empty projects have no marker, so they continue to open directly in
+  // the expert editor while an unanswered new project survives a reload.
+  useEffect(() => {
+    if (!persistenceReady || !showFreshStart) return;
+    markNewProjectStartPending(projectId);
+  }, [persistenceReady, projectId, showFreshStart]);
 
   // Reclaim OPFS blobs no project references, shortly after load so the active
   // project has settled. Undo-safe: deletion keeps blobs, GC only reaps ones
@@ -66,20 +104,6 @@ export function EditorShell() {
     );
   }
 
-  const showFreshStart =
-    bootstrapProjectId.current === projectId && !completedStartIds.has(projectId);
-  const showStart = showFreshStart || requestedStartProjectId === projectId;
-  const activePath = entry.projectId === projectId ? entry.path : "manual";
-  const onNewProject = (id: string) => {
-    setEntry({ projectId: id, path: "manual" });
-    setRequestedStartProjectId(id);
-  };
-  const onChooseStart = (path: NewProjectPath) => {
-    setEntry({ projectId, path });
-    setCompletedStartIds((current) => new Set(current).add(projectId));
-    setRequestedStartProjectId(null);
-  };
-
   if (showStart) {
     return (
       <div className="flex h-full flex-col bg-panel-0 text-ink-1">
@@ -93,7 +117,7 @@ export function EditorShell() {
         >
           <TopBar onNewProject={onNewProject} />
         </header>
-        <NewProjectStart onChoose={onChooseStart} />
+        <NewProjectStart key={projectId} onChoose={onChooseStart} />
       </div>
     );
   }

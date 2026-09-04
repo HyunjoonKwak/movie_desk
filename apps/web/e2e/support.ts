@@ -9,7 +9,31 @@ export const PNG = Buffer.from(
   "base64",
 );
 
-export const MEDIA_INPUT = 'input[type="file"][accept="video/*,audio/*,image/*"]';
+interface MediaFilePayload {
+  name: string;
+  mimeType: string;
+  buffer: Buffer;
+}
+
+type MediaFileSelection = string | string[] | MediaFilePayload | MediaFilePayload[];
+
+// Selects media through the stable C1 hook when guidance is open, or through
+// the existing accessible Media Bin control once the editor is visible.
+export const importMediaFiles = async (page: Page, files: MediaFileSelection): Promise<void> => {
+  const startInput = page.getByTestId("new-project-start").getByTestId("media-file-input");
+  const editorImport = page.getByRole("button", { name: "Import", exact: true });
+  const target = await Promise.race([
+    startInput.waitFor({ state: "attached" }).then(() => "start" as const),
+    editorImport.waitFor({ state: "visible" }).then(() => "editor" as const),
+  ]);
+  if (target === "start") {
+    await startInput.setInputFiles(files);
+    return;
+  }
+  const chooser = page.waitForEvent("filechooser");
+  await editorImport.click();
+  await (await chooser).setFiles(files);
+};
 
 // English UI and no first-run welcome toast, so text assertions are stable.
 export const configurePage = async (page: Page): Promise<void> => {
@@ -34,9 +58,7 @@ export const clipCount = (page: Page): Promise<number> => page.locator("[data-cl
 // measured rather than assumed.
 export const seedTimeline = async (page: Page, presses: number): Promise<number> => {
   await page.goto("/editor");
-  await page
-    .locator(MEDIA_INPUT)
-    .setInputFiles({ name: "pix.png", mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: "pix.png", mimeType: "image/png", buffer: PNG });
   await expect(mediaCard(page)).toBeVisible();
   const placed = await clipCount(page);
   await mediaCard(page).click();

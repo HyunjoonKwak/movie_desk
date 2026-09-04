@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { importMediaFiles } from "./support";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -77,9 +78,7 @@ test("keeps populated panels contained at compact desktop width", async ({ page 
   await page.goto("/editor");
 
   const filename = "a-very-long-family-trip-video-filename-for-layout-check.png";
-  await page
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles({ name: filename, mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: filename, mimeType: "image/png", buffer: PNG });
   await expect(page.getByText(filename, { exact: true })).toBeVisible();
 
   const overflows = await page

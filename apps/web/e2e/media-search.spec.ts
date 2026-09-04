@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { MEDIA_INPUT, PNG, configurePage, mediaCard } from "./support";
+import { PNG, configurePage, importMediaFiles, mediaCard } from "./support";
 
 // Library search (A2): free text narrows the bin, the filter panel combines
 // with it, the count says how much is hidden, and reset brings it all back.
@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
 
 test("free text and filters narrow the library and can be reset", async ({ page }) => {
   await page.goto("/editor");
-  await page.locator(MEDIA_INPUT).setInputFiles([
+  await importMediaFiles(page, [
     { name: "beach.png", mimeType: "image/png", buffer: PNG },
     { name: "cafe.png", mimeType: "image/png", buffer: PNG },
   ]);

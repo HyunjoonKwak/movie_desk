@@ -1,5 +1,6 @@
 import path from "node:path";
 import { expect, test, type Page } from "@playwright/test";
+import { importMediaFiles } from "./support";
 
 // Regression guard for the existing auto-edit journey: import → background
 // analysis → "Generate rough cut" → AUTO tracks on the timeline → one undo
@@ -27,9 +28,10 @@ test("generates a rough cut on AUTO tracks and one undo removes it", async ({ pa
   const fixtureDir = path.join(test.info().project.testDir, "fixtures");
 
   await page.goto("/editor");
-  await page
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles(FIXTURES.map((name) => path.join(fixtureDir, name)));
+  await importMediaFiles(
+    page,
+    FIXTURES.map((name) => path.join(fixtureDir, name)),
+  );
   for (const name of FIXTURES) {
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }

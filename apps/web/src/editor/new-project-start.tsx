@@ -1,7 +1,9 @@
 "use client";
 
 import { collectDroppedMediaFiles, type MediaImportCandidate } from "@/media/folder-import";
+import { useImportFailureStore } from "@/media/import-failure-store";
 import { useMediaImport } from "@/media/hooks";
+import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import {
   ArrowRight,
@@ -11,7 +13,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 export type NewProjectPath = "organize" | "manual" | "guided";
@@ -19,18 +21,30 @@ export type NewProjectPath = "organize" | "manual" | "guided";
 export function NewProjectStart({ onChoose }: { onChoose: (path: NewProjectPath) => void }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const primaryActionRef = useRef<HTMLButtonElement>(null);
   const { importing, importFiles } = useMediaImport();
   const t = useT();
+
+  useEffect(() => {
+    primaryActionRef.current?.focus();
+  }, []);
 
   const importThenOpen = useCallback(
     async (files: FileList | readonly File[] | readonly MediaImportCandidate[]) => {
       if (files.length === 0) return;
+      const mediaBefore = useProjectStore.getState().project.mediaLibrary.length;
+      const failuresBefore = useImportFailureStore.getState().failures.length;
       try {
         await importFiles(files);
       } finally {
-        // Failed files remain visible in the existing Media panel, where the
-        // established retry and error explanations are available.
-        onChoose("organize");
+        const mediaAfter = useProjectStore.getState().project.mediaLibrary.length;
+        const failuresAfter = useImportFailureStore.getState().failures.length;
+        // Enter the Media panel only when the request did real work. Failed
+        // files still need its retry UI, while a busy or cancelled/no-op
+        // import should leave the user's path choice intact.
+        if (mediaAfter > mediaBefore || failuresAfter > failuresBefore) {
+          onChoose("organize");
+        }
       }
     },
     [importFiles, onChoose],
@@ -95,6 +109,7 @@ export function NewProjectStart({ onChoose }: { onChoose: (path: NewProjectPath)
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <button
+                ref={primaryActionRef}
                 type="button"
                 className="btn-primary flex-1 px-3"
                 onClick={() => fileInputRef.current?.click()}
@@ -147,6 +162,7 @@ export function NewProjectStart({ onChoose }: { onChoose: (path: NewProjectPath)
 
       <input
         ref={fileInputRef}
+        data-testid="media-file-input"
         type="file"
         accept="video/*,audio/*,image/*"
         multiple

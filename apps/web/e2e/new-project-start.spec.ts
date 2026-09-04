@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { PNG, configurePage } from "./support";
+import { PNG, configurePage, importMediaFiles } from "./support";
 
 test.beforeEach(async ({ page }) => {
   await configurePage(page);
@@ -17,9 +17,28 @@ test("offers three real starting paths for a fresh project", async ({ page }) =>
     start.getByText("Every path opens the same complete editing workspace."),
   ).toBeVisible();
   await expect(start.getByText("Your media and analysis stay on this device.")).toBeVisible();
+  await expect(start.getByRole("button", { name: "Import files" })).toBeFocused();
 });
 
-test("manual editing keeps the existing empty expert editor", async ({ page }) => {
+test("reload keeps an unanswered new project on the start screen", async ({ page }) => {
+  await page.goto("/editor");
+  await expect(page.getByTestId("new-project-start")).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Object.keys(localStorage).some((key) =>
+          key.startsWith("cut.editor.new-project-start.pending.v1:"),
+        ),
+      ),
+    )
+    .toBe(true);
+
+  await page.reload();
+
+  await expect(page.getByTestId("new-project-start")).toBeVisible();
+});
+
+test("manual editing keeps the existing empty expert editor across reloads", async ({ page }) => {
   await page.goto("/editor");
   await page.getByRole("button", { name: "Open empty editor" }).click();
 
@@ -39,13 +58,27 @@ test("manual editing keeps the existing empty expert editor", async ({ page }) =
 
 test("import and organize enters the existing organized media workspace", async ({ page }) => {
   await page.goto("/editor");
-  await page
-    .getByTestId("new-project-start")
-    .locator('input[type="file"][accept="video/*,audio/*,image/*"]')
-    .setInputFiles({ name: "first-day.png", mimeType: "image/png", buffer: PNG });
+  await importMediaFiles(page, { name: "first-day.png", mimeType: "image/png", buffer: PNG });
 
   await expect(page.getByTestId("new-project-start")).toBeHidden();
   await expect(page.getByText("first-day.png", { exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Sort" })).toHaveValue("captured");
+});
+
+test("dropping media on the header enters the organized media workspace", async ({ page }) => {
+  await page.goto("/editor");
+  await expect(page.getByTestId("new-project-start")).toBeVisible();
+
+  const dataTransfer = await page.evaluateHandle((base64) => {
+    const bytes = Uint8Array.from(atob(base64), (character) => character.charCodeAt(0));
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], "header-drop.png", { type: "image/png" }));
+    return transfer;
+  }, PNG.toString("base64"));
+  await page.locator("header").dispatchEvent("drop", { dataTransfer });
+
+  await expect(page.getByTestId("new-project-start")).toBeHidden();
+  await expect(page.getByText("header-drop.png", { exact: true })).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Sort" })).toHaveValue("captured");
 });
 
@@ -72,6 +105,7 @@ test("creating another project shows the start choices again", async ({ page }) 
 });
 
 for (const viewport of [
+  { name: "phone", width: 390, height: 844 },
   { name: "compact", width: 900, height: 620 },
   { name: "desktop", width: 1440, height: 900 },
 ] as const) {
@@ -84,6 +118,8 @@ for (const viewport of [
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(horizontalOverflow).toBeLessThanOrEqual(1);
-    await expect(page.getByRole("button", { name: "Open empty editor" })).toBeInViewport();
+    const manualAction = page.getByRole("button", { name: "Open empty editor" });
+    await manualAction.scrollIntoViewIfNeeded();
+    await expect(manualAction).toBeInViewport();
   });
 }

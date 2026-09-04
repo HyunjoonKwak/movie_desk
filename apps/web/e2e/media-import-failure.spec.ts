@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { importMediaFiles } from "./support";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
@@ -14,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 
 test("keeps good files and explains a damaged file in the same import", async ({ page }) => {
   await page.goto("/editor");
-  await page.locator('input[type="file"][accept="video/*,audio/*,image/*"]').setInputFiles([
+  await importMediaFiles(page, [
     { name: "good.png", mimeType: "image/png", buffer: PNG },
     { name: "damaged.jpg", mimeType: "image/jpeg", buffer: Buffer.from("not an image") },
   ]);
