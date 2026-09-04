@@ -109,6 +109,7 @@ export const getLiveDoc = (): LiveDoc => {
       if (
         project.timeline.tracks === previous.timeline.tracks &&
         project.mediaLibrary === previous.mediaLibrary &&
+        project.collections === previous.collections &&
         project.name === previous.name &&
         project.framerate === previous.framerate &&
         project.resolution === previous.resolution &&

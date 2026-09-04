@@ -1,6 +1,6 @@
 "use client";
 
-import { Layers, Link2, Loader2, Pin, Scissors, Trash2, X } from "lucide-react";
+import { Heart, Layers, Link2, Loader2, Pin, Scissors, Star, Trash2, X } from "lucide-react";
 import { Music, Image as ImageIcon, Film } from "lucide-react";
 import { memo } from "react";
 import { useT } from "@/i18n/use-t";
@@ -158,6 +158,39 @@ export const MediaCard = memo(function MediaCard({
         <div className="flex items-center gap-1.5 px-2 py-1.5">
           <Icon className="size-3 shrink-0 text-ink-3" />
           <span className="truncate text-meta text-ink-1">{asset.name}</span>
+          {(asset.rating !== undefined ||
+            asset.favorite === true ||
+            (asset.tags?.length ?? 0) > 0) && (
+            <span
+              className="ml-auto flex shrink-0 items-center gap-1 text-3xs"
+              data-testid="card-marks"
+            >
+              {asset.rating !== undefined && (
+                <span
+                  className="flex items-center gap-0.5 text-amber-300"
+                  title={t("media.rateStars", { n: asset.rating })}
+                >
+                  <Star className="size-2.5 fill-current" />
+                  {asset.rating}
+                </span>
+              )}
+              {asset.favorite && (
+                <Heart
+                  className="size-2.5 fill-current text-rose-400"
+                  role="img"
+                  aria-label={t("media.favorite")}
+                />
+              )}
+              {asset.tags && asset.tags.length > 0 && (
+                <span
+                  className="text-ink-3"
+                  title={t("media.tagsOnCard", { tags: asset.tags.join(", ") })}
+                >
+                  #{asset.tags.length}
+                </span>
+              )}
+            </span>
+          )}
         </div>
       </button>
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">

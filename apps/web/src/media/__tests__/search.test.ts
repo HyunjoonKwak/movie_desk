@@ -5,6 +5,7 @@ import {
   audioPresence,
   buildSearchIndex,
   collectPlaces,
+  collectTags,
   durationClass,
   hasActiveFilters,
   msUntilNextMidnight,
@@ -70,7 +71,7 @@ const library = [
 
 const index = buildSearchIndex(library, geocode, "ko");
 const search = (query: string, filters = DEFAULT_FILTERS) =>
-  searchAssets(index, library, query, filters, NOW).map((a) => a.id);
+  searchAssets(index, library, query, filters, { now: NOW }).map((a) => a.id);
 
 describe("classes", () => {
   it("classifies duration and resolution", () => {
@@ -120,7 +121,7 @@ describe("filters", () => {
     const all = [...library, unknown];
     const idx = buildSearchIndex(all, geocode, "ko");
     const ids = (audio: "with" | "without") =>
-      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, audio }, NOW).map((a) => a.id);
+      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, audio }, { now: NOW }).map((a) => a.id);
     expect(ids("with")).not.toContain("old");
     expect(ids("without")).not.toContain("old");
   });
@@ -134,7 +135,7 @@ describe("filters", () => {
     const all = [edge, before, early, lastMonth];
     const idx = buildSearchIndex(all, geocode, "ko");
     const ids = (period: "today" | "week" | "month" | "year") =>
-      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, period }, NOW).map((a) => a.id);
+      searchAssets(idx, all, "", { ...DEFAULT_FILTERS, period }, { now: NOW }).map((a) => a.id);
     expect(ids("today")).toEqual(["edge"]);
     expect(ids("week")).toEqual(["edge", "before", "early"]);
     expect(ids("month")).toEqual(["edge", "before", "early"]);
@@ -157,5 +158,55 @@ describe("filters", () => {
     expect(hasActiveFilters(DEFAULT_FILTERS)).toBe(false);
     expect(hasActiveFilters({ ...DEFAULT_FILTERS, place: "강릉" })).toBe(true);
     expect(collectPlaces(index)).toEqual(["강릉", "서울"]);
+  });
+});
+
+describe("marks", () => {
+  const sea = asset("sea", { tags: ["Sea", "Trip"], rating: 4, favorite: true });
+  const hill = asset("hill", { tags: ["trip"], rating: 2 });
+  const plain = asset("plain");
+  const all = [sea, hill, plain];
+  const idx = buildSearchIndex(all, geocode, "ko");
+  const run = (query: string, patch: Partial<typeof DEFAULT_FILTERS>, context = {}) =>
+    searchAssets(idx, all, query, { ...DEFAULT_FILTERS, ...patch }, { now: NOW, ...context }).map(
+      (a) => a.id,
+    );
+
+  it("finds tags as free text and by prefix with a #token", () => {
+    expect(run("sea", {})).toEqual(["sea"]);
+    expect(run("#trip", {})).toEqual(["sea", "hill"]);
+    expect(run("#tri", {})).toEqual(["sea", "hill"]);
+    expect(run("#rip", {})).toEqual([]);
+    expect(run("#", {})).toEqual(["sea", "hill", "plain"]);
+  });
+
+  it("filters by every tag, minimum rating and favourite, case-insensitively", () => {
+    expect(run("", { tags: ["TRIP"] })).toEqual(["sea", "hill"]);
+    expect(run("", { tags: ["trip", "sea"] })).toEqual(["sea"]);
+    expect(run("", { minRating: 3 })).toEqual(["sea"]);
+    expect(run("", { minRating: 1 })).toEqual(["sea", "hill"]);
+    expect(run("", { favorite: true })).toEqual(["sea"]);
+  });
+
+  it("filters by timeline usage and manual collection through the context", () => {
+    const used = new Set<ID>(["hill" as ID]);
+    expect(run("", { usage: "used" }, { used })).toEqual(["hill"]);
+    expect(run("", { usage: "unused" }, { used })).toEqual(["sea", "plain"]);
+    // No timeline in the context: nothing is known to be used.
+    expect(run("", { usage: "used" })).toEqual([]);
+    const collections = new Map<ID, ReadonlySet<ID>>([
+      ["c1" as ID, new Set<ID>(["plain" as ID, "ghost" as ID])],
+    ]);
+    expect(run("", { collection: "c1" as ID }, { collections })).toEqual(["plain"]);
+    expect(run("", { collection: "missing" as ID }, { collections })).toEqual([]);
+  });
+
+  it("counts tags across the index, most used first, one spelling per tag", () => {
+    expect(collectTags(idx)).toEqual([
+      { tag: "Trip", count: 2 },
+      { tag: "Sea", count: 1 },
+    ]);
+    expect(hasActiveFilters({ ...DEFAULT_FILTERS, tags: ["x"] })).toBe(true);
+    expect(hasActiveFilters({ ...DEFAULT_FILTERS, usage: "used" })).toBe(true);
   });
 });

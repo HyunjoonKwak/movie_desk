@@ -145,8 +145,43 @@ export const mediaAssetSchema = z
     sourceRef: sourceRefSchema.optional(),
     rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
     importedAt: z.number().int().nonnegative(),
+    tags: z.array(z.string()).optional(),
+    // A malformed mark is dropped, never a reason to refuse the project.
+    rating: z.number().int().min(1).max(5).optional().catch(undefined),
+    favorite: z.boolean().optional(),
   })
+  .passthrough()
+  // `.catch(undefined)` leaves the key behind; a dropped mark must not
+  // linger as `rating: undefined` (record identity checks use `in`).
+  .transform(({ rating, ...rest }) => (rating === undefined ? rest : { rating, ...rest }));
+
+// Collections must never make a project unloadable: a kind this build does
+// not know (a newer build wrote it) or an odd filter value passes through
+// untouched so the next save keeps it. Smart filter values are validated
+// field by field when the collection is loaded (media/smart-filters.ts).
+const knownCollectionSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string(),
+      kind: z.literal("manual"),
+      assetIds: z.array(z.string()),
+    })
+    .passthrough(),
+  z
+    .object({
+      id: z.string().min(1),
+      name: z.string(),
+      kind: z.literal("smart"),
+      query: z.string(),
+      filters: z.record(z.string(), z.unknown()),
+    })
+    .passthrough(),
+]);
+const unknownCollectionSchema = z
+  .object({ id: z.string().min(1), name: z.string(), kind: z.string() })
   .passthrough();
+const collectionSchema = z.union([knownCollectionSchema, unknownCollectionSchema]);
 
 const markerSchema = z
   .object({
@@ -180,6 +215,7 @@ const projectSchema = z
       .passthrough()
       .transform(({ magnetic: _legacy, ...rest }) => rest),
     mediaLibrary: z.array(mediaAssetSchema),
+    collections: z.array(collectionSchema).optional(),
   })
   .passthrough() as unknown as z.ZodType<Project>;
 

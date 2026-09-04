@@ -120,3 +120,68 @@ describe("project-export", () => {
     ).toThrow();
   });
 });
+
+describe("library marks and collections in the export", () => {
+  const withMarks = () => {
+    const project = createEmptyProject({ name: "Marks" });
+    return {
+      ...project,
+      mediaLibrary: [
+        {
+          id: newId(),
+          name: "sea.mp4",
+          kind: "video" as const,
+          mime: "video/mp4",
+          durationMs: 1000,
+          opfsPath: "media/sea.mp4",
+          importedAt: 0,
+          tags: ["Sea", "Trip"],
+          rating: 4 as const,
+          favorite: true,
+        },
+      ],
+      collections: [
+        { id: newId(), name: "Trip", kind: "manual" as const, assetIds: [newId()] },
+        {
+          id: newId(),
+          name: "Best",
+          kind: "smart" as const,
+          query: "#trip",
+          filters: { minRating: 4 },
+        },
+      ],
+    };
+  };
+
+  it("round-trips tags, rating, favourite and both collection kinds", () => {
+    const project = withMarks();
+    const parsed = parseProjectExport(JSON.parse(JSON.stringify(toProjectExport(project))));
+    expect(parsed.project.mediaLibrary[0]).toMatchObject({
+      tags: ["Sea", "Trip"],
+      rating: 4,
+      favorite: true,
+    });
+    expect(parsed.project.collections).toEqual(project.collections);
+  });
+
+  it("drops a malformed rating and keeps a collection kind it does not know", () => {
+    const project = withMarks();
+    const badRating = {
+      ...project,
+      mediaLibrary: [{ ...project.mediaLibrary[0], rating: 7 }],
+    };
+    expect(parseStoredProject(badRating).mediaLibrary[0]).not.toHaveProperty("rating");
+    // A newer build's collection, or odd filter values, must not make the
+    // project unloadable; they pass through so the next save keeps them.
+    const future = {
+      ...project,
+      collections: [
+        { id: "f", name: "Future", kind: "album", cover: { assetId: "a" } },
+        { id: "s", name: "Odd", kind: "smart", query: "", filters: { range: { from: 1 } } },
+      ],
+    };
+    expect(parseStoredProject(future).collections).toEqual(future.collections);
+    const noKind = { ...project, collections: [{ id: "x", name: "?" }] };
+    expect(() => parseStoredProject(noKind)).toThrow();
+  });
+});

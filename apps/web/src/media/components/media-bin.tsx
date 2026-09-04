@@ -24,20 +24,31 @@ import { groupByDay, sortAssets } from "@/media/organize";
 import {
   DEFAULT_FILTERS,
   type MediaFilters,
-  RESOLUTION_LABEL,
   buildSearchIndex,
   collectPlaces,
+  collectTags,
   hasActiveFilters,
   msUntilNextMidnight,
   searchAssets,
 } from "@/media/search";
+import { filtersFromSpec, filtersToSpec } from "@/media/smart-filters";
+import { tagKey } from "@/media/tags";
+import { usedAssetIds } from "@/media/usage";
 import { useLocaleStore } from "@/i18n/store";
 import { useViewStore } from "@/stores/view-store";
 import { MediaGroupHeader } from "./media-group-header";
 import type { ID } from "@movie-desk/core";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
-import type { MediaAsset, MediaKind } from "@movie-desk/core";
+import type {
+  ManualCollection,
+  MediaAsset,
+  MediaCollection,
+  MediaKind,
+  Rating,
+  SmartCollection,
+  Track,
+} from "@movie-desk/core";
 import { deleteMediaFile, getStorageUsage } from "@/persistence/opfs";
 import { generateProxy } from "@/media/proxy";
 import { formatBytes } from "@/media/format";
@@ -47,13 +58,17 @@ import { useSourceHealth } from "@/media/use-source-health";
 import { compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
 import { countTrash, moveAssetToTrash, reconcileTrash } from "@/persistence/trash";
 import { ImportFailures } from "./import-failures";
+import { BulkBar } from "./bulk-bar";
 import { MediaCard } from "./media-card";
+import { MediaFiltersPanel } from "./media-filters-panel";
 import { TrashDialog } from "./trash-dialog";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 // Measured card heights (incl. the li padding) per thumbnail size, used as
 // the placeholder for cards that are not rendered yet.
 const CARD_HEIGHT_BY_SIZE: readonly [number, number, number] = [78, 113, 198];
+const NO_COLLECTIONS: readonly MediaCollection[] = [];
+const NO_TRACKS: readonly Track[] = [];
 
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +83,17 @@ export function MediaBin() {
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
   const setAssetProxy = useProjectStore((s) => s.setAssetProxy);
+  const collections = useProjectStore((s) => s.project.collections ?? NO_COLLECTIONS);
+  const setAssetsRating = useProjectStore((s) => s.setAssetsRating);
+  const setAssetsFavorite = useProjectStore((s) => s.setAssetsFavorite);
+  const addAssetsTags = useProjectStore((s) => s.addAssetsTags);
+  const removeAssetsTag = useProjectStore((s) => s.removeAssetsTag);
+  const removeFromCollection = useProjectStore((s) => s.removeFromCollection);
+  const createCollection = useProjectStore((s) => s.createCollection);
+  const createSmartCollection = useProjectStore((s) => s.createSmartCollection);
+  const renameCollection = useProjectStore((s) => s.renameCollection);
+  const deleteCollection = useProjectStore((s) => s.deleteCollection);
+  const addToCollection = useProjectStore((s) => s.addToCollection);
   const { importing, importFiles } = useMediaImport();
   const sourceHealth = useSourceHealth(media);
   const t = useT();
@@ -104,6 +130,10 @@ export function MediaBin() {
 
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<MediaFilters>(DEFAULT_FILTERS);
+  // Only the usage filter needs the timeline; subscribing to it otherwise
+  // would re-run the whole search on every clip drag frame.
+  const usageActive = filters.usage !== "any";
+  const tracks = useProjectStore((s) => (usageActive ? s.project.timeline.tracks : NO_TRACKS));
   const [filtersOpen, setFiltersOpen] = useState(false);
   const locale = useLocaleStore((s) => s.locale);
   const filter = filters.kind;
@@ -125,6 +155,92 @@ export function MediaBin() {
 
   // 다중 선택 (Cmd/Ctrl+클릭, 빈 공간 드래그 마퀴) + 자동 편집 사용/제외 연동.
   const [selected, setSelected] = useState<ReadonlySet<ID>>(new Set());
+  // Marks shared by the whole selection drive the bulk bar's controls.
+  const selectionRating = useMemo<Rating | null>(() => {
+    let shared: Rating | null | undefined;
+    for (const asset of media) {
+      if (!selected.has(asset.id)) continue;
+      const rating = asset.rating ?? null;
+      if (shared === undefined) shared = rating;
+      else if (shared !== rating) return null;
+    }
+    return shared ?? null;
+  }, [media, selected]);
+  const selectionFavorite = useMemo(
+    () => selected.size > 0 && media.every((asset) => !selected.has(asset.id) || asset.favorite),
+    [media, selected],
+  );
+  const selectionTags = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const asset of media) {
+      if (!selected.has(asset.id)) continue;
+      for (const tag of asset.tags ?? []) if (!seen.has(tagKey(tag))) seen.set(tagKey(tag), tag);
+    }
+    return [...seen.values()];
+  }, [media, selected]);
+  const tagSelection = useCallback(
+    (newTags: readonly string[]) => {
+      const ids = [...selected];
+      addAssetsTags(ids, newTags);
+      const first = newTags[0];
+      if (first) toast.success(t("media.tagged", { n: ids.length, tag: first }));
+    },
+    [selected, addAssetsTags, t],
+  );
+  const untagSelection = useCallback(
+    (tag: string) => removeAssetsTag([...selected], tag),
+    [selected, removeAssetsTag],
+  );
+  const addSelectionToCollection = useCallback(
+    (collectionId: ID) => {
+      const collection = collections.find((c) => c.id === collectionId);
+      if (!collection || collection.kind !== "manual") return;
+      const added = [...selected].filter((id) => !collection.assetIds.includes(id));
+      addToCollection(collectionId, added);
+      toast.success(t("media.collectionAdded", { n: added.length, name: collection.name }));
+    },
+    [collections, selected, addToCollection, t],
+  );
+  const collectionFilter = useMemo(
+    () =>
+      collections.find(
+        (c): c is ManualCollection => c.kind === "manual" && c.id === filters.collection,
+      ) ?? null,
+    [collections, filters.collection],
+  );
+  const removeSelectionFromCollection = useCallback(() => {
+    if (collectionFilter) removeFromCollection(collectionFilter.id, [...selected]);
+  }, [collectionFilter, selected, removeFromCollection]);
+  // Deleting is undoable, but the media panel gives no other hint that it
+  // went through the project history: the toast offers the undo directly,
+  // and only while the deletion is still the last edit.
+  const deleteCollectionWithUndo = useCallback(
+    (collectionId: ID) => {
+      const collection = collections.find((c) => c.id === collectionId);
+      if (!collection) return;
+      deleteCollection(collectionId);
+      const { history } = useProjectStore.getState();
+      const entry = history.past[history.past.length - 1];
+      toast(t("media.collectionDeleted", { name: collection.name }), {
+        action: {
+          label: t("cmd.undo"),
+          onClick: () => {
+            const { history: now, undo } = useProjectStore.getState();
+            if (now.past[now.past.length - 1] === entry) undo();
+          },
+        },
+      });
+    },
+    [collections, deleteCollection, t],
+  );
+  const newCollectionFromSelection = useCallback(
+    (name: string) => {
+      const id = createCollection(name, [...selected]);
+      setFilters((f) => ({ ...f, collection: id }));
+      toast.success(t("media.collectionCreated", { name }));
+    },
+    [createCollection, selected, t],
+  );
   const [rangeEditing, setRangeEditing] = useState<ID | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const marqueeStart = useRef<{ x: number; y: number } | null>(null);
@@ -354,11 +470,55 @@ export function MediaBin() {
       setFilters((f) => ({ ...f, place: null }));
     }
   }, [filters.place, places]);
+  const tags = useMemo(() => collectTags(searchIndex, locale), [searchIndex, locale]);
+  const used = useMemo(
+    () => (usageActive ? usedAssetIds(tracks) : undefined),
+    [usageActive, tracks],
+  );
+  const manualCollections = useMemo(
+    () => collections.filter((c): c is ManualCollection => c.kind === "manual"),
+    [collections],
+  );
+  const collectionMembers = useMemo(
+    () => new Map(manualCollections.map((c) => [c.id, new Set(c.assetIds)] as const)),
+    [manualCollections],
+  );
+  // A deleted collection must not keep filtering from a select that no
+  // longer offers it.
+  useEffect(() => {
+    if (filters.collection !== null && !collectionMembers.has(filters.collection)) {
+      setFilters((f) => ({ ...f, collection: null }));
+    }
+  }, [filters.collection, collectionMembers]);
   const filtered = useMemo(
-    () => searchAssets(searchIndex, media, query, filters, today),
-    [searchIndex, media, query, filters, today],
+    () =>
+      searchAssets(searchIndex, media, query, filters, {
+        now: today,
+        used,
+        collections: collectionMembers,
+      }),
+    [searchIndex, media, query, filters, today, used, collectionMembers],
   );
   const filtersActive = hasActiveFilters(filters);
+  const resetSearch = useCallback(() => {
+    setFilters(DEFAULT_FILTERS);
+    setQuery("");
+  }, []);
+  const loadSmartCollection = useCallback(
+    (collection: SmartCollection) => {
+      setQuery(collection.query);
+      setFilters(filtersFromSpec(collection.filters));
+      toast.success(t("media.collectionLoaded", { name: collection.name }));
+    },
+    [t],
+  );
+  const saveSmartCollection = useCallback(
+    (name: string) => {
+      createSmartCollection(name, query, filtersToSpec(filters));
+      toast.success(t("media.collectionCreated", { name }));
+    },
+    [createSmartCollection, query, filters, t],
+  );
 
   // "던져 놓으면 정리된다": capture order and day groups are the default view.
   const mediaOrder = useViewStore((s) => s.mediaOrder);
@@ -434,100 +594,21 @@ export function MediaBin() {
             </button>
           </label>
           {filtersOpen && (
-            <div className="grid grid-cols-2 gap-1" data-testid="media-filters">
-              <select
-                value={filters.period}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, period: e.target.value as MediaFilters["period"] }))
-                }
-                aria-label={t("media.filterPeriod")}
-                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
-              >
-                <option value="any">{t("media.filterPeriodAny")}</option>
-                <option value="today">{t("media.filterPeriodToday")}</option>
-                <option value="week">{t("media.filterPeriodWeek")}</option>
-                <option value="month">{t("media.filterPeriodMonth")}</option>
-                <option value="year">{t("media.filterPeriodYear")}</option>
-              </select>
-              <select
-                value={filters.duration}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    duration: e.target.value as MediaFilters["duration"],
-                  }))
-                }
-                aria-label={t("media.filterDuration")}
-                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
-              >
-                <option value="any">{t("media.filterDurationAny")}</option>
-                <option value="short">{t("media.filterDurationShort")}</option>
-                <option value="medium">{t("media.filterDurationMedium")}</option>
-                <option value="long">{t("media.filterDurationLong")}</option>
-              </select>
-              <select
-                value={filters.resolution}
-                onChange={(e) =>
-                  setFilters((f) => ({
-                    ...f,
-                    resolution: e.target.value as MediaFilters["resolution"],
-                  }))
-                }
-                aria-label={t("media.filterResolution")}
-                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
-              >
-                <option value="any">{t("media.filterResolutionAny")}</option>
-                {(["uhd", "fhd", "hd", "sd"] as const).map((r) => (
-                  <option key={r} value={r}>
-                    {RESOLUTION_LABEL[r]}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={filters.audio}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, audio: e.target.value as MediaFilters["audio"] }))
-                }
-                aria-label={t("media.filterAudio")}
-                className="min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
-              >
-                <option value="any">{t("media.filterAudioAny")}</option>
-                <option value="with">{t("media.filterAudioWith")}</option>
-                <option value="without">{t("media.filterAudioWithout")}</option>
-              </select>
-              {places.length > 0 && (
-                <select
-                  value={filters.place ?? ""}
-                  onChange={(e) => setFilters((f) => ({ ...f, place: e.target.value || null }))}
-                  aria-label={t("media.filterPlace")}
-                  className="col-span-2 min-w-0 rounded bg-white/5 px-1 py-1 text-2xs text-ink-2 outline-none focus:bg-white/10"
-                >
-                  <option value="">{t("media.filterPlaceAny")}</option>
-                  {places.map((place) => (
-                    <option key={place} value={place}>
-                      {place}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <div className="col-span-2 flex items-center justify-between text-3xs text-ink-3">
-                <span data-testid="media-match-count">
-                  {t("media.matchCount", { shown: filtered.length, total: media.length })}
-                </span>
-                {(filtersActive || query) && (
-                  <button
-                    type="button"
-                    className="rounded px-1 py-0.5 hover:text-ink-1"
-                    onClick={() => {
-                      setFilters(DEFAULT_FILTERS);
-                      setQuery("");
-                    }}
-                  >
-                    {t("media.filterReset")}
-                  </button>
-                )}
-              </div>
-            </div>
+            <MediaFiltersPanel
+              filters={filters}
+              setFilters={setFilters}
+              places={places}
+              tags={tags}
+              collections={collections}
+              shown={filtered.length}
+              total={media.length}
+              canReset={filtersActive || query !== ""}
+              onReset={resetSearch}
+              onLoadSmart={loadSmartCollection}
+              onSaveSmart={saveSmartCollection}
+              onRenameCollection={renameCollection}
+              onDeleteCollection={deleteCollectionWithUndo}
+            />
           )}
           <div className="grid grid-cols-4 gap-1">
             {KIND_FILTERS.map((k) => (
@@ -594,6 +675,18 @@ export function MediaBin() {
           onUse={() => useAutoEditStore.getState().markPinned([...selected])}
           onSkip={() => useAutoEditStore.getState().markExcluded([...selected])}
           onClearMarks={() => useAutoEditStore.getState().clearMarks([...selected])}
+          rating={selectionRating}
+          favorite={selectionFavorite}
+          onRate={(rating) => setAssetsRating([...selected], rating)}
+          onFavorite={(favorite) => setAssetsFavorite([...selected], favorite)}
+          onTag={tagSelection}
+          selectionTags={selectionTags}
+          onUntag={untagSelection}
+          collections={manualCollections}
+          onAddToCollection={addSelectionToCollection}
+          onNewCollection={newCollectionFromSelection}
+          collectionFilter={collectionFilter}
+          onRemoveFromCollection={removeSelectionFromCollection}
           onDeselect={() => setSelected(new Set())}
         />
       )}
@@ -786,55 +879,6 @@ function ImportProgress() {
         <div className="h-full bg-accent transition-[width]" style={{ width: `${pct}%` }} />
       </div>
       <p className="mt-1 truncate text-ink-3">{currentName}</p>
-    </div>
-  );
-}
-
-// 선택된 자산 일괄 처리 바 — 자동 편집의 사용(핀)/제외 지정과 연동.
-function BulkBar(props: {
-  count: number;
-  onUse: () => void;
-  onSkip: () => void;
-  onClearMarks: () => void;
-  onDeselect: () => void;
-}) {
-  const t = useT();
-  return (
-    <div className="mx-2 mb-2 flex flex-wrap items-center gap-1 rounded border border-accent/30 bg-accent/10 px-2 py-1 text-2xs">
-      <span className="mr-auto whitespace-nowrap font-medium text-ink-1">
-        {t("media.selectedCount", { n: props.count })}
-      </span>
-      <button
-        type="button"
-        onClick={props.onUse}
-        className="flex items-center gap-0.5 whitespace-nowrap rounded bg-accent/80 px-1.5 py-0.5 text-accent-fg hover:bg-accent"
-      >
-        <Pin className="size-2.5" />
-        {t("media.markUse")}
-      </button>
-      <button
-        type="button"
-        onClick={props.onSkip}
-        className="flex items-center gap-0.5 whitespace-nowrap rounded bg-red-500/70 px-1.5 py-0.5 text-white hover:bg-red-500"
-      >
-        <X className="size-2.5" />
-        {t("media.markSkip")}
-      </button>
-      <button
-        type="button"
-        onClick={props.onClearMarks}
-        className="whitespace-nowrap rounded border border-white/15 px-1.5 py-0.5 text-ink-1 hover:border-white/40"
-      >
-        {t("media.unmark")}
-      </button>
-      <button
-        type="button"
-        onClick={props.onDeselect}
-        className="rounded p-0.5 text-ink-3 hover:text-ink-1"
-        title={t("media.deselect")}
-      >
-        <X className="size-3" />
-      </button>
     </div>
   );
 }

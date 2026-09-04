@@ -1,4 +1,10 @@
-import { type ID, type MediaClip, type Project, type Track, createEmptyProject } from "@movie-desk/core";
+import {
+  type ID,
+  type MediaClip,
+  type Project,
+  type Track,
+  createEmptyProject,
+} from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";
@@ -142,5 +148,52 @@ describe("project CRDT", () => {
     });
 
     expect(crdt.read(base.id, base.timeline)).toBeNull();
+  });
+});
+
+describe("collections in the CRDT", () => {
+  it("round-trips collections and omits the field when there are none", () => {
+    const doc = new Y.Doc();
+    const crdt = createProjectCrdt(doc);
+    const base = createEmptyProject();
+    crdt.write(base);
+    expect("collections" in (crdt.read(base.id, base.timeline) ?? {})).toBe(false);
+
+    const project: Project = {
+      ...base,
+      collections: [
+        { id: asId("c1"), name: "Trip", kind: "manual", assetIds: [asId("a")] },
+        { id: asId("c2"), name: "Best", kind: "smart", query: "#trip", filters: { minRating: 4 } },
+      ],
+    };
+    crdt.write(project);
+    const read = crdt.read(project.id, project.timeline);
+    expect(read?.collections).toEqual(project.collections);
+
+    const peer = new Y.Doc();
+    Y.applyUpdate(peer, Y.encodeStateAsUpdate(doc));
+    expect(createProjectCrdt(peer).read(project.id, project.timeline)?.collections).toEqual(
+      project.collections,
+    );
+  });
+
+  it("keeps collections created concurrently in two documents", () => {
+    const base = createEmptyProject();
+    const left = new Y.Doc();
+    const right = new Y.Doc();
+    createProjectCrdt(left).write(base);
+    Y.applyUpdate(right, Y.encodeStateAsUpdate(left));
+    const leftVector = Y.encodeStateVector(left);
+    const rightVector = Y.encodeStateVector(right);
+
+    const mine = { id: asId("mine"), name: "Mine", kind: "manual" as const, assetIds: [] };
+    const theirs = { id: asId("theirs"), name: "Theirs", kind: "manual" as const, assetIds: [] };
+    createProjectCrdt(left).write({ ...base, collections: [mine] });
+    createProjectCrdt(right).write({ ...base, collections: [theirs] });
+    exchangeConcurrentUpdates(left, right, leftVector, rightVector);
+
+    const merged = createProjectCrdt(left).read(base.id, base.timeline)?.collections ?? [];
+    expect(merged.map((c) => c.id).sort()).toEqual(["mine", "theirs"]);
+    expect(createProjectCrdt(right).read(base.id, base.timeline)?.collections).toEqual(merged);
   });
 });

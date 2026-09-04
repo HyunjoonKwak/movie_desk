@@ -22,6 +22,9 @@ export const runWith = <S extends ProjectMutating>(
 ): void => {
   set((s) => {
     const r = runCommand(s.project, s.history, { label, apply: fn });
+    // A no-op edit (the action found nothing to change) must not consume an
+    // undo slot or discard the redo stack.
+    if (r.project === s.project) return s;
     return { project: r.project, history: r.history } as Partial<S>;
   });
 };

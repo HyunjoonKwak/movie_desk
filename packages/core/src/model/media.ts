@@ -5,6 +5,9 @@ import type { SourceRef } from "./media-source";
 
 export type MediaKind = "video" | "audio" | "image";
 
+// Star rating; absent = unrated. 0 is never stored (clearing removes the field).
+export type Rating = 1 | 2 | 3 | 4 | 5;
+
 export interface SourceImageMetadata {
   readonly orientation?: number;
   readonly cameraMake?: string;
@@ -47,6 +50,9 @@ export interface MediaAsset {
   readonly gpsLon?: number;
   readonly sourceImageMetadata?: SourceImageMetadata; // preserved source facts; previews are disposable
   readonly livePhoto?: LivePhotoLink; // strict same-folder still + MOV pair; both originals remain usable
+  readonly tags?: readonly string[]; // user labels, display case; unique case-insensitively
+  readonly rating?: Rating;
+  readonly favorite?: boolean; // library favourite (distinct from the auto-edit pin)
   readonly useInMs?: Ms; // user-marked usable range within the source —
   readonly useOutMs?: Ms; // auto-edit candidates and timeline adds respect it
   readonly filmstripDataUrl?: string; // wide multi-frame strip over full source

@@ -1,4 +1,5 @@
-import type { MediaAsset, MediaKind } from "@movie-desk/core";
+import type { ID, MediaAsset, MediaKind, Rating } from "@movie-desk/core";
+import { tagKey } from "./tags";
 import type { Geocode } from "./organize";
 
 // Library search over what the app already knows about each asset: name,
@@ -11,6 +12,8 @@ export type DurationFilter = "any" | "short" | "medium" | "long";
 export type ResolutionFilter = "any" | "sd" | "hd" | "fhd" | "uhd";
 export type PeriodFilter = "any" | "today" | "week" | "month" | "year";
 export type AudioFilter = "any" | "with" | "without";
+export type UsageFilter = "any" | "used" | "unused";
+export type MinRating = 0 | Rating; // 0 = any
 
 export interface MediaFilters {
   readonly kind: MediaKind | "all";
@@ -19,6 +22,11 @@ export interface MediaFilters {
   readonly period: PeriodFilter;
   readonly place: string | null;
   readonly audio: AudioFilter;
+  readonly tags: readonly string[]; // every tag must be present (AND)
+  readonly minRating: MinRating;
+  readonly favorite: boolean; // true = favourites only
+  readonly usage: UsageFilter; // needs SearchContext.used
+  readonly collection: ID | null; // manual collection membership; needs SearchContext.collections
 }
 
 export const DEFAULT_FILTERS: MediaFilters = {
@@ -28,6 +36,11 @@ export const DEFAULT_FILTERS: MediaFilters = {
   period: "any",
   place: null,
   audio: "any",
+  tags: [],
+  minRating: 0,
+  favorite: false,
+  usage: "any",
+  collection: null,
 };
 
 export const hasActiveFilters = (filters: MediaFilters): boolean =>
@@ -36,7 +49,12 @@ export const hasActiveFilters = (filters: MediaFilters): boolean =>
   filters.resolution !== "any" ||
   filters.period !== "any" ||
   filters.place !== null ||
-  filters.audio !== "any";
+  filters.audio !== "any" ||
+  filters.tags.length > 0 ||
+  filters.minRating !== 0 ||
+  filters.favorite ||
+  filters.usage !== "any" ||
+  filters.collection !== null;
 
 // Under 10 s is a moment, up to a minute a scene, longer a whole take.
 export const durationClass = (asset: MediaAsset): Exclude<DurationFilter, "any"> | null => {
@@ -90,6 +108,15 @@ export interface SearchEntry {
   readonly asset: MediaAsset;
   readonly place: string | null;
   readonly text: string; // lowercased haystack for free-text tokens
+  readonly tagKeys: readonly string[]; // case-folded tags for exact "#tag" tokens and the tag filter
+}
+
+// What the filters need beyond the asset itself: the clock for period
+// filters, the timeline's asset usage, and manual collection membership.
+export interface SearchContext {
+  readonly now?: number;
+  readonly used?: ReadonlySet<ID> | undefined;
+  readonly collections?: ReadonlyMap<ID, ReadonlySet<ID>>;
 }
 
 const pad = (n: number): string => String(n).padStart(2, "0");
@@ -130,8 +157,14 @@ const buildEntry = (asset: MediaAsset, geocode: Geocode, locale: string): Search
     asset.sourceImageMetadata?.cameraMake ?? "",
     asset.sourceImageMetadata?.cameraModel ?? "",
     ...(asset.livePhoto ? LIVE_WORDS : []),
+    ...(asset.tags ?? []),
   ];
-  return { asset, place, text: parts.join(" ").toLowerCase() };
+  return {
+    asset,
+    place,
+    text: parts.join(" ").toLowerCase(),
+    tagKeys: (asset.tags ?? []).map(tagKey),
+  };
 };
 
 // Entries live as long as their asset record; a new record (any edit) gets a
@@ -162,9 +195,20 @@ export const buildSearchIndex = (
 const tokensOf = (query: string): readonly string[] =>
   query.toLowerCase().split(/\s+/).filter(Boolean);
 
-// Every whitespace-separated token must appear somewhere in the haystack.
+// A "#tag" token matches a tag by prefix ("#sea" finds "sea" and "sea trip",
+// and narrows while typing); a lone "#" matches everything; anything else
+// is a substring of the haystack.
+const matchesToken = (entry: SearchEntry, token: string): boolean => {
+  if (token === "#") return true;
+  if (token.startsWith("#")) {
+    const prefix = token.slice(1);
+    return entry.tagKeys.some((key) => key.startsWith(prefix));
+  }
+  return entry.text.includes(token);
+};
+
 export const matchesQuery = (entry: SearchEntry, query: string): boolean =>
-  tokensOf(query).every((token) => entry.text.includes(token));
+  tokensOf(query).every((token) => matchesToken(entry, token));
 
 // Calendar arithmetic, so a DST change does not shift the window by an hour.
 const periodStart = (period: Exclude<PeriodFilter, "any">, now: number): number => {
@@ -184,10 +228,22 @@ const periodStart = (period: Exclude<PeriodFilter, "any">, now: number): number 
 export const matchesFilters = (
   entry: SearchEntry,
   filters: MediaFilters,
-  now = Date.now(),
+  context: SearchContext = {},
 ): boolean => {
   const { asset } = entry;
+  const now = context.now ?? Date.now();
   if (filters.kind !== "all" && asset.kind !== filters.kind) return false;
+  if (filters.favorite && !asset.favorite) return false;
+  if (filters.minRating !== 0 && (asset.rating ?? 0) < filters.minRating) return false;
+  if (filters.tags.length > 0 && !filters.tags.every((tag) => entry.tagKeys.includes(tagKey(tag))))
+    return false;
+  if (filters.usage !== "any") {
+    // Without a timeline in the context nothing is known to be used.
+    const used = context.used?.has(asset.id) ?? false;
+    if (used !== (filters.usage === "used")) return false;
+  }
+  if (filters.collection !== null && !context.collections?.get(filters.collection)?.has(asset.id))
+    return false;
   if (filters.duration !== "any" && durationClass(asset) !== filters.duration) return false;
   if (filters.resolution !== "any" && resolutionClass(asset) !== filters.resolution) return false;
   if (filters.place !== null && entry.place !== filters.place) return false;
@@ -204,16 +260,41 @@ export const searchAssets = (
   assets: readonly MediaAsset[],
   query: string,
   filters: MediaFilters,
-  now = Date.now(),
+  context: SearchContext = {},
 ): readonly MediaAsset[] => {
   const tokens = tokensOf(query);
   return assets.filter((asset) => {
     const entry = index.get(asset.id);
     if (!entry) return false;
     return (
-      matchesFilters(entry, filters, now) && tokens.every((token) => entry.text.includes(token))
+      matchesFilters(entry, filters, context) && tokens.every((token) => matchesToken(entry, token))
     );
   });
+};
+
+export interface TagCount {
+  readonly tag: string; // first spelling seen
+  readonly count: number;
+}
+
+// Distinct tags with how many assets carry each, most used first, then by
+// name in the UI locale's order.
+export const collectTags = (
+  index: ReadonlyMap<string, SearchEntry>,
+  locale?: string,
+): readonly TagCount[] => {
+  const counts = new Map<string, { tag: string; count: number }>();
+  for (const entry of index.values()) {
+    for (const tag of entry.asset.tags ?? []) {
+      const key = tagKey(tag);
+      const current = counts.get(key);
+      if (current) counts.set(key, { tag: current.tag, count: current.count + 1 });
+      else counts.set(key, { tag, count: 1 });
+    }
+  }
+  return [...counts.values()].sort(
+    (a, b) => b.count - a.count || a.tag.localeCompare(b.tag, locale, { sensitivity: "base" }),
+  );
 };
 
 // Distinct places in first-seen order, for the place filter.

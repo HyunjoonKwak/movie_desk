@@ -1,5 +1,6 @@
 export * from "./project";
 export * from "./media";
+export * from "./collection";
 export * from "./media-source";
 export * from "./media-rotation";
 export * from "./track";

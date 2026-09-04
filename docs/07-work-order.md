@@ -59,6 +59,24 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-05 Claude: A3 컬렉션·태그·평점 1차(`claude/a3-collections`). 데이터 계층: core `MediaAsset.tags/rating/favorite`,
+  `Project.collections`(수동 컬렉션 = 자산 id 목록, 스마트 컬렉션 = 저장된 검색어+필터 스펙). 필터 스펙은 core에서 느슨한
+  레코드로 두고 렌더러가 `media/smart-filters.ts`에서 필드별로 검증해 모르는 값은 기본값으로 떨어뜨린다(구 빌드 호환).
+  검색: 태그 자유 텍스트 + `#태그` 정확 일치, 필터에 태그(AND)·최소 평점·즐겨찾기·사용 여부(타임라인 참조로 계산, 저장
+  안 함)·컬렉션 소속 추가(`SearchContext`). store 액션은 선택 단위로 한 번의 undo, 변경 없으면 레코드 동일성 유지.
+  영속화: CRDT meta `collections`(비어 있으면 생략), live-doc 변경 감지, 내보내기 스키마(평점 1~5, 컬렉션 kind 판별).
+  삭제된 자산의 컬렉션 소속은 그대로 두어 휴지통 복원 시 돌아오고, 읽는 쪽은 없는 id를 무시한다. UI 1차(Codex 다듬기
+  대상): 일괄 처리 바(`bulk-bar.tsx`)에 별점·하트·태그 입력·컬렉션 추가/새 컬렉션, 필터 패널(`media-filters-panel.tsx`,
+  media-bin에서 분리)에 평점·사용 여부·즐겨찾기·태그 칩·컬렉션 선택(스마트 선택 시 검색어·필터 로드)·이름 바꾸기·
+  삭제·"검색을 스마트 컬렉션으로 저장", 카드 하단에 ★n·♥·#태그수 배지. e2e 2건(`media-marks.spec.ts`).
+  리뷰 반영: (1) 내보내기 스키마가 모르는 컬렉션 kind·이상한 필터 값에 프로젝트 전체를 거부하고, CRDT read→null→
+  빈 프로젝트 저장으로 문서를 비우던 경로를 막음(모르는 항목은 원형 통과, 잘못된 평점은 버림). (2) 컬렉션을 meta
+  JSON 한 덩어리(LWW)가 아니라 미디어처럼 항목 맵 + 순서 배열로 저장해 두 탭이 동시에 만든 컬렉션이 모두 살아남음
+  (테스트). (3) 변경 없는 액션은 undo 슬롯을 쓰거나 redo를 지우지 않도록 `runWith` 공통 수정. (4) 태그 여러 개
+  입력이 undo 한 단계(`addAssetsTags`). (5) 태그 제거(일괄 처리 바 칩 ×)·컬렉션에서 제외(컬렉션 필터 중) UI 추가.
+  (6) 스마트 컬렉션도 이름 변경·삭제 가능(선택 상태를 필터와 분리), 이름 변경 대상 고정. (7) 사용 여부 필터가
+  꺼져 있으면 타임라인을 구독하지 않음(클립 드래그마다 재검색 방지). (8) `#태그` 접두 일치, 태그 칩 12개 + 더 보기,
+  삭제 토스트에 실행 취소, 별점 radiogroup·아이콘 버튼 aria-label. 남은 LOW: 영구 삭제된 자산 id가 컬렉션에 남음.
 - 2026-09-04 Claude: A5 라이브러리 1,000개 측정(`claude/a5-library-scale`). `apps/web/scripts/bench-library.mjs`가 실제
   Chrome으로 1,000개(비디오 200·이미지 800)를 가져와 가져오기·검색·필터·소스 상태 검사·복원·저장·힙을 잰다
   (`docs/evaluations/2026-09-04-library-1000.md`). 병목은 카드 1,000장이 상태 변화마다 전부 다시 렌더되는 것:
@@ -410,6 +428,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, main 통합 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
 | A1-c helper 계약 | Codex | 완료, main 통합 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
 | A1-d 렌더러 disk adapter | Claude + Codex | 완료, main 통합 | `26e3058` + `4760e18`. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록. `<img>/<video>` fallback도 공통 resolver를 사용하며 오류 응답 CORS·상태 헤더를 노출. 읽기 lease 재사용은 프로파일링 뒤 최적화 |
+| A3 컬렉션·태그·평점 | Claude(데이터·검색) · Codex(UI 다듬기) | 1차 구현(`claude/a3-collections`) | 태그·평점·즐겨찾기·사용 여부·컬렉션(수동/스마트) 데이터 모델·검색·영속화 + 1차 UI. 남은 것: 카드에서 직접 별점/하트 편집, 컬렉션 사이드바, 자동 편집 후보에 평점 가중치 |
 | A2 메타데이터 인덱스·검색 | Claude + Codex 검토 | 구현·리뷰 완료, main 통합 | 자유 텍스트 + 기간·길이·해상도·오디오·장소·종류 필터, 코덱 저장. 리뷰에서 오디오 유무를 3값으로 보강하고 자산별 인덱스 캐시·재연결 메타 갱신을 추가했다. `d2cb6ba` + `7cf9b60`, 원격 CI 통과. 태그·평점은 A3 |
 | A5 1,000개 성능 측정 | Claude | 1차 완료, main 통합(f25ebf9) | 벤치 스크립트 + 기록 문서. 검색 54ms·필터 346ms·소스 검사 0.5초·복원 0.6초·가져오기 12ms/자산. 다음: 그룹 가상화, 썸네일 캐시 분리 |
 | A4 누락 재연결·휴지통 | Claude | 1차 구현(OPFS 원본 재연결 + 휴지통) | 데스크톱 참조 파일 재연결과 카탈로그 백업/복원은 다음 배치. e2e 3개(같은 크기 재연결, 다른 크기 확인 후 연결, 삭제→휴지통→복원) |

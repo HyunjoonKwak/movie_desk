@@ -68,6 +68,8 @@ import { type TitleTemplate, createClipCreateActions } from "./actions/clip-crea
 import { createEffectActions } from "./actions/effect-actions";
 import { createKeyframeActions } from "./actions/keyframe-actions";
 import { createMarkerActions } from "./actions/marker-actions";
+import { type CollectionActions, createCollectionActions } from "./actions/collection-actions";
+import { type LibraryMarkActions, createLibraryMarkActions } from "./actions/library-marks-actions";
 import { type RelinkAssetPatch, createMediaActions } from "./actions/media-actions";
 import { createMusicActions } from "./actions/music-actions";
 import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
@@ -75,7 +77,7 @@ import { createTrackActions } from "./actions/track-actions";
 import { runWith } from "./store-helpers";
 import { useTimelineUiStore } from "./timeline-ui-store";
 
-interface ProjectStoreState {
+interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
   project: Project;
   history: CommandHistory;
 
@@ -281,6 +283,8 @@ export const useProjectStore = create<ProjectStoreState>()(
       })),
 
     ...createMediaActions(set),
+    ...createLibraryMarkActions(set),
+    ...createCollectionActions(set),
     ...createMusicActions(set),
     ...createPlaceAssetActions(set),
     ...createTrackActions(set),

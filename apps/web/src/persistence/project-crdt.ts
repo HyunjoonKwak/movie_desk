@@ -1,5 +1,5 @@
 import { parseStoredProject } from "@/persistence/project-export";
-import type { Clip, MediaAsset, Project, Track } from "@movie-desk/core";
+import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
 import type * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
 
@@ -12,6 +12,8 @@ const TRACKS = "tracks-v2";
 const TRACK_ORDER = "track-order-v2";
 const MEDIA = "media-v2";
 const MEDIA_ORDER = "media-order-v2";
+const COLLECTIONS = "collections-v1";
+const COLLECTION_ORDER = "collection-order-v1";
 const CLIP_ORDER_PREFIX = "track-clips-v2:";
 
 type TrackMeta = Omit<Track, "clips">;
@@ -46,6 +48,11 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const trackOrder = doc.getArray<string>(TRACK_ORDER);
   const mediaMap = doc.getMap<MediaAsset>(MEDIA);
   const mediaOrder = doc.getArray<string>(MEDIA_ORDER);
+  // Per-collection entries, like media: two tabs creating different
+  // collections must both keep theirs (a single JSON blob would be
+  // last-write-wins).
+  const collectionsMap = doc.getMap<MediaCollection>(COLLECTIONS);
+  const collectionOrder = doc.getArray<string>(COLLECTION_ORDER);
   const clipsMap = doc.getMap<Clip>(CLIPS_MAP_NAME);
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
 
@@ -59,6 +66,12 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     // but documents written by older builds require a boolean here.
     setJsonValue(metaMap, "magnetic", true);
     setJsonValue(metaMap, "markers", project.timeline.markers ?? []);
+    const nextCollections = new Map((project.collections ?? []).map((c) => [c.id, c]));
+    syncEntityMap(collectionsMap, nextCollections);
+    reconcileSequence(
+      collectionOrder,
+      (project.collections ?? []).map((c) => c.id),
+    );
 
     const nextMedia = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
     syncEntityMap(mediaMap, nextMedia);
@@ -116,6 +129,10 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     const framerate = metaMap.get("framerate");
     const resolution = metaMap.get("resolution");
     const markers = metaMap.get("markers");
+    // Optional: documents written before A3 have no collections.
+    const collections = uniqueSequence(collectionOrder.toArray())
+      .map((collectionId) => collectionsMap.get(collectionId))
+      .filter((collection): collection is MediaCollection => collection !== undefined);
     if (
       typeof name !== "string" ||
       typeof createdAt !== "number" ||
@@ -135,6 +152,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       framerate,
       resolution: resolution as Project["resolution"],
       mediaLibrary,
+      ...(collections.length > 0 ? { collections } : {}),
       timeline: {
         tracks,
         playhead: localView.playhead,
