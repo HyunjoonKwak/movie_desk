@@ -47,7 +47,11 @@ export const saveSnapshot = async (project: Project, label: string): Promise<voi
 };
 
 export const listSnapshots = async (projectId: string): Promise<readonly ProjectSnapshot[]> =>
-  getDb().snapshots.where("projectId").equals(projectId).reverse().sortBy("createdAt");
+  getDb()
+    .snapshots.where("projectId")
+    .equals(projectId)
+    .reverse()
+    .sortBy("createdAt");
 
 export const loadSnapshot = async (id: string): Promise<Project | null> => {
   const row = await getDb().snapshots.get(id);

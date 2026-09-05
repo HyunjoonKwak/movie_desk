@@ -13,6 +13,7 @@ const storage = vi.hoisted(() => ({
 }));
 
 vi.mock("@/persistence/trash", () => ({ trashMediaKeys: async () => {} }));
+vi.mock("@/persistence/snapshots", () => ({ forEachSnapshotJson: async () => {} }));
 vi.mock("@/persistence/opfs", () => ({
   listMediaKeys: async () => [...storage.keys],
   deleteMediaFile: async (key: string) => {
