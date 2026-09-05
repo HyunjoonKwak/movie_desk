@@ -6,6 +6,7 @@ import {
   downloadProjectJson,
   parseProjectExport,
 } from "@/persistence/project-export";
+import { withInlinePreviews } from "@/persistence/previews";
 import {
   deleteStoredProject,
   listProjectsLibrary,
@@ -126,7 +127,8 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
     await refresh();
   };
 
-  const onExport = () => downloadProjectJson(useProjectStore.getState().project);
+  const onExport = async () =>
+    downloadProjectJson(await withInlinePreviews(useProjectStore.getState().project));
 
   const onImport = async (file: File) => {
     try {

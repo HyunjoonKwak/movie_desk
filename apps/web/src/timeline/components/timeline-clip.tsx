@@ -3,6 +3,7 @@
 import { useMemo, useRef } from "react";
 import type { Clip } from "@movie-desk/core";
 import { isMediaClip, isAdjustmentClip } from "@movie-desk/core";
+import { useAssetFilmstrip, useAssetThumb } from "@/stores/preview-store";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
@@ -38,6 +39,8 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
     if (!isMediaClip(clip)) return null;
     return media.find((a) => a.id === clip.assetId) ?? null;
   }, [clip, media]);
+  const thumb = useAssetThumb(asset);
+  const strip = useAssetFilmstrip(asset);
 
   const dragRef = useRef<DragState>({
     mode: null,
@@ -131,20 +134,20 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   // Filmstrip: map the clip's trimmed source range across its timeline width.
   // Falls back to the single repeated thumbnail when no strip is available.
   const filmstrip = useMemo(() => {
-    if (!isMediaClip(clip) || width <= 40 || !asset?.filmstripDataUrl) return null;
+    if (!isMediaClip(clip) || width <= 40 || !asset || !strip) return null;
     const dur = asset.durationMs || 1;
     const span = Math.max(1, clip.trimOut - clip.trimIn);
     const visibleFraction = Math.min(1, span / dur);
     const bgFullWidth = width / Math.max(0.0001, visibleFraction);
     const offsetX = (clip.trimIn / dur) * bgFullWidth;
     return {
-      backgroundImage: `url(${asset.filmstripDataUrl})`,
+      backgroundImage: `url(${strip.dataUrl})`,
       backgroundSize: `${bgFullWidth}px 100%`,
       backgroundPosition: `-${offsetX}px center`,
       backgroundRepeat: "no-repeat",
     } as const;
-  }, [clip, asset, width]);
-  const showThumb = !filmstrip && isMedia && asset?.thumbDataUrl && width > 40;
+  }, [clip, asset, strip, width]);
+  const showThumb = !filmstrip && isMedia && thumb !== undefined && width > 40;
 
   return (
     <ClipContextMenu clipId={clip.id}>
@@ -175,7 +178,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
           <div
             className="pointer-events-none absolute inset-0 opacity-60"
             style={{
-              backgroundImage: `url(${asset!.thumbDataUrl})`,
+              backgroundImage: `url(${thumb})`,
               backgroundSize: "auto 100%",
               backgroundRepeat: "repeat-x",
             }}

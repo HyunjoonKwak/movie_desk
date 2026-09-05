@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Scissors, X } from "lucide-react";
+import { useAssetFilmstrip } from "@/stores/preview-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { fmtSec } from "@/media/format";
@@ -10,6 +11,7 @@ import type { MediaAsset } from "@movie-desk/core";
 export function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: () => void }) {
   const t = useT();
   const setAssetUseRange = useProjectStore((s) => s.setAssetUseRange);
+  const strip = useAssetFilmstrip(asset);
   const stripRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<{ anchorMs: number } | null>(null);
   const [inMs, setInMs] = useState(asset.useInMs ?? 0);
@@ -89,10 +91,10 @@ export function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: ()
         onPointerUp={onUp}
         className="relative h-12 cursor-crosshair touch-none select-none overflow-hidden rounded bg-black"
       >
-        {asset.filmstripDataUrl ? (
+        {strip ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={asset.filmstripDataUrl}
+            src={strip.dataUrl}
             alt=""
             draggable={false}
             className="pointer-events-none size-full object-cover"

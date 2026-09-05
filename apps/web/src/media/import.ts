@@ -1,6 +1,7 @@
 import { extractCaptureMeta } from "@/autoedit/metadata";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { writeMediaFile } from "@/persistence/opfs";
+import { leasePreview, putAssetPreviews } from "@/persistence/previews";
 import { type MediaAsset, newId } from "@movie-desk/core";
 import { audioVariantKey, ensureAudioVariant } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
@@ -21,9 +22,11 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   // has registered the asset; the batch releases them together.
   const releaseOriginal = leaseMediaKey(opfsPath);
   const releaseVariant = leaseMediaKey(audioVariantKey({ opfsPath, sizeBytes: file.size }));
+  const releasePreviews = leasePreview(id);
   const releaseLease = (): void => {
     releaseOriginal();
     releaseVariant();
+    releasePreviews();
   };
   try {
     await writeMediaFile(opfsPath, file);
@@ -56,6 +59,22 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       }
     } catch {
       thumbDataUrl = undefined;
+    }
+    // Pictures go to the preview store, not the record. If that store is
+    // unavailable they stay inline (fat record, but a visible thumbnail)
+    // and the migration retries later.
+    let inlinePreviews = false;
+    if (thumbDataUrl || filmstripDataUrl) {
+      try {
+        await putAssetPreviews(id, {
+          ...(thumbDataUrl ? { thumb: thumbDataUrl } : {}),
+          ...(filmstripDataUrl
+            ? { filmstrip: { dataUrl: filmstripDataUrl, frames: filmstripFrames ?? 0 } }
+            : {}),
+        });
+      } catch {
+        inlinePreviews = true;
+      }
     }
 
     // Extract a peak envelope for audio-bearing media so the timeline can draw
@@ -93,9 +112,9 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(capture.gpsLat !== undefined && capture.gpsLon !== undefined
         ? { gpsLat: capture.gpsLat, gpsLon: capture.gpsLon }
         : {}),
-      ...(thumbDataUrl ? { thumbDataUrl } : {}),
-      ...(filmstripDataUrl ? { filmstripDataUrl } : {}),
-      ...(filmstripFrames !== undefined ? { filmstripFrames } : {}),
+      ...(inlinePreviews && thumbDataUrl ? { thumbDataUrl } : {}),
+      ...(inlinePreviews && filmstripDataUrl ? { filmstripDataUrl } : {}),
+      ...(inlinePreviews && filmstripFrames !== undefined ? { filmstripFrames } : {}),
       ...(waveformPeaks ? { waveformPeaks } : {}),
       ...(rotation ? { rotation } : {}),
       ...(videoCodec ? { videoCodec } : {}),

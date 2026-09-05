@@ -106,3 +106,8 @@ export const trashMediaKeys = async (keep: Set<string>, now = Date.now()): Promi
     }
   }
 };
+
+// Every trashed asset id, across projects: their previews stay until the
+// entry is gone.
+export const trashAssetIds = async (): Promise<ReadonlySet<string>> =>
+  new Set((await getDb().trash.toArray()).map((row) => row.assetId));

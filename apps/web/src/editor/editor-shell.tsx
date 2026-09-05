@@ -11,6 +11,7 @@ import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { MediaBin } from "@/media/components/media-bin";
 import { collectMediaGarbage } from "@/persistence/media-gc";
+import { collectPreviewGarbage } from "@/persistence/previews";
 import { useLocalPersistence } from "@/persistence/use-local-persistence";
 import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
@@ -92,6 +93,7 @@ export function EditorShell() {
     if (!persistenceReady) return;
     const id = setTimeout(() => {
       void collectMediaGarbage(() => useProjectStore.getState().project).catch(() => {});
+      void collectPreviewGarbage(() => useProjectStore.getState().project).catch(() => {});
     }, 3000);
     return () => clearTimeout(id);
   }, [persistenceReady]);

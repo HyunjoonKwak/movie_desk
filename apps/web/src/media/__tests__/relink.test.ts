@@ -63,6 +63,7 @@ describe("relinkAssetFromFile", () => {
           width: 640,
           height: 360,
         }),
+        storePreviews: async () => {},
         containerInfo: async () => ({
           container: "mp4" as const,
           videoCodec: "avc1",

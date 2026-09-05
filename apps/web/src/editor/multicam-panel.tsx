@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Clapperboard } from "lucide-react";
 import { toast } from "sonner";
 import type { MulticamAngle } from "@movie-desk/core";
+import { useAssetThumbs } from "@/stores/preview-store";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
@@ -19,6 +20,7 @@ export function MulticamPanel() {
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
   const videoAssets = useMemo(() => media.filter((a) => a.kind === "video"), [media]);
+  const thumbs = useAssetThumbs(videoAssets);
 
   const angles: MulticamAngle[] = useMemo(
     () =>
@@ -74,9 +76,9 @@ export function MulticamPanel() {
                     )}
                   >
                     <div className="aspect-video bg-black">
-                      {a.thumbDataUrl && (
+                      {thumbs[a.id] && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={a.thumbDataUrl} alt={a.name} className="size-full object-cover" />
+                        <img src={thumbs[a.id]} alt={a.name} className="size-full object-cover" />
                       )}
                     </div>
                     <span className="block truncate px-2 py-1 text-2xs text-ink-1">{a.name}</span>

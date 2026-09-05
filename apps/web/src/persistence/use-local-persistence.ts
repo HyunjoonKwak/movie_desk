@@ -5,6 +5,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { disposeLiveDoc, getLiveDoc } from "./live-doc";
+import { startInlinePreviewMigration } from "./previews";
 import { getActiveProjectId, loadStoredProject } from "./project-library";
 
 let started = false;
@@ -21,6 +22,7 @@ export const useLocalPersistence = (): boolean => {
     started = true;
     let cancelled = false;
     let unsubscribeProject: (() => void) | null = null;
+    let stopMigration: (() => void) | null = null;
 
     const initialize = async () => {
       try {
@@ -34,6 +36,9 @@ export const useLocalPersistence = (): boolean => {
         }
 
         getLiveDoc();
+        // Records written by older builds carry inline thumbnails; move
+        // them to the preview store as they show up.
+        stopMigration = startInlinePreviewMigration();
         unsubscribeProject = useProjectStore.subscribe(
           (state) => state.project.id,
           () => {
@@ -64,6 +69,7 @@ export const useLocalPersistence = (): boolean => {
     return () => {
       cancelled = true;
       unsubscribeProject?.();
+      stopMigration?.();
       disposeLiveDoc();
       setHydrated(false);
       started = false;

@@ -1,4 +1,5 @@
 import { leaseMediaKey } from "@/persistence/media-gc";
+import { putAssetPreviews } from "@/persistence/previews";
 import { deleteMediaFile, replaceMediaFile } from "@/persistence/opfs";
 import { formatBytes } from "@/media/format";
 import type { MediaAsset, SourceRotation } from "@movie-desk/core";
@@ -72,6 +73,7 @@ export interface RelinkDependencies {
   readonly videoThumb: typeof makeVideoThumb;
   readonly filmstrip: typeof makeVideoFilmstrip;
   readonly waveform: typeof extractWaveformPeaks;
+  readonly storePreviews: typeof putAssetPreviews;
 }
 
 const defaultDependencies: RelinkDependencies = {
@@ -83,6 +85,7 @@ const defaultDependencies: RelinkDependencies = {
   videoThumb: makeVideoThumb,
   filmstrip: makeVideoFilmstrip,
   waveform: extractWaveformPeaks,
+  storePreviews: putAssetPreviews,
 };
 
 // Best-effort derived visuals for the new bytes; a failure leaves the field
@@ -145,6 +148,27 @@ export const relinkAssetFromFile = async (
       probe && probe.kind !== "image" ? await deps.containerInfo(file).catch(() => null) : null;
     const rotation = container?.rotation;
     const visuals = await derivedFacts(file, probe?.kind ?? asset.kind, rotation, deps);
+    // New pictures go to the preview store; the record only clears any
+    // inline (legacy) ones. If the store fails, the patch carries them.
+    let stored = false;
+    if (visuals.thumbDataUrl || visuals.filmstripDataUrl) {
+      try {
+        await deps.storePreviews(asset.id, {
+          ...(visuals.thumbDataUrl ? { thumb: visuals.thumbDataUrl } : {}),
+          ...(visuals.filmstripDataUrl
+            ? {
+                filmstrip: {
+                  dataUrl: visuals.filmstripDataUrl,
+                  frames: visuals.filmstripFrames ?? 0,
+                },
+              }
+            : {}),
+        });
+        stored = true;
+      } catch {
+        stored = false;
+      }
+    }
     return {
       ...base,
       dropProxy: true,
@@ -155,6 +179,7 @@ export const relinkAssetFromFile = async (
       videoCodec: container?.videoCodec ?? null,
       audioCodec: container?.audioCodec ?? null,
       ...visuals,
+      ...(stored ? { thumbDataUrl: null, filmstripDataUrl: null, filmstripFrames: null } : {}),
     };
   } finally {
     release();

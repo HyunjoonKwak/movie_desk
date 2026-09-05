@@ -30,6 +30,7 @@ const withNullable = <K extends keyof MediaAsset>(
   }
   return { ...asset, [key]: value };
 };
+import { withoutInlinePreviews } from "@/persistence/previews";
 import { type ProjectMutating, type SetFn, runWith } from "../store-helpers";
 
 export interface MediaLibraryActions {
@@ -43,6 +44,9 @@ export interface MediaLibraryActions {
   relinkMediaAsset: (assetId: ID, patch: RelinkAssetPatch) => void;
   // 사용 구간 지정 — undefined 전달 시 구간 해제(전체 사용).
   setAssetUseRange: (assetId: ID, range: { inMs: Ms; outMs: Ms } | undefined) => void;
+  // Maintenance: inline previews were moved to the preview store. Not an
+  // undo step — the pictures are the same, only where they live changed.
+  dropInlinePreviews: (assetIds: readonly ID[]) => void;
 }
 
 export const createMediaActions = <S extends ProjectMutating>(
@@ -68,6 +72,19 @@ export const createMediaActions = <S extends ProjectMutating>(
         ...p,
         mediaLibrary: p.mediaLibrary.map((a) => (a.id === assetId ? { ...a, ...proxy } : a)),
       };
+    }),
+
+  dropInlinePreviews: (assetIds) =>
+    set((s) => {
+      const ids = new Set(assetIds);
+      let changed = false;
+      const mediaLibrary = s.project.mediaLibrary.map((asset) => {
+        if (!ids.has(asset.id)) return asset;
+        const next = withoutInlinePreviews(asset);
+        if (next !== asset) changed = true;
+        return next;
+      });
+      return changed ? ({ project: { ...s.project, mediaLibrary } } as unknown as Partial<S>) : {};
     }),
 
   setAssetUseRange: (assetId, range) =>

@@ -9,6 +9,7 @@ import { fmtSec } from "@/media/format";
 import { canRelinkFromFile } from "@/media/relink";
 import type { SourceHealth } from "@/media/source/probe-source";
 import { useMediaUiStore } from "@/stores/media-ui-store";
+import { useAssetThumb } from "@/stores/preview-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import type { MediaAsset } from "@movie-desk/core";
 import { MissingBadge } from "./missing-badge";
@@ -63,6 +64,7 @@ export const MediaCard = memo(function MediaCard({
 }: MediaCardProps) {
   const t = useT();
   const Icon = KIND_ICON[asset.kind];
+  const thumb = useAssetThumb(asset);
   const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
   return (
     <li
@@ -105,9 +107,9 @@ export const MediaCard = memo(function MediaCard({
         title={t("media.clickToAdd")}
       >
         <div className="relative aspect-video bg-black">
-          {asset.thumbDataUrl ? (
+          {thumb ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={asset.thumbDataUrl} alt={asset.name} className="size-full object-cover" />
+            <img src={thumb} alt={asset.name} className="size-full object-cover" />
           ) : (
             <div className="flex size-full items-center justify-center text-ink-3">
               <Icon className="size-6" />
