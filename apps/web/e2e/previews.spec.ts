@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import path from "node:path";
 import { PNG, configurePage, importMediaFiles, mediaCard } from "./support";
 
 const libraryJson = async (page: import("@playwright/test").Page): Promise<string> =>
@@ -62,4 +63,24 @@ test("keeps thumbnails outside project persistence and restores them after reloa
   const chunks: Buffer[] = [];
   for await (const chunk of json) chunks.push(Buffer.from(chunk));
   expect(Buffer.concat(chunks).toString("utf8")).toContain("data:image");
+});
+
+test("keeps waveforms outside project persistence and restores them on the timeline", async ({
+  page,
+}) => {
+  await configurePage(page);
+  await page.goto("/editor");
+  await importMediaFiles(page, path.join(process.cwd(), "src/media/__tests__/fixtures/aac-video.mp4"));
+
+  const card = mediaCard(page, "aac-video.mp4");
+  await expect(card).toBeVisible();
+  await expect.poll(() => libraryJson(page)).toContain('"hasAudio":true');
+  await expect.poll(() => libraryJson(page)).not.toContain("waveformPeaks");
+  await card.click();
+  await page.keyboard.press("e");
+  await expect(page.getByTestId("clip-waveform").first()).toBeVisible();
+
+  await page.reload();
+  await expect(page.getByTestId("clip-waveform").first()).toBeVisible();
+  await expect.poll(() => libraryJson(page)).not.toContain("waveformPeaks");
 });

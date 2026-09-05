@@ -3,6 +3,7 @@ import {
   type Filmstrip,
   getFilmstrips,
   getThumbs,
+  getWaveforms,
   onPreviewsStored,
 } from "@/persistence/previews";
 import type { MediaAsset } from "@movie-desk/core";
@@ -16,6 +17,7 @@ import { create } from "zustand";
 interface PreviewState {
   readonly thumbs: Readonly<Record<string, string>>;
   readonly filmstrips: Readonly<Record<string, Filmstrip>>;
+  readonly waveforms: Readonly<Record<string, readonly number[]>>;
   remember: (assetId: string, previews: AssetPreviews, replaceMissing?: boolean) => void;
   forget: (assetIds: readonly string[]) => void;
   clear: () => void;
@@ -26,6 +28,9 @@ const filmstripOrder: string[] = [];
 const retainedFilmstrips = new Map<string, number>();
 const askedThumbs = new Set<string>();
 const askedFilmstrips = new Set<string>();
+const askedWaveforms = new Set<string>();
+const waveformOrder: string[] = [];
+const MAX_WAVEFORMS = 200;
 let previewGeneration = 0;
 const evictOverflow = (filmstrips: Record<string, Filmstrip>): string[] => {
   const evictedIds: string[] = [];
@@ -78,10 +83,12 @@ export const retainFilmstrip = (assetId: string): (() => void) => {
 export const usePreviewStore = create<PreviewState>((set) => ({
   thumbs: {},
   filmstrips: {},
+  waveforms: {},
   remember: (assetId, previews, replaceMissing = true) =>
     set((s) => {
       const thumbs = { ...s.thumbs };
       const filmstrips = { ...s.filmstrips };
+      const waveforms = { ...s.waveforms };
       if (previews.thumb) thumbs[assetId] = previews.thumb;
       else if (replaceMissing) delete thumbs[assetId];
       if (previews.filmstrip) {
@@ -92,20 +99,40 @@ export const usePreviewStore = create<PreviewState>((set) => ({
         const prior = filmstripOrder.indexOf(assetId);
         if (prior >= 0) filmstripOrder.splice(prior, 1);
       }
-      return { thumbs, filmstrips };
+      if (previews.waveform) {
+        waveforms[assetId] = previews.waveform;
+        const prior = waveformOrder.indexOf(assetId);
+        if (prior >= 0) waveformOrder.splice(prior, 1);
+        waveformOrder.push(assetId);
+        while (waveformOrder.length > MAX_WAVEFORMS) {
+          const evicted = waveformOrder.shift();
+          if (evicted) {
+            delete waveforms[evicted];
+            askedWaveforms.delete(evicted);
+          }
+        }
+      } else if (replaceMissing) {
+        delete waveforms[assetId];
+        const prior = waveformOrder.indexOf(assetId);
+        if (prior >= 0) waveformOrder.splice(prior, 1);
+      }
+      return { thumbs, filmstrips, waveforms };
     }),
   clear: () => {
     previewGeneration++;
     askedThumbs.clear();
     askedFilmstrips.clear();
+    askedWaveforms.clear();
     filmstripOrder.length = 0;
     retainedFilmstrips.clear();
-    set({ thumbs: {}, filmstrips: {} });
+    waveformOrder.length = 0;
+    set({ thumbs: {}, filmstrips: {}, waveforms: {} });
   },
   forget: (assetIds) =>
     set((s) => {
       const thumbs = { ...s.thumbs };
       const filmstrips = { ...s.filmstrips };
+      const waveforms = { ...s.waveforms };
       for (const id of assetIds) {
         delete thumbs[id];
         delete filmstrips[id];
@@ -113,14 +140,19 @@ export const usePreviewStore = create<PreviewState>((set) => ({
         if (prior >= 0) filmstripOrder.splice(prior, 1);
         askedThumbs.delete(id);
         askedFilmstrips.delete(id);
+        delete waveforms[id];
+        const waveformPrior = waveformOrder.indexOf(id);
+        if (waveformPrior >= 0) waveformOrder.splice(waveformPrior, 1);
+        askedWaveforms.delete(id);
       }
-      return { thumbs, filmstrips };
+      return { thumbs, filmstrips, waveforms };
     }),
 }));
 
 onPreviewsStored((assetId, previews, { replaceMissing }) => {
   if (previews.thumb || replaceMissing) askedThumbs.add(assetId);
   if (previews.filmstrip || replaceMissing) askedFilmstrips.add(assetId);
+  if (previews.waveform || replaceMissing) askedWaveforms.add(assetId);
   usePreviewStore.getState().remember(assetId, previews, replaceMissing);
 });
 
@@ -186,6 +218,13 @@ export const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (foun
   });
 });
 
+export const requestWaveforms = makeBatch(askedWaveforms, getWaveforms, (found, generation) => {
+  if (generation !== previewGeneration) return;
+  for (const [id, waveform] of found) {
+    usePreviewStore.getState().remember(id, { waveform }, false);
+  }
+});
+
 // Test hook: forget what was asked so a fresh test starts cold.
 export const resetPreviewRequestsForTests = (): void => {
   usePreviewStore.getState().clear();
@@ -196,6 +235,7 @@ type StripSource =
   | Pick<MediaAsset, "id" | "filmstripDataUrl" | "filmstripFrames">
   | null
   | undefined;
+type WaveformSource = Pick<MediaAsset, "id" | "waveformPeaks"> | null | undefined;
 
 // The asset's thumbnail: an inline (legacy) one wins, otherwise the store's.
 export const useAssetThumb = (asset: ThumbSource, shouldLoad = true): string | undefined => {
@@ -223,6 +263,19 @@ export const useAssetFilmstrip = (
     if (shouldLoad && id && !inline && stored === undefined) requestFilmstrips([id]);
   }, [id, inline, shouldLoad, stored]);
   return useMemo(() => (inline ? { dataUrl: inline, frames } : stored), [frames, inline, stored]);
+};
+
+export const useAssetWaveform = (
+  asset: WaveformSource,
+  shouldLoad = true,
+): readonly number[] | undefined => {
+  const id = asset?.id;
+  const inline = asset?.waveformPeaks;
+  const stored = usePreviewStore((s) => (id ? s.waveforms[id] : undefined));
+  useEffect(() => {
+    if (shouldLoad && id && !inline && stored === undefined) requestWaveforms([id]);
+  }, [id, inline, shouldLoad, stored]);
+  return inline ?? stored;
 };
 
 const PREVIEW_ROOT_MARGIN = "240px";

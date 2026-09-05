@@ -5,6 +5,7 @@ import type { ID } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { playheadLevel } from "./playhead-level";
+import { requestWaveforms, usePreviewStore } from "@/stores/preview-store";
 
 // Compact peak meter reflecting the audio level at the playhead. Decays
 // smoothly so it reads like a VU meter during playback.
@@ -13,6 +14,7 @@ export function LevelMeter() {
   const playhead = useProjectStore((s) => s.project.timeline.playhead);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const [level, setLevel] = useState(0);
+  const waveforms = usePreviewStore((s) => s.waveforms);
   const decayed = useRef(0);
 
   const getAsset = useMemo(() => {
@@ -20,13 +22,21 @@ export function LevelMeter() {
     return (id: ID) => map.get(id);
   }, [media]);
 
+  useEffect(() => {
+    requestWaveforms(media.filter((asset) => asset.hasAudio).map((asset) => asset.id));
+  }, [media]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: playhead/playing are intentional ticks — the project is read fresh from the store inside.
   useEffect(() => {
-    const target = playheadLevel(useProjectStore.getState().project, getAsset);
+    const target = playheadLevel(
+      useProjectStore.getState().project,
+      getAsset,
+      (id) => getAsset(id)?.waveformPeaks ?? waveforms[id],
+    );
     // Fast attack, slow release for a meter-like feel.
     decayed.current = target > decayed.current ? target : decayed.current * 0.8 + target * 0.2;
     setLevel(decayed.current);
-  }, [playhead, playing, getAsset]);
+  }, [playhead, playing, getAsset, waveforms]);
 
   const pct = Math.round(level * 100);
   // dBFS-ish color zones: green up to ~-6, amber to ~-1.5, red near clipping.

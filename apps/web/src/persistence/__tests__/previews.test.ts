@@ -94,6 +94,7 @@ import {
   deleteAssetPreviews,
   getFilmstrips,
   getThumbs,
+  getWaveforms,
   leasePreview,
   putAssetPreviews,
   startInlinePreviewMigration,
@@ -140,6 +141,7 @@ describe("preview persistence", () => {
     await putAssetPreviews("a", {
       thumb: "data:image/png;base64,thumb",
       filmstrip: { dataUrl: "data:image/png;base64,strip", frames: 8 },
+      waveform: [0.2, 0.8],
     });
     expect(await getThumbs(["a", "missing"])).toEqual(
       new Map([["a", "data:image/png;base64,thumb"]]),
@@ -147,10 +149,12 @@ describe("preview persistence", () => {
     expect(await getFilmstrips(["a"])).toEqual(
       new Map([["a", { dataUrl: "data:image/png;base64,strip", frames: 8 }]]),
     );
+    expect(await getWaveforms(["a"])).toEqual(new Map([["a", [0.2, 0.8]]]));
 
     await putAssetPreviews("a", { thumb: "data:image/png;base64,new" });
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,new");
     expect(await getFilmstrips(["a"])).toEqual(new Map());
+    expect(await getWaveforms(["a"])).toEqual(new Map());
   });
 
   it("handles inline previews and fills missing fields for JSON export", async () => {
@@ -158,14 +162,18 @@ describe("preview persistence", () => {
       thumbDataUrl: "data:image/png;base64,inline",
       filmstripDataUrl: "data:image/png;base64,strip",
       filmstripFrames: 4,
+      waveformPeaks: [0.4, 0.7],
     });
     expect(hasInlinePreviews(legacy)).toBe(true);
     expect(inlinePreviewsOf(legacy).filmstrip?.frames).toBe(4);
     expect(withoutInlinePreviews(legacy)).not.toHaveProperty("thumbDataUrl");
+    expect(withoutInlinePreviews(legacy)).toMatchObject({ hasAudio: true });
+    expect(withoutInlinePreviews(legacy)).not.toHaveProperty("waveformPeaks");
 
     await putAssetPreviews("a", {
       thumb: "data:image/png;base64,stored",
       filmstrip: { dataUrl: "data:image/png;base64,stored-strip", frames: 6 },
+      waveform: [0.1, 0.9],
     });
     const exported = await withInlinePreviews(
       project(asset("a", { thumbDataUrl: "data:image/png;base64,inline" })),
@@ -174,6 +182,7 @@ describe("preview persistence", () => {
       thumbDataUrl: "data:image/png;base64,inline",
       filmstripDataUrl: "data:image/png;base64,stored-strip",
       filmstripFrames: 6,
+      waveformPeaks: [0.1, 0.9],
     });
   });
 
@@ -253,7 +262,14 @@ describe("preview persistence", () => {
     await deleteAssetPreviews(["a", "b"]);
     expect(bulkDeleteCalls).toHaveLength(1);
     expect(new Set(bulkDeleteCalls[0])).toEqual(
-      new Set(["a:thumb", "a:filmstrip", "b:thumb", "b:filmstrip"]),
+      new Set([
+        "a:thumb",
+        "a:filmstrip",
+        "a:waveform",
+        "b:thumb",
+        "b:filmstrip",
+        "b:waveform",
+      ]),
     );
   });
 
@@ -286,7 +302,16 @@ describe("preview persistence", () => {
 
     await deleteAssetPreviews(["A", "X"]);
     expect(await getThumbs(["A", "X"])).toEqual(new Map());
-    expect(bulkDeleteCalls).toHaveLength(2);
+    expect(bulkDeleteCalls.flat()).toEqual(
+      expect.arrayContaining([
+        "A:thumb",
+        "A:filmstrip",
+        "A:waveform",
+        "X:thumb",
+        "X:filmstrip",
+        "X:waveform",
+      ]),
+    );
   });
 
   it("serializes migration after an already-queued relink preview write", async () => {

@@ -22,8 +22,9 @@ export type { AssetPreviews, Filmstrip } from "@/media/inline-previews";
 interface PreviewRow {
   id: string; // `${assetId}:${kind}`
   assetId: string;
-  kind: "thumb" | "filmstrip";
-  dataUrl: string;
+  kind: "thumb" | "filmstrip" | "waveform";
+  dataUrl?: string;
+  peaks?: readonly number[];
   frames?: number;
   updatedAt: number;
 }
@@ -88,9 +89,19 @@ export const putAssetPreviews = async (
       updatedAt,
     });
   }
+  if (previews.waveform) {
+    rows.push({
+      id: rowId(assetId, "waveform"),
+      assetId,
+      kind: "waveform",
+      peaks: previews.waveform,
+      updatedAt,
+    });
+  }
   const missing: PreviewRow["kind"][] = [];
   if (replaceMissing && !previews.thumb) missing.push("thumb");
   if (replaceMissing && !previews.filmstrip) missing.push("filmstrip");
+  if (replaceMissing && !previews.waveform) missing.push("waveform");
   const previous = previewWrites.get(assetId) ?? Promise.resolve(true);
   const write = previous
     .catch(() => false)
@@ -102,7 +113,10 @@ export const putAssetPreviews = async (
           const existing = await getDb().previews.bulkGet(rows.map((row) => row.id));
           writtenRows = rows.filter((_row, index) => !existing[index]);
           allRowsSatisfied = rows.every(
-            (row, index) => !existing[index] || existing[index]?.dataUrl === row.dataUrl,
+            (row, index) =>
+              !existing[index] ||
+              (existing[index]?.dataUrl === row.dataUrl &&
+                JSON.stringify(existing[index]?.peaks) === JSON.stringify(row.peaks)),
           );
         }
         if (writtenRows.length > 0) await getDb().previews.bulkPut(writtenRows);
@@ -113,7 +127,11 @@ export const putAssetPreviews = async (
       const changed = writtenRows.length > 0 || missing.length > 0;
       if (changed) {
         const thumb = writtenRows.find((row) => row.kind === "thumb");
-        const filmstrip = writtenRows.find((row) => row.kind === "filmstrip");
+        const filmstrip = writtenRows.find(
+          (row): row is PreviewRow & { dataUrl: string } =>
+            row.kind === "filmstrip" && row.dataUrl !== undefined,
+        );
+        const waveform = writtenRows.find((row) => row.kind === "waveform");
         const written: AssetPreviews = {
           ...(thumb ? { thumb: thumb.dataUrl } : {}),
           ...(filmstrip
@@ -124,6 +142,7 @@ export const putAssetPreviews = async (
                 },
               }
             : {}),
+          ...(waveform?.peaks ? { waveform: waveform.peaks } : {}),
         };
         for (const listener of listeners) listener(assetId, written, { replaceMissing });
       }
@@ -145,7 +164,7 @@ export const getThumbs = async (
 ): Promise<ReadonlyMap<string, string>> => {
   const rows = await getDb().previews.bulkGet(assetIds.map((id) => rowId(id, "thumb")));
   const thumbs = new Map<string, string>();
-  for (const row of rows) if (row) thumbs.set(row.assetId, row.dataUrl);
+  for (const row of rows) if (row?.dataUrl) thumbs.set(row.assetId, row.dataUrl);
   return thumbs;
 };
 
@@ -155,8 +174,17 @@ export const getFilmstrips = async (
   const rows = await getDb().previews.bulkGet(assetIds.map((id) => rowId(id, "filmstrip")));
   const strips = new Map<string, Filmstrip>();
   for (const row of rows)
-    if (row) strips.set(row.assetId, { dataUrl: row.dataUrl, frames: row.frames ?? 0 });
+    if (row?.dataUrl) strips.set(row.assetId, { dataUrl: row.dataUrl, frames: row.frames ?? 0 });
   return strips;
+};
+
+export const getWaveforms = async (
+  assetIds: readonly string[],
+): Promise<ReadonlyMap<string, readonly number[]>> => {
+  const rows = await getDb().previews.bulkGet(assetIds.map((id) => rowId(id, "waveform")));
+  const waveforms = new Map<string, readonly number[]>();
+  for (const row of rows) if (row?.peaks) waveforms.set(row.assetId, row.peaks);
+  return waveforms;
 };
 
 export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<void> => {
@@ -172,7 +200,11 @@ export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<
   if (immediate.length > 0) {
     operations.push(
       getDb().previews.bulkDelete(
-        immediate.flatMap((assetId) => [rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]),
+        immediate.flatMap((assetId) => [
+          rowId(assetId, "thumb"),
+          rowId(assetId, "filmstrip"),
+          rowId(assetId, "waveform"),
+        ]),
       ),
     );
   }
@@ -180,7 +212,11 @@ export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<
     const deletion = write
       .catch(() => false)
       .then(async () => {
-        await getDb().previews.bulkDelete([rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]);
+        await getDb().previews.bulkDelete([
+          rowId(assetId, "thumb"),
+          rowId(assetId, "filmstrip"),
+          rowId(assetId, "waveform"),
+        ]);
         return true;
       });
     previewWrites.set(assetId, deletion);
@@ -218,20 +254,26 @@ export const leasePreview = (assetId: string): (() => void) => {
 export const withInlinePreviews = async (project: Project): Promise<Project> => {
   const ids = project.mediaLibrary.map((a) => a.id);
   if (ids.length === 0) return project;
-  const [thumbs, strips] = await Promise.all([getThumbs(ids), getFilmstrips(ids)]);
-  if (thumbs.size === 0 && strips.size === 0) return project;
+  const [thumbs, strips, waveforms] = await Promise.all([
+    getThumbs(ids),
+    getFilmstrips(ids),
+    getWaveforms(ids),
+  ]);
+  if (thumbs.size === 0 && strips.size === 0 && waveforms.size === 0) return project;
   return {
     ...project,
     mediaLibrary: project.mediaLibrary.map((asset) => {
       const thumb = thumbs.get(asset.id);
       const strip = strips.get(asset.id);
-      if (!thumb && !strip) return asset;
+      const waveform = waveforms.get(asset.id);
+      if (!thumb && !strip && !waveform) return asset;
       return {
         ...asset,
         ...(!asset.thumbDataUrl && thumb ? { thumbDataUrl: thumb } : {}),
         ...(!asset.filmstripDataUrl && strip
           ? { filmstripDataUrl: strip.dataUrl, filmstripFrames: strip.frames }
           : {}),
+        ...(!asset.waveformPeaks && waveform ? { waveformPeaks: waveform } : {}),
       };
     }),
   };
@@ -284,6 +326,7 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
             current?.thumbDataUrl === asset.thumbDataUrl &&
             current?.filmstripDataUrl === asset.filmstripDataUrl &&
             current?.filmstripFrames === asset.filmstripFrames
+            && current?.waveformPeaks === asset.waveformPeaks
           ) {
             moved.push(asset.id);
           }

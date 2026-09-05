@@ -35,6 +35,7 @@ export interface MediaAsset {
   readonly rotation?: SourceRotation; // container display rotation (tkhd); frames decode unrotated
   readonly videoCodec?: string; // WebCodecs codec string read at import (e.g. "hvc1.1.6.L93.B0")
   readonly audioCodec?: string; // e.g. "mp4a.40.2"; searchable, re-readable from the source
+  readonly hasAudio?: boolean; // durable fact; waveform data is stored separately
   readonly sizeBytes?: number; // full-res byte length; lets a peer detect an
   // incomplete/partial OPFS file (e.g. a media
   // transfer interrupted by a crash) instead of

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Scissors, X } from "lucide-react";
-import { useAssetFilmstrip } from "@/stores/preview-store";
+import { useAssetFilmstrip, useAssetWaveform } from "@/stores/preview-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import { fmtSec } from "@/media/format";
@@ -12,6 +12,7 @@ export function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: ()
   const t = useT();
   const setAssetUseRange = useProjectStore((s) => s.setAssetUseRange);
   const strip = useAssetFilmstrip(asset);
+  const waveform = useAssetWaveform(asset);
   const stripRef = useRef<HTMLDivElement>(null);
   const dragging = useRef<{ anchorMs: number } | null>(null);
   const [inMs, setInMs] = useState(asset.useInMs ?? 0);
@@ -99,9 +100,9 @@ export function RangeEditor({ asset, onClose }: { asset: MediaAsset; onClose: ()
             draggable={false}
             className="pointer-events-none size-full object-cover"
           />
-        ) : asset.waveformPeaks && asset.waveformPeaks.length > 0 ? (
+        ) : waveform && waveform.length > 0 ? (
           <div className="pointer-events-none flex size-full items-center gap-px px-0.5">
-            {asset.waveformPeaks.slice(0, 160).map((p, i) => (
+            {waveform.slice(0, 160).map((p, i) => (
               <div
                 // 파형 막대는 정적 스냅샷 — 순서가 바뀌지 않으므로 인덱스 키가 안전
                 // biome-ignore lint/suspicious/noArrayIndexKey: static waveform bars never reorder

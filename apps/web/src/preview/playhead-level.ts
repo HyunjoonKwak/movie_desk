@@ -12,6 +12,7 @@ import {
 export const playheadLevel = (
   project: Project,
   getAsset: (id: ID) => MediaAsset | undefined,
+  getWaveform: (id: ID) => readonly number[] | undefined = (id) => getAsset(id)?.waveformPeaks,
 ): number => {
   const at = project.timeline.playhead;
   let level = 0;
@@ -21,7 +22,7 @@ export const playheadLevel = (
       if (!isMediaClip(clip)) continue;
       if (at < clip.start || at >= clip.start + clip.duration) continue;
       const asset = getAsset(clip.assetId);
-      const peaks = asset?.waveformPeaks;
+      const peaks = getWaveform(clip.assetId);
       if (!asset || !peaks || peaks.length === 0) continue;
       const dur = asset.durationMs || 1;
       const srcMs = clip.trimIn + sourceOffsetForRamp(clip, at - clip.start);

@@ -115,10 +115,11 @@ describe("relinkAssetFromFile", () => {
       rotation: 90,
       videoCodec: "avc1",
       audioCodec: null,
+      hasAudio: true,
       thumbDataUrl: null,
       filmstripDataUrl: null,
       filmstripFrames: null,
-      waveformPeaks: [0.5, 0.25],
+      waveformPeaks: null,
       previewsStored: true,
     });
     expect(calls.removed).toContain("a__proxy.mp4");
@@ -140,6 +141,7 @@ describe("relinkAssetFromFile", () => {
     expect(patch.thumbDataUrl).toBe("data:image/png;base64,vthumb");
     expect(patch.filmstripDataUrl).toBe("data:image/png;base64,strip");
     expect(patch.filmstripFrames).toBe(10);
+    expect(patch.waveformPeaks).toEqual([0.5, 0.25]);
     expect(patch.previewsStored).toBe(false);
   });
 

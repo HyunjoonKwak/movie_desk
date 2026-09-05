@@ -78,7 +78,7 @@ await page.addInitScript(() => {
 const cardCount = () => page.locator("[data-asset-card]").count();
 const heap = () =>
   page.evaluate(() => (performance.memory ? performance.memory.usedJSHeapSize : null));
-const libraryRowBytes = () =>
+const libraryRowMetrics = () =>
   page.evaluate(
     () =>
       new Promise((resolve) => {
@@ -88,10 +88,39 @@ const libraryRowBytes = () =>
           const req = db.transaction("projects").objectStore("projects").getAll();
           req.onsuccess = () => {
             db.close();
-            resolve(Math.max(0, ...req.result.map((row) => row.json.length)));
+            const encoder = new TextEncoder();
+            const rows = req.result.map((row) => ({
+              json: row.json,
+              bytes: encoder.encode(row.json).byteLength,
+            }));
+            const largest = rows.reduce(
+              (best, row) => (row.bytes > best.bytes ? row : best),
+              { json: "", bytes: 0 },
+            );
+            const fields = {};
+            let assetFieldBytes = 0;
+            try {
+              const project = JSON.parse(largest.json);
+              for (const asset of project.mediaLibrary ?? []) {
+                for (const [key, value] of Object.entries(asset)) {
+                  const bytes = encoder.encode(`${JSON.stringify(key)}:${JSON.stringify(value)},`)
+                    .byteLength;
+                  assetFieldBytes += bytes;
+                  const prior = fields[key] ?? { bytes: 0, assets: 0 };
+                  fields[key] = { bytes: prior.bytes + bytes, assets: prior.assets + 1 };
+                }
+              }
+            } catch {
+              // Keep the total useful even if a corrupt row cannot be decomposed.
+            }
+            resolve({
+              bytes: largest.bytes,
+              fields,
+              otherProjectBytes: Math.max(0, largest.bytes - assetFieldBytes),
+            });
           };
         };
-        open.onerror = () => resolve(-1);
+        open.onerror = () => resolve({ bytes: -1, fields: {}, otherProjectBytes: 0 });
       }),
   );
 const untilStable = async (read, { settleMs = 1500, timeoutMs = 600_000 } = {}) => {
@@ -128,7 +157,10 @@ try {
 
   // 2. Persisted project size (the debounced library row holds the whole project).
   await page.waitForTimeout(1_000);
-  result.libraryRowBytes = await libraryRowBytes();
+  const library = await libraryRowMetrics();
+  result.libraryRowBytes = library.bytes;
+  result.libraryJsonComposition = library.fields;
+  result.libraryOtherProjectBytes = library.otherProjectBytes;
 
   // 3. Search latency: type a query, wait for the match count to update.
   const search = page.getByPlaceholder("Search media…");
@@ -214,4 +246,15 @@ const rows = [
 ];
 console.log("| metric | value |\n| --- | --- |");
 for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+console.log("\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |");
+for (const [field, value] of Object.entries(result.libraryJsonComposition).sort(
+  (a, b) => b[1].bytes - a[1].bytes,
+)) {
+  console.log(
+    `| ${field} | ${value.bytes.toLocaleString("en-US")} | ${((value.bytes / result.libraryRowBytes) * 100).toFixed(1)}% | ${value.assets} |`,
+  );
+}
+console.log(
+  `| other project data/structure | ${result.libraryOtherProjectBytes.toLocaleString("en-US")} | ${((result.libraryOtherProjectBytes / result.libraryRowBytes) * 100).toFixed(1)}% | — |`,
+);
 if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);

@@ -3,10 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getThumbs: vi.fn(),
   getFilmstrips: vi.fn(),
+  getWaveforms: vi.fn(),
   storedListener: undefined as
     | ((
         assetId: string,
-        previews: { thumb?: string; filmstrip?: { dataUrl: string; frames: number } },
+        previews: {
+          thumb?: string;
+          filmstrip?: { dataUrl: string; frames: number };
+          waveform?: readonly number[];
+        },
         options: { replaceMissing: boolean },
       ) => void)
     | undefined,
@@ -14,6 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/persistence/previews", () => ({
   getThumbs: mocks.getThumbs,
   getFilmstrips: mocks.getFilmstrips,
+  getWaveforms: mocks.getWaveforms,
   onPreviewsStored: (listener: typeof mocks.storedListener) => {
     mocks.storedListener = listener;
     return () => {};
@@ -25,6 +31,7 @@ import {
   retainFilmstrip,
   requestFilmstrips,
   requestThumbs,
+  requestWaveforms,
   resetPreviewRequestsForTests,
   usePreviewStore,
 } from "../preview-store";
@@ -34,6 +41,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.getFilmstrips.mockResolvedValue(new Map());
+  mocks.getWaveforms.mockResolvedValue(new Map());
   resetPreviewRequestsForTests();
 });
 
@@ -112,6 +120,20 @@ describe("preview store", () => {
     await vi.waitFor(() =>
       expect(usePreviewStore.getState().filmstrips["id-0"]?.dataUrl).toBe("reloaded"),
     );
+  });
+
+  it("caps waveforms and can reload an evicted id", async () => {
+    const waveforms = new Map(
+      Array.from({ length: 500 }, (_, index) => [`id-${index}`, [index / 500]]),
+    );
+    mocks.getWaveforms.mockResolvedValueOnce(waveforms).mockResolvedValueOnce(
+      new Map([["id-0", [0.75]]]),
+    );
+    requestWaveforms([...waveforms.keys()]);
+    await vi.waitFor(() => expect(Object.keys(usePreviewStore.getState().waveforms)).toHaveLength(200));
+    expect(usePreviewStore.getState().waveforms["id-0"]).toBeUndefined();
+    requestWaveforms(["id-0"]);
+    await vi.waitFor(() => expect(usePreviewStore.getState().waveforms["id-0"]).toEqual([0.75]));
   });
 
   it("keeps 300 retained filmstrips without re-requesting or eviction ping-pong", async () => {

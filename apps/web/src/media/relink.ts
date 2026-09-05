@@ -73,6 +73,7 @@ export interface RelinkPatch {
   readonly rotation?: SourceRotation;
   readonly videoCodec?: string | null; // null clears a codec the new file lacks
   readonly audioCodec?: string | null;
+  readonly hasAudio?: boolean;
   readonly thumbDataUrl?: string | null;
   readonly filmstripDataUrl?: string | null;
   readonly filmstripFrames?: number | null;
@@ -178,6 +179,7 @@ export const relinkAssetFromFile = async (
               },
             }
           : {}),
+        ...(visuals.waveformPeaks ? { waveform: visuals.waveformPeaks } : {}),
       });
       stored = true;
     } catch {
@@ -192,9 +194,17 @@ export const relinkAssetFromFile = async (
       ...(rotation !== undefined ? { rotation } : {}),
       videoCodec: container?.videoCodec ?? null,
       audioCodec: container?.audioCodec ?? null,
+      hasAudio: Boolean(container?.audioCodec || visuals.waveformPeaks?.length),
       ...visuals,
       previewsStored: stored,
-      ...(stored ? { thumbDataUrl: null, filmstripDataUrl: null, filmstripFrames: null } : {}),
+      ...(stored
+        ? {
+            thumbDataUrl: null,
+            filmstripDataUrl: null,
+            filmstripFrames: null,
+            waveformPeaks: null,
+          }
+        : {}),
     };
   } finally {
     release();

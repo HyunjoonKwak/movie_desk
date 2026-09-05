@@ -64,18 +64,6 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
     // unavailable they stay inline (fat record, but a visible thumbnail)
     // and the migration retries later.
     let inlinePreviews = false;
-    if (thumbDataUrl || filmstripDataUrl) {
-      try {
-        await putAssetPreviews(id, {
-          ...(thumbDataUrl ? { thumb: thumbDataUrl } : {}),
-          ...(filmstripDataUrl
-            ? { filmstrip: { dataUrl: filmstripDataUrl, frames: filmstripFrames ?? 0 } }
-            : {}),
-        });
-      } catch {
-        inlinePreviews = true;
-      }
-    }
 
     // Extract a peak envelope for audio-bearing media so the timeline can draw
     // a waveform. Images skip this.
@@ -92,6 +80,20 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
         })) ?? file;
       const peaks = await extractWaveformPeaks(audio);
       if (peaks) waveformPeaks = peaks;
+    }
+
+    if (thumbDataUrl || filmstripDataUrl || waveformPeaks) {
+      try {
+        await putAssetPreviews(id, {
+          ...(thumbDataUrl ? { thumb: thumbDataUrl } : {}),
+          ...(filmstripDataUrl
+            ? { filmstrip: { dataUrl: filmstripDataUrl, frames: filmstripFrames ?? 0 } }
+            : {}),
+          ...(waveformPeaks ? { waveform: waveformPeaks } : {}),
+        });
+      } catch {
+        inlinePreviews = true;
+      }
     }
 
     // Capture time + GPS for the auto-edit story engine (EXIF / mvhd / ISO6709).
@@ -115,7 +117,8 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(inlinePreviews && thumbDataUrl ? { thumbDataUrl } : {}),
       ...(inlinePreviews && filmstripDataUrl ? { filmstripDataUrl } : {}),
       ...(inlinePreviews && filmstripFrames !== undefined ? { filmstripFrames } : {}),
-      ...(waveformPeaks ? { waveformPeaks } : {}),
+      ...(inlinePreviews && waveformPeaks ? { waveformPeaks } : {}),
+      ...((audioCodec || waveformPeaks) ? { hasAudio: true } : {}),
       ...(rotation ? { rotation } : {}),
       ...(videoCodec ? { videoCodec } : {}),
       ...(audioCodec ? { audioCodec } : {}),

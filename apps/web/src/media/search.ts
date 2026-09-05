@@ -86,6 +86,7 @@ export const RESOLUTION_LABEL: Record<Exclude<ResolutionFilter, "any">, string> 
 // whose waveform could not be extracted). Unknown matches neither "with"
 // nor "without": absence of evidence is not silence.
 export const audioPresence = (asset: MediaAsset): boolean | null => {
+  if (asset.hasAudio !== undefined) return asset.hasAudio;
   if (asset.kind === "audio") return true;
   if (asset.kind === "image") return false;
   if (asset.audioCodec) return true;

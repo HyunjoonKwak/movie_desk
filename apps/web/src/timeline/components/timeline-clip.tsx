@@ -6,6 +6,7 @@ import { isMediaClip, isAdjustmentClip } from "@movie-desk/core";
 import {
   useAssetFilmstrip,
   useAssetThumb,
+  useAssetWaveform,
   usePreviewVisibility,
 } from "@/stores/preview-store";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
@@ -47,6 +48,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   const previewVisible = usePreviewVisibility(clipRef);
   const thumb = useAssetThumb(asset);
   const strip = useAssetFilmstrip(asset, previewVisible);
+  const waveform = useAssetWaveform(asset, previewVisible);
 
   const dragRef = useRef<DragState>({
     mode: null,
@@ -135,7 +137,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   const width = Math.max(2, clip.duration * zoom);
   const isMedia = isMediaClip(clip);
   const isAdjustment = isAdjustmentClip(clip);
-  const showWaveform = isMediaClip(clip) && !!asset?.waveformPeaks && width > 20;
+  const showWaveform = isMediaClip(clip) && !!waveform?.length && width > 20;
 
   // Filmstrip: map the clip's trimmed source range across its timeline width.
   // Falls back to the single repeated thumbnail when no strip is available.
@@ -192,7 +194,13 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
           />
         )}
         {showWaveform && isMediaClip(clip) && (
-          <ClipWaveform clip={clip} width={width} height={trackHeight - 8} />
+          <ClipWaveform
+            clip={clip}
+            width={width}
+            height={trackHeight - 8}
+            durationMs={asset?.durationMs ?? 0}
+            peaks={waveform ?? []}
+          />
         )}
         <div className="pointer-events-none relative flex h-full items-center px-2">
           <span className="truncate text-ink-1">{clip.label ?? asset?.name ?? clip.kind}</span>

@@ -149,6 +149,7 @@ export const mediaAssetSchema = z
     // A malformed mark is dropped, never a reason to refuse the project.
     rating: z.number().int().min(1).max(5).optional().catch(undefined),
     favorite: z.boolean().optional(),
+    hasAudio: z.boolean().optional(),
   })
   .passthrough()
   // `.catch(undefined)` leaves the key behind; a dropped mark must not
