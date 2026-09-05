@@ -76,4 +76,19 @@ describe("media action no-ops", () => {
     resetProject();
     expectRedoPreserved(() => useProjectStore.getState().removeMediaAsset("missing" as ID));
   });
+
+  it("clears a prior audio-presence fact when relink cannot determine it", () => {
+    useProjectStore.getState().loadProject({
+      ...createEmptyProject(),
+      mediaLibrary: [{ ...media, hasAudio: true }],
+    });
+    useProjectStore.getState().relinkMediaAsset(media.id, {
+      sizeBytes: 100,
+      mime: "video/mp4",
+      dropProxy: false,
+      hasAudio: null,
+      previewsStored: true,
+    });
+    expect(useProjectStore.getState().project.mediaLibrary[0]).not.toHaveProperty("hasAudio");
+  });
 });

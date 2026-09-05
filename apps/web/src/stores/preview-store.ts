@@ -61,13 +61,7 @@ const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>):
   const prior = filmstripOrder.indexOf(assetId);
   if (prior >= 0) filmstripOrder.splice(prior, 1);
   filmstripOrder.push(assetId);
-  evictOverflow(
-    filmstrips,
-    filmstripOrder,
-    retainedFilmstrips,
-    askedFilmstrips,
-    MAX_FILMSTRIPS,
-  );
+  evictOverflow(filmstrips, filmstripOrder, retainedFilmstrips, askedFilmstrips, MAX_FILMSTRIPS);
 };
 
 const touchWaveform = (assetId: string, waveforms: Record<string, readonly number[]>): void => {
@@ -79,34 +73,28 @@ const touchWaveform = (assetId: string, waveforms: Record<string, readonly numbe
 
 const pruneFilmstrips = (): void => {
   if (filmstripOrder.length <= MAX_FILMSTRIPS) return;
-  usePreviewStore.setState((state) => {
-    const filmstrips = { ...state.filmstrips };
-    return evictOverflow(
-      filmstrips,
-      filmstripOrder,
-      retainedFilmstrips,
-      askedFilmstrips,
-      MAX_FILMSTRIPS,
-    ).length > 0
-      ? { filmstrips }
-      : {};
-  });
+  const filmstrips = { ...usePreviewStore.getState().filmstrips };
+  const evicted = evictOverflow(
+    filmstrips,
+    filmstripOrder,
+    retainedFilmstrips,
+    askedFilmstrips,
+    MAX_FILMSTRIPS,
+  );
+  if (evicted.length > 0) usePreviewStore.setState({ filmstrips });
 };
 
 const pruneWaveforms = (): void => {
   if (waveformOrder.length <= MAX_WAVEFORMS) return;
-  usePreviewStore.setState((state) => {
-    const waveforms = { ...state.waveforms };
-    return evictOverflow(
-      waveforms,
-      waveformOrder,
-      retainedWaveforms,
-      askedWaveforms,
-      MAX_WAVEFORMS,
-    ).length > 0
-      ? { waveforms }
-      : {};
-  });
+  const waveforms = { ...usePreviewStore.getState().waveforms };
+  const evicted = evictOverflow(
+    waveforms,
+    waveformOrder,
+    retainedWaveforms,
+    askedWaveforms,
+    MAX_WAVEFORMS,
+  );
+  if (evicted.length > 0) usePreviewStore.setState({ waveforms });
 };
 
 export const retainFilmstrip = (assetId: string): (() => void) => {
@@ -304,10 +292,7 @@ export const useAssetThumb = (asset: ThumbSource, shouldLoad = true): string | u
   return inline ?? stored;
 };
 
-export const useAssetFilmstrip = (
-  asset: StripSource,
-  shouldLoad = true,
-): Filmstrip | undefined => {
+export const useAssetFilmstrip = (asset: StripSource, shouldLoad = true): Filmstrip | undefined => {
   const id = asset?.id;
   const inline = asset?.filmstripDataUrl;
   const frames = asset?.filmstripFrames ?? 0;

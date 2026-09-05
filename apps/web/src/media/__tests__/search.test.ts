@@ -120,6 +120,9 @@ describe("filters", () => {
     expect(audioPresence(asset("peaks", { waveformPeaks: [0.2] }))).toBe(true);
     expect(audioPresence(asset("stored", { hasAudio: true }))).toBe(true);
     expect(audioPresence(asset("silent", { hasAudio: false }))).toBe(false);
+    expect(audioPresence(asset("confirmed-silent", { hasAudio: false, waveformPeaks: [0.2] }))).toBe(
+      false,
+    );
     const all = [...library, unknown];
     const idx = buildSearchIndex(all, geocode, "ko");
     const ids = (audio: "with" | "without") =>
