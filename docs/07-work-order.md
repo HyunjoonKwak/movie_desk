@@ -77,6 +77,11 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   (6) 스마트 컬렉션도 이름 변경·삭제 가능(선택 상태를 필터와 분리), 이름 변경 대상 고정. (7) 사용 여부 필터가
   꺼져 있으면 타임라인을 구독하지 않음(클립 드래그마다 재검색 방지). (8) `#태그` 접두 일치, 태그 칩 12개 + 더 보기,
   삭제 토스트에 실행 취소, 별점 radiogroup·아이콘 버튼 aria-label. 남은 LOW: 영구 삭제된 자산 id가 컬렉션에 남음.
+  Codex 교차 리뷰(2026-09-05, Orca 감독 하에 읽기 전용 리뷰 → 같은 터미널에서 수정 d8b421f): `runWith`의 no-op
+  판정은 참조 동일성이므로 기존 mutator(setAssetProxy·setAssetUseRange·relink/remove 대상 없음, core effect
+  제거/토글/같은 위치 reorder)가 변경 없을 때 원래 Project를 반환하도록 한정 수정 + undo 깊이·redo 보존 회귀
+  테스트; 스마트 컬렉션은 로드한 query+filters 스냅샷과 현재 값이 달라지는 즉시 선택 표시를 해제(수동 컬렉션 전환은
+  기존 검색 조건 유지). 운영 방식 전환: 사용자 지시로 Codex가 구현, Claude는 Orca coordinator로 감독·리뷰·계획.
 - 2026-09-04 Claude: A5 라이브러리 1,000개 측정(`claude/a5-library-scale`). `apps/web/scripts/bench-library.mjs`가 실제
   Chrome으로 1,000개(비디오 200·이미지 800)를 가져와 가져오기·검색·필터·소스 상태 검사·복원·저장·힙을 잰다
   (`docs/evaluations/2026-09-04-library-1000.md`). 병목은 카드 1,000장이 상태 변화마다 전부 다시 렌더되는 것:
@@ -428,7 +433,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A1-b 데스크톱 카탈로그·`media://` | Codex | 완료, main 통합 | worker 소유 node:sqlite 카탈로그, lease 기반 `media://` Range 프로토콜, source resolver 6상태, VolumeRootResolver. Claude 검토 반영(aed1a1b). 렌더러 `disk` adapter는 A1-d(Claude) |
 | A1-c helper 계약 | Codex | 완료, main 통합 | JSON-lines sidecar v1: volume-resolve·volume-mount·inspect·preview·fingerprint, 1차 sips/diskutil. `docs/decisions/2026-09-03-media-helper-protocol.md` |
 | A1-d 렌더러 disk adapter | Claude + Codex | 완료, main 통합 | `26e3058` + `4760e18`. 읽기별 lease를 `finally`에서 해제, 정확한 `206`·응답 길이 검증, 전송 실패 시 `sourceState` 복구, IPC 런타임 검증, 길이 0 가드, 브리지 있을 때만 기본 `disk` adapter 등록. `<img>/<video>` fallback도 공통 resolver를 사용하며 오류 응답 CORS·상태 헤더를 노출. 읽기 lease 재사용은 프로파일링 뒤 최적화 |
-| A3 컬렉션·태그·평점 | Claude(데이터·검색) · Codex(UI 다듬기) | 1차 구현(`claude/a3-collections`) | 태그·평점·즐겨찾기·사용 여부·컬렉션(수동/스마트) 데이터 모델·검색·영속화 + 1차 UI. 남은 것: 카드에서 직접 별점/하트 편집, 컬렉션 사이드바, 자동 편집 후보에 평점 가중치 |
+| A3 컬렉션·태그·평점 | Claude(데이터·검색) · Codex(교차 리뷰·수정) | 구현·교차 리뷰 완료, main 통합(e43b35f + d8b421f) | 태그·평점·즐겨찾기·사용 여부·컬렉션(수동/스마트) 데이터 모델·검색·영속화 + 1차 UI. 남은 것: 카드에서 직접 별점/하트 편집, 컬렉션 사이드바, 자동 편집 후보에 평점 가중치 |
 | A2 메타데이터 인덱스·검색 | Claude + Codex 검토 | 구현·리뷰 완료, main 통합 | 자유 텍스트 + 기간·길이·해상도·오디오·장소·종류 필터, 코덱 저장. 리뷰에서 오디오 유무를 3값으로 보강하고 자산별 인덱스 캐시·재연결 메타 갱신을 추가했다. `d2cb6ba` + `7cf9b60`, 원격 CI 통과. 태그·평점은 A3 |
 | A5 1,000개 성능 측정 | Claude | 1차 완료, main 통합(f25ebf9) | 벤치 스크립트 + 기록 문서. 검색 54ms·필터 346ms·소스 검사 0.5초·복원 0.6초·가져오기 12ms/자산. 다음: 그룹 가상화, 썸네일 캐시 분리 |
 | A4 누락 재연결·휴지통 | Claude | 1차 구현(OPFS 원본 재연결 + 휴지통) | 데스크톱 참조 파일 재연결과 카탈로그 백업/복원은 다음 배치. e2e 3개(같은 크기 재연결, 다른 크기 확인 후 연결, 삭제→휴지통→복원) |
