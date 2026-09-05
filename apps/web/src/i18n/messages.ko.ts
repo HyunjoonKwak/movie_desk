@@ -447,6 +447,7 @@ export const ko = {
     "project.opened": "\"{name}\" 프로젝트를 열었습니다",
     "project.imported": "\"{name}\" 가져오기 완료",
     "project.importFailed": "가져오기 실패",
+    "project.exportFailed": "프리뷰 내보내기 실패; 프리뷰 없이 내보냈습니다",
     "project.corrupt": "저장된 프로젝트가 손상되어 열 수 없습니다",
     "project.activeCorrupt": "마지막 프로젝트가 손상되어 새 프로젝트를 열었습니다",
 

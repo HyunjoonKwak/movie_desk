@@ -23,6 +23,7 @@ interface PreviewState {
 
 const MAX_FILMSTRIPS = 200;
 const filmstripOrder: string[] = [];
+const retainedFilmstrips = new Map<string, number>();
 const askedThumbs = new Set<string>();
 const askedFilmstrips = new Set<string>();
 let previewGeneration = 0;
@@ -30,13 +31,50 @@ const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>):
   const prior = filmstripOrder.indexOf(assetId);
   if (prior >= 0) filmstripOrder.splice(prior, 1);
   filmstripOrder.push(assetId);
-  while (filmstripOrder.length > MAX_FILMSTRIPS) {
+  let candidates = filmstripOrder.length;
+  while (filmstripOrder.length > MAX_FILMSTRIPS && candidates > 0) {
+    candidates--;
     const evicted = filmstripOrder.shift();
-    if (evicted) {
+    if (!evicted) break;
+    if (retainedFilmstrips.has(evicted)) {
+      filmstripOrder.push(evicted);
+      continue;
+    }
+    delete filmstrips[evicted];
+    askedFilmstrips.delete(evicted);
+  }
+};
+
+const pruneFilmstrips = (): void => {
+  usePreviewStore.setState((state) => {
+    const filmstrips = { ...state.filmstrips };
+    let candidates = filmstripOrder.length;
+    while (filmstripOrder.length > MAX_FILMSTRIPS && candidates > 0) {
+      candidates--;
+      const evicted = filmstripOrder.shift();
+      if (!evicted) break;
+      if (retainedFilmstrips.has(evicted)) {
+        filmstripOrder.push(evicted);
+        continue;
+      }
       delete filmstrips[evicted];
       askedFilmstrips.delete(evicted);
     }
-  }
+    return { filmstrips };
+  });
+};
+
+export const retainFilmstrip = (assetId: string): (() => void) => {
+  retainedFilmstrips.set(assetId, (retainedFilmstrips.get(assetId) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const count = (retainedFilmstrips.get(assetId) ?? 1) - 1;
+    if (count <= 0) retainedFilmstrips.delete(assetId);
+    else retainedFilmstrips.set(assetId, count);
+    pruneFilmstrips();
+  };
 };
 
 export const usePreviewStore = create<PreviewState>((set) => ({
@@ -137,21 +175,17 @@ export const requestThumbs = makeBatch(askedThumbs, getThumbs, async (found, gen
   }
 });
 
-export const requestFilmstrips = makeBatch(
-  askedFilmstrips,
-  getFilmstrips,
-  (found, generation) => {
-    if (generation !== previewGeneration) return;
-    usePreviewStore.setState((s) => {
-      const filmstrips = { ...s.filmstrips };
-      for (const [id, strip] of found) {
-        filmstrips[id] = strip;
-        touchFilmstrip(id, filmstrips);
-      }
-      return { filmstrips };
-    });
-  },
-);
+export const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (found, generation) => {
+  if (generation !== previewGeneration) return;
+  usePreviewStore.setState((s) => {
+    const filmstrips = { ...s.filmstrips };
+    for (const [id, strip] of found) {
+      filmstrips[id] = strip;
+      touchFilmstrip(id, filmstrips);
+    }
+    return { filmstrips };
+  });
+});
 
 // Test hook: forget what was asked so a fresh test starts cold.
 export const resetPreviewRequestsForTests = (): void => {
@@ -180,6 +214,9 @@ export const useAssetFilmstrip = (asset: StripSource): Filmstrip | undefined => 
   const inline = asset?.filmstripDataUrl;
   const frames = asset?.filmstripFrames ?? 0;
   const stored = usePreviewStore((s) => (id ? s.filmstrips[id] : undefined));
+  useEffect(() => {
+    if (id && !inline) return retainFilmstrip(id);
+  }, [id, inline]);
   useEffect(() => {
     if (id && !inline && stored === undefined) requestFilmstrips([id]);
   }, [id, inline, stored]);
@@ -250,10 +287,12 @@ export const useAssetThumbs = (
   useEffect(() => {
     requestThumbs(assets.filter((a) => !a.thumbDataUrl).map((a) => a.id));
   }, [assets]);
-  const merged: Record<string, string> = {};
-  for (const asset of assets) {
-    const thumb = asset.thumbDataUrl ?? thumbs[asset.id];
-    if (thumb) merged[asset.id] = thumb;
-  }
-  return merged;
+  return useMemo(() => {
+    const merged: Record<string, string> = {};
+    for (const asset of assets) {
+      const thumb = asset.thumbDataUrl ?? thumbs[asset.id];
+      if (thumb) merged[asset.id] = thumb;
+    }
+    return merged;
+  }, [assets, thumbs]);
 };

@@ -22,6 +22,7 @@ vi.mock("@/persistence/previews", () => ({
 
 import {
   observePreviewVisibility,
+  retainFilmstrip,
   requestFilmstrips,
   requestThumbs,
   resetPreviewRequestsForTests,
@@ -111,6 +112,29 @@ describe("preview store", () => {
     await vi.waitFor(() =>
       expect(usePreviewStore.getState().filmstrips["id-0"]?.dataUrl).toBe("reloaded"),
     );
+  });
+
+  it("keeps 300 retained filmstrips without re-requesting or eviction ping-pong", async () => {
+    const strips = new Map(
+      Array.from({ length: 300 }, (_, index) => [
+        `retained-${index}`,
+        { dataUrl: `strip-${index}`, frames: 10 },
+      ]),
+    );
+    const releases = [...strips.keys()].map(retainFilmstrip);
+    mocks.getFilmstrips.mockResolvedValue(strips);
+    try {
+      requestFilmstrips([...strips.keys()]);
+      await vi.waitFor(() => expect(mocks.getFilmstrips).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(Object.keys(usePreviewStore.getState().filmstrips)).toHaveLength(300),
+      );
+      requestFilmstrips([...strips.keys()]);
+      await tick();
+      expect(mocks.getFilmstrips).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of releases) release();
+    }
   });
 
   it("does not apply an old project's in-flight thumbnail load after clear", async () => {

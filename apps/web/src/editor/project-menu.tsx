@@ -127,8 +127,15 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
     await refresh();
   };
 
-  const onExport = async () =>
-    downloadProjectJson(await withInlinePreviews(useProjectStore.getState().project));
+  const onExport = async () => {
+    const project = useProjectStore.getState().project;
+    try {
+      downloadProjectJson(await withInlinePreviews(project));
+    } catch (err) {
+      toast.error(`${t("project.exportFailed")}: ${err instanceof Error ? err.message : err}`);
+      downloadProjectJson(project);
+    }
+  };
 
   const onImport = async (file: File) => {
     try {

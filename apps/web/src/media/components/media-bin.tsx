@@ -57,6 +57,7 @@ import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
 import { compareRelinkCandidate, relinkAssetFromFile } from "@/media/relink";
+import { deleteAssetPreviews } from "@/persistence/previews";
 import { countTrash, moveAssetToTrash, reconcileTrash } from "@/persistence/trash";
 import { ImportFailures } from "./import-failures";
 import { BulkBar } from "./bulk-bar";
@@ -390,6 +391,14 @@ export function MediaBin() {
     async (asset: MediaAsset, file: File, identical: boolean) => {
       try {
         const patch = await relinkAssetFromFile(asset, file, { identical });
+        if (
+          typeof patch.thumbDataUrl === "string" ||
+          typeof patch.filmstripDataUrl === "string"
+        ) {
+          // Preview persistence failed and relink returned its derived images
+          // inline. Remove old stored rows so migration can fill empty slots.
+          await deleteAssetPreviews([asset.id]).catch(() => undefined);
+        }
         dropInlinePreviews([asset.id]);
         relinkMediaAsset(asset.id, patch);
         toast.success(t("media.relinked", { name: asset.name }));

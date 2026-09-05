@@ -43,6 +43,9 @@ vi.mock("dexie", () => {
       };
     }
     transaction(_mode: string, _table: FakeTable, run: () => Promise<void>) {
+      // This fake has no transaction isolation. Concurrency tests below
+      // verify previewWrites ordering; Dexie's own transaction semantics are
+      // covered by Dexie rather than simulated here.
       return run();
     }
   }
@@ -84,6 +87,7 @@ import {
 } from "@/media/inline-previews";
 import {
   collectPreviewGarbage,
+  deleteAssetPreviews,
   getFilmstrips,
   getThumbs,
   leasePreview,
@@ -184,7 +188,7 @@ describe("preview persistence", () => {
     stop();
   });
 
-  it("does not let an in-flight legacy migration erase newer relink previews", async () => {
+  it("serializes migration after an already-queued relink preview write", async () => {
     useProjectStore
       .getState()
       .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,legacy" })));
@@ -214,6 +218,24 @@ describe("preview persistence", () => {
       dataUrl: "data:image/png;base64,new-strip",
       frames: 12,
     });
+    stop();
+  });
+
+  it("migrates a relink fallback after clearing previews from the old file", async () => {
+    await putAssetPreviews("a", { thumb: "data:image/png;base64,old-picture" });
+    useProjectStore.getState().loadProject(
+      project(asset("a", { thumbDataUrl: "data:image/png;base64,new-picture" })),
+    );
+
+    // relink's storePreviews failed, so its patch carried the new preview
+    // inline. The media-bin handler clears the old row before applying it.
+    const storePreviews = vi.fn().mockRejectedValue(new Error("preview store unavailable"));
+    await storePreviews().catch(() => undefined);
+    await deleteAssetPreviews(["a"]);
+    const stop = startInlinePreviewMigration(useProjectStore);
+    await settle();
+
+    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,new-picture");
     stop();
   });
 

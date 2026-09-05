@@ -447,6 +447,7 @@ export const en = {
     "project.opened": "Opened \"{name}\"",
     "project.imported": "Imported \"{name}\"",
     "project.importFailed": "Import failed",
+    "project.exportFailed": "Preview export failed; exported without previews",
     "project.corrupt": "This saved project is damaged and could not be opened",
     "project.activeCorrupt": "The last project is damaged. Opened a new project instead",
 

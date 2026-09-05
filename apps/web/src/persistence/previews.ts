@@ -151,9 +151,23 @@ export const getFilmstrips = async (
   return strips;
 };
 
-const deletePreviews = async (assetIds: readonly string[]): Promise<void> => {
-  await getDb().previews.bulkDelete(
-    assetIds.flatMap((id) => [rowId(id, "thumb"), rowId(id, "filmstrip")]),
+export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<void> => {
+  await Promise.all(
+    assetIds.map(async (assetId) => {
+      const previous = previewWrites.get(assetId) ?? Promise.resolve(true);
+      const deletion = previous
+        .catch(() => false)
+        .then(async () => {
+          await getDb().previews.bulkDelete([rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]);
+          return true;
+        });
+      previewWrites.set(assetId, deletion);
+      try {
+        await deletion;
+      } finally {
+        if (previewWrites.get(assetId) === deletion) previewWrites.delete(assetId);
+      }
+    }),
   );
 };
 
@@ -207,7 +221,10 @@ export const withInlinePreviews = async (project: Project): Promise<Project> => 
 // helper, generated map cards, an imported project file) are picked up.
 interface PreviewMigrationStore {
   getState: () => { project: Project; dropInlinePreviews: (ids: readonly ID[]) => void };
-  subscribe: (listener: (state: { project: Project }) => void) => () => void;
+  subscribe: (
+    selector: (state: { project: Project }) => readonly MediaAsset[],
+    listener: (library: readonly MediaAsset[]) => void,
+  ) => () => void;
 }
 
 export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() => void) => {
@@ -222,6 +239,7 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
         const next = queued;
         queued = null;
         const inline = next.filter(hasInlinePreviews);
+        if (inline.length === 0) continue;
         const stored: MediaAsset[] = [];
         for (const asset of inline) {
           try {
@@ -240,13 +258,13 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
         const moved: ID[] = [];
         for (const asset of stored) {
           const current = currentById.get(asset.id);
-            if (
-              current?.thumbDataUrl === asset.thumbDataUrl &&
-              current?.filmstripDataUrl === asset.filmstripDataUrl &&
-              current?.filmstripFrames === asset.filmstripFrames
-            ) {
-              moved.push(asset.id);
-            }
+          if (
+            current?.thumbDataUrl === asset.thumbDataUrl &&
+            current?.filmstripDataUrl === asset.filmstripDataUrl &&
+            current?.filmstripFrames === asset.filmstripFrames
+          ) {
+            moved.push(asset.id);
+          }
         }
         if (moved.length > 0) store.getState().dropInlinePreviews(moved);
       }
@@ -254,7 +272,10 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
       running = false;
     }
   };
-  const unsubscribe = store.subscribe((state) => void migrate(state.project.mediaLibrary));
+  const unsubscribe = store.subscribe(
+    (state) => state.project.mediaLibrary,
+    (library) => void migrate(library),
+  );
   void migrate(store.getState().project.mediaLibrary);
   return unsubscribe;
 };
@@ -287,6 +308,6 @@ export const collectPreviewGarbage = async (
     if (current().mediaLibrary.some((asset) => asset.id === id)) continue;
     stale.push(id);
   }
-  if (stale.length > 0) await deletePreviews(stale);
+  if (stale.length > 0) await deleteAssetPreviews(stale);
   return stale.length;
 };
