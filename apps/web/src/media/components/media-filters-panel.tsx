@@ -1,14 +1,16 @@
 "use client";
 
-import { Pencil, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import type { ID, MediaCollection, SmartCollection } from "@movie-desk/core";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { type MediaFilters, RESOLUTION_LABEL, type TagCount } from "@/media/search";
+import { filtersFromSpec } from "@/media/smart-filters";
+import type { ID, MediaCollection, SmartCollection } from "@movie-desk/core";
+import { Pencil, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 export interface MediaFiltersPanelProps {
   readonly filters: MediaFilters;
+  readonly query: string;
   readonly setFilters: (update: (filters: MediaFilters) => MediaFilters) => void;
   readonly places: readonly string[];
   readonly tags: readonly TagCount[];
@@ -29,6 +31,20 @@ const SMART_PREFIX = "smart:";
 // Tag chips shown before "more": a real library can carry hundreds of tags.
 const TAG_CHIP_LIMIT = 12;
 
+const sameFilters = (left: MediaFilters, right: MediaFilters): boolean =>
+  left.kind === right.kind &&
+  left.duration === right.duration &&
+  left.resolution === right.resolution &&
+  left.period === right.period &&
+  left.place === right.place &&
+  left.audio === right.audio &&
+  left.minRating === right.minRating &&
+  left.favorite === right.favorite &&
+  left.usage === right.usage &&
+  left.collection === right.collection &&
+  left.tags.length === right.tags.length &&
+  left.tags.every((tag, index) => tag === right.tags[index]);
+
 // The filter panel under the search box. Selecting a manual collection
 // filters by membership; selecting a smart one loads its saved search into
 // the query and filters instead (it is a search, not a list).
@@ -40,6 +56,10 @@ export function MediaFiltersPanel(props: MediaFiltersPanelProps) {
   // a smart collection is applied as a search and is not a filter value,
   // but it still has to be renameable and deletable.
   const [picked, setPicked] = useState<ID | null>(null);
+  const [loadedSmart, setLoadedSmart] = useState<{
+    query: string;
+    filters: MediaFilters;
+  } | null>(null);
   const [renaming, setRenaming] = useState<{ id: ID; name: string } | null>(null);
   const [allTags, setAllTags] = useState(false);
   const pickedCollection = collections.find((c) => c.id === picked) ?? null;
@@ -52,6 +72,15 @@ export function MediaFiltersPanel(props: MediaFiltersPanelProps) {
     if (filters.collection !== null) setPicked(filters.collection);
     else if (pickedCollection?.kind === "manual") setPicked(null);
   }, [filters.collection, pickedCollection]);
+  useEffect(() => {
+    if (
+      loadedSmart !== null &&
+      (props.query !== loadedSmart.query || !sameFilters(filters, loadedSmart.filters))
+    ) {
+      setPicked(null);
+      setLoadedSmart(null);
+    }
+  }, [filters, loadedSmart, props.query]);
   const selectValue =
     pickedCollection === null
       ? ""
@@ -242,9 +271,16 @@ export function MediaFiltersPanel(props: MediaFiltersPanelProps) {
               );
               if (!smart) return;
               setPicked(smart.id);
+              setLoadedSmart({
+                query: smart.query,
+                filters: filtersFromSpec(smart.filters),
+              });
               props.onLoadSmart(smart);
               return;
             }
+            // A manual collection is an additional membership filter; keep
+            // any query and other conditions loaded from a smart collection.
+            setLoadedSmart(null);
             setPicked(value ? (value as ID) : null);
             setFilters((f) => ({ ...f, collection: value ? (value as ID) : null }));
           }}
@@ -343,6 +379,7 @@ export function MediaFiltersPanel(props: MediaFiltersPanelProps) {
               className="rounded px-1 py-0.5 hover:text-ink-1"
               onClick={() => {
                 setPicked(null);
+                setLoadedSmart(null);
                 props.onReset();
               }}
             >

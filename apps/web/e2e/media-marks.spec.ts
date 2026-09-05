@@ -148,6 +148,13 @@ test("manual collections filter by membership and smart collections re-apply a s
   await page.getByLabel("Collection", { exact: true }).selectOption({ label: "Smart: Sea shots" });
   await expect(search).toHaveValue("#sea");
   await expect(matchCount(page)).toHaveText("1 of 2");
+  // A smart collection is a loaded search, not live membership: editing the
+  // loaded query clears its selection marker immediately.
+  await search.fill("#sea changed");
+  await expect(page.getByLabel("Collection", { exact: true })).toHaveValue("");
+  await expect(page.getByRole("button", { name: "Delete collection" })).toHaveCount(0);
+  await page.getByLabel("Collection", { exact: true }).selectOption({ label: "Smart: Sea shots" });
+  await expect(search).toHaveValue("#sea");
 
   // Both collections survive a reload; either kind can be deleted, and the
   // deletion toast undoes it.

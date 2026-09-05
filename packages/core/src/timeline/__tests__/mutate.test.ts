@@ -1,24 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyProject } from "../../model/factory";
 import type { MediaClip } from "../../model/clip";
+import { createEmptyProject } from "../../model/factory";
 import { newId } from "../../utils/id";
 import {
   addClip,
-  moveClip,
-  removeClip,
-  rippleDeleteClip,
   closeGapsOnTrack,
-  rollEdit,
-  slideClip,
   detachAudio,
   groupClips,
+  moveClip,
   moveClipOrGroup,
-  ungroupClips,
+  removeClip,
+  removeEffectFromClip,
+  reorderEffect,
+  rippleDeleteClip,
+  rollEdit,
+  slideClip,
+  toggleEffectEnabled,
   trimClipEnd,
   trimClipStart,
+  ungroupClips,
 } from "../mutate";
-import { splitClipAt } from "../split";
 import { computeDuration, findClip } from "../query";
+import { splitClipAt } from "../split";
 
 const makeMediaClip = (start = 0, duration = 1000): MediaClip => ({
   kind: "media",
@@ -209,5 +212,22 @@ describe("timeline mutate", () => {
     const trimmed = findClip(p2.timeline, clip.id)!;
     expect(trimmed.start).toBe(1000);
     expect(trimmed.duration).toBe(1500); // 2500 - 1000
+  });
+
+  it("keeps project identity for missing effects and same-position reorders", () => {
+    const p0 = createEmptyProject();
+    const tid = p0.timeline.tracks[0]!.id;
+    const effectId = newId();
+    const clip = {
+      ...makeMediaClip(),
+      effects: [{ id: effectId, type: "blur", enabled: true, params: {} }],
+    };
+    const project = addClip(p0, tid, clip);
+    const missing = newId();
+
+    expect(removeEffectFromClip(project, clip.id, missing)).toBe(project);
+    expect(toggleEffectEnabled(project, clip.id, missing)).toBe(project);
+    expect(reorderEffect(project, clip.id, missing, 0)).toBe(project);
+    expect(reorderEffect(project, clip.id, effectId, 0)).toBe(project);
   });
 });

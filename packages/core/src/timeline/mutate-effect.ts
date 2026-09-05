@@ -2,28 +2,23 @@
 // single param, and the upsert/audio-fade convenience wrappers used by the
 // crossfade + auto-WB flows.
 
-import type { Project } from "../model/project";
 import type { EffectInstance, EffectParamValue } from "../model/effect";
+import type { Project } from "../model/project";
 import type { ID } from "../utils/id";
 import { newId } from "../utils/id";
 import { updateClip } from "./mutate-core";
 
-export const addEffectToClip = (
-  project: Project,
-  clipId: ID,
-  effect: EffectInstance,
-): Project =>
+export const addEffectToClip = (project: Project, clipId: ID, effect: EffectInstance): Project =>
   updateClip(project, clipId, (c) => ({ ...c, effects: [...c.effects, effect] }));
 
-export const removeEffectFromClip = (
-  project: Project,
-  clipId: ID,
-  effectId: ID,
-): Project =>
-  updateClip(project, clipId, (c) => ({
+export const removeEffectFromClip = (project: Project, clipId: ID, effectId: ID): Project => {
+  const clip = project.timeline.tracks.flatMap((track) => track.clips).find((c) => c.id === clipId);
+  if (!clip?.effects.some((effect) => effect.id === effectId)) return project;
+  return updateClip(project, clipId, (c) => ({
     ...c,
     effects: c.effects.filter((e) => e.id !== effectId),
   }));
+};
 
 export const setEffectParam = (
   project: Project,
@@ -39,15 +34,14 @@ export const setEffectParam = (
     ),
   }));
 
-export const toggleEffectEnabled = (
-  project: Project,
-  clipId: ID,
-  effectId: ID,
-): Project =>
-  updateClip(project, clipId, (c) => ({
+export const toggleEffectEnabled = (project: Project, clipId: ID, effectId: ID): Project => {
+  const clip = project.timeline.tracks.flatMap((track) => track.clips).find((c) => c.id === clipId);
+  if (!clip?.effects.some((effect) => effect.id === effectId)) return project;
+  return updateClip(project, clipId, (c) => ({
     ...c,
     effects: c.effects.map((e) => (e.id === effectId ? { ...e, enabled: !e.enabled } : e)),
   }));
+};
 
 // Move an existing effect within a clip's effect array to a new index. Used
 // by the inspector's drag-to-reorder list.
@@ -56,16 +50,20 @@ export const reorderEffect = (
   clipId: ID,
   effectId: ID,
   toIndex: number,
-): Project =>
-  updateClip(project, clipId, (c) => {
+): Project => {
+  const clip = project.timeline.tracks.flatMap((track) => track.clips).find((c) => c.id === clipId);
+  const from = clip?.effects.findIndex((effect) => effect.id === effectId) ?? -1;
+  if (!clip || from < 0) return project;
+  const destination = Math.max(0, Math.min(clip.effects.length - 1, toIndex));
+  if (from === destination) return project;
+  return updateClip(project, clipId, (c) => {
     const from = c.effects.findIndex((e) => e.id === effectId);
-    if (from < 0) return c;
     const next = [...c.effects];
     const [moved] = next.splice(from, 1);
-    if (!moved) return c;
-    next.splice(Math.max(0, Math.min(next.length, toIndex)), 0, moved);
+    next.splice(destination, 0, moved!);
     return { ...c, effects: next };
   });
+};
 
 // Merge params into the first effect of `type` on a clip, adding the effect
 // if none exists. Returns the project unchanged when the clip is missing.

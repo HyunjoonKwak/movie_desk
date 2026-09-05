@@ -13,8 +13,10 @@ export interface ProjectMutating {
 
 export type SetFn<S extends ProjectMutating> = (fn: (s: S) => Partial<S>) => void;
 // History-aware wrapper: every mutating action goes through this so undo /
-// redo work uniformly. Use a plain `set` instead when an edit is transient
-// (slider drags, playhead/zoom) and shouldn't appear in the undo stack.
+// redo work uniformly. Mutators must return the same project reference when
+// they find nothing to change; runWith uses that contract to preserve both
+// the undo depth and the redo stack. Use a plain `set` instead when an edit is
+// transient (slider drags, playhead/zoom) and shouldn't appear in history.
 export const runWith = <S extends ProjectMutating>(
   set: SetFn<S>,
   label: string,

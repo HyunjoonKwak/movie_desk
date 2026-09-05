@@ -596,6 +596,7 @@ export function MediaBin() {
           {filtersOpen && (
             <MediaFiltersPanel
               filters={filters}
+              query={query}
               setFilters={setFilters}
               places={places}
               tags={tags}
