@@ -30,7 +30,7 @@ export function MediaGroupHeader({
   const Icon = allSelected ? CheckSquare : Square;
   return (
     <div
-      className="pt-1"
+      className="overflow-hidden pt-1"
       style={{ height: MEDIA_GROUP_HEADER_HEIGHT }}
       data-group-header={group.key}
     >
@@ -45,7 +45,7 @@ export function MediaGroupHeader({
         )}
       >
         <Icon className="size-3 shrink-0" />
-        <span className="font-medium text-ink-2">{title}</span>
+        <span className="min-w-0 truncate font-medium text-ink-2">{title}</span>
         {group.places.map((place) => (
           <span key={place} className="truncate">
             · {place}

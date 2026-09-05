@@ -13,6 +13,7 @@ import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import type { MediaAsset } from "@movie-desk/core";
 import { MissingBadge } from "./missing-badge";
+import { MEDIA_CARD_PADDING } from "@/media/virtual-layout";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 
@@ -79,7 +80,10 @@ export const MediaCard = memo(function MediaCard({
       data-asset-card={asset.id}
       aria-posinset={position}
       aria-setsize={setSize}
-      style={{ contentVisibility: "auto", containIntrinsicSize: `${estimatedHeight}px` }}
+      style={{
+        contentVisibility: "auto",
+        containIntrinsicSize: `${Math.max(0, estimatedHeight - MEDIA_CARD_PADDING)}px`,
+      }}
     >
       <button
         type="button"

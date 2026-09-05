@@ -20,19 +20,37 @@ test("cards unmount outside the scrolled virtual window and return", async ({ pa
   await revealMediaCard(page, "virtual-39.png");
   await expect(mediaCard(page, "virtual-39.png")).toBeVisible();
   await expect(mediaCard(page, "virtual-00.png")).toHaveCount(0);
+  const geometry = await page.getByTestId("media-scroll").evaluate((scroll) => {
+    const cards = scroll.querySelector<HTMLElement>('[data-testid="media-cards"]');
+    if (!cards) return null;
+    const paddingBottom = Number.parseFloat(getComputedStyle(scroll).paddingBottom);
+    return {
+      actual: scroll.scrollHeight,
+      expected: cards.offsetTop + Number(cards.dataset.layoutHeight) + paddingBottom,
+    };
+  });
+  expect(geometry).not.toBeNull();
+  expect(geometry?.actual).toBe(geometry?.expected);
 
   await revealMediaCard(page, "virtual-00.png");
   await expect(mediaCard(page, "virtual-00.png")).toBeVisible();
   await expect(mediaCard(page, "virtual-39.png")).toHaveCount(0);
 });
 
-test("a marquee over the first row selects exactly its cards", async ({ page }) => {
+test("a marquee after scrolling several segments selects exactly one row", async ({ page }) => {
   await page.goto("/editor");
   await importMediaFiles(page, files);
   await expect(page.getByTestId("media-count")).toHaveText("40/40");
-  const cards = page.locator("[data-asset-card]");
-  const first = await cards.nth(0).boundingBox();
-  const second = await cards.nth(1).boundingBox();
+  await revealMediaCard(page, "virtual-32.png");
+  await mediaCard(page, "virtual-32.png").evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
+  const first = await mediaCard(page, "virtual-32.png")
+    .locator("xpath=ancestor::li[1]")
+    .boundingBox();
+  const second = await mediaCard(page, "virtual-33.png")
+    .locator("xpath=ancestor::li[1]")
+    .boundingBox();
   expect(first).not.toBeNull();
   expect(second).not.toBeNull();
   if (!first || !second) return;
@@ -42,4 +60,19 @@ test("a marquee over the first row selects exactly its cards", async ({ page }) 
   await page.mouse.move(first.x + 1, first.y + 1, { steps: 5 });
   await page.mouse.up();
   await expect(page.getByTestId("bulk-bar")).toContainText("2 selected");
+});
+
+test("group headers stay inside the fixed layout row at narrow panel widths", async ({ page }) => {
+  await page.goto("/editor");
+  await importMediaFiles(page, files.slice(0, 2));
+  await expect(page.getByTestId("media-count")).toHaveText("2/2");
+  const panel = page.getByTestId("media-scroll").locator("xpath=ancestor::*[@data-panel][1]");
+  const header = page.locator("[data-group-header]").first();
+  for (const width of [173, 200, 240]) {
+    await panel.evaluate((element, pixels) => {
+      element.style.flex = `0 0 ${pixels}px`;
+    }, width);
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+    expect((await header.boundingBox())?.height).toBeLessThanOrEqual(21);
+  }
 });

@@ -51,7 +51,7 @@ export const mediaCard = (page: Page, name = "pix.png") =>
   page.getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}`) }).first();
 
 // Virtualized cards outside the media viewport are intentionally absent from
-// the DOM. Ask the bin to scroll its layout model to the asset before locating it.
+// the DOM. Scroll the real panel in bounded steps until the requested card mounts.
 export const revealMediaCard = async (page: Page, name = "pix.png") => {
   const scroll = page.getByTestId("media-scroll");
   await scroll.waitFor();
@@ -60,7 +60,7 @@ export const revealMediaCard = async (page: Page, name = "pix.png") => {
     height: element.clientHeight,
     maximum: element.scrollHeight - element.clientHeight,
   }));
-  for (let top = 0; top <= range.maximum + range.height; top += Math.max(1, range.height / 2)) {
+  for (let top = 0; top <= range.maximum + range.height; top += Math.max(100, range.height / 2)) {
     await scroll.evaluate((element, scrollTop) => element.scrollTo({ top: scrollTop }), top);
     if ((await card.count()) > 0) {
       await card.scrollIntoViewIfNeeded();

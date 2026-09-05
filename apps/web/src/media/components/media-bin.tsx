@@ -253,7 +253,7 @@ export function MediaBin() {
     [createCollection, selected, t],
   );
   const [rangeEditing, setRangeEditing] = useState<ID | null>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLElement>(null);
   const cardsRef = useRef<HTMLDivElement>(null);
   const [listWidth, setListWidth] = useState(0);
   const layoutRef = useRef<{
@@ -738,7 +738,7 @@ export function MediaBin() {
         </div>
       )}
 
-      {selected.size > 0 && (
+      {selected.size > 0 && !marquee && (
         <BulkBar
           count={selected.size}
           onUse={() => useAutoEditStore.getState().markPinned([...selected])}
@@ -805,6 +805,7 @@ export function MediaBin() {
         <div
           ref={cardsRef}
           data-testid="media-cards"
+          data-layout-height={layout.height}
           onFocusCapture={(event) => {
             const card = (event.target as HTMLElement).closest<HTMLElement>("[data-asset-card]");
             setFocusedAssetId((card?.dataset.assetCard as ID | undefined) ?? null);
@@ -836,6 +837,7 @@ export function MediaBin() {
                     segment={segment}
                     rootRef={listRef}
                     columns={columns}
+                    cardHeight={layout.cardHeight}
                     gapAfter={segment !== groupLayout.segments.at(-1)}
                     forceVisible={[activeLocation, focusedLocation].some(
                       (location) =>
@@ -970,13 +972,15 @@ function VirtualMediaSegment({
   segment,
   rootRef,
   columns,
+  cardHeight,
   gapAfter,
   forceVisible,
   children,
 }: {
   segment: MediaSegmentLayout;
-  rootRef: React.RefObject<HTMLDivElement | null>;
+  rootRef: React.RefObject<HTMLElement | null>;
   columns: number;
+  cardHeight: number;
   gapAfter: boolean;
   forceVisible: boolean;
   children: () => React.ReactNode;
@@ -1008,6 +1012,7 @@ function VirtualMediaSegment({
           style={{
             display: "grid",
             gap: MEDIA_GRID_GAP,
+            gridAutoRows: `${cardHeight}px`,
             gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
           }}
         >

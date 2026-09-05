@@ -4,7 +4,6 @@ import {
   MEDIA_GRID_GAP,
   MEDIA_GROUP_HEADER_HEIGHT,
   buildMediaLayout,
-  cardTop,
   marqueeHitTest,
   mediaCardHeight,
 } from "../virtual-layout";
@@ -48,12 +47,9 @@ describe("virtual media layout", () => {
     expect(marqueeHitTest(layout, groups, { x: 0, y: 0, w: 200, h: 200 })).toEqual(new Set());
   });
 
-  it("calculates card tops and marquee hits without mounted cards", () => {
+  it("calculates marquee hits without mounted cards", () => {
     const groups = [{ key: "all", assets: [asset("a"), asset("b"), asset("c")] }];
     const layout = buildMediaLayout({ groups, width: 204, columns: 2, withHeaders: false });
-    expect(cardTop(layout, groups, groups[0]!.assets[2]!.id)).toBe(
-      layout.cardHeight + MEDIA_GRID_GAP,
-    );
     expect(
       marqueeHitTest(layout, groups, {
         x: 0,

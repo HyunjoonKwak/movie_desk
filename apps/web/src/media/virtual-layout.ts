@@ -1,6 +1,7 @@
 import type { ID, MediaAsset } from "@movie-desk/core";
 
 export const MEDIA_GRID_GAP = 4;
+// Header box: 4px top padding + 16px button line box + 1px rounding allowance.
 export const MEDIA_GROUP_HEADER_HEIGHT = 21;
 export const MEDIA_SEGMENT_ROWS = 8;
 // MediaCard: li p-1 (8px) + button borders (2px) reduce the 16:9 content
@@ -8,6 +9,7 @@ export const MEDIA_SEGMENT_ROWS = 8;
 // metadata row (16px line box + 12px padding) in Chrome 152.
 export const MEDIA_CARD_INLINE_CHROME = 10;
 export const MEDIA_CARD_BLOCK_CHROME = 38;
+export const MEDIA_CARD_PADDING = 8;
 
 export interface VirtualMediaGroup {
   readonly key: string;
@@ -96,25 +98,6 @@ export function buildMediaLayout({
     cardHeight,
     groups: layouts,
   };
-}
-
-export function cardTop(
-  layout: MediaLayout,
-  groups: readonly VirtualMediaGroup[],
-  id: ID,
-): number | undefined {
-  for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
-    const assetIndex = groups[groupIndex]!.assets.findIndex((asset) => asset.id === id);
-    if (assetIndex < 0) continue;
-    const group = layout.groups[groupIndex];
-    if (!group) return undefined;
-    return (
-      group.top +
-      group.headerHeight +
-      Math.floor(assetIndex / layout.columns) * (layout.cardHeight + MEDIA_GRID_GAP)
-    );
-  }
-  return undefined;
 }
 
 export function marqueeHitTest(
