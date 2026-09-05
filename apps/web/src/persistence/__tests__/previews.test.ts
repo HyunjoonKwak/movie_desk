@@ -213,6 +213,33 @@ describe("preview persistence", () => {
     stop();
   });
 
+  it("keeps all inline data when only the missing filmstrip can be migrated", async () => {
+    await putAssetPreviews("a", { thumb: "data:image/png;base64,stale-thumb" });
+    useProjectStore.getState().loadProject(
+      project(
+        asset("a", {
+          thumbDataUrl: "data:image/png;base64,new-thumb",
+          filmstripDataUrl: "data:image/png;base64,new-strip",
+          filmstripFrames: 6,
+        }),
+      ),
+    );
+    const stop = startInlinePreviewMigration(useProjectStore);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,stale-thumb");
+    expect((await getFilmstrips(["a"])).get("a")).toEqual({
+      dataUrl: "data:image/png;base64,new-strip",
+      frames: 6,
+    });
+    expect(useProjectStore.getState().project.mediaLibrary[0]).toMatchObject({
+      thumbDataUrl: "data:image/png;base64,new-thumb",
+      filmstripDataUrl: "data:image/png;base64,new-strip",
+      filmstripFrames: 6,
+    });
+    stop();
+  });
+
   it("deletes idle asset previews in one batch", async () => {
     await putAssetPreviews("a", {
       thumb: "data:image/png;base64,a",

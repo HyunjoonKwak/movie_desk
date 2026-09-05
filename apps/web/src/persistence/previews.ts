@@ -127,7 +127,10 @@ export const putAssetPreviews = async (
         };
         for (const listener of listeners) listener(assetId, written, { replaceMissing });
       }
-      return changed || (onlyIfAbsent && allRowsSatisfied);
+      // For migration this answers whether every inline preview is safe to
+      // drop, not merely whether one missing row happened to be written.
+      if (onlyIfAbsent) return allRowsSatisfied;
+      return changed;
     });
   previewWrites.set(assetId, write);
   try {
