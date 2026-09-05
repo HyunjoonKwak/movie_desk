@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Filter,
@@ -69,16 +69,15 @@ import { MediaCard } from "./media-card";
 import { MediaFiltersPanel } from "./media-filters-panel";
 import { TrashDialog } from "./trash-dialog";
 import {
+  MEDIA_GRID_GAP,
   buildMediaLayout,
   marqueeHitTest,
   mediaColumns,
   type MediaSegmentLayout,
+  type VirtualMediaGroup,
 } from "@/media/virtual-layout";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
-// Measured card heights (incl. the li padding) per thumbnail size, used as
-// the placeholder for cards that are not rendered yet.
-const CARD_HEIGHT_BY_SIZE: readonly [number, number, number] = [78, 113, 198];
 const NO_COLLECTIONS: readonly MediaCollection[] = [];
 const NO_TRACKS: readonly Track[] = [];
 
@@ -255,8 +254,12 @@ export function MediaBin() {
   );
   const [rangeEditing, setRangeEditing] = useState<ID | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const cardsRef = useRef<HTMLDivElement>(null);
   const [listWidth, setListWidth] = useState(0);
-  const layoutRef = useRef<ReturnType<typeof buildMediaLayout> | null>(null);
+  const layoutRef = useRef<{
+    layout: ReturnType<typeof buildMediaLayout>;
+    groups: readonly VirtualMediaGroup[];
+  } | null>(null);
   const marqueeStart = useRef<{ x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(
     null,
@@ -269,9 +272,9 @@ export function MediaBin() {
   const excludedSet = useMemo(() => new Set<string>(excluded), [excluded]);
 
   useEffect(() => {
-    const element = listRef.current;
+    const element = cardsRef.current;
     if (!element) return;
-    const update = () => setListWidth(element.clientWidth - 16);
+    const update = () => setListWidth(element.clientWidth);
     update();
     const observer = new ResizeObserver(update);
     observer.observe(element);
@@ -309,11 +312,14 @@ export function MediaBin() {
       };
       if (rect.w < 4 && rect.h < 4) return;
       setMarquee(rect);
+      const model = layoutRef.current;
+      const cards = cardsRef.current;
+      if (!model || !cards) return;
       setSelected(
-        marqueeHitTest(layoutRef.current?.cards ?? [], {
+        marqueeHitTest(model.layout, model.groups, {
           ...rect,
-          x: rect.x - 8,
-          y: rect.y - 8,
+          x: rect.x - cards.offsetLeft,
+          y: rect.y - cards.offsetTop,
         }),
       );
     },
@@ -555,29 +561,41 @@ export function MediaBin() {
     [groups, ordered],
   );
   const columns = mediaColumns(thumbSize);
-  const cardHeight = CARD_HEIGHT_BY_SIZE[thumbSize as 0 | 1 | 2] ?? CARD_HEIGHT_BY_SIZE[1];
   const layout = useMemo(
     () =>
       buildMediaLayout({
         groups: virtualGroups,
         width: listWidth,
         columns,
-        cardHeight,
         withHeaders: groups !== null,
       }),
-    [virtualGroups, listWidth, columns, cardHeight, groups],
+    [virtualGroups, listWidth, columns, groups],
   );
-  layoutRef.current = layout;
-  useEffect(() => {
-    const reveal = (event: Event) => {
-      const name = (event as CustomEvent<string>).detail;
-      const asset = ordered.find((candidate) => candidate.name === name);
-      const top = asset ? layout.cardTops.get(asset.id) : undefined;
-      if (top !== undefined) listRef.current?.scrollTo({ top: Math.max(0, top - 8) });
-    };
-    window.addEventListener("media-reveal-asset", reveal);
-    return () => window.removeEventListener("media-reveal-asset", reveal);
-  }, [layout, ordered]);
+  useLayoutEffect(() => {
+    layoutRef.current = { layout, groups: virtualGroups };
+  }, [layout, virtualGroups]);
+  const [focusedAssetId, setFocusedAssetId] = useState<ID | null>(null);
+  const locateAsset = useCallback(
+    (id: ID | null) => {
+      if (!id) return null;
+      for (let groupIndex = 0; groupIndex < virtualGroups.length; groupIndex += 1) {
+        const assetIndex = virtualGroups[groupIndex]!.assets.findIndex((asset) => asset.id === id);
+        if (assetIndex >= 0) return { groupIndex, assetIndex };
+      }
+      return null;
+    },
+    [virtualGroups],
+  );
+  const activeLocation = useMemo(() => locateAsset(activeAssetId), [locateAsset, activeAssetId]);
+  const focusedLocation = useMemo(() => locateAsset(focusedAssetId), [locateAsset, focusedAssetId]);
+  const groupOffsets = useMemo(() => {
+    let offset = 0;
+    return virtualGroups.map((group) => {
+      const current = offset;
+      offset += group.assets.length;
+      return current;
+    });
+  }, [virtualGroups]);
   const toggleGroupSelect = useCallback((ids: readonly ID[]) => {
     setSelected((prev) => {
       const all = ids.every((id) => prev.has(id));
@@ -742,7 +760,7 @@ export function MediaBin() {
         />
       )}
 
-      <div
+      <section
         ref={listRef}
         className={cn(
           "relative flex-1 select-none overflow-y-auto p-2",
@@ -754,6 +772,9 @@ export function MediaBin() {
         onPointerMove={onMarqueeMove}
         onPointerUp={onMarqueeUp}
         data-testid="media-scroll"
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrollable media region needs a keyboard focus target.
+        tabIndex={0}
+        aria-label={t("media.title")}
       >
         {marquee && (
           <div
@@ -781,11 +802,27 @@ export function MediaBin() {
           <p className="px-2 py-6 text-center text-xs text-ink-3">{t("media.noMatches")}</p>
         )}
 
-        <div>
+        <div
+          ref={cardsRef}
+          data-testid="media-cards"
+          onFocusCapture={(event) => {
+            const card = (event.target as HTMLElement).closest<HTMLElement>("[data-asset-card]");
+            setFocusedAssetId((card?.dataset.assetCard as ID | undefined) ?? null);
+          }}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setFocusedAssetId(null);
+            }
+          }}
+        >
           {virtualGroups.map((group, groupIndex) => {
             const groupLayout = layout.groups[groupIndex];
             return (
-              <section key={group.key} className="mb-1 last:mb-0" data-media-group={group.key}>
+              <section
+                key={group.key}
+                style={{ marginBottom: groupIndex < virtualGroups.length - 1 ? MEDIA_GRID_GAP : 0 }}
+                data-media-group={group.key}
+              >
                 {groups && (
                   <MediaGroupHeader
                     group={group}
@@ -799,31 +836,43 @@ export function MediaBin() {
                     segment={segment}
                     rootRef={listRef}
                     columns={columns}
-                    forceVisible={group.assets
-                      .slice(segment.start, segment.end)
-                      .some((asset) => asset.id === activeAssetId)}
+                    gapAfter={segment !== groupLayout.segments.at(-1)}
+                    forceVisible={[activeLocation, focusedLocation].some(
+                      (location) =>
+                        location?.groupIndex === groupIndex &&
+                        location.assetIndex >= segment.start &&
+                        location.assetIndex < segment.end,
+                    )}
                   >
-                    {group.assets.slice(segment.start, segment.end).map((asset) => (
-                  <MediaCard
-                    key={asset.id}
-                    asset={asset}
-                    isSelected={selected.has(asset.id)}
-                    isActive={activeAssetId === asset.id}
-                    isPinned={pinnedSet.has(asset.id)}
-                    isExcluded={excludedSet.has(asset.id)}
-                    selectionMode={selected.size > 0}
-                    health={sourceHealth[asset.id]}
-                    rangeEditing={rangeEditing === asset.id}
-                    proxy={proxying === null ? "idle" : proxying === asset.id ? "self" : "busy"}
-                    estimatedHeight={cardHeight}
-                    onToggleSelect={toggleSelect}
-                    onAdd={addToTimeline}
-                    onToggleRange={toggleRangeEditing}
-                    onMakeProxy={makeProxyStable}
-                    onRelink={startRelink}
-                    onDelete={deleteStable}
-                  />
-                    ))}
+                    {() =>
+                      group.assets
+                        .slice(segment.start, segment.end)
+                        .map((asset, localIndex) => (
+                          <MediaCard
+                            key={asset.id}
+                            asset={asset}
+                            isSelected={selected.has(asset.id)}
+                            isActive={activeAssetId === asset.id}
+                            isPinned={pinnedSet.has(asset.id)}
+                            isExcluded={excludedSet.has(asset.id)}
+                            selectionMode={selected.size > 0}
+                            health={sourceHealth[asset.id]}
+                            rangeEditing={rangeEditing === asset.id}
+                            proxy={
+                              proxying === null ? "idle" : proxying === asset.id ? "self" : "busy"
+                            }
+                            estimatedHeight={layout.cardHeight}
+                            position={groupOffsets[groupIndex]! + segment.start + localIndex + 1}
+                            setSize={ordered.length}
+                            onToggleSelect={toggleSelect}
+                            onAdd={addToTimeline}
+                            onToggleRange={toggleRangeEditing}
+                            onMakeProxy={makeProxyStable}
+                            onRelink={startRelink}
+                            onDelete={deleteStable}
+                          />
+                        ))
+                    }
                   </VirtualMediaSegment>
                 ))}
               </section>
@@ -856,7 +905,7 @@ export function MediaBin() {
             e.target.value = "";
           }}
         />
-      </div>
+      </section>
 
       {rangeEditing &&
         (() => {
@@ -885,7 +934,12 @@ export function MediaBin() {
           <Trash2 className="size-3" aria-hidden />
           {t("media.trash")} ({trashCount})
         </button>
-        <span className="font-mono" data-testid="media-count">
+        <span
+          className="font-mono"
+          data-testid="media-count"
+          title={t("media.matchCount", { shown: filtered.length, total: media.length })}
+          aria-label={t("media.matchCount", { shown: filtered.length, total: media.length })}
+        >
           {filtered.length}/{media.length}
         </span>
       </div>
@@ -916,14 +970,16 @@ function VirtualMediaSegment({
   segment,
   rootRef,
   columns,
+  gapAfter,
   forceVisible,
   children,
 }: {
   segment: MediaSegmentLayout;
   rootRef: React.RefObject<HTMLDivElement | null>;
   columns: number;
+  gapAfter: boolean;
   forceVisible: boolean;
-  children: React.ReactNode;
+  children: () => React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(forceVisible);
@@ -944,18 +1000,18 @@ function VirtualMediaSegment({
   return (
     <div
       ref={ref}
-      className="mb-1 last:mb-0"
-      style={{ minHeight: segment.height }}
+      style={{ minHeight: segment.height, marginBottom: gapAfter ? MEDIA_GRID_GAP : 0 }}
       data-media-segment={segment.key}
     >
       {visible || forceVisible ? (
         <ul
-          className={cn(
-            "grid gap-1",
-            columns === 3 ? "grid-cols-3" : columns === 1 ? "grid-cols-1" : "grid-cols-2",
-          )}
+          style={{
+            display: "grid",
+            gap: MEDIA_GRID_GAP,
+            gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+          }}
         >
-          {children}
+          {children()}
         </ul>
       ) : null}
     </div>

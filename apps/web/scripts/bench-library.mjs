@@ -51,7 +51,9 @@ const mb = (bytes) => `${(bytes / 1e6).toFixed(1)} MB`;
 // Waits for `read()` to reach `target`, failing instead of hanging.
 const untilAtLeast = async (read, target, timeoutMs) => {
   const start = performance.now();
-  while ((await read()) < target) {
+  for (;;) {
+    const value = await read();
+    if (Number.isFinite(value) && value >= target) return;
     if (performance.now() - start > timeoutMs) throw new Error(`timed out waiting for ${target}`);
     await page.waitForTimeout(250);
   }
@@ -152,6 +154,7 @@ try {
   await untilAtLeast(shownCount, TOTAL, Math.max(120_000, TOTAL * 200));
   result.importMs = performance.now() - t0;
   result.importPerAssetMs = result.importMs / TOTAL;
+  await page.waitForTimeout(500);
   result.domCardsAfterImport = await page.locator("[data-asset-card]").count();
   await page.waitForTimeout(2_000);
   result.heapAfterImport = await heap();
@@ -172,10 +175,7 @@ try {
   await search.fill("clip-01");
   await count.filter({ hasText: /^\d+\/\d+$/ }).waitFor();
   await page.waitForFunction(
-    (n) =>
-      !document
-        .querySelector('[data-testid="media-count"]')
-        ?.textContent?.startsWith(`${n}/`),
+    (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
     TOTAL,
   );
   result.searchMs = performance.now() - t0;
@@ -183,10 +183,7 @@ try {
   t0 = performance.now();
   await page.getByLabel("Length").selectOption("short"); // videos only; images have no length
   await page.waitForFunction(
-    (n) =>
-      !document
-        .querySelector('[data-testid="media-count"]')
-        ?.textContent?.startsWith(`${n}/`),
+    (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
     TOTAL,
   );
   result.filterMs = performance.now() - t0;

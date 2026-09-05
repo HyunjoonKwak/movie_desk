@@ -53,12 +53,22 @@ export const mediaCard = (page: Page, name = "pix.png") =>
 // Virtualized cards outside the media viewport are intentionally absent from
 // the DOM. Ask the bin to scroll its layout model to the asset before locating it.
 export const revealMediaCard = async (page: Page, name = "pix.png") => {
-  await page.getByTestId("media-count").waitFor();
-  await page.evaluate(
-    (assetName) => window.dispatchEvent(new CustomEvent("media-reveal-asset", { detail: assetName })),
-    name,
-  );
+  const scroll = page.getByTestId("media-scroll");
+  await scroll.waitFor();
   const card = mediaCard(page, name);
+  const range = await scroll.evaluate((element) => ({
+    height: element.clientHeight,
+    maximum: element.scrollHeight - element.clientHeight,
+  }));
+  for (let top = 0; top <= range.maximum + range.height; top += Math.max(1, range.height / 2)) {
+    await scroll.evaluate((element, scrollTop) => element.scrollTo({ top: scrollTop }), top);
+    if ((await card.count()) > 0) {
+      await card.scrollIntoViewIfNeeded();
+      await card.waitFor({ state: "visible" });
+      return card;
+    }
+    await page.waitForTimeout(25);
+  }
   await card.waitFor({ state: "visible" });
   return card;
 };

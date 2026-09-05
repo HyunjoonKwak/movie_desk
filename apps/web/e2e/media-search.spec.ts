@@ -24,7 +24,7 @@ test("free text and filters narrow the library and can be reset", async ({ page 
   await expect(mediaCard(page, "beach.png")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Filters" }).click();
-  await expect(page.getByTestId("media-count")).toHaveText("1/2");
+  await expect(page.getByTestId("media-match-count")).toHaveText("1 of 2");
   // A 1×1 image is neither video nor 4K: the filters hide it.
   await page.getByLabel("Resolution").selectOption("uhd");
   await expect(page.getByTestId("media-count")).toHaveText("0/2");

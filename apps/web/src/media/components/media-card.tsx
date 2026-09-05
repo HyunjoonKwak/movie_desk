@@ -30,6 +30,8 @@ export interface MediaCardProps {
   // Placeholder height for a card that is not rendered yet, so the scroll
   // height does not jump as cards come into view; depends on the grid size.
   readonly estimatedHeight: number;
+  readonly position: number;
+  readonly setSize: number;
   readonly onToggleSelect: (assetId: MediaAsset["id"]) => void;
   readonly onAdd: (asset: MediaAsset) => void;
   readonly onToggleRange: (assetId: MediaAsset["id"]) => void;
@@ -55,6 +57,8 @@ export const MediaCard = memo(function MediaCard({
   rangeEditing,
   proxy,
   estimatedHeight,
+  position,
+  setSize,
   onToggleSelect,
   onAdd,
   onToggleRange,
@@ -73,7 +77,9 @@ export const MediaCard = memo(function MediaCard({
       ref={cardRef}
       className="group relative p-1"
       data-asset-card={asset.id}
-      style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${estimatedHeight}px` }}
+      aria-posinset={position}
+      aria-setsize={setSize}
+      style={{ contentVisibility: "auto", containIntrinsicSize: `${estimatedHeight}px` }}
     >
       <button
         type="button"

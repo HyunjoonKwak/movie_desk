@@ -5,6 +5,7 @@ import { useLocaleStore } from "@/i18n/store";
 import { AUDIO_GROUP, UNDATED_GROUP, formatDayLabel, type MediaDayGroup } from "@/media/organize";
 import { cn } from "@/lib/cn";
 import { CheckSquare, Square } from "lucide-react";
+import { MEDIA_GROUP_HEADER_HEIGHT } from "@/media/virtual-layout";
 
 // One row above each day in the media bin: "8월 12일 (수) · 서울 · 강릉 · 12개".
 // Clicking it selects (or deselects) the whole day so the bulk 사용/제외 bar
@@ -28,7 +29,11 @@ export function MediaGroupHeader({
         : formatDayLabel(group.dayStart ?? 0, locale);
   const Icon = allSelected ? CheckSquare : Square;
   return (
-    <div className="h-[21px] pt-1 first:pt-0" data-group-header={group.key}>
+    <div
+      className="pt-1"
+      style={{ height: MEDIA_GROUP_HEADER_HEIGHT }}
+      data-group-header={group.key}
+    >
       <button
         type="button"
         onClick={onToggle}
