@@ -1,6 +1,6 @@
-import Dexie, { type Table } from "dexie";
-import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
+import type { ID, MediaAsset, Project } from "@movie-desk/core";
+import Dexie, { type Table } from "dexie";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
 import { trashAssetIds } from "./trash";
 
@@ -78,8 +78,13 @@ export const putAssetPreviews = async (assetId: string, previews: AssetPreviews)
       updatedAt,
     });
   }
-  if (rows.length === 0) return;
-  await getDb().previews.bulkPut(rows);
+  const missing: PreviewRow["kind"][] = [];
+  if (!previews.thumb) missing.push("thumb");
+  if (!previews.filmstrip) missing.push("filmstrip");
+  if (rows.length > 0) await getDb().previews.bulkPut(rows);
+  if (missing.length > 0) {
+    await getDb().previews.bulkDelete(missing.map((kind) => rowId(assetId, kind)));
+  }
   for (const listener of listeners) listener(assetId, previews);
 };
 
@@ -102,7 +107,7 @@ export const getFilmstrips = async (
   return strips;
 };
 
-export const deletePreviews = async (assetIds: readonly string[]): Promise<void> => {
+const deletePreviews = async (assetIds: readonly string[]): Promise<void> => {
   await getDb().previews.bulkDelete(
     assetIds.flatMap((id) => [rowId(id, "thumb"), rowId(id, "filmstrip")]),
   );
@@ -110,7 +115,7 @@ export const deletePreviews = async (assetIds: readonly string[]): Promise<void>
 
 // Asset ids with at least one preview; an index scan, so the pictures
 // themselves stay on disk.
-export const listPreviewAssetIds = async (): Promise<ReadonlySet<string>> =>
+const listPreviewAssetIds = async (): Promise<ReadonlySet<string>> =>
   new Set((await getDb().previews.orderBy("assetId").uniqueKeys()).map(String));
 
 // Previews written for an asset that is not registered yet (an import in
@@ -149,7 +154,7 @@ export const withoutInlinePreviews = (asset: MediaAsset): MediaAsset => {
 // A project file is the user's escape hatch and should carry its pictures:
 // the export re-inlines what this store holds.
 export const withInlinePreviews = async (project: Project): Promise<Project> => {
-  const ids = project.mediaLibrary.filter((a) => !hasInlinePreviews(a)).map((a) => a.id);
+  const ids = project.mediaLibrary.map((a) => a.id);
   if (ids.length === 0) return project;
   const [thumbs, strips] = await Promise.all([getThumbs(ids), getFilmstrips(ids)]);
   if (thumbs.size === 0 && strips.size === 0) return project;
@@ -161,8 +166,10 @@ export const withInlinePreviews = async (project: Project): Promise<Project> => 
       if (!thumb && !strip) return asset;
       return {
         ...asset,
-        ...(thumb ? { thumbDataUrl: thumb } : {}),
-        ...(strip ? { filmstripDataUrl: strip.dataUrl, filmstripFrames: strip.frames } : {}),
+        ...(!asset.thumbDataUrl && thumb ? { thumbDataUrl: thumb } : {}),
+        ...(!asset.filmstripDataUrl && strip
+          ? { filmstripDataUrl: strip.dataUrl, filmstripFrames: strip.frames }
+          : {}),
       };
     }),
   };
@@ -174,22 +181,39 @@ export const withInlinePreviews = async (project: Project): Promise<Project> => 
 // helper, generated map cards, an imported project file) are picked up.
 export const startInlinePreviewMigration = (): (() => void) => {
   let running = false;
+  let queued: readonly MediaAsset[] | null = null;
   const migrate = async (library: readonly MediaAsset[]): Promise<void> => {
+    queued = library;
     if (running) return;
-    const inline = library.filter(hasInlinePreviews);
-    if (inline.length === 0) return;
     running = true;
     try {
-      const moved: ID[] = [];
-      for (const asset of inline) {
-        try {
-          await putAssetPreviews(asset.id, inlinePreviewsOf(asset));
-          moved.push(asset.id);
-        } catch {
-          // Keep the inline copy: better a fat record than no picture.
+      while (queued) {
+        const next = queued;
+        queued = null;
+        const inline = next.filter(hasInlinePreviews);
+        const moved: ID[] = [];
+        for (const asset of inline) {
+          try {
+            await putAssetPreviews(asset.id, inlinePreviewsOf(asset));
+            // An Undo or project restore can replace the preview while the
+            // IndexedDB write is pending. Only strip the exact copy written;
+            // the queued pass will persist a newer one before removing it.
+            const current = useProjectStore
+              .getState()
+              .project.mediaLibrary.find((candidate) => candidate.id === asset.id);
+            if (
+              current?.thumbDataUrl === asset.thumbDataUrl &&
+              current?.filmstripDataUrl === asset.filmstripDataUrl &&
+              current?.filmstripFrames === asset.filmstripFrames
+            ) {
+              moved.push(asset.id);
+            }
+          } catch {
+            // Keep the inline copy: better a fat record than no picture.
+          }
         }
+        if (moved.length > 0) useProjectStore.getState().dropInlinePreviews(moved);
       }
-      if (moved.length > 0) useProjectStore.getState().dropInlinePreviews(moved);
     } finally {
       running = false;
     }

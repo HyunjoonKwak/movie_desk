@@ -82,6 +82,13 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   제거/토글/같은 위치 reorder)가 변경 없을 때 원래 Project를 반환하도록 한정 수정 + undo 깊이·redo 보존 회귀
   테스트; 스마트 컬렉션은 로드한 query+filters 스냅샷과 현재 값이 달라지는 즉시 선택 표시를 해제(수동 컬렉션 전환은
   기존 검색 조건 유지). 운영 방식 전환: 사용자 지시로 Codex가 구현, Claude는 Orca coordinator로 감독·리뷰·계획.
+- 2026-09-05 Codex: A5 후속 프리뷰 저장소 분리(`claude/a5-preview-store`). 썸네일·필름스트립을
+  `movie-desk.previews.v1` IndexedDB로 옮겨 자산 편집과 Yjs/프로젝트 행 갱신에서 data URL을 제외했다.
+  기존 레코드·HEIC helper·지도 전환·스냅샷 복원·JSON 가져오기의 인라인 프리뷰는 history 밖 maintenance
+  migration이 저장 후 제거하고, JSON 내보내기는 다시 인라인한다. 가져오기 lease와 라이브·저장 프로젝트·휴지통·
+  손상 행 salvage를 GC keep에 포함했다. 리뷰에서 migration 실행 중 변경 유실, 부분 인라인 JSON 내보내기 누락,
+  relink 뒤 예전 filmstrip 잔존과 메모리 캐시 미갱신을 수정했다. Chrome 152, 1,000개 재측정: 프로젝트 JSON
+  6.9→3.3MB, 가져오기 10.6ms/자산, 이름 변경→Saved 232ms, 힙 125.9/210.2MB.
 - 2026-09-04 Claude: A5 라이브러리 1,000개 측정(`claude/a5-library-scale`). `apps/web/scripts/bench-library.mjs`가 실제
   Chrome으로 1,000개(비디오 200·이미지 800)를 가져와 가져오기·검색·필터·소스 상태 검사·복원·저장·힙을 잰다
   (`docs/evaluations/2026-09-04-library-1000.md`). 병목은 카드 1,000장이 상태 변화마다 전부 다시 렌더되는 것:
@@ -436,6 +443,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A3 컬렉션·태그·평점 | Claude(데이터·검색) · Codex(교차 리뷰·수정) | 구현·교차 리뷰 완료, main 통합(e43b35f + d8b421f) | 태그·평점·즐겨찾기·사용 여부·컬렉션(수동/스마트) 데이터 모델·검색·영속화 + 1차 UI. 남은 것: 카드에서 직접 별점/하트 편집, 컬렉션 사이드바, 자동 편집 후보에 평점 가중치 |
 | A2 메타데이터 인덱스·검색 | Claude + Codex 검토 | 구현·리뷰 완료, main 통합 | 자유 텍스트 + 기간·길이·해상도·오디오·장소·종류 필터, 코덱 저장. 리뷰에서 오디오 유무를 3값으로 보강하고 자산별 인덱스 캐시·재연결 메타 갱신을 추가했다. `d2cb6ba` + `7cf9b60`, 원격 CI 통과. 태그·평점은 A3 |
 | A5 1,000개 성능 측정 | Claude | 1차 완료, main 통합(f25ebf9) | 벤치 스크립트 + 기록 문서. 검색 54ms·필터 346ms·소스 검사 0.5초·복원 0.6초·가져오기 12ms/자산. 다음: 그룹 가상화, 썸네일 캐시 분리 |
+| A5 후속 프리뷰 저장소 분리 | Codex | 구현·검증 완료, 리뷰 대기 | IndexedDB 프리뷰 저장소 + 레거시 migration + GC/lease + JSON 재인라인. 1,000개 프로젝트 행 6.9→3.3MB, Chromium E2E 37개 통과 |
 | A4 누락 재연결·휴지통 | Claude | 1차 구현(OPFS 원본 재연결 + 휴지통) | 데스크톱 참조 파일 재연결과 카탈로그 백업/복원은 다음 배치. e2e 3개(같은 크기 재연결, 다른 크기 확인 후 연결, 삭제→휴지통→복원) |
 | C1 새 프로젝트 출발점 | Codex + Claude 검토 | 구현·교차 리뷰 완료, main 통합 | 가져오기·정리, 수동 편집, 안내형 초안의 세 출발점을 같은 전문 편집 작업 공간에 연결했다. Claude 교차 리뷰에서 찾은 미선택 새로고침·전역 드롭·키보드 포커스·모바일 검증·E2E 결합 문제를 후속 수정. `267eee2` + `8342164`, Chromium E2E 36개·Chrome HEVC·원격 CI 통과. 다음은 C2 |
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |

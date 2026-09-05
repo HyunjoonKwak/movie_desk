@@ -1,6 +1,3 @@
-import { useEffect } from "react";
-import type { MediaAsset } from "@movie-desk/core";
-import { create } from "zustand";
 import {
   type AssetPreviews,
   type Filmstrip,
@@ -8,6 +5,9 @@ import {
   getThumbs,
   onPreviewsStored,
 } from "@/persistence/previews";
+import type { MediaAsset } from "@movie-desk/core";
+import { useEffect } from "react";
+import { create } from "zustand";
 
 // In-memory previews for the session. Thumbnails are small and kept for
 // every asset asked for; filmstrips are loaded only for the assets the
@@ -24,12 +24,15 @@ export const usePreviewStore = create<PreviewState>((set) => ({
   thumbs: {},
   filmstrips: {},
   remember: (assetId, previews) =>
-    set((s) => ({
-      ...(previews.thumb ? { thumbs: { ...s.thumbs, [assetId]: previews.thumb } } : {}),
-      ...(previews.filmstrip
-        ? { filmstrips: { ...s.filmstrips, [assetId]: previews.filmstrip } }
-        : {}),
-    })),
+    set((s) => {
+      const thumbs = { ...s.thumbs };
+      const filmstrips = { ...s.filmstrips };
+      if (previews.thumb) thumbs[assetId] = previews.thumb;
+      else delete thumbs[assetId];
+      if (previews.filmstrip) filmstrips[assetId] = previews.filmstrip;
+      else delete filmstrips[assetId];
+      return { thumbs, filmstrips };
+    }),
   forget: (assetIds) =>
     set((s) => {
       const thumbs = { ...s.thumbs };
@@ -87,7 +90,7 @@ export const requestThumbs = makeBatch(askedThumbs, getThumbs, (found) =>
   usePreviewStore.setState((s) => ({ thumbs: { ...s.thumbs, ...Object.fromEntries(found) } })),
 );
 
-export const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (found) =>
+const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (found) =>
   usePreviewStore.setState((s) => ({
     filmstrips: { ...s.filmstrips, ...Object.fromEntries(found) },
   })),

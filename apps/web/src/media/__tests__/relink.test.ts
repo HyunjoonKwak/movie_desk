@@ -105,12 +105,30 @@ describe("relinkAssetFromFile", () => {
       rotation: 90,
       videoCodec: "avc1",
       audioCodec: null,
-      thumbDataUrl: "data:image/png;base64,vthumb",
-      filmstripDataUrl: "data:image/png;base64,strip",
-      filmstripFrames: 10,
+      thumbDataUrl: null,
+      filmstripDataUrl: null,
+      filmstripFrames: null,
       waveformPeaks: [0.5, 0.25],
     });
     expect(calls.removed).toContain("a__proxy.mp4");
+  });
+
+  it("keeps generated previews inline when the preview store fails", async () => {
+    const { deps: d } = deps();
+    const patch = await relinkAssetFromFile(
+      asset(),
+      file("other.mp4", 2048),
+      { identical: false },
+      {
+        ...d,
+        storePreviews: async () => {
+          throw new Error("quota");
+        },
+      },
+    );
+    expect(patch.thumbDataUrl).toBe("data:image/png;base64,vthumb");
+    expect(patch.filmstripDataUrl).toBe("data:image/png;base64,strip");
+    expect(patch.filmstripFrames).toBe(10);
   });
 
   it("releases the GC lease when the write fails", async () => {

@@ -1,7 +1,7 @@
-import { leaseMediaKey } from "@/persistence/media-gc";
-import { putAssetPreviews } from "@/persistence/previews";
-import { deleteMediaFile, replaceMediaFile } from "@/persistence/opfs";
 import { formatBytes } from "@/media/format";
+import { leaseMediaKey } from "@/persistence/media-gc";
+import { deleteMediaFile, replaceMediaFile } from "@/persistence/opfs";
+import { putAssetPreviews } from "@/persistence/previews";
 import type { MediaAsset, SourceRotation } from "@movie-desk/core";
 import { audioVariantKey } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
@@ -151,23 +151,21 @@ export const relinkAssetFromFile = async (
     // New pictures go to the preview store; the record only clears any
     // inline (legacy) ones. If the store fails, the patch carries them.
     let stored = false;
-    if (visuals.thumbDataUrl || visuals.filmstripDataUrl) {
-      try {
-        await deps.storePreviews(asset.id, {
-          ...(visuals.thumbDataUrl ? { thumb: visuals.thumbDataUrl } : {}),
-          ...(visuals.filmstripDataUrl
-            ? {
-                filmstrip: {
-                  dataUrl: visuals.filmstripDataUrl,
-                  frames: visuals.filmstripFrames ?? 0,
-                },
-              }
-            : {}),
-        });
-        stored = true;
-      } catch {
-        stored = false;
-      }
+    try {
+      await deps.storePreviews(asset.id, {
+        ...(visuals.thumbDataUrl ? { thumb: visuals.thumbDataUrl } : {}),
+        ...(visuals.filmstripDataUrl
+          ? {
+              filmstrip: {
+                dataUrl: visuals.filmstripDataUrl,
+                frames: visuals.filmstripFrames ?? 0,
+              },
+            }
+          : {}),
+      });
+      stored = true;
+    } catch {
+      stored = false;
     }
     return {
       ...base,
