@@ -4,12 +4,13 @@ import { useMusicLibraryStore } from "@/stores/music-library-store";
 import type { Project } from "@movie-desk/core";
 import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
+import { forEachSnapshotJson } from "./snapshots";
 import { trashMediaKeys } from "./trash";
 
-export type StoredProjectScan = readonly Awaited<ReturnType<typeof loadStoredProject>>[];
-
-export const scanStoredProjects = async (): Promise<StoredProjectScan> =>
-  Promise.all((await listProjectsLibrary()).map((row) => loadStoredProject(row.id)));
+export interface StoredProjectKeep {
+  readonly mediaKeys: ReadonlySet<string>;
+  readonly assetIds: ReadonlySet<string>;
+}
 
 const mediaLeases = new Map<string, number>();
 
@@ -62,6 +63,40 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
   }
 };
 
+const salvageAssetIds = (raw: string, keep: Set<string>): void => {
+  for (const match of raw.matchAll(/"id"\s*:\s*"([^"]+)"/g)) {
+    const id = match[1];
+    if (id) keep.add(id);
+  }
+};
+
+// Parse one saved row at a time and retain only compact keep sets. A damaged
+// row cannot abort the other rows, and snapshots use the same symmetric media
+// and preview retention policy without loading all JSON strings at once.
+export const scanStoredProjects = async (): Promise<StoredProjectKeep> => {
+  const mediaKeys = new Set<string>();
+  const assetIds = new Set<string>();
+  for (const row of await listProjectsLibrary()) {
+    try {
+      const result = await loadStoredProject(row.id);
+      if (result.status === "ok") {
+        referencedMediaKeys(result.project, mediaKeys);
+        for (const asset of result.project.mediaLibrary) assetIds.add(asset.id);
+      } else if (result.status === "corrupt") {
+        salvageMediaKeys(result.raw, mediaKeys);
+        salvageAssetIds(result.raw, assetIds);
+      }
+    } catch {
+      // Keep scanning independent rows; a failed read contains no safe keys.
+    }
+  }
+  await forEachSnapshotJson((raw) => {
+    salvageMediaKeys(raw, mediaKeys);
+    salvageAssetIds(raw, assetIds);
+  });
+  return { mediaKeys, assetIds };
+};
+
 // Reclaim OPFS blobs (originals + proxies) that no project references — the
 // current in-memory project plus every project saved in the library. Media
 // deletion is metadata-only (see media-bin), so this is what actually frees
@@ -74,7 +109,7 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
 // re-checked against the live project right before deletion.
 export const collectMediaGarbage = async (
   current: Project | (() => Project),
-  storedProjects?: StoredProjectScan,
+  stored?: StoredProjectKeep,
 ): Promise<number> => {
   const live = typeof current === "function" ? current : () => current;
   const keep = new Set<string>();
@@ -90,17 +125,8 @@ export const collectMediaGarbage = async (
   } catch {
     return 0;
   }
-  for (const result of storedProjects ?? (await scanStoredProjects())) {
-    // A damaged row can't be parsed, but salvage any OPFS-key-shaped strings
-    // from its raw JSON so a recoverable project's media is never reaped — and
-    // keep scanning instead of aborting the whole pass forever (one corrupt row
-    // used to disable GC permanently).
-    if (result.status === "corrupt") {
-      salvageMediaKeys(result.raw, keep);
-      continue;
-    }
-    if (result.status === "ok") referencedMediaKeys(result.project, keep);
-  }
+  const saved = stored ?? (await scanStoredProjects());
+  for (const key of saved.mediaKeys) keep.add(key);
 
   let removed = 0;
   for (const key of await listMediaKeys()) {

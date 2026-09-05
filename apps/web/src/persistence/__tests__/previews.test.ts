@@ -16,10 +16,12 @@ const stored = new Map<
 >();
 const trashed = new Set<string>();
 const snapshotJson: string[] = [];
+let beforeBulkPut: (() => Promise<void>) | undefined;
 
 vi.mock("dexie", () => {
   class FakeTable {
     bulkPut = async (values: Row[]) => {
+      await beforeBulkPut?.();
       for (const row of values) rows.set(row.id, row);
     };
     bulkGet = async (ids: string[]) => ids.map((id) => rows.get(id));
@@ -53,23 +55,41 @@ vi.mock("../project-library", () => ({
 }));
 vi.mock("../trash", () => ({ trashAssetIds: async () => new Set(trashed) }));
 vi.mock("../media-gc", () => ({
-  scanStoredProjects: async () =>
-    libraryRows.map((row) => stored.get(row.id) ?? { status: "missing" }),
+  scanStoredProjects: async () => {
+    const assetIds = new Set<string>();
+    for (const row of libraryRows) {
+      const result = stored.get(row.id);
+      if (result?.status === "ok") {
+        for (const item of result.project.mediaLibrary) assetIds.add(item.id);
+      } else if (result?.status === "corrupt") {
+        for (const match of result.raw.matchAll(/"id"\s*:\s*"([^"]+)"/g)) {
+          if (match[1]) assetIds.add(match[1]);
+        }
+      }
+    }
+    for (const raw of snapshotJson) {
+      for (const match of raw.matchAll(/"id"\s*:\s*"([^"]+)"/g)) {
+        if (match[1]) assetIds.add(match[1]);
+      }
+    }
+    return { assetIds, mediaKeys: new Set<string>() };
+  },
 }));
-vi.mock("../snapshots", () => ({ listSnapshotJson: async () => snapshotJson }));
 
 import { useProjectStore } from "@/stores/project-store";
+import {
+  hasInlinePreviews,
+  inlinePreviewsOf,
+  withoutInlinePreviews,
+} from "@/media/inline-previews";
 import {
   collectPreviewGarbage,
   getFilmstrips,
   getThumbs,
-  hasInlinePreviews,
-  inlinePreviewsOf,
   leasePreview,
   putAssetPreviews,
   startInlinePreviewMigration,
   withInlinePreviews,
-  withoutInlinePreviews,
 } from "../previews";
 
 const asset = (id: string, patch: Partial<MediaAsset> = {}): MediaAsset => ({
@@ -101,6 +121,7 @@ beforeEach(() => {
   stored.clear();
   trashed.clear();
   snapshotJson.length = 0;
+  beforeBulkPut = undefined;
   useProjectStore.getState().loadProject(project());
 });
 
@@ -146,7 +167,7 @@ describe("preview persistence", () => {
     });
   });
 
-  it("migrates inline records without adding undo history and handles later undo-like writes", async () => {
+  it("migrates inline records without adding undo history and preserves an existing stored preview", async () => {
     const first = asset("a", { thumbDataUrl: "data:image/png;base64,one" });
     useProjectStore.getState().loadProject(project(first));
     const history = useProjectStore.getState().history;
@@ -159,7 +180,7 @@ describe("preview persistence", () => {
       .getState()
       .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,two" })));
     await settle();
-    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,two");
+    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,one");
     stop();
   });
 
@@ -167,13 +188,25 @@ describe("preview persistence", () => {
     useProjectStore
       .getState()
       .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,legacy" })));
-    const stop = startInlinePreviewMigration(useProjectStore);
+    let releaseWrite = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    let entered = false;
+    beforeBulkPut = async () => {
+      if (entered) return;
+      entered = true;
+      await blocked;
+    };
     const relink = putAssetPreviews("a", {
       thumb: "data:image/png;base64,new",
       filmstrip: { dataUrl: "data:image/png;base64,new-strip", frames: 12 },
     });
-    useProjectStore.getState().dropInlinePreviews(["a" as ID]);
+    await vi.waitFor(() => expect(entered).toBe(true));
+    const stop = startInlinePreviewMigration(useProjectStore);
+    releaseWrite();
     await relink;
+    useProjectStore.getState().dropInlinePreviews(["a" as ID]);
     await settle();
 
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,new");

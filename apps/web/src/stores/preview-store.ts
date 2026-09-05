@@ -23,13 +23,19 @@ interface PreviewState {
 
 const MAX_FILMSTRIPS = 200;
 const filmstripOrder: string[] = [];
+const askedThumbs = new Set<string>();
+const askedFilmstrips = new Set<string>();
+let previewGeneration = 0;
 const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>): void => {
   const prior = filmstripOrder.indexOf(assetId);
   if (prior >= 0) filmstripOrder.splice(prior, 1);
   filmstripOrder.push(assetId);
   while (filmstripOrder.length > MAX_FILMSTRIPS) {
     const evicted = filmstripOrder.shift();
-    if (evicted) delete filmstrips[evicted];
+    if (evicted) {
+      delete filmstrips[evicted];
+      askedFilmstrips.delete(evicted);
+    }
   }
 };
 
@@ -53,6 +59,7 @@ export const usePreviewStore = create<PreviewState>((set) => ({
       return { thumbs, filmstrips };
     }),
   clear: () => {
+    previewGeneration++;
     askedThumbs.clear();
     askedFilmstrips.clear();
     filmstripOrder.length = 0;
@@ -85,17 +92,20 @@ onPreviewsStored((assetId, previews, { replaceMissing }) => {
 const makeBatch = <T>(
   asked: Set<string>,
   load: (ids: readonly string[]) => Promise<ReadonlyMap<string, T>>,
-  apply: (found: ReadonlyMap<string, T>) => void | Promise<void>,
+  apply: (found: ReadonlyMap<string, T>, generation: number) => void | Promise<void>,
 ) => {
-  let pending: string[] = [];
+  let pending: { id: string; generation: number }[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
   const flush = async () => {
     timer = null;
-    const ids = pending;
+    const queued = pending;
     pending = [];
+    const generation = previewGeneration;
+    const ids = queued.filter((item) => item.generation === generation).map((item) => item.id);
+    if (ids.length === 0) return;
     try {
       const found = await load(ids);
-      if (found.size > 0) await apply(found);
+      if (generation === previewGeneration && found.size > 0) await apply(found, generation);
     } catch {
       for (const id of ids) asked.delete(id);
     }
@@ -104,14 +114,11 @@ const makeBatch = <T>(
     for (const id of assetIds) {
       if (asked.has(id)) continue;
       asked.add(id);
-      pending.push(id);
+      pending.push({ id, generation: previewGeneration });
     }
     if (pending.length > 0 && timer === null) timer = setTimeout(() => void flush(), 0);
   };
 };
-
-const askedThumbs = new Set<string>();
-const askedFilmstrips = new Set<string>();
 
 const nextFrame = (): Promise<void> =>
   new Promise((resolve) =>
@@ -120,19 +127,30 @@ const nextFrame = (): Promise<void> =>
       : requestAnimationFrame(() => resolve()),
   );
 
-export const requestThumbs = makeBatch(askedThumbs, getThumbs, async (found) => {
+export const requestThumbs = makeBatch(askedThumbs, getThumbs, async (found, generation) => {
   const entries = [...found];
   for (let offset = 0; offset < entries.length; offset += 100) {
+    if (generation !== previewGeneration) return;
     const chunk = Object.fromEntries(entries.slice(offset, offset + 100));
     usePreviewStore.setState((s) => ({ thumbs: { ...s.thumbs, ...chunk } }));
     if (offset + 100 < entries.length) await nextFrame();
   }
 });
 
-const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (found) =>
-  usePreviewStore.setState((s) => ({
-    filmstrips: { ...s.filmstrips, ...Object.fromEntries(found) },
-  })),
+export const requestFilmstrips = makeBatch(
+  askedFilmstrips,
+  getFilmstrips,
+  (found, generation) => {
+    if (generation !== previewGeneration) return;
+    usePreviewStore.setState((s) => {
+      const filmstrips = { ...s.filmstrips };
+      for (const [id, strip] of found) {
+        filmstrips[id] = strip;
+        touchFilmstrip(id, filmstrips);
+      }
+      return { filmstrips };
+    });
+  },
 );
 
 // Test hook: forget what was asked so a fresh test starts cold.
@@ -168,24 +186,57 @@ export const useAssetFilmstrip = (asset: StripSource): Filmstrip | undefined => 
   return useMemo(() => (inline ? { dataUrl: inline, frames } : stored), [frames, inline, stored]);
 };
 
+const PREVIEW_ROOT_MARGIN = "240px";
+interface SharedObserver {
+  observer: IntersectionObserver;
+  setters: Map<Element, (visible: boolean) => void>;
+}
+const visibilityObservers = new Map<string, SharedObserver>();
+
+export const observePreviewVisibility = (
+  node: Element,
+  setter: (visible: boolean) => void,
+  rootMargin = PREVIEW_ROOT_MARGIN,
+): (() => void) => {
+  if (typeof IntersectionObserver === "undefined") {
+    setter(true);
+    return () => {};
+  }
+  let shared = visibilityObservers.get(rootMargin);
+  if (!shared) {
+    const setters = new Map<Element, (visible: boolean) => void>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setters.get(entry.target)?.(entry.isIntersecting);
+      },
+      { rootMargin },
+    );
+    shared = { observer, setters };
+    visibilityObservers.set(rootMargin, shared);
+  }
+  shared.setters.set(node, setter);
+  shared.observer.observe(node);
+  return () => {
+    const current = visibilityObservers.get(rootMargin);
+    if (!current) return;
+    current.observer.unobserve(node);
+    current.setters.delete(node);
+    if (current.setters.size === 0) {
+      current.observer.disconnect();
+      visibilityObservers.delete(rootMargin);
+    }
+  };
+};
+
 export const usePreviewVisibility = (
   ref: RefObject<Element | null>,
-  rootMargin = "240px",
+  rootMargin = PREVIEW_ROOT_MARGIN,
 ): boolean => {
   const [visible, setVisible] = useState(false);
   useEffect(() => {
     const node = ref.current;
     if (!node) return;
-    if (typeof IntersectionObserver === "undefined") {
-      setVisible(true);
-      return;
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry?.isIntersecting ?? false),
-      { rootMargin },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
+    return observePreviewVisibility(node, setVisible, rootMargin);
   }, [ref, rootMargin]);
   return visible;
 };

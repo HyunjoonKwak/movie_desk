@@ -1,19 +1,19 @@
 import type { MediaAsset } from "@movie-desk/core";
 
-interface InlineFilmstrip {
+export interface Filmstrip {
   readonly dataUrl: string;
   readonly frames: number;
 }
 
-interface InlineAssetPreviews {
+export interface AssetPreviews {
   readonly thumb?: string;
-  readonly filmstrip?: InlineFilmstrip;
+  readonly filmstrip?: Filmstrip;
 }
 
 export const hasInlinePreviews = (asset: MediaAsset): boolean =>
   asset.thumbDataUrl !== undefined || asset.filmstripDataUrl !== undefined;
 
-export const inlinePreviewsOf = (asset: MediaAsset): InlineAssetPreviews => ({
+export const inlinePreviewsOf = (asset: MediaAsset): AssetPreviews => ({
   ...(asset.thumbDataUrl ? { thumb: asset.thumbDataUrl } : {}),
   ...(asset.filmstripDataUrl
     ? { filmstrip: { dataUrl: asset.filmstripDataUrl, frames: asset.filmstripFrames ?? 0 } }

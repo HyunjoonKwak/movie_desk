@@ -2,8 +2,8 @@
 // independent of the live Yjs doc. Each snapshot is a frozen JSON of the
 // project at a moment in time.
 
-import type { Project } from "@movie-desk/core";
 import Dexie, { type Table } from "dexie";
+import type { Project } from "@movie-desk/core";
 import { parseStoredProject } from "./project-export";
 
 export interface ProjectSnapshot {
@@ -63,5 +63,6 @@ export const deleteSnapshot = async (id: string): Promise<void> => {
   await getDb().snapshots.delete(id);
 };
 
-export const listSnapshotJson = async (): Promise<readonly string[]> =>
-  (await getDb().snapshots.toArray()).map((row) => row.json);
+export const forEachSnapshotJson = async (visit: (json: string) => void): Promise<void> => {
+  await getDb().snapshots.each((row) => visit(row.json));
+};

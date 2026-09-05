@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getThumbs: vi.fn(),
+  getFilmstrips: vi.fn(),
   storedListener: undefined as
     | ((
         assetId: string,
@@ -12,19 +13,26 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock("@/persistence/previews", () => ({
   getThumbs: mocks.getThumbs,
-  getFilmstrips: vi.fn(async () => new Map()),
+  getFilmstrips: mocks.getFilmstrips,
   onPreviewsStored: (listener: typeof mocks.storedListener) => {
     mocks.storedListener = listener;
     return () => {};
   },
 }));
 
-import { requestThumbs, resetPreviewRequestsForTests, usePreviewStore } from "../preview-store";
+import {
+  observePreviewVisibility,
+  requestFilmstrips,
+  requestThumbs,
+  resetPreviewRequestsForTests,
+  usePreviewStore,
+} from "../preview-store";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.getFilmstrips.mockResolvedValue(new Map());
   resetPreviewRequestsForTests();
 });
 
@@ -79,5 +87,63 @@ describe("preview store", () => {
       { replaceMissing: false },
     );
     expect(usePreviewStore.getState().thumbs.a).toBe("legacy-thumb");
+  });
+
+  it("caps filmstrips loaded through the batch path and can reload an evicted id", async () => {
+    const strips = new Map(
+      Array.from({ length: 500 }, (_, index) => [
+        `id-${index}`,
+        { dataUrl: `strip-${index}`, frames: 10 },
+      ]),
+    );
+    mocks.getFilmstrips.mockResolvedValueOnce(strips).mockResolvedValueOnce(
+      new Map([["id-0", { dataUrl: "reloaded", frames: 10 }]]),
+    );
+    requestFilmstrips([...strips.keys()]);
+    await vi.waitFor(() => expect(mocks.getFilmstrips).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(Object.keys(usePreviewStore.getState().filmstrips).length).toBe(200),
+    );
+    expect(usePreviewStore.getState().filmstrips["id-0"]).toBeUndefined();
+
+    requestFilmstrips(["id-0"]);
+    await vi.waitFor(() => expect(mocks.getFilmstrips).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(usePreviewStore.getState().filmstrips["id-0"]?.dataUrl).toBe("reloaded"),
+    );
+  });
+
+  it("does not apply an old project's in-flight thumbnail load after clear", async () => {
+    let resolveLoad = (_value: ReadonlyMap<string, string>) => {};
+    mocks.getThumbs.mockReturnValueOnce(
+      new Promise<ReadonlyMap<string, string>>((resolve) => {
+        resolveLoad = resolve;
+      }),
+    );
+    requestThumbs(["old"]);
+    await vi.waitFor(() => expect(mocks.getThumbs).toHaveBeenCalledTimes(1));
+    usePreviewStore.getState().clear();
+    resolveLoad(new Map([["old", "old-thumb"]]));
+    await tick();
+    expect(usePreviewStore.getState().thumbs).toEqual({});
+  });
+
+  it("shares one intersection observer and releases targets", () => {
+    const observe = vi.fn();
+    const unobserve = vi.fn();
+    const disconnect = vi.fn();
+    const Constructor = vi.fn(() => ({ observe, unobserve, disconnect }));
+    vi.stubGlobal("IntersectionObserver", Constructor);
+    const a = {} as Element;
+    const b = {} as Element;
+    const stopA = observePreviewVisibility(a, () => {});
+    const stopB = observePreviewVisibility(b, () => {});
+    expect(Constructor).toHaveBeenCalledTimes(1);
+    stopA();
+    expect(unobserve).toHaveBeenCalledWith(a);
+    expect(disconnect).not.toHaveBeenCalled();
+    stopB();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
   });
 });

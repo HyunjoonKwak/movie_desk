@@ -8,20 +8,31 @@ const libraryJson = async (page: import("@playwright/test").Page): Promise<strin
         const open = indexedDB.open("cut_editor.library.v1");
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
+          const db = open.result;
           try {
-            const db = open.result;
+            if (!db.objectStoreNames.contains("projects")) {
+              db.close();
+              resolve("");
+              return;
+            }
             const request = db.transaction("projects", "readonly").objectStore("projects").getAll();
-            request.onerror = () => reject(request.error);
+            request.onerror = () => {
+              db.close();
+              reject(request.error);
+            };
             request.onsuccess = () => {
               try {
-                db.close();
                 resolve(request.result.map((row: { json?: string }) => row.json ?? "").join("\n"));
               } catch (error) {
                 reject(error);
+              } finally {
+                db.close();
               }
             };
           } catch (error) {
-            reject(error);
+            db.close();
+            if (error instanceof DOMException && error.name === "NotFoundError") resolve("");
+            else reject(error);
           }
         };
       }),

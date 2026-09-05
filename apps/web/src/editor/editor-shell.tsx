@@ -1,7 +1,7 @@
 "use client";
 
-import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
+import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
 import { InspectorPanel } from "./inspector-panel";
-import { type NewProjectPath, NewProjectStart } from "./new-project-start";
+import { NewProjectStart, type NewProjectPath } from "./new-project-start";
 import {
   clearNewProjectStartPending,
   isNewProjectStartPending,

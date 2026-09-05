@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../trash", () => ({ trashMediaKeys: async () => {} }));
+vi.mock("../snapshots", () => ({ forEachSnapshotJson: async () => {} }));
 vi.mock("../opfs", () => ({
   deleteMediaFile: mocks.deleteMediaFile,
   listMediaKeys: mocks.listMediaKeys,

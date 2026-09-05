@@ -1,12 +1,13 @@
 import {
+  type AssetPreviews,
+  type Filmstrip,
   hasInlinePreviews,
   inlinePreviewsOf,
   withoutInlinePreviews,
 } from "@/media/inline-previews";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import Dexie, { type Table } from "dexie";
-import { type StoredProjectScan, scanStoredProjects } from "./media-gc";
-import { listSnapshotJson } from "./snapshots";
+import { type StoredProjectKeep, scanStoredProjects } from "./media-gc";
 import { trashAssetIds } from "./trash";
 
 // Derived previews (thumbnail, filmstrip) live here, keyed by asset id,
@@ -16,21 +17,7 @@ import { trashAssetIds } from "./trash";
 // not rewrite a thumbnail. Records written by older builds still carry
 // the data URLs and are migrated on load (startInlinePreviewMigration).
 
-export interface Filmstrip {
-  readonly dataUrl: string;
-  readonly frames: number;
-}
-
-export interface AssetPreviews {
-  readonly thumb?: string;
-  readonly filmstrip?: Filmstrip;
-}
-
-export {
-  hasInlinePreviews,
-  inlinePreviewsOf,
-  withoutInlinePreviews,
-} from "@/media/inline-previews";
+export type { AssetPreviews, Filmstrip } from "@/media/inline-previews";
 
 interface PreviewRow {
   id: string; // `${assetId}:${kind}`
@@ -77,8 +64,8 @@ export const putAssetPreviews = async (
   previews: AssetPreviews,
   {
     replaceMissing = true,
-    shouldWrite,
-  }: { readonly replaceMissing?: boolean; readonly shouldWrite?: () => boolean } = {},
+    onlyIfAbsent = false,
+  }: { readonly replaceMissing?: boolean; readonly onlyIfAbsent?: boolean } = {},
 ): Promise<boolean> => {
   const updatedAt = Date.now();
   const rows: PreviewRow[] = [];
@@ -108,14 +95,33 @@ export const putAssetPreviews = async (
   const write = previous
     .catch(() => false)
     .then(async () => {
-      if (shouldWrite && !shouldWrite()) return false;
+      let writtenRows = rows;
       await getDb().transaction("rw", getDb().previews, async () => {
-        if (rows.length > 0) await getDb().previews.bulkPut(rows);
+        if (onlyIfAbsent && rows.length > 0) {
+          const existing = await getDb().previews.bulkGet(rows.map((row) => row.id));
+          writtenRows = rows.filter((_row, index) => !existing[index]);
+        }
+        if (writtenRows.length > 0) await getDb().previews.bulkPut(writtenRows);
         if (missing.length > 0) {
           await getDb().previews.bulkDelete(missing.map((kind) => rowId(assetId, kind)));
         }
       });
-      for (const listener of listeners) listener(assetId, previews, { replaceMissing });
+      if (writtenRows.length > 0 || missing.length > 0) {
+        const thumb = writtenRows.find((row) => row.kind === "thumb");
+        const filmstrip = writtenRows.find((row) => row.kind === "filmstrip");
+        const written: AssetPreviews = {
+          ...(thumb ? { thumb: thumb.dataUrl } : {}),
+          ...(filmstrip
+            ? {
+                filmstrip: {
+                  dataUrl: filmstrip.dataUrl,
+                  frames: filmstrip.frames ?? 0,
+                },
+              }
+            : {}),
+        };
+        for (const listener of listeners) listener(assetId, written, { replaceMissing });
+      }
       return true;
     });
   previewWrites.set(assetId, write);
@@ -216,28 +222,24 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
         const next = queued;
         queued = null;
         const inline = next.filter(hasInlinePreviews);
-        const moved: ID[] = [];
+        const stored: MediaAsset[] = [];
         for (const asset of inline) {
           try {
-            const unchanged = () => {
-              const before = store.getState().project.mediaLibrary.find((a) => a.id === asset.id);
-              return (
-                before?.thumbDataUrl === asset.thumbDataUrl &&
-                before?.filmstripDataUrl === asset.filmstripDataUrl &&
-                before?.filmstripFrames === asset.filmstripFrames
-              );
-            };
-            const written = await putAssetPreviews(asset.id, inlinePreviewsOf(asset), {
+            await putAssetPreviews(asset.id, inlinePreviewsOf(asset), {
               replaceMissing: false,
-              shouldWrite: unchanged,
+              onlyIfAbsent: true,
             });
-            if (!written) continue;
-            // An Undo or project restore can replace the preview while the
-            // IndexedDB write is pending. Only strip the exact copy written;
-            // the queued pass will persist a newer one before removing it.
-            const current = store
-              .getState()
-              .project.mediaLibrary.find((candidate) => candidate.id === asset.id);
+            stored.push(asset);
+          } catch {
+            // Keep the inline copy: better a fat record than no picture.
+          }
+        }
+        const currentById = new Map(
+          store.getState().project.mediaLibrary.map((asset) => [asset.id, asset]),
+        );
+        const moved: ID[] = [];
+        for (const asset of stored) {
+          const current = currentById.get(asset.id);
             if (
               current?.thumbDataUrl === asset.thumbDataUrl &&
               current?.filmstripDataUrl === asset.filmstripDataUrl &&
@@ -245,9 +247,6 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
             ) {
               moved.push(asset.id);
             }
-          } catch {
-            // Keep the inline copy: better a fat record than no picture.
-          }
         }
         if (moved.length > 0) store.getState().dropInlinePreviews(moved);
       }
@@ -262,20 +261,13 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
 
 // ---- garbage ----
 
-const salvageAssetIds = (raw: string, keep: Set<string>): void => {
-  for (const match of raw.matchAll(/"id"\s*:\s*"([^"]+)"/g)) {
-    const id = match[1];
-    if (id) keep.add(id);
-  }
-};
-
 // Reclaims previews of assets no project (live, saved, or trashed) still
 // references. Mirrors collectMediaGarbage: a saved project that cannot be
 // read keeps everything its raw JSON might name, and each candidate is
 // re-checked against the live project right before deletion.
 export const collectPreviewGarbage = async (
   current: () => Project,
-  storedProjects?: StoredProjectScan,
+  stored?: StoredProjectKeep,
 ): Promise<number> => {
   const keep = new Set<string>();
   const add = (project: Project) => {
@@ -287,16 +279,8 @@ export const collectPreviewGarbage = async (
   } catch {
     return 0;
   }
-  for (const result of storedProjects ?? (await scanStoredProjects())) {
-    if (result.status === "corrupt") salvageAssetIds(result.raw, keep);
-    else if (result.status === "ok") add(result.project);
-  }
-  try {
-    for (const raw of await listSnapshotJson()) salvageAssetIds(raw, keep);
-  } catch {
-    // A snapshot store failure must not make otherwise reachable previews unsafe.
-    return 0;
-  }
+  const saved = stored ?? (await scanStoredProjects());
+  for (const id of saved.assetIds) keep.add(id);
   const stale: string[] = [];
   for (const id of await listPreviewAssetIds()) {
     if (keep.has(id) || previewLeases.has(id)) continue;

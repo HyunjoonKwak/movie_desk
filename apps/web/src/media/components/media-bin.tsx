@@ -79,6 +79,7 @@ export function MediaBin() {
   const activeAssetId = useMediaUiStore((s) => s.activeAssetId);
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
+  const dropInlinePreviews = useProjectStore((s) => s.dropInlinePreviews);
   const relinkInputRef = useRef<HTMLInputElement>(null);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -374,8 +375,8 @@ export function MediaBin() {
         return;
       }
       try {
-        removeMediaAsset(asset.id);
         usePreviewStore.getState().forget([asset.id]);
+        removeMediaAsset(asset.id);
         refreshTrashCount();
         toast.success(t("media.movedToTrash", { name: asset.name }));
       } catch (err) {
@@ -389,13 +390,14 @@ export function MediaBin() {
     async (asset: MediaAsset, file: File, identical: boolean) => {
       try {
         const patch = await relinkAssetFromFile(asset, file, { identical });
+        dropInlinePreviews([asset.id]);
         relinkMediaAsset(asset.id, patch);
         toast.success(t("media.relinked", { name: asset.name }));
       } catch (err) {
         toast.error(`${t("media.relinkFailed")}: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [relinkMediaAsset, t],
+    [dropInlinePreviews, relinkMediaAsset, t],
   );
 
   const toggleRangeEditing = useCallback((assetId: ID) => {
