@@ -12,7 +12,7 @@ export interface RelinkAssetPatch {
   // null clears the field (the new file has none); undefined leaves it.
   readonly videoCodec?: string | null;
   readonly audioCodec?: string | null;
-  readonly hasAudio?: boolean;
+  readonly hasAudio?: boolean | null;
   readonly thumbDataUrl?: string | null;
   readonly filmstripDataUrl?: string | null;
   readonly filmstripFrames?: number | null;
@@ -134,7 +134,7 @@ export const createMediaActions = <S extends ProjectMutating>(
           };
           next = withNullable(next, "videoCodec", patch.videoCodec);
           next = withNullable(next, "audioCodec", patch.audioCodec);
-          if (patch.hasAudio !== undefined) next = { ...next, hasAudio: patch.hasAudio };
+          next = withNullable(next, "hasAudio", patch.hasAudio);
           next = withNullable(next, "thumbDataUrl", patch.thumbDataUrl);
           next = withNullable(next, "filmstripDataUrl", patch.filmstripDataUrl);
           next = withNullable(next, "filmstripFrames", patch.filmstripFrames);

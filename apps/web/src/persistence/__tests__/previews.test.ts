@@ -169,6 +169,9 @@ describe("preview persistence", () => {
     expect(withoutInlinePreviews(legacy)).not.toHaveProperty("thumbDataUrl");
     expect(withoutInlinePreviews(legacy)).toMatchObject({ hasAudio: true });
     expect(withoutInlinePreviews(legacy)).not.toHaveProperty("waveformPeaks");
+    expect(withoutInlinePreviews(asset("empty", { waveformPeaks: [] }))).not.toHaveProperty(
+      "hasAudio",
+    );
 
     await putAssetPreviews("a", {
       thumb: "data:image/png;base64,stored",

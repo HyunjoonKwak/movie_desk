@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { ID } from "@movie-desk/core";
+import { type ID, isMediaClip } from "@movie-desk/core";
+import { useShallow } from "zustand/react/shallow";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { playheadLevel } from "./playhead-level";
@@ -12,10 +13,28 @@ import { requestWaveforms, usePreviewStore } from "@/stores/preview-store";
 export function LevelMeter() {
   const playing = usePlaybackStore((s) => s.playing);
   const playhead = useProjectStore((s) => s.project.timeline.playhead);
+  const tracks = useProjectStore((s) => s.project.timeline.tracks);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const [level, setLevel] = useState(0);
-  const waveforms = usePreviewStore((s) => s.waveforms);
   const decayed = useRef(0);
+
+  const waveformAssetIds = useMemo(() => {
+    const referenced = new Set(
+      tracks.flatMap((track) =>
+        track.clips.filter(isMediaClip).map((clip) => clip.assetId),
+      ),
+    );
+    return media
+      .filter((asset) => referenced.has(asset.id) && asset.hasAudio !== false)
+      .map((asset) => asset.id)
+      .sort();
+  }, [media, tracks]);
+  const waveformAssetKey = waveformAssetIds.join("\0");
+  const waveforms = usePreviewStore(
+    useShallow((state) =>
+      Object.fromEntries(waveformAssetIds.map((id) => [id, state.waveforms[id]])),
+    ),
+  );
 
   const getAsset = useMemo(() => {
     const map = new Map(media.map((a) => [a.id, a]));
@@ -23,8 +42,8 @@ export function LevelMeter() {
   }, [media]);
 
   useEffect(() => {
-    requestWaveforms(media.filter((asset) => asset.hasAudio).map((asset) => asset.id));
-  }, [media]);
+    requestWaveforms(waveformAssetKey ? waveformAssetKey.split("\0") : []);
+  }, [waveformAssetKey]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: playhead/playing are intentional ticks — the project is read fresh from the store inside.
   useEffect(() => {

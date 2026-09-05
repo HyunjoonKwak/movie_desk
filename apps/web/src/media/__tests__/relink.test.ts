@@ -145,6 +145,26 @@ describe("relinkAssetFromFile", () => {
     expect(patch.previewsStored).toBe(false);
   });
 
+  it("leaves audio presence unknown when an audio relink yields no positive evidence", async () => {
+    const { deps: d } = deps();
+    const patch = await relinkAssetFromFile(
+      asset({ kind: "audio", hasAudio: true }),
+      file("other.mp3", 2048),
+      { identical: false },
+      {
+        ...d,
+        probe: async () => ({
+          kind: "audio",
+          mime: "audio/mpeg",
+          durationMs: 4200,
+        }),
+        containerInfo: async () => null,
+        waveform: async () => null,
+      },
+    );
+    expect(patch.hasAudio).toBeNull();
+  });
+
   it("reports preview storage failure even when preview generation also fails", async () => {
     const { deps: d } = deps();
     const patch = await relinkAssetFromFile(

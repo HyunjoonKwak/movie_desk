@@ -24,27 +24,34 @@ interface PreviewState {
 }
 
 const MAX_FILMSTRIPS = 200;
+const MAX_WAVEFORMS = 200;
 const filmstripOrder: string[] = [];
 const retainedFilmstrips = new Map<string, number>();
+const waveformOrder: string[] = [];
+const retainedWaveforms = new Map<string, number>();
 const askedThumbs = new Set<string>();
 const askedFilmstrips = new Set<string>();
 const askedWaveforms = new Set<string>();
-const waveformOrder: string[] = [];
-const MAX_WAVEFORMS = 200;
 let previewGeneration = 0;
-const evictOverflow = (filmstrips: Record<string, Filmstrip>): string[] => {
+const evictOverflow = <T>(
+  values: Record<string, T>,
+  order: string[],
+  retained: ReadonlyMap<string, number>,
+  asked: Set<string>,
+  limit: number,
+): string[] => {
   const evictedIds: string[] = [];
-  let candidates = filmstripOrder.length;
-  while (filmstripOrder.length > MAX_FILMSTRIPS && candidates > 0) {
+  let candidates = order.length;
+  while (order.length > limit && candidates > 0) {
     candidates--;
-    const evicted = filmstripOrder.shift();
+    const evicted = order.shift();
     if (!evicted) break;
-    if (retainedFilmstrips.has(evicted)) {
-      filmstripOrder.push(evicted);
+    if (retained.has(evicted)) {
+      order.push(evicted);
       continue;
     }
-    delete filmstrips[evicted];
-    askedFilmstrips.delete(evicted);
+    delete values[evicted];
+    asked.delete(evicted);
     evictedIds.push(evicted);
   }
   return evictedIds;
@@ -54,14 +61,51 @@ const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>):
   const prior = filmstripOrder.indexOf(assetId);
   if (prior >= 0) filmstripOrder.splice(prior, 1);
   filmstripOrder.push(assetId);
-  evictOverflow(filmstrips);
+  evictOverflow(
+    filmstrips,
+    filmstripOrder,
+    retainedFilmstrips,
+    askedFilmstrips,
+    MAX_FILMSTRIPS,
+  );
+};
+
+const touchWaveform = (assetId: string, waveforms: Record<string, readonly number[]>): void => {
+  const prior = waveformOrder.indexOf(assetId);
+  if (prior >= 0) waveformOrder.splice(prior, 1);
+  waveformOrder.push(assetId);
+  evictOverflow(waveforms, waveformOrder, retainedWaveforms, askedWaveforms, MAX_WAVEFORMS);
 };
 
 const pruneFilmstrips = (): void => {
   if (filmstripOrder.length <= MAX_FILMSTRIPS) return;
   usePreviewStore.setState((state) => {
     const filmstrips = { ...state.filmstrips };
-    return evictOverflow(filmstrips).length > 0 ? { filmstrips } : {};
+    return evictOverflow(
+      filmstrips,
+      filmstripOrder,
+      retainedFilmstrips,
+      askedFilmstrips,
+      MAX_FILMSTRIPS,
+    ).length > 0
+      ? { filmstrips }
+      : {};
+  });
+};
+
+const pruneWaveforms = (): void => {
+  if (waveformOrder.length <= MAX_WAVEFORMS) return;
+  usePreviewStore.setState((state) => {
+    const waveforms = { ...state.waveforms };
+    return evictOverflow(
+      waveforms,
+      waveformOrder,
+      retainedWaveforms,
+      askedWaveforms,
+      MAX_WAVEFORMS,
+    ).length > 0
+      ? { waveforms }
+      : {};
   });
 };
 
@@ -77,6 +121,21 @@ export const retainFilmstrip = (assetId: string): (() => void) => {
     if (count <= 0) retainedFilmstrips.delete(assetId);
     else retainedFilmstrips.set(assetId, count);
     pruneFilmstrips();
+  };
+};
+
+export const retainWaveform = (assetId: string): (() => void) => {
+  const generation = previewGeneration;
+  retainedWaveforms.set(assetId, (retainedWaveforms.get(assetId) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    if (generation !== previewGeneration) return;
+    const count = (retainedWaveforms.get(assetId) ?? 1) - 1;
+    if (count <= 0) retainedWaveforms.delete(assetId);
+    else retainedWaveforms.set(assetId, count);
+    pruneWaveforms();
   };
 };
 
@@ -101,16 +160,7 @@ export const usePreviewStore = create<PreviewState>((set) => ({
       }
       if (previews.waveform) {
         waveforms[assetId] = previews.waveform;
-        const prior = waveformOrder.indexOf(assetId);
-        if (prior >= 0) waveformOrder.splice(prior, 1);
-        waveformOrder.push(assetId);
-        while (waveformOrder.length > MAX_WAVEFORMS) {
-          const evicted = waveformOrder.shift();
-          if (evicted) {
-            delete waveforms[evicted];
-            askedWaveforms.delete(evicted);
-          }
-        }
+        touchWaveform(assetId, waveforms);
       } else if (replaceMissing) {
         delete waveforms[assetId];
         const prior = waveformOrder.indexOf(assetId);
@@ -125,6 +175,7 @@ export const usePreviewStore = create<PreviewState>((set) => ({
     askedWaveforms.clear();
     filmstripOrder.length = 0;
     retainedFilmstrips.clear();
+    retainedWaveforms.clear();
     waveformOrder.length = 0;
     set({ thumbs: {}, filmstrips: {}, waveforms: {} });
   },
@@ -220,9 +271,14 @@ export const requestFilmstrips = makeBatch(askedFilmstrips, getFilmstrips, (foun
 
 export const requestWaveforms = makeBatch(askedWaveforms, getWaveforms, (found, generation) => {
   if (generation !== previewGeneration) return;
-  for (const [id, waveform] of found) {
-    usePreviewStore.getState().remember(id, { waveform }, false);
-  }
+  usePreviewStore.setState((s) => {
+    const waveforms = { ...s.waveforms };
+    for (const [id, waveform] of found) {
+      waveforms[id] = waveform;
+      touchWaveform(id, waveforms);
+    }
+    return { waveforms };
+  });
 });
 
 // Test hook: forget what was asked so a fresh test starts cold.
@@ -272,6 +328,9 @@ export const useAssetWaveform = (
   const id = asset?.id;
   const inline = asset?.waveformPeaks;
   const stored = usePreviewStore((s) => (id ? s.waveforms[id] : undefined));
+  useEffect(() => {
+    if (shouldLoad && id && !inline) return retainWaveform(id);
+  }, [id, inline, shouldLoad]);
   useEffect(() => {
     if (shouldLoad && id && !inline && stored === undefined) requestWaveforms([id]);
   }, [id, inline, shouldLoad, stored]);

@@ -11,7 +11,7 @@ IndexedDB 프리뷰 저장소로 분리했다. 같은 입력의 후측정 행은
 
 - `apps/web/scripts/bench-library.mjs --url http://127.0.0.1:3000 --assets 1000 --videos 200`
 - 설치된 Google Chrome의 새 임시 프로필과 개발 서버를 사용했다.
-- 최대 프로젝트 행을 UTF-8 바이트로 재고, 각 자산 속성의 JSON key/value 토큰과 구분자 바이트를
+- 선행 벤치의 JavaScript 문자열 길이 대신 최대 프로젝트 행을 UTF-8 바이트로 재고, 각 자산 속성의 JSON key/value 토큰과 구분자 바이트를
   합산했다. `other project data/structure`는 전체 행에서 자산 속성 합계를 뺀 값이다.
 - 전후 측정은 같은 Apple Silicon Mac과 같은 세션에서 순서대로 실행했다. 개발 서버 측정이므로
   절대 시간보다 데이터 크기와 큰 폭의 변화에 의미가 있다.

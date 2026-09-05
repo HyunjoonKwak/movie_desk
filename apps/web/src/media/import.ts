@@ -118,7 +118,7 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
       ...(inlinePreviews && filmstripDataUrl ? { filmstripDataUrl } : {}),
       ...(inlinePreviews && filmstripFrames !== undefined ? { filmstripFrames } : {}),
       ...(inlinePreviews && waveformPeaks ? { waveformPeaks } : {}),
-      ...((audioCodec || waveformPeaks) ? { hasAudio: true } : {}),
+      ...(audioCodec || waveformPeaks ? { hasAudio: true } : {}),
       ...(rotation ? { rotation } : {}),
       ...(videoCodec ? { videoCodec } : {}),
       ...(audioCodec ? { audioCodec } : {}),

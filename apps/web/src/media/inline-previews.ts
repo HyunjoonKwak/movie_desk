@@ -35,8 +35,8 @@ export const withoutInlinePreviews = (asset: MediaAsset): MediaAsset => {
   } = asset;
   return {
     ...rest,
-    ...(!("hasAudio" in rest) && asset.waveformPeaks
-      ? { hasAudio: asset.waveformPeaks.length > 0 }
+    ...(!("hasAudio" in rest) && (asset.waveformPeaks?.length ?? 0) > 0
+      ? { hasAudio: true }
       : {}),
   } as MediaAsset;
 };

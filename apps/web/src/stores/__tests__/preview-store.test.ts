@@ -29,6 +29,7 @@ vi.mock("@/persistence/previews", () => ({
 import {
   observePreviewVisibility,
   retainFilmstrip,
+  retainWaveform,
   requestFilmstrips,
   requestThumbs,
   requestWaveforms,
@@ -105,9 +106,9 @@ describe("preview store", () => {
         { dataUrl: `strip-${index}`, frames: 10 },
       ]),
     );
-    mocks.getFilmstrips.mockResolvedValueOnce(strips).mockResolvedValueOnce(
-      new Map([["id-0", { dataUrl: "reloaded", frames: 10 }]]),
-    );
+    mocks.getFilmstrips
+      .mockResolvedValueOnce(strips)
+      .mockResolvedValueOnce(new Map([["id-0", { dataUrl: "reloaded", frames: 10 }]]));
     requestFilmstrips([...strips.keys()]);
     await vi.waitFor(() => expect(mocks.getFilmstrips).toHaveBeenCalledTimes(1));
     await vi.waitFor(() =>
@@ -126,11 +127,13 @@ describe("preview store", () => {
     const waveforms = new Map(
       Array.from({ length: 500 }, (_, index) => [`id-${index}`, [index / 500]]),
     );
-    mocks.getWaveforms.mockResolvedValueOnce(waveforms).mockResolvedValueOnce(
-      new Map([["id-0", [0.75]]]),
-    );
+    mocks.getWaveforms
+      .mockResolvedValueOnce(waveforms)
+      .mockResolvedValueOnce(new Map([["id-0", [0.75]]]));
     requestWaveforms([...waveforms.keys()]);
-    await vi.waitFor(() => expect(Object.keys(usePreviewStore.getState().waveforms)).toHaveLength(200));
+    await vi.waitFor(() =>
+      expect(Object.keys(usePreviewStore.getState().waveforms)).toHaveLength(200),
+    );
     expect(usePreviewStore.getState().waveforms["id-0"]).toBeUndefined();
     requestWaveforms(["id-0"]);
     await vi.waitFor(() => expect(usePreviewStore.getState().waveforms["id-0"]).toEqual([0.75]));
@@ -154,6 +157,26 @@ describe("preview store", () => {
       requestFilmstrips([...strips.keys()]);
       await tick();
       expect(mocks.getFilmstrips).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const release of releases) release();
+    }
+  });
+
+  it("keeps 300 retained waveforms without re-requesting or eviction ping-pong", async () => {
+    const waveforms = new Map(
+      Array.from({ length: 300 }, (_, index) => [`retained-${index}`, [index / 300]]),
+    );
+    const releases = [...waveforms.keys()].map(retainWaveform);
+    mocks.getWaveforms.mockResolvedValue(waveforms);
+    try {
+      requestWaveforms([...waveforms.keys()]);
+      await vi.waitFor(() => expect(mocks.getWaveforms).toHaveBeenCalledTimes(1));
+      await vi.waitFor(() =>
+        expect(Object.keys(usePreviewStore.getState().waveforms)).toHaveLength(300),
+      );
+      requestWaveforms([...waveforms.keys()]);
+      await tick();
+      expect(mocks.getWaveforms).toHaveBeenCalledTimes(1);
     } finally {
       for (const release of releases) release();
     }

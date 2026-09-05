@@ -247,14 +247,16 @@ const rows = [
 console.log("| metric | value |\n| --- | --- |");
 for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
 console.log("\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |");
+const share = (bytes) =>
+  result.libraryRowBytes > 0 ? `${((bytes / result.libraryRowBytes) * 100).toFixed(1)}%` : "n/a";
 for (const [field, value] of Object.entries(result.libraryJsonComposition).sort(
   (a, b) => b[1].bytes - a[1].bytes,
 )) {
   console.log(
-    `| ${field} | ${value.bytes.toLocaleString("en-US")} | ${((value.bytes / result.libraryRowBytes) * 100).toFixed(1)}% | ${value.assets} |`,
+    `| ${field} | ${value.bytes.toLocaleString("en-US")} | ${share(value.bytes)} | ${value.assets} |`,
   );
 }
 console.log(
-  `| other project data/structure | ${result.libraryOtherProjectBytes.toLocaleString("en-US")} | ${((result.libraryOtherProjectBytes / result.libraryRowBytes) * 100).toFixed(1)}% | — |`,
+  `| other project data/structure | ${result.libraryOtherProjectBytes.toLocaleString("en-US")} | ${share(result.libraryOtherProjectBytes)} | — |`,
 );
 if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);

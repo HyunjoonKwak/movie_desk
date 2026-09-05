@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { PNG, configurePage, importMediaFiles, mediaCard } from "./support";
 
 const libraryJson = async (page: import("@playwright/test").Page): Promise<string> =>
@@ -70,10 +70,14 @@ test("keeps waveforms outside project persistence and restores them on the timel
 }) => {
   await configurePage(page);
   await page.goto("/editor");
-  await importMediaFiles(page, path.join(process.cwd(), "src/media/__tests__/fixtures/aac-video.mp4"));
+  await importMediaFiles(
+    page,
+    fileURLToPath(new URL("../src/media/__tests__/fixtures/aac-video.mp4", import.meta.url)),
+  );
 
   const card = mediaCard(page, "aac-video.mp4");
   await expect(card).toBeVisible();
+  await expect.poll(() => libraryJson(page)).toContain("aac-video.mp4");
   await expect.poll(() => libraryJson(page)).toContain('"hasAudio":true');
   await expect.poll(() => libraryJson(page)).not.toContain("waveformPeaks");
   await card.click();

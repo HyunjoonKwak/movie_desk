@@ -45,6 +45,15 @@ const getDb = (): PreviewDB => {
 
 const rowId = (assetId: string, kind: PreviewRow["kind"]): string => `${assetId}:${kind}`;
 
+export const peaksEqual = (
+  left: readonly number[] | undefined,
+  right: readonly number[] | undefined,
+): boolean => {
+  if (left === right) return true;
+  if (!left || !right || left.length !== right.length) return false;
+  return left.every((peak, index) => peak === right[index]);
+};
+
 type StoredListener = (
   assetId: string,
   previews: AssetPreviews,
@@ -116,7 +125,7 @@ export const putAssetPreviews = async (
             (row, index) =>
               !existing[index] ||
               (existing[index]?.dataUrl === row.dataUrl &&
-                JSON.stringify(existing[index]?.peaks) === JSON.stringify(row.peaks)),
+                peaksEqual(existing[index]?.peaks, row.peaks)),
           );
         }
         if (writtenRows.length > 0) await getDb().previews.bulkPut(writtenRows);
@@ -325,8 +334,8 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
           if (
             current?.thumbDataUrl === asset.thumbDataUrl &&
             current?.filmstripDataUrl === asset.filmstripDataUrl &&
-            current?.filmstripFrames === asset.filmstripFrames
-            && current?.waveformPeaks === asset.waveformPeaks
+            current?.filmstripFrames === asset.filmstripFrames &&
+            peaksEqual(current?.waveformPeaks, asset.waveformPeaks)
           ) {
             moved.push(asset.id);
           }
