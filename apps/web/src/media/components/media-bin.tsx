@@ -771,6 +771,7 @@ export function MediaBin() {
         onPointerDown={onMarqueeDown}
         onPointerMove={onMarqueeMove}
         onPointerUp={onMarqueeUp}
+        onPointerCancel={onMarqueeUp}
         data-testid="media-scroll"
         // biome-ignore lint/a11y/noNoninteractiveTabindex: the scrollable media region needs a keyboard focus target.
         tabIndex={0}

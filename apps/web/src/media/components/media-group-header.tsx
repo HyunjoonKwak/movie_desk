@@ -30,7 +30,7 @@ export function MediaGroupHeader({
   const Icon = allSelected ? CheckSquare : Square;
   return (
     <div
-      className="overflow-hidden pt-1"
+      className="pt-1"
       style={{ height: MEDIA_GROUP_HEADER_HEIGHT }}
       data-group-header={group.key}
     >

@@ -1,15 +1,18 @@
 import type { ID, MediaAsset } from "@movie-desk/core";
 
 export const MEDIA_GRID_GAP = 4;
-// Header box: 4px top padding + 16px button line box + 1px rounding allowance.
+// Header box: 4px top padding + a 16px button box (12px line box + py-0.5 4px)
+// + 1px rounding allowance.
 export const MEDIA_GROUP_HEADER_HEIGHT = 21;
 export const MEDIA_SEGMENT_ROWS = 8;
 // MediaCard: li p-1 (8px) + button borders (2px) reduce the 16:9 content
 // width by 10px. Vertical chrome is those 10px plus the measured 28px
 // metadata row (16px line box + 12px padding) in Chrome 152.
 export const MEDIA_CARD_INLINE_CHROME = 10;
-export const MEDIA_CARD_BLOCK_CHROME = 38;
+// Sum of the li's vertical p-1, used to convert its border-box model height
+// to the content-box value required by contain-intrinsic-size.
 export const MEDIA_CARD_PADDING = 8;
+export const MEDIA_CARD_BLOCK_CHROME = MEDIA_CARD_PADDING + 2 + 28;
 
 export interface VirtualMediaGroup {
   readonly key: string;

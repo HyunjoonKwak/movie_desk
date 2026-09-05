@@ -11,15 +11,17 @@ const files = Array.from({ length: 40 }, (_, index) => ({
   buffer: PNG,
 }));
 
-test("cards unmount outside the scrolled virtual window and return", async ({ page }) => {
+test("an active offscreen segment stays mounted without changing virtual height", async ({ page }) => {
   await page.goto("/editor");
   await importMediaFiles(page, files);
   await expect(page.getByTestId("media-count")).toHaveText("40/40");
   expect(await page.locator("[data-asset-card]").count()).toBeLessThan(40);
 
+  await revealMediaCard(page, "virtual-00.png");
+  await mediaCard(page, "virtual-00.png").click();
   await revealMediaCard(page, "virtual-39.png");
   await expect(mediaCard(page, "virtual-39.png")).toBeVisible();
-  await expect(mediaCard(page, "virtual-00.png")).toHaveCount(0);
+  await expect(mediaCard(page, "virtual-00.png")).not.toBeInViewport();
   const geometry = await page.getByTestId("media-scroll").evaluate((scroll) => {
     const cards = scroll.querySelector<HTMLElement>('[data-testid="media-cards"]');
     if (!cards) return null;
@@ -41,6 +43,8 @@ test("a marquee after scrolling several segments selects exactly one row", async
   await page.goto("/editor");
   await importMediaFiles(page, files);
   await expect(page.getByTestId("media-count")).toHaveText("40/40");
+  await revealMediaCard(page, "virtual-00.png");
+  await mediaCard(page, "virtual-00.png").click();
   await revealMediaCard(page, "virtual-32.png");
   await mediaCard(page, "virtual-32.png").evaluate((element) =>
     element.scrollIntoView({ block: "center" }),
@@ -73,6 +77,18 @@ test("group headers stay inside the fixed layout row at narrow panel widths", as
       element.style.flex = `0 0 ${pixels}px`;
     }, width);
     await page.evaluate(() => new Promise(requestAnimationFrame));
-    expect((await header.boundingBox())?.height).toBeLessThanOrEqual(21);
+    await expect
+      .poll(async () => {
+        const wrapperBox = await header.boundingBox();
+        const buttonBox = await header.getByRole("button").boundingBox();
+        expect(wrapperBox).not.toBeNull();
+        expect(buttonBox).not.toBeNull();
+        if (!wrapperBox || !buttonBox) return null;
+        const overflow = await header.evaluate(
+          (element) => element.scrollHeight - element.clientHeight,
+        );
+        return { wrapper: wrapperBox.height, button: buttonBox.height, overflow };
+      })
+      .toEqual({ wrapper: 21, button: 16, overflow: 0 });
   }
 });
