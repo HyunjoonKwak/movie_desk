@@ -6,6 +6,7 @@ import {
   importMediaFiles,
   mediaCard,
   opfsKeys,
+  revealMediaCard,
   seedTimeline,
 } from "./support";
 
@@ -23,6 +24,7 @@ const removeOpfsKey = async (page: Page, suffix: string): Promise<void> => {
 };
 
 const flagMissing = async (page: Page): Promise<void> => {
+  await revealMediaCard(page);
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));
   await expect(mediaCard(page).locator("[data-missing]")).toBeVisible({ timeout: 15_000 });
 };
@@ -95,6 +97,7 @@ test("a missing badge survives the preview checking only the clip under the play
 }) => {
   await seedTimeline(page, 1);
   await importMediaFiles(page, { name: "other.png", mimeType: "image/png", buffer: PNG });
+  await revealMediaCard(page, "other.png");
   await expect(mediaCard(page, "other.png")).toBeVisible();
   await removeOpfsKey(page, "__other.png");
   await page.evaluate(() => window.dispatchEvent(new Event("focus")));

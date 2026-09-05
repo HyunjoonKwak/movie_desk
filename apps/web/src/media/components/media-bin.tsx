@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Filter,
@@ -68,6 +68,12 @@ import { BulkBar } from "./bulk-bar";
 import { MediaCard } from "./media-card";
 import { MediaFiltersPanel } from "./media-filters-panel";
 import { TrashDialog } from "./trash-dialog";
+import {
+  buildMediaLayout,
+  marqueeHitTest,
+  mediaColumns,
+  type MediaSegmentLayout,
+} from "@/media/virtual-layout";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 // Measured card heights (incl. the li padding) per thumbnail size, used as
@@ -249,6 +255,8 @@ export function MediaBin() {
   );
   const [rangeEditing, setRangeEditing] = useState<ID | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const [listWidth, setListWidth] = useState(0);
+  const layoutRef = useRef<ReturnType<typeof buildMediaLayout> | null>(null);
   const marqueeStart = useRef<{ x: number; y: number } | null>(null);
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(
     null,
@@ -259,6 +267,16 @@ export function MediaBin() {
   // constant with a thousand cards.
   const pinnedSet = useMemo(() => new Set<string>(pinned), [pinned]);
   const excludedSet = useMemo(() => new Set<string>(excluded), [excluded]);
+
+  useEffect(() => {
+    const element = listRef.current;
+    if (!element) return;
+    const update = () => setListWidth(element.clientWidth - 16);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const toLocal = useCallback((e: React.PointerEvent) => {
     const el = listRef.current!;
@@ -291,22 +309,13 @@ export function MediaBin() {
       };
       if (rect.w < 4 && rect.h < 4) return;
       setMarquee(rect);
-      // 교차하는 카드 선택
-      const el = listRef.current!;
-      const cRect = el.getBoundingClientRect();
-      const next = new Set<ID>();
-      for (const li of el.querySelectorAll<HTMLElement>("[data-asset-card]")) {
-        const r = li.getBoundingClientRect();
-        const lx = r.left - cRect.left + el.scrollLeft;
-        const ly = r.top - cRect.top + el.scrollTop;
-        const hit =
-          lx < rect.x + rect.w &&
-          lx + r.width > rect.x &&
-          ly < rect.y + rect.h &&
-          ly + r.height > rect.y;
-        if (hit) next.add(li.dataset.assetCard as ID);
-      }
-      setSelected(next);
+      setSelected(
+        marqueeHitTest(layoutRef.current?.cards ?? [], {
+          ...rect,
+          x: rect.x - 8,
+          y: rect.y - 8,
+        }),
+      );
     },
     [toLocal],
   );
@@ -541,6 +550,34 @@ export function MediaBin() {
     () => (groupDays ? groupByDay(ordered, reverseGeocode) : null),
     [ordered, groupDays],
   );
+  const virtualGroups = useMemo(
+    () => groups ?? [{ key: "all", dayStart: null, places: [], assets: ordered }],
+    [groups, ordered],
+  );
+  const columns = mediaColumns(thumbSize);
+  const cardHeight = CARD_HEIGHT_BY_SIZE[thumbSize as 0 | 1 | 2] ?? CARD_HEIGHT_BY_SIZE[1];
+  const layout = useMemo(
+    () =>
+      buildMediaLayout({
+        groups: virtualGroups,
+        width: listWidth,
+        columns,
+        cardHeight,
+        withHeaders: groups !== null,
+      }),
+    [virtualGroups, listWidth, columns, cardHeight, groups],
+  );
+  layoutRef.current = layout;
+  useEffect(() => {
+    const reveal = (event: Event) => {
+      const name = (event as CustomEvent<string>).detail;
+      const asset = ordered.find((candidate) => candidate.name === name);
+      const top = asset ? layout.cardTops.get(asset.id) : undefined;
+      if (top !== undefined) listRef.current?.scrollTo({ top: Math.max(0, top - 8) });
+    };
+    window.addEventListener("media-reveal-asset", reveal);
+    return () => window.removeEventListener("media-reveal-asset", reveal);
+  }, [layout, ordered]);
   const toggleGroupSelect = useCallback((ids: readonly ID[]) => {
     setSelected((prev) => {
       const all = ids.every((id) => prev.has(id));
@@ -716,6 +753,7 @@ export function MediaBin() {
         onPointerDown={onMarqueeDown}
         onPointerMove={onMarqueeMove}
         onPointerUp={onMarqueeUp}
+        data-testid="media-scroll"
       >
         {marquee && (
           <div
@@ -743,15 +781,11 @@ export function MediaBin() {
           <p className="px-2 py-6 text-center text-xs text-ink-3">{t("media.noMatches")}</p>
         )}
 
-        <ul
-          className={cn(
-            "grid gap-1",
-            thumbSize === 0 ? "grid-cols-3" : thumbSize === 2 ? "grid-cols-1" : "grid-cols-2",
-          )}
-        >
-          {(groups ?? [{ key: "all", dayStart: null, places: [], assets: ordered }]).map(
-            (group) => (
-              <Fragment key={group.key}>
+        <div>
+          {virtualGroups.map((group, groupIndex) => {
+            const groupLayout = layout.groups[groupIndex];
+            return (
+              <section key={group.key} className="mb-1 last:mb-0" data-media-group={group.key}>
                 {groups && (
                   <MediaGroupHeader
                     group={group}
@@ -759,7 +793,17 @@ export function MediaBin() {
                     onToggle={() => toggleGroupSelect(group.assets.map((a) => a.id))}
                   />
                 )}
-                {group.assets.map((asset) => (
+                {groupLayout?.segments.map((segment) => (
+                  <VirtualMediaSegment
+                    key={segment.key}
+                    segment={segment}
+                    rootRef={listRef}
+                    columns={columns}
+                    forceVisible={group.assets
+                      .slice(segment.start, segment.end)
+                      .some((asset) => asset.id === activeAssetId)}
+                  >
+                    {group.assets.slice(segment.start, segment.end).map((asset) => (
                   <MediaCard
                     key={asset.id}
                     asset={asset}
@@ -771,9 +815,7 @@ export function MediaBin() {
                     health={sourceHealth[asset.id]}
                     rangeEditing={rangeEditing === asset.id}
                     proxy={proxying === null ? "idle" : proxying === asset.id ? "self" : "busy"}
-                    estimatedHeight={
-                      CARD_HEIGHT_BY_SIZE[thumbSize as 0 | 1 | 2] ?? CARD_HEIGHT_BY_SIZE[1]
-                    }
+                    estimatedHeight={cardHeight}
                     onToggleSelect={toggleSelect}
                     onAdd={addToTimeline}
                     onToggleRange={toggleRangeEditing}
@@ -781,11 +823,13 @@ export function MediaBin() {
                     onRelink={startRelink}
                     onDelete={deleteStable}
                   />
+                    ))}
+                  </VirtualMediaSegment>
                 ))}
-              </Fragment>
-            ),
-          )}
-        </ul>
+              </section>
+            );
+          })}
+        </div>
 
         <input
           ref={inputRef}
@@ -841,6 +885,9 @@ export function MediaBin() {
           <Trash2 className="size-3" aria-hidden />
           {t("media.trash")} ({trashCount})
         </button>
+        <span className="font-mono" data-testid="media-count">
+          {filtered.length}/{media.length}
+        </span>
       </div>
 
       {usage && usage.quotaBytes > 0 && (
@@ -861,6 +908,56 @@ export function MediaBin() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function VirtualMediaSegment({
+  segment,
+  rootRef,
+  columns,
+  forceVisible,
+  children,
+}: {
+  segment: MediaSegmentLayout;
+  rootRef: React.RefObject<HTMLDivElement | null>;
+  columns: number;
+  forceVisible: boolean;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(forceVisible);
+  useEffect(() => {
+    if (forceVisible) setVisible(true);
+  }, [forceVisible]);
+  useEffect(() => {
+    const element = ref.current;
+    const root = rootRef.current;
+    if (!element || !root) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry?.isIntersecting ?? false),
+      { root, rootMargin: "100% 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [rootRef]);
+  return (
+    <div
+      ref={ref}
+      className="mb-1 last:mb-0"
+      style={{ minHeight: segment.height }}
+      data-media-segment={segment.key}
+    >
+      {visible || forceVisible ? (
+        <ul
+          className={cn(
+            "grid gap-1",
+            columns === 3 ? "grid-cols-3" : columns === 1 ? "grid-cols-1" : "grid-cols-2",
+          )}
+        >
+          {children}
+        </ul>
+      ) : null}
     </div>
   );
 }

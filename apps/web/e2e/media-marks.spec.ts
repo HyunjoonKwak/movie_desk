@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { PNG, clipCount, configurePage, importMediaFiles, mediaCard } from "./support";
+import {
+  PNG,
+  clipCount,
+  configurePage,
+  importMediaFiles,
+  mediaCard,
+  revealMediaCard,
+} from "./support";
 
 // Library marks and collections (A3): rating, favourite and tags are set
 // on a selection, filter the bin, and survive a reload; a manual collection
@@ -9,7 +16,7 @@ test.beforeEach(async ({ page }) => {
   await configurePage(page);
 });
 
-const matchCount = (page: Parameters<typeof mediaCard>[0]) => page.getByTestId("media-match-count");
+const matchCount = (page: Parameters<typeof mediaCard>[0]) => page.getByTestId("media-count");
 
 test("marks a selection, filters by the marks, and keeps them across a reload", async ({
   page,
@@ -19,6 +26,7 @@ test("marks a selection, filters by the marks, and keeps them across a reload", 
     { name: "beach.png", mimeType: "image/png", buffer: PNG },
     { name: "cafe.png", mimeType: "image/png", buffer: PNG },
   ]);
+  await revealMediaCard(page, "beach.png");
   await expect(mediaCard(page, "beach.png")).toBeVisible();
   await expect(mediaCard(page, "cafe.png")).toBeVisible();
 
@@ -51,28 +59,28 @@ test("marks a selection, filters by the marks, and keeps them across a reload", 
 
   // Filters: tag chip, minimum rating, favourites only, #tag search.
   await page.getByRole("button", { name: "Filters" }).click();
-  await expect(matchCount(page)).toHaveText("2 of 2");
+  await expect(matchCount(page)).toHaveText("2/2");
   const seaChip = page.getByTestId("media-tag-filters").getByRole("button", { name: /#sea/ });
   await seaChip.click();
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await expect(mediaCard(page, "cafe.png")).toHaveCount(0);
   await seaChip.click();
-  await expect(matchCount(page)).toHaveText("2 of 2");
+  await expect(matchCount(page)).toHaveText("2/2");
   await page.getByLabel("Rating").selectOption("5");
-  await expect(matchCount(page)).toHaveText("0 of 2");
+  await expect(matchCount(page)).toHaveText("0/2");
   await page.getByLabel("Rating").selectOption("4");
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await page.getByLabel("Rating").selectOption("0");
   await page.getByLabel("Favourites only").check();
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await page.getByLabel("Favourites only").uncheck();
   const search = page.getByPlaceholder("Search media…");
   await search.fill("#trip");
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await search.fill("#tri"); // prefix: still narrows while typing
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await search.fill("#rip");
-  await expect(matchCount(page)).toHaveText("0 of 2");
+  await expect(matchCount(page)).toHaveText("0/2");
   await search.fill("");
 
   // Usage follows the timeline: adding a card makes it "used".
@@ -80,6 +88,7 @@ test("marks a selection, filters by the marks, and keeps them across a reload", 
   await mediaCard(page, "cafe.png").click();
   await expect.poll(() => clipCount(page)).toBeGreaterThan(placed);
   await page.getByLabel("Usage").selectOption("used");
+  await revealMediaCard(page, "cafe.png");
   await expect(mediaCard(page, "cafe.png")).toBeVisible();
   await page.getByLabel("Usage").selectOption("unused");
   await expect(mediaCard(page, "cafe.png")).toHaveCount(0);
@@ -109,7 +118,7 @@ test("manual collections filter by membership and smart collections re-apply a s
   await bulk.getByLabel("Collection name").press("Enter");
   await bulk.getByTitle("Deselect").click();
   await page.getByRole("button", { name: "Filters" }).click();
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await expect(page.getByLabel("Collection", { exact: true })).toHaveValue(/.+/);
   await expect(mediaCard(page, "beach.png")).toHaveCount(0);
 
@@ -119,11 +128,11 @@ test("manual collections filter by membership and smart collections re-apply a s
   await bulk.getByLabel("Add to collection").selectOption({ label: "Trip" });
   await bulk.getByTitle("Deselect").click();
   await page.getByLabel("Collection", { exact: true }).selectOption({ label: "Trip" });
-  await expect(matchCount(page)).toHaveText("2 of 2");
+  await expect(matchCount(page)).toHaveText("2/2");
   // Taking the selection out of the filtered collection hides it again.
   await mediaCard(page, "beach.png").click({ modifiers: ["Meta"] });
   await bulk.getByRole("button", { name: "Remove from collection" }).click();
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await bulk.getByTitle("Deselect").click();
   await page.getByRole("button", { name: "Rename collection" }).click();
   await page.getByLabel("Rename collection").fill("Trip 2026");
@@ -139,15 +148,15 @@ test("manual collections filter by membership and smart collections re-apply a s
   await bulk.getByTitle("Deselect").click();
   const search = page.getByPlaceholder("Search media…");
   await search.fill("#sea");
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await page.getByRole("button", { name: "Save search as smart collection" }).click();
   await page.getByLabel("Save search as smart collection").fill("Sea shots");
   await page.getByLabel("Save search as smart collection").press("Enter");
   await page.getByRole("button", { name: "Reset", exact: true }).click();
-  await expect(matchCount(page)).toHaveText("2 of 2");
+  await expect(matchCount(page)).toHaveText("2/2");
   await page.getByLabel("Collection", { exact: true }).selectOption({ label: "Smart: Sea shots" });
   await expect(search).toHaveValue("#sea");
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   // A smart collection is a loaded search, not live membership: editing the
   // loaded query clears its selection marker immediately.
   await search.fill("#sea changed");
@@ -170,9 +179,9 @@ test("manual collections filter by membership and smart collections re-apply a s
   await select.selectOption({ label: "Trip 2026" });
   await page.getByRole("button", { name: "Delete collection" }).click();
   await expect(select.getByRole("option")).toHaveText(["All media", "Smart: Sea shots"]);
-  await expect(matchCount(page)).toHaveText("2 of 2");
+  await expect(matchCount(page)).toHaveText("2/2");
   await select.selectOption({ label: "Smart: Sea shots" });
-  await expect(matchCount(page)).toHaveText("1 of 2");
+  await expect(matchCount(page)).toHaveText("1/2");
   await page.getByRole("button", { name: "Delete collection" }).click();
   await expect(select.getByRole("option")).toHaveText(["All media"]);
   await page

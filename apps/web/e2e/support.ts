@@ -50,6 +50,19 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
 export const mediaCard = (page: Page, name = "pix.png") =>
   page.getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}`) }).first();
 
+// Virtualized cards outside the media viewport are intentionally absent from
+// the DOM. Ask the bin to scroll its layout model to the asset before locating it.
+export const revealMediaCard = async (page: Page, name = "pix.png") => {
+  await page.getByTestId("media-count").waitFor();
+  await page.evaluate(
+    (assetName) => window.dispatchEvent(new CustomEvent("media-reveal-asset", { detail: assetName })),
+    name,
+  );
+  const card = mediaCard(page, name);
+  await card.waitFor({ state: "visible" });
+  return card;
+};
+
 export const clipCount = (page: Page): Promise<number> => page.locator("[data-clip]").count();
 
 // Imports one still image and appends it `presses` times. Returns the clip

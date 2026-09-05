@@ -28,7 +28,7 @@ export function MediaGroupHeader({
         : formatDayLabel(group.dayStart ?? 0, locale);
   const Icon = allSelected ? CheckSquare : Square;
   return (
-    <li className="col-span-full pt-1 first:pt-0" data-group-header={group.key}>
+    <div className="h-[21px] pt-1 first:pt-0" data-group-header={group.key}>
       <button
         type="button"
         onClick={onToggle}
@@ -50,6 +50,6 @@ export function MediaGroupHeader({
           {t("media.groupCount", { n: group.assets.length })}
         </span>
       </button>
-    </li>
+    </div>
   );
 }

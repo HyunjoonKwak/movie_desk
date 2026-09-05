@@ -75,7 +75,8 @@ await page.addInitScript(() => {
   };
 });
 
-const cardCount = () => page.locator("[data-asset-card]").count();
+const shownCount = () =>
+  page.getByTestId("media-count").evaluate((element) => Number(element.textContent?.split("/")[0]));
 const heap = () =>
   page.evaluate(() => (performance.memory ? performance.memory.usedJSHeapSize : null));
 const libraryRowMetrics = () =>
@@ -147,10 +148,11 @@ try {
   // 1. Import throughput.
   let t0 = performance.now();
   await startInput.setInputFiles(files);
-  await page.locator("[data-asset-card]").first().waitFor({ timeout: 120_000 });
-  await untilAtLeast(cardCount, TOTAL, Math.max(120_000, TOTAL * 200));
+  await page.getByTestId("media-count").waitFor({ timeout: 120_000 });
+  await untilAtLeast(shownCount, TOTAL, Math.max(120_000, TOTAL * 200));
   result.importMs = performance.now() - t0;
   result.importPerAssetMs = result.importMs / TOTAL;
+  result.domCardsAfterImport = await page.locator("[data-asset-card]").count();
   await page.waitForTimeout(2_000);
   result.heapAfterImport = await heap();
   result.fileOpensDuringImport = await page.evaluate(() => window.__bench.fileOpens);
@@ -165,15 +167,15 @@ try {
   // 3. Search latency: type a query, wait for the match count to update.
   const search = page.getByPlaceholder("Search media…");
   await page.getByRole("button", { name: "Filters" }).click();
-  const count = page.getByTestId("media-match-count");
+  const count = page.getByTestId("media-count");
   t0 = performance.now();
   await search.fill("clip-01");
-  await count.filter({ hasText: /^\d+ of \d+$/ }).waitFor();
+  await count.filter({ hasText: /^\d+\/\d+$/ }).waitFor();
   await page.waitForFunction(
     (n) =>
       !document
-        .querySelector('[data-testid="media-match-count"]')
-        ?.textContent?.startsWith(`${n} of`),
+        .querySelector('[data-testid="media-count"]')
+        ?.textContent?.startsWith(`${n}/`),
     TOTAL,
   );
   result.searchMs = performance.now() - t0;
@@ -183,8 +185,8 @@ try {
   await page.waitForFunction(
     (n) =>
       !document
-        .querySelector('[data-testid="media-match-count"]')
-        ?.textContent?.startsWith(`${n} of`),
+        .querySelector('[data-testid="media-count"]')
+        ?.textContent?.startsWith(`${n}/`),
     TOTAL,
   );
   result.filterMs = performance.now() - t0;
@@ -204,8 +206,9 @@ try {
   // 5. Reload → library restored (row parse + Yjs sync) → all cards back.
   t0 = performance.now();
   await page.reload();
-  await untilAtLeast(cardCount, TOTAL, 120_000);
+  await untilAtLeast(shownCount, TOTAL, 120_000);
   result.reloadToReadyMs = performance.now() - t0;
+  result.domCardsAfterReload = await page.locator("[data-asset-card]").count();
   result.heapAfterReload = await heap();
 
   // 6. Single edit cost with a large library: rename the project and wait for the save badge.
@@ -231,6 +234,7 @@ try {
 const rows = [
   ["assets", `${TOTAL} (${VIDEOS} video, ${TOTAL - VIDEOS} image)`],
   ["import total", `${ms(result.importMs)} (${result.importPerAssetMs.toFixed(1)} ms/asset)`],
+  ["DOM cards after import", String(result.domCardsAfterImport)],
   ["OPFS file opens during import", String(result.fileOpensDuringImport)],
   ["JS heap after import", result.heapAfterImport ? mb(result.heapAfterImport) : "n/a"],
   ["persisted project JSON", mb(result.libraryRowBytes)],
@@ -240,7 +244,8 @@ const rows = [
     "source-health pass (focus)",
     `${ms(result.healthPassMs)} (${result.healthPassOpens} file opens)`,
   ],
-  ["reload → all cards", ms(result.reloadToReadyMs)],
+  ["reload → library ready", ms(result.reloadToReadyMs)],
+  ["DOM cards after reload", String(result.domCardsAfterReload)],
   ["JS heap after reload", result.heapAfterReload ? mb(result.heapAfterReload) : "n/a"],
   ["rename → Saved badge", ms(result.renameToSavedMs)],
 ];
