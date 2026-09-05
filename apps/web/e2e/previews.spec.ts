@@ -8,13 +8,21 @@ const libraryJson = async (page: import("@playwright/test").Page): Promise<strin
         const open = indexedDB.open("cut_editor.library.v1");
         open.onerror = () => reject(open.error);
         open.onsuccess = () => {
-          const db = open.result;
-          const request = db.transaction("projects", "readonly").objectStore("projects").getAll();
-          request.onerror = () => reject(request.error);
-          request.onsuccess = () => {
-            db.close();
-            resolve(request.result.map((row: { json?: string }) => row.json ?? "").join("\n"));
-          };
+          try {
+            const db = open.result;
+            const request = db.transaction("projects", "readonly").objectStore("projects").getAll();
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+              try {
+                db.close();
+                resolve(request.result.map((row: { json?: string }) => row.json ?? "").join("\n"));
+              } catch (error) {
+                reject(error);
+              }
+            };
+          } catch (error) {
+            reject(error);
+          }
         };
       }),
   );
@@ -30,6 +38,7 @@ test("keeps thumbnails outside project persistence and restores them after reloa
   const image = card.locator("img");
   await expect(image).toBeVisible();
   await expect(image).toHaveAttribute("src", /^data:image/);
+  await expect.poll(() => libraryJson(page)).toContain("preview.png");
   await expect.poll(() => libraryJson(page)).not.toContain("data:image");
 
   await page.reload();

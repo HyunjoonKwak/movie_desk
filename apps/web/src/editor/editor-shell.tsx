@@ -1,7 +1,7 @@
 "use client";
 
-import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
+import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
@@ -10,7 +10,7 @@ import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { MediaBin } from "@/media/components/media-bin";
-import { collectMediaGarbage } from "@/persistence/media-gc";
+import { collectMediaGarbage, scanStoredProjects } from "@/persistence/media-gc";
 import { collectPreviewGarbage } from "@/persistence/previews";
 import { useLocalPersistence } from "@/persistence/use-local-persistence";
 import { PreviewViewport } from "@/preview/preview-viewport";
@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
 import { InspectorPanel } from "./inspector-panel";
-import { NewProjectStart, type NewProjectPath } from "./new-project-start";
+import { type NewProjectPath, NewProjectStart } from "./new-project-start";
 import {
   clearNewProjectStartPending,
   isNewProjectStartPending,
@@ -92,8 +92,14 @@ export function EditorShell() {
   useEffect(() => {
     if (!persistenceReady) return;
     const id = setTimeout(() => {
-      void collectMediaGarbage(() => useProjectStore.getState().project).catch(() => {});
-      void collectPreviewGarbage(() => useProjectStore.getState().project).catch(() => {});
+      void scanStoredProjects()
+        .then((storedProjects) =>
+          Promise.all([
+            collectMediaGarbage(() => useProjectStore.getState().project, storedProjects),
+            collectPreviewGarbage(() => useProjectStore.getState().project, storedProjects),
+          ]),
+        )
+        .catch(() => {});
     }, 3000);
     return () => clearTimeout(id);
   }, [persistenceReady]);

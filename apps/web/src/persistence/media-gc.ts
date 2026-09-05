@@ -6,6 +6,11 @@ import { deleteMediaFile, listMediaKeys } from "./opfs";
 import { listProjectsLibrary, loadStoredProject } from "./project-library";
 import { trashMediaKeys } from "./trash";
 
+export type StoredProjectScan = readonly Awaited<ReturnType<typeof loadStoredProject>>[];
+
+export const scanStoredProjects = async (): Promise<StoredProjectScan> =>
+  Promise.all((await listProjectsLibrary()).map((row) => loadStoredProject(row.id)));
+
 const mediaLeases = new Map<string, number>();
 
 // A producer holds a lease from before the OPFS write until its project
@@ -67,7 +72,10 @@ const salvageMediaKeys = (raw: string, keep: Set<string>): void => {
 // `current` may be a getter: the pass loads every saved project first, and
 // an import that lands meanwhile must not lose its file — each candidate is
 // re-checked against the live project right before deletion.
-export const collectMediaGarbage = async (current: Project | (() => Project)): Promise<number> => {
+export const collectMediaGarbage = async (
+  current: Project | (() => Project),
+  storedProjects?: StoredProjectScan,
+): Promise<number> => {
   const live = typeof current === "function" ? current : () => current;
   const keep = new Set<string>();
   referencedMediaKeys(live(), keep);
@@ -82,8 +90,7 @@ export const collectMediaGarbage = async (current: Project | (() => Project)): P
   } catch {
     return 0;
   }
-  for (const row of await listProjectsLibrary()) {
-    const result = await loadStoredProject(row.id);
+  for (const result of storedProjects ?? (await scanStoredProjects())) {
     // A damaged row can't be parsed, but salvage any OPFS-key-shaped strings
     // from its raw JSON so a recoverable project's media is never reaped — and
     // keep scanning instead of aborting the whole pass forever (one corrupt row

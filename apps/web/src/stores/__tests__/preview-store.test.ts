@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   getThumbs: vi.fn(),
   storedListener: undefined as
-    | ((assetId: string, previews: { thumb?: string }) => void)
+    | ((
+        assetId: string,
+        previews: { thumb?: string; filmstrip?: { dataUrl: string; frames: number } },
+        options: { replaceMissing: boolean },
+      ) => void)
     | undefined,
 }));
 vi.mock("@/persistence/previews", () => ({
@@ -58,8 +62,22 @@ describe("preview store", () => {
       thumb: "old",
       filmstrip: { dataUrl: "old-strip", frames: 2 },
     });
-    mocks.storedListener?.("a", { thumb: "new" });
+    mocks.storedListener?.("a", { thumb: "new" }, { replaceMissing: true });
     expect(usePreviewStore.getState().thumbs.a).toBe("new");
     expect(usePreviewStore.getState().filmstrips.a).toBeUndefined();
+  });
+
+  it("keeps a stored filmstrip when migration only supplies an inline thumbnail", () => {
+    usePreviewStore.getState().remember("a", {
+      filmstrip: { dataUrl: "new-strip", frames: 10 },
+    });
+    mocks.storedListener?.("a", { thumb: "legacy-thumb" }, { replaceMissing: false });
+    expect(usePreviewStore.getState().filmstrips.a?.dataUrl).toBe("new-strip");
+    mocks.storedListener?.(
+      "a",
+      { filmstrip: { dataUrl: "migrated-strip", frames: 4 } },
+      { replaceMissing: false },
+    );
+    expect(usePreviewStore.getState().thumbs.a).toBe("legacy-thumb");
   });
 });

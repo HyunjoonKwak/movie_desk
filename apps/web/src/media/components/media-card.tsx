@@ -2,14 +2,14 @@
 
 import { Heart, Layers, Link2, Loader2, Pin, Scissors, Star, Trash2, X } from "lucide-react";
 import { Music, Image as ImageIcon, Film } from "lucide-react";
-import { memo } from "react";
+import { memo, useRef } from "react";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { fmtSec } from "@/media/format";
 import { canRelinkFromFile } from "@/media/relink";
 import type { SourceHealth } from "@/media/source/probe-source";
 import { useMediaUiStore } from "@/stores/media-ui-store";
-import { useAssetThumb } from "@/stores/preview-store";
+import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import type { MediaAsset } from "@movie-desk/core";
 import { MissingBadge } from "./missing-badge";
@@ -64,10 +64,13 @@ export const MediaCard = memo(function MediaCard({
 }: MediaCardProps) {
   const t = useT();
   const Icon = KIND_ICON[asset.kind];
-  const thumb = useAssetThumb(asset);
+  const cardRef = useRef<HTMLLIElement>(null);
+  const previewVisible = usePreviewVisibility(cardRef);
+  const thumb = useAssetThumb(asset, previewVisible);
   const hasRange = asset.useInMs !== undefined || asset.useOutMs !== undefined;
   return (
     <li
+      ref={cardRef}
       className="group relative p-1"
       data-asset-card={asset.id}
       style={{ contentVisibility: "auto", containIntrinsicSize: `auto ${estimatedHeight}px` }}

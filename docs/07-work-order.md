@@ -88,7 +88,10 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   migration이 저장 후 제거하고, JSON 내보내기는 다시 인라인한다. 가져오기 lease와 라이브·저장 프로젝트·휴지통·
   손상 행 salvage를 GC keep에 포함했다. 리뷰에서 migration 실행 중 변경 유실, 부분 인라인 JSON 내보내기 누락,
   relink 뒤 예전 filmstrip 잔존과 메모리 캐시 미갱신을 수정했다. Chrome 152, 1,000개 재측정: 프로젝트 JSON
-  6.9→3.3MB, 가져오기 10.6ms/자산, 이름 변경→Saved 232ms, 힙 125.9/210.2MB.
+  리뷰 후 가시 카드만 프리뷰를 읽도록 바꿔 재측정: 6.9→3.3MB, 가져오기 10.6ms/자산,
+  이름 변경→Saved 56ms, 힙 165.9/199.9MB. 재연결 Undo는
+  메타데이터만 되돌리고 파생 프리뷰는 새 원본 것을 유지한다. 프리뷰까지 되돌리려면 비동기 저장소를 history
+  트랜잭션과 묶어야 하므로 이번 배치에서는 데이터 손실 위험을 늘리지 않고, 아래 재생성 경로를 후속으로 남긴다.
 - 2026-09-04 Claude: A5 라이브러리 1,000개 측정(`claude/a5-library-scale`). `apps/web/scripts/bench-library.mjs`가 실제
   Chrome으로 1,000개(비디오 200·이미지 800)를 가져와 가져오기·검색·필터·소스 상태 검사·복원·저장·힙을 잰다
   (`docs/evaluations/2026-09-04-library-1000.md`). 병목은 카드 1,000장이 상태 변화마다 전부 다시 렌더되는 것:
@@ -400,6 +403,8 @@ B7의 P0/P1 순서가 우선이다. 아래는 기본 순서다.
 
 **유지보수 후속 항목**
 
+- 미디어 카드의 "썸네일 다시 만들기": 재연결 Undo 또는 손상된 파생 캐시에서 현재 원본으로 썸네일·필름스트립을
+  명시적으로 재생성한다. 프리뷰 저장소 변경을 undo history에 넣기 전 이 복구 경로를 먼저 제공한다.
 - GitHub Actions: `actions/checkout@v4`, `actions/setup-node@v4`, `pnpm/action-setup@v4`가
   Node 20 런타임 deprecation 경고를 냈다(run 33684793493). 2026-09-03 B15 후속에서 v7/v7/v6으로
   올림. 담당 Claude(`.github/`).

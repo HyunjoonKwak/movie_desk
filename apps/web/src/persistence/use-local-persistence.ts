@@ -1,6 +1,7 @@
 "use client";
 
 import { t } from "@/i18n/use-t";
+import { usePreviewStore } from "@/stores/preview-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -38,10 +39,11 @@ export const useLocalPersistence = (): boolean => {
         getLiveDoc();
         // Records written by older builds carry inline thumbnails; move
         // them to the preview store as they show up.
-        stopMigration = startInlinePreviewMigration();
+        stopMigration = startInlinePreviewMigration(useProjectStore);
         unsubscribeProject = useProjectStore.subscribe(
           (state) => state.project.id,
           () => {
+            usePreviewStore.getState().clear();
             // getLiveDoc disposes the previous project's document and opens
             // the correctly namespaced one for the new active id.
             try {

@@ -1,7 +1,7 @@
 import { formatBytes } from "@/media/format";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { deleteMediaFile, replaceMediaFile } from "@/persistence/opfs";
-import { putAssetPreviews } from "@/persistence/previews";
+import { type AssetPreviews, putAssetPreviews } from "@/persistence/previews";
 import type { MediaAsset, SourceRotation } from "@movie-desk/core";
 import { audioVariantKey } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
@@ -73,7 +73,7 @@ export interface RelinkDependencies {
   readonly videoThumb: typeof makeVideoThumb;
   readonly filmstrip: typeof makeVideoFilmstrip;
   readonly waveform: typeof extractWaveformPeaks;
-  readonly storePreviews: typeof putAssetPreviews;
+  readonly storePreviews: (assetId: string, previews: AssetPreviews) => Promise<unknown>;
 }
 
 const defaultDependencies: RelinkDependencies = {

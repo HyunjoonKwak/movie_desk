@@ -15,6 +15,7 @@ const stored = new Map<
   { status: "ok"; project: Project } | { status: "corrupt"; raw: string }
 >();
 const trashed = new Set<string>();
+const snapshotJson: string[] = [];
 
 vi.mock("dexie", () => {
   class FakeTable {
@@ -39,6 +40,9 @@ vi.mock("dexie", () => {
         },
       };
     }
+    transaction(_mode: string, _table: FakeTable, run: () => Promise<void>) {
+      return run();
+    }
   }
   return { default: FakeDexie };
 });
@@ -48,6 +52,11 @@ vi.mock("../project-library", () => ({
   loadStoredProject: async (id: string) => stored.get(id) ?? { status: "missing" },
 }));
 vi.mock("../trash", () => ({ trashAssetIds: async () => new Set(trashed) }));
+vi.mock("../media-gc", () => ({
+  scanStoredProjects: async () =>
+    libraryRows.map((row) => stored.get(row.id) ?? { status: "missing" }),
+}));
+vi.mock("../snapshots", () => ({ listSnapshotJson: async () => snapshotJson }));
 
 import { useProjectStore } from "@/stores/project-store";
 import {
@@ -91,6 +100,7 @@ beforeEach(() => {
   libraryRows.length = 0;
   stored.clear();
   trashed.clear();
+  snapshotJson.length = 0;
   useProjectStore.getState().loadProject(project());
 });
 
@@ -140,7 +150,7 @@ describe("preview persistence", () => {
     const first = asset("a", { thumbDataUrl: "data:image/png;base64,one" });
     useProjectStore.getState().loadProject(project(first));
     const history = useProjectStore.getState().history;
-    const stop = startInlinePreviewMigration();
+    const stop = startInlinePreviewMigration(useProjectStore);
     await settle();
     expect(useProjectStore.getState().history).toBe(history);
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,one");
@@ -153,8 +163,29 @@ describe("preview persistence", () => {
     stop();
   });
 
+  it("does not let an in-flight legacy migration erase newer relink previews", async () => {
+    useProjectStore
+      .getState()
+      .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,legacy" })));
+    const stop = startInlinePreviewMigration(useProjectStore);
+    const relink = putAssetPreviews("a", {
+      thumb: "data:image/png;base64,new",
+      filmstrip: { dataUrl: "data:image/png;base64,new-strip", frames: 12 },
+    });
+    useProjectStore.getState().dropInlinePreviews(["a" as ID]);
+    await relink;
+    await settle();
+
+    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,new");
+    expect((await getFilmstrips(["a"])).get("a")).toEqual({
+      dataUrl: "data:image/png;base64,new-strip",
+      frames: 12,
+    });
+    stop();
+  });
+
   it("keeps leased, trashed, live, saved, and corrupt-row asset ids during GC", async () => {
-    for (const id of ["live", "saved", "leased", "trash", "salvaged", "stale"]) {
+    for (const id of ["live", "saved", "leased", "trash", "salvaged", "snapshot", "stale"]) {
       await putAssetPreviews(id, { thumb: `data:image/png;base64,${id}` });
     }
     const live = project(asset("live"));
@@ -166,12 +197,15 @@ describe("preview persistence", () => {
       raw: '{"mediaLibrary":[{"id":"salvaged"}], broken',
     });
     trashed.add("trash");
+    snapshotJson.push('{"mediaLibrary":[{"id":"snapshot"}]}');
     const release = leasePreview("leased");
 
     expect(await collectPreviewGarbage(() => useProjectStore.getState().project)).toBe(1);
-    expect(await getThumbs(["live", "saved", "leased", "trash", "salvaged", "stale"])).toEqual(
+    expect(
+      await getThumbs(["live", "saved", "leased", "trash", "salvaged", "snapshot", "stale"]),
+    ).toEqual(
       new Map(
-        ["live", "saved", "leased", "trash", "salvaged"].map((id) => [
+        ["live", "saved", "leased", "trash", "salvaged", "snapshot"].map((id) => [
           id,
           `data:image/png;base64,${id}`,
         ]),

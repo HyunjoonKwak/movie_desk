@@ -177,6 +177,15 @@ try {
   result.heapAfterReload = await heap();
 
   // 6. Single edit cost with a large library: rename the project and wait for the save badge.
+  // Let visible previews finish their lazy IndexedDB read and image decode so
+  // that startup paint is not accidentally charged to the unrelated rename.
+  await page.locator("[data-asset-card] img").first().waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll("[data-asset-card] img")].every(
+      (image) => image instanceof HTMLImageElement && image.complete,
+    ),
+  );
+  await page.waitForTimeout(500);
   t0 = performance.now();
   const nameInput = page.locator('header input[type="text"]').first();
   await nameInput.fill("bench");

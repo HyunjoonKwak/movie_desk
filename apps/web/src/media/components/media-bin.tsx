@@ -16,6 +16,7 @@ import {
 import { toast } from "sonner";
 import { useMediaUiStore } from "@/stores/media-ui-store";
 import { useProjectStore } from "@/stores/project-store";
+import { usePreviewStore } from "@/stores/preview-store";
 import { useMediaImport } from "@/media/hooks";
 import { useImportProgressStore } from "@/media/import-progress-store";
 import { useAutoEditStore } from "@/autoedit/autoedit-store";
@@ -374,6 +375,7 @@ export function MediaBin() {
       }
       try {
         removeMediaAsset(asset.id);
+        usePreviewStore.getState().forget([asset.id]);
         refreshTrashCount();
         toast.success(t("media.movedToTrash", { name: asset.name }));
       } catch (err) {
