@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { isMediaKeyLeased } from "@/persistence/media-gc";
 import {
   canRelinkFromFile,
-  clearStalePreviewsForRelink,
+  clearStalePreviewsAfterFailedStore,
   compareRelinkCandidate,
   relinkAssetFromFile,
 } from "../relink";
@@ -195,11 +195,11 @@ describe("relinkAssetFromFile", () => {
   });
 });
 
-describe("clearStalePreviewsForRelink", () => {
+describe("clearStalePreviewsAfterFailedStore", () => {
   it("skips deletion when relink stored previews and reports deletion failure", async () => {
     const clear = vi.fn().mockRejectedValue(new Error("blocked"));
-    await expect(clearStalePreviewsForRelink(true, clear)).resolves.toBe(true);
+    await expect(clearStalePreviewsAfterFailedStore(true, clear)).resolves.toBe("not-needed");
     expect(clear).not.toHaveBeenCalled();
-    await expect(clearStalePreviewsForRelink(false, clear)).resolves.toBe(false);
+    await expect(clearStalePreviewsAfterFailedStore(false, clear)).resolves.toBe("failed");
   });
 });

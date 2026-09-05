@@ -17,6 +17,8 @@ const stored = new Map<
 const trashed = new Set<string>();
 const snapshotJson: string[] = [];
 let beforeBulkPut: (() => Promise<void>) | undefined;
+let beforeBulkDelete: ((ids: string[]) => Promise<void>) | undefined;
+const bulkDeleteCalls: string[][] = [];
 
 vi.mock("dexie", () => {
   class FakeTable {
@@ -26,6 +28,8 @@ vi.mock("dexie", () => {
     };
     bulkGet = async (ids: string[]) => ids.map((id) => rows.get(id));
     bulkDelete = async (ids: string[]) => {
+      bulkDeleteCalls.push(ids);
+      await beforeBulkDelete?.(ids);
       for (const id of ids) rows.delete(id);
     };
     toArray = async () => [...rows.values()];
@@ -80,7 +84,6 @@ vi.mock("../media-gc", () => ({
 }));
 
 import { useProjectStore } from "@/stores/project-store";
-import { clearStalePreviewsForRelink } from "@/media/relink";
 import {
   hasInlinePreviews,
   inlinePreviewsOf,
@@ -127,6 +130,8 @@ beforeEach(() => {
   trashed.clear();
   snapshotJson.length = 0;
   beforeBulkPut = undefined;
+  beforeBulkDelete = undefined;
+  bulkDeleteCalls.length = 0;
   useProjectStore.getState().loadProject(project());
 });
 
@@ -172,7 +177,7 @@ describe("preview persistence", () => {
     });
   });
 
-  it("migrates inline records without adding undo history and keeps inline data it could not store", async () => {
+  it("migrates inline records without adding undo history", async () => {
     const first = asset("a", { thumbDataUrl: "data:image/png;base64,one" });
     useProjectStore.getState().loadProject(project(first));
     const history = useProjectStore.getState().history;
@@ -180,16 +185,81 @@ describe("preview persistence", () => {
     await settle();
     expect(useProjectStore.getState().history).toBe(history);
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,one");
+    stop();
+  });
 
-    useProjectStore
-      .getState()
-      .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,two" })));
+  it("strips inline data when an identical preview row already satisfies migration", async () => {
+    await putAssetPreviews("a", { thumb: "data:image/png;base64,same" });
+    useProjectStore.getState().loadProject(
+      project(asset("a", { thumbDataUrl: "data:image/png;base64,same" })),
+    );
+    const stop = startInlinePreviewMigration(useProjectStore);
+    await settle();
+    expect(useProjectStore.getState().project.mediaLibrary[0]?.thumbDataUrl).toBeUndefined();
+    stop();
+  });
+
+  it("keeps inline data when an existing preview row is stale", async () => {
+    await putAssetPreviews("a", { thumb: "data:image/png;base64,old" });
+    useProjectStore.getState().loadProject(
+      project(asset("a", { thumbDataUrl: "data:image/png;base64,new" })),
+    );
+    const stop = startInlinePreviewMigration(useProjectStore);
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,one");
+    expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,old");
     expect(useProjectStore.getState().project.mediaLibrary[0]?.thumbDataUrl).toBe(
-      "data:image/png;base64,two",
+      "data:image/png;base64,new",
     );
     stop();
+  });
+
+  it("deletes idle asset previews in one batch", async () => {
+    await putAssetPreviews("a", {
+      thumb: "data:image/png;base64,a",
+      filmstrip: { dataUrl: "data:image/png;base64,a-strip", frames: 2 },
+    });
+    await putAssetPreviews("b", {
+      thumb: "data:image/png;base64,b",
+      filmstrip: { dataUrl: "data:image/png;base64,b-strip", frames: 2 },
+    });
+    bulkDeleteCalls.length = 0;
+    await deleteAssetPreviews(["a", "b"]);
+    expect(bulkDeleteCalls).toHaveLength(1);
+    expect(new Set(bulkDeleteCalls[0])).toEqual(
+      new Set(["a:thumb", "a:filmstrip", "b:thumb", "b:filmstrip"]),
+    );
+  });
+
+  it("deletes a captured pending write even when it settles during the batched delete", async () => {
+    rows.set("A:thumb", {
+      id: "A:thumb",
+      assetId: "A",
+      kind: "thumb",
+      dataUrl: "data:image/png;base64,A",
+    });
+    let releaseWrite = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    let writeEntered = false;
+    beforeBulkPut = async () => {
+      writeEntered = true;
+      await blocked;
+    };
+    const xWrite = putAssetPreviews("X", {
+      thumb: "data:image/png;base64,X",
+      filmstrip: { dataUrl: "data:image/png;base64,X-strip", frames: 2 },
+    });
+    await vi.waitFor(() => expect(writeEntered).toBe(true));
+    beforeBulkDelete = async (ids) => {
+      if (!ids.includes("A:thumb")) return;
+      releaseWrite();
+      await xWrite;
+    };
+
+    await deleteAssetPreviews(["A", "X"]);
+    expect(await getThumbs(["A", "X"])).toEqual(new Map());
+    expect(bulkDeleteCalls).toHaveLength(2);
   });
 
   it("serializes migration after an already-queued relink preview write", async () => {
@@ -241,20 +311,15 @@ describe("preview persistence", () => {
     stop();
   });
 
-  it("keeps a relink fallback inline when clearing the old preview row fails", async () => {
+  it("does not strip an inline fallback during an identical relink", () => {
     useProjectStore.getState().loadProject(
-      project(asset("a", { thumbDataUrl: "data:image/png;base64,old-inline" })),
+      project(asset("a", { thumbDataUrl: "data:image/png;base64,new-inline" })),
     );
-    const cleared = await clearStalePreviewsForRelink(false, async () => {
-      throw new Error("blocked");
-    });
-    if (cleared) useProjectStore.getState().dropInlinePreviews(["a" as ID]);
     useProjectStore.getState().relinkMediaAsset("a" as ID, {
       sizeBytes: 2,
       mime: "image/png",
-      dropProxy: true,
-      previewsStored: false,
-      thumbDataUrl: "data:image/png;base64,new-inline",
+      dropProxy: false,
+      previewsStored: true,
     });
     expect(useProjectStore.getState().project.mediaLibrary[0]?.thumbDataUrl).toBe(
       "data:image/png;base64,new-inline",

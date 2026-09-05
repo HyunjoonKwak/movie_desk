@@ -27,16 +27,18 @@ export type RelinkVerdict =
 export const canRelinkFromFile = (asset: MediaAsset): boolean =>
   !asset.sourceRef || asset.sourceRef.kind === "opfs";
 
-export const clearStalePreviewsForRelink = async (
+export type RelinkPreviewClearResult = "not-needed" | "cleared" | "failed";
+
+export const clearStalePreviewsAfterFailedStore = async (
   previewsStored: boolean,
   clear: () => Promise<void>,
-): Promise<boolean> => {
-  if (previewsStored) return true;
+): Promise<RelinkPreviewClearResult> => {
+  if (previewsStored) return "not-needed";
   try {
     await clear();
-    return true;
+    return "cleared";
   } catch {
-    return false;
+    return "failed";
   }
 };
 

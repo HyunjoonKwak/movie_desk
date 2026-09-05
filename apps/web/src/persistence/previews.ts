@@ -96,10 +96,14 @@ export const putAssetPreviews = async (
     .catch(() => false)
     .then(async () => {
       let writtenRows = rows;
+      let allRowsSatisfied = true;
       await getDb().transaction("rw", getDb().previews, async () => {
         if (onlyIfAbsent && rows.length > 0) {
           const existing = await getDb().previews.bulkGet(rows.map((row) => row.id));
           writtenRows = rows.filter((_row, index) => !existing[index]);
+          allRowsSatisfied = rows.every(
+            (row, index) => !existing[index] || existing[index]?.dataUrl === row.dataUrl,
+          );
         }
         if (writtenRows.length > 0) await getDb().previews.bulkPut(writtenRows);
         if (missing.length > 0) {
@@ -123,7 +127,7 @@ export const putAssetPreviews = async (
         };
         for (const listener of listeners) listener(assetId, written, { replaceMissing });
       }
-      return changed;
+      return changed || (onlyIfAbsent && allRowsSatisfied);
     });
   previewWrites.set(assetId, write);
   try {
@@ -153,31 +157,37 @@ export const getFilmstrips = async (
 };
 
 export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<void> => {
-  const immediate = assetIds.filter((assetId) => !previewWrites.has(assetId));
+  const immediate: string[] = [];
+  const pending: [assetId: string, write: Promise<boolean>][] = [];
+  for (const assetId of assetIds) {
+    const write = previewWrites.get(assetId);
+    if (write) pending.push([assetId, write]);
+    else immediate.push(assetId);
+  }
+
+  const operations: Promise<unknown>[] = [];
   if (immediate.length > 0) {
-    await getDb().previews.bulkDelete(
-      immediate.flatMap((assetId) => [rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]),
+    operations.push(
+      getDb().previews.bulkDelete(
+        immediate.flatMap((assetId) => [rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]),
+      ),
     );
   }
-  const pending = assetIds.filter((assetId) => previewWrites.has(assetId));
-  await Promise.all(
-    pending.map(async (assetId) => {
-      const previous = previewWrites.get(assetId);
-      if (!previous) return;
-      const deletion = previous
-        .catch(() => false)
-        .then(async () => {
-          await getDb().previews.bulkDelete([rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]);
-          return true;
-        });
-      previewWrites.set(assetId, deletion);
-      try {
-        await deletion;
-      } finally {
+  for (const [assetId, write] of pending) {
+    const deletion = write
+      .catch(() => false)
+      .then(async () => {
+        await getDb().previews.bulkDelete([rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]);
+        return true;
+      });
+    previewWrites.set(assetId, deletion);
+    operations.push(
+      deletion.finally(() => {
         if (previewWrites.get(assetId) === deletion) previewWrites.delete(assetId);
-      }
-    }),
-  );
+      }),
+    );
+  }
+  await Promise.all(operations);
 };
 
 // Asset ids with at least one preview; an index scan, so the pictures

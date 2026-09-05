@@ -57,7 +57,7 @@ import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
 import {
-  clearStalePreviewsForRelink,
+  clearStalePreviewsAfterFailedStore,
   compareRelinkCandidate,
   relinkAssetFromFile,
 } from "@/media/relink";
@@ -84,7 +84,6 @@ export function MediaBin() {
   const activeAssetId = useMediaUiStore((s) => s.activeAssetId);
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
-  const dropInlinePreviews = useProjectStore((s) => s.dropInlinePreviews);
   const relinkInputRef = useRef<HTMLInputElement>(null);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -397,10 +396,9 @@ export function MediaBin() {
         const patch = await relinkAssetFromFile(asset, file, { identical });
         // If persistence failed, remove old stored rows so migration can fill
         // empty slots; on delete failure keep the inline copy visible.
-        const cleared = await clearStalePreviewsForRelink(patch.previewsStored, () =>
+        await clearStalePreviewsAfterFailedStore(patch.previewsStored, () =>
           deleteAssetPreviews([asset.id]),
         );
-        if (cleared) dropInlinePreviews([asset.id]);
         usePreviewStore.getState().forget([asset.id]);
         relinkMediaAsset(asset.id, patch);
         toast.success(t("media.relinked", { name: asset.name }));
@@ -408,7 +406,7 @@ export function MediaBin() {
         toast.error(`${t("media.relinkFailed")}: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [dropInlinePreviews, relinkMediaAsset, t],
+    [relinkMediaAsset, t],
   );
 
   const toggleRangeEditing = useCallback((assetId: ID) => {
