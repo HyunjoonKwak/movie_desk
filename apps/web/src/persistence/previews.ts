@@ -106,7 +106,8 @@ export const putAssetPreviews = async (
           await getDb().previews.bulkDelete(missing.map((kind) => rowId(assetId, kind)));
         }
       });
-      if (writtenRows.length > 0 || missing.length > 0) {
+      const changed = writtenRows.length > 0 || missing.length > 0;
+      if (changed) {
         const thumb = writtenRows.find((row) => row.kind === "thumb");
         const filmstrip = writtenRows.find((row) => row.kind === "filmstrip");
         const written: AssetPreviews = {
@@ -122,7 +123,7 @@ export const putAssetPreviews = async (
         };
         for (const listener of listeners) listener(assetId, written, { replaceMissing });
       }
-      return true;
+      return changed;
     });
   previewWrites.set(assetId, write);
   try {
@@ -152,9 +153,17 @@ export const getFilmstrips = async (
 };
 
 export const deleteAssetPreviews = async (assetIds: readonly string[]): Promise<void> => {
+  const immediate = assetIds.filter((assetId) => !previewWrites.has(assetId));
+  if (immediate.length > 0) {
+    await getDb().previews.bulkDelete(
+      immediate.flatMap((assetId) => [rowId(assetId, "thumb"), rowId(assetId, "filmstrip")]),
+    );
+  }
+  const pending = assetIds.filter((assetId) => previewWrites.has(assetId));
   await Promise.all(
-    assetIds.map(async (assetId) => {
-      const previous = previewWrites.get(assetId) ?? Promise.resolve(true);
+    pending.map(async (assetId) => {
+      const previous = previewWrites.get(assetId);
+      if (!previous) return;
       const deletion = previous
         .catch(() => false)
         .then(async () => {
@@ -243,11 +252,11 @@ export const startInlinePreviewMigration = (store: PreviewMigrationStore): (() =
         const stored: MediaAsset[] = [];
         for (const asset of inline) {
           try {
-            await putAssetPreviews(asset.id, inlinePreviewsOf(asset), {
+            const moved = await putAssetPreviews(asset.id, inlinePreviewsOf(asset), {
               replaceMissing: false,
               onlyIfAbsent: true,
             });
-            stored.push(asset);
+            if (moved) stored.push(asset);
           } catch {
             // Keep the inline copy: better a fat record than no picture.
           }

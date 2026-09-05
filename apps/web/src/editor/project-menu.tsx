@@ -129,12 +129,13 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
 
   const onExport = async () => {
     const project = useProjectStore.getState().project;
+    let payload = project;
     try {
-      downloadProjectJson(await withInlinePreviews(project));
+      payload = await withInlinePreviews(project);
     } catch (err) {
       toast.error(`${t("project.exportFailed")}: ${err instanceof Error ? err.message : err}`);
-      downloadProjectJson(project);
     }
+    downloadProjectJson(payload);
   };
 
   const onImport = async (file: File) => {

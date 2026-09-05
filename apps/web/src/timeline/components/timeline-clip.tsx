@@ -3,7 +3,11 @@
 import { useMemo, useRef } from "react";
 import type { Clip } from "@movie-desk/core";
 import { isMediaClip, isAdjustmentClip } from "@movie-desk/core";
-import { useAssetFilmstrip, useAssetThumb } from "@/stores/preview-store";
+import {
+  useAssetFilmstrip,
+  useAssetThumb,
+  usePreviewVisibility,
+} from "@/stores/preview-store";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
@@ -39,8 +43,10 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
     if (!isMediaClip(clip)) return null;
     return media.find((a) => a.id === clip.assetId) ?? null;
   }, [clip, media]);
+  const clipRef = useRef<HTMLDivElement>(null);
+  const previewVisible = usePreviewVisibility(clipRef);
   const thumb = useAssetThumb(asset);
-  const strip = useAssetFilmstrip(asset);
+  const strip = useAssetFilmstrip(asset, previewVisible);
 
   const dragRef = useRef<DragState>({
     mode: null,
@@ -152,6 +158,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   return (
     <ClipContextMenu clipId={clip.id}>
       <div
+        ref={clipRef}
         data-clip={clip.id}
         className={cn(
           "absolute top-1 select-none overflow-hidden rounded-md border text-meta",

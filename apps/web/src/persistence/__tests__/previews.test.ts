@@ -80,6 +80,7 @@ vi.mock("../media-gc", () => ({
 }));
 
 import { useProjectStore } from "@/stores/project-store";
+import { clearStalePreviewsForRelink } from "@/media/relink";
 import {
   hasInlinePreviews,
   inlinePreviewsOf,
@@ -171,7 +172,7 @@ describe("preview persistence", () => {
     });
   });
 
-  it("migrates inline records without adding undo history and preserves an existing stored preview", async () => {
+  it("migrates inline records without adding undo history and keeps inline data it could not store", async () => {
     const first = asset("a", { thumbDataUrl: "data:image/png;base64,one" });
     useProjectStore.getState().loadProject(project(first));
     const history = useProjectStore.getState().history;
@@ -183,8 +184,11 @@ describe("preview persistence", () => {
     useProjectStore
       .getState()
       .loadProject(project(asset("a", { thumbDataUrl: "data:image/png;base64,two" })));
-    await settle();
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,one");
+    expect(useProjectStore.getState().project.mediaLibrary[0]?.thumbDataUrl).toBe(
+      "data:image/png;base64,two",
+    );
     stop();
   });
 
@@ -227,16 +231,34 @@ describe("preview persistence", () => {
       project(asset("a", { thumbDataUrl: "data:image/png;base64,new-picture" })),
     );
 
-    // relink's storePreviews failed, so its patch carried the new preview
-    // inline. The media-bin handler clears the old row before applying it.
-    const storePreviews = vi.fn().mockRejectedValue(new Error("preview store unavailable"));
-    await storePreviews().catch(() => undefined);
+    // relink's storePreviews failure made its patch carry the new preview
+    // inline; the handler clears the old row before applying that patch.
     await deleteAssetPreviews(["a"]);
     const stop = startInlinePreviewMigration(useProjectStore);
     await settle();
 
     expect((await getThumbs(["a"])).get("a")).toBe("data:image/png;base64,new-picture");
     stop();
+  });
+
+  it("keeps a relink fallback inline when clearing the old preview row fails", async () => {
+    useProjectStore.getState().loadProject(
+      project(asset("a", { thumbDataUrl: "data:image/png;base64,old-inline" })),
+    );
+    const cleared = await clearStalePreviewsForRelink(false, async () => {
+      throw new Error("blocked");
+    });
+    if (cleared) useProjectStore.getState().dropInlinePreviews(["a" as ID]);
+    useProjectStore.getState().relinkMediaAsset("a" as ID, {
+      sizeBytes: 2,
+      mime: "image/png",
+      dropProxy: true,
+      previewsStored: false,
+      thumbDataUrl: "data:image/png;base64,new-inline",
+    });
+    expect(useProjectStore.getState().project.mediaLibrary[0]?.thumbDataUrl).toBe(
+      "data:image/png;base64,new-inline",
+    );
   });
 
   it("keeps leased, trashed, live, saved, and corrupt-row asset ids during GC", async () => {

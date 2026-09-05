@@ -27,10 +27,8 @@ const retainedFilmstrips = new Map<string, number>();
 const askedThumbs = new Set<string>();
 const askedFilmstrips = new Set<string>();
 let previewGeneration = 0;
-const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>): void => {
-  const prior = filmstripOrder.indexOf(assetId);
-  if (prior >= 0) filmstripOrder.splice(prior, 1);
-  filmstripOrder.push(assetId);
+const evictOverflow = (filmstrips: Record<string, Filmstrip>): string[] => {
+  const evictedIds: string[] = [];
   let candidates = filmstripOrder.length;
   while (filmstripOrder.length > MAX_FILMSTRIPS && candidates > 0) {
     candidates--;
@@ -42,34 +40,34 @@ const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>):
     }
     delete filmstrips[evicted];
     askedFilmstrips.delete(evicted);
+    evictedIds.push(evicted);
   }
+  return evictedIds;
+};
+
+const touchFilmstrip = (assetId: string, filmstrips: Record<string, Filmstrip>): void => {
+  const prior = filmstripOrder.indexOf(assetId);
+  if (prior >= 0) filmstripOrder.splice(prior, 1);
+  filmstripOrder.push(assetId);
+  evictOverflow(filmstrips);
 };
 
 const pruneFilmstrips = (): void => {
+  if (filmstripOrder.length <= MAX_FILMSTRIPS) return;
   usePreviewStore.setState((state) => {
     const filmstrips = { ...state.filmstrips };
-    let candidates = filmstripOrder.length;
-    while (filmstripOrder.length > MAX_FILMSTRIPS && candidates > 0) {
-      candidates--;
-      const evicted = filmstripOrder.shift();
-      if (!evicted) break;
-      if (retainedFilmstrips.has(evicted)) {
-        filmstripOrder.push(evicted);
-        continue;
-      }
-      delete filmstrips[evicted];
-      askedFilmstrips.delete(evicted);
-    }
-    return { filmstrips };
+    return evictOverflow(filmstrips).length > 0 ? { filmstrips } : {};
   });
 };
 
 export const retainFilmstrip = (assetId: string): (() => void) => {
+  const generation = previewGeneration;
   retainedFilmstrips.set(assetId, (retainedFilmstrips.get(assetId) ?? 0) + 1);
   let released = false;
   return () => {
     if (released) return;
     released = true;
+    if (generation !== previewGeneration) return;
     const count = (retainedFilmstrips.get(assetId) ?? 1) - 1;
     if (count <= 0) retainedFilmstrips.delete(assetId);
     else retainedFilmstrips.set(assetId, count);
@@ -101,6 +99,7 @@ export const usePreviewStore = create<PreviewState>((set) => ({
     askedThumbs.clear();
     askedFilmstrips.clear();
     filmstripOrder.length = 0;
+    retainedFilmstrips.clear();
     set({ thumbs: {}, filmstrips: {} });
   },
   forget: (assetIds) =>
@@ -209,17 +208,20 @@ export const useAssetThumb = (asset: ThumbSource, shouldLoad = true): string | u
   return inline ?? stored;
 };
 
-export const useAssetFilmstrip = (asset: StripSource): Filmstrip | undefined => {
+export const useAssetFilmstrip = (
+  asset: StripSource,
+  shouldLoad = true,
+): Filmstrip | undefined => {
   const id = asset?.id;
   const inline = asset?.filmstripDataUrl;
   const frames = asset?.filmstripFrames ?? 0;
   const stored = usePreviewStore((s) => (id ? s.filmstrips[id] : undefined));
   useEffect(() => {
-    if (id && !inline) return retainFilmstrip(id);
-  }, [id, inline]);
+    if (shouldLoad && id && !inline) return retainFilmstrip(id);
+  }, [id, inline, shouldLoad]);
   useEffect(() => {
-    if (id && !inline && stored === undefined) requestFilmstrips([id]);
-  }, [id, inline, stored]);
+    if (shouldLoad && id && !inline && stored === undefined) requestFilmstrips([id]);
+  }, [id, inline, shouldLoad, stored]);
   return useMemo(() => (inline ? { dataUrl: inline, frames } : stored), [frames, inline, stored]);
 };
 

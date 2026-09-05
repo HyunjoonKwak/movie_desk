@@ -2,7 +2,12 @@ import type { ID, MediaAsset } from "@movie-desk/core";
 import { describe, expect, it, vi } from "vitest";
 
 import { isMediaKeyLeased } from "@/persistence/media-gc";
-import { canRelinkFromFile, compareRelinkCandidate, relinkAssetFromFile } from "../relink";
+import {
+  canRelinkFromFile,
+  clearStalePreviewsForRelink,
+  compareRelinkCandidate,
+  relinkAssetFromFile,
+} from "../relink";
 
 const asset = (patch: Partial<MediaAsset> = {}): MediaAsset => ({
   id: "a" as ID,
@@ -84,7 +89,12 @@ describe("relinkAssetFromFile", () => {
     const a = asset({ proxyPath: "a__proxy.mp4" });
     const { calls, deps: d } = deps();
     const patch = await relinkAssetFromFile(a, file("trip.mp4", 1000), { identical: true }, d);
-    expect(patch).toEqual({ sizeBytes: 1000, mime: "video/mp4", dropProxy: false });
+    expect(patch).toEqual({
+      sizeBytes: 1000,
+      mime: "video/mp4",
+      dropProxy: false,
+      previewsStored: true,
+    });
     expect(calls.replaced).toEqual(["a__trip.mp4"]);
     expect(calls.removed.some((key) => key.startsWith("cache__"))).toBe(true);
     expect(calls.removed).not.toContain("a__proxy.mp4");
@@ -109,6 +119,7 @@ describe("relinkAssetFromFile", () => {
       filmstripDataUrl: null,
       filmstripFrames: null,
       waveformPeaks: [0.5, 0.25],
+      previewsStored: true,
     });
     expect(calls.removed).toContain("a__proxy.mp4");
   });
@@ -129,6 +140,28 @@ describe("relinkAssetFromFile", () => {
     expect(patch.thumbDataUrl).toBe("data:image/png;base64,vthumb");
     expect(patch.filmstripDataUrl).toBe("data:image/png;base64,strip");
     expect(patch.filmstripFrames).toBe(10);
+    expect(patch.previewsStored).toBe(false);
+  });
+
+  it("reports preview storage failure even when preview generation also fails", async () => {
+    const { deps: d } = deps();
+    const patch = await relinkAssetFromFile(
+      asset(),
+      file("other.mp4", 2048),
+      { identical: false },
+      {
+        ...d,
+        videoThumb: async () => {
+          throw new Error("decode");
+        },
+        storePreviews: async () => {
+          throw new Error("quota");
+        },
+      },
+    );
+    expect(patch.thumbDataUrl).toBeNull();
+    expect(patch.filmstripDataUrl).toBeNull();
+    expect(patch.previewsStored).toBe(false);
   });
 
   it("releases the GC lease when the write fails", async () => {
@@ -159,5 +192,14 @@ describe("relinkAssetFromFile", () => {
         }),
       ),
     ).toBe(false);
+  });
+});
+
+describe("clearStalePreviewsForRelink", () => {
+  it("skips deletion when relink stored previews and reports deletion failure", async () => {
+    const clear = vi.fn().mockRejectedValue(new Error("blocked"));
+    await expect(clearStalePreviewsForRelink(true, clear)).resolves.toBe(true);
+    expect(clear).not.toHaveBeenCalled();
+    await expect(clearStalePreviewsForRelink(false, clear)).resolves.toBe(false);
   });
 });

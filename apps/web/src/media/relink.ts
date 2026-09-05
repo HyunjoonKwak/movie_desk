@@ -27,6 +27,19 @@ export type RelinkVerdict =
 export const canRelinkFromFile = (asset: MediaAsset): boolean =>
   !asset.sourceRef || asset.sourceRef.kind === "opfs";
 
+export const clearStalePreviewsForRelink = async (
+  previewsStored: boolean,
+  clear: () => Promise<void>,
+): Promise<boolean> => {
+  if (previewsStored) return true;
+  try {
+    await clear();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 // Size is the fingerprint we always have; when it is unknown (older records)
 // the name has to match instead.
 export const compareRelinkCandidate = (asset: MediaAsset, file: File): RelinkVerdict => {
@@ -62,6 +75,7 @@ export interface RelinkPatch {
   readonly filmstripDataUrl?: string | null;
   readonly filmstripFrames?: number | null;
   readonly waveformPeaks?: readonly number[] | null;
+  readonly previewsStored: boolean;
 }
 
 export interface RelinkDependencies {
@@ -141,7 +155,7 @@ export const relinkAssetFromFile = async (
     await deps.replace(asset.opfsPath, file);
     if (asset.kind !== "image") await deps.remove(audioVariantKey(asset));
     const base = { sizeBytes: file.size, mime: file.type || asset.mime };
-    if (identical) return { ...base, dropProxy: false };
+    if (identical) return { ...base, dropProxy: false, previewsStored: true };
     if (asset.proxyPath) await deps.remove(asset.proxyPath);
     const probe = await deps.probe(file).catch(() => null);
     const container =
@@ -177,6 +191,7 @@ export const relinkAssetFromFile = async (
       videoCodec: container?.videoCodec ?? null,
       audioCodec: container?.audioCodec ?? null,
       ...visuals,
+      previewsStored: stored,
       ...(stored ? { thumbDataUrl: null, filmstripDataUrl: null, filmstripFrames: null } : {}),
     };
   } finally {

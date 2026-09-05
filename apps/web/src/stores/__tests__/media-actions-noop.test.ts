@@ -70,6 +70,7 @@ describe("media action no-ops", () => {
         sizeBytes: 10,
         mime: "video/mp4",
         dropProxy: false,
+        previewsStored: true,
       }),
     );
     resetProject();

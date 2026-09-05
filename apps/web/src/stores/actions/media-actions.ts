@@ -16,6 +16,7 @@ export interface RelinkAssetPatch {
   readonly filmstripDataUrl?: string | null;
   readonly filmstripFrames?: number | null;
   readonly waveformPeaks?: readonly number[] | null;
+  readonly previewsStored: boolean;
 }
 
 // Applies an optional-or-null patch field immutably.
