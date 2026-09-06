@@ -82,3 +82,25 @@ mux timing defect, not WSOLA output length drift.
 
 Feature gate: **PASS**, all 9 steps; web unit 558, desktop 72, scripts 11, E2E 56.
 Gate benchmark: DSP 119.89ms, first start 73.70ms, max pitch slice 0.315ms.
+
+AAC correction: local 128kbps stereo calibration finds **2112 samples** of delay.
+Reserve the muxer's existing edit list, retain all encoded packets, and expose
+only requested samples after 4096-sample preroll plus measured priming. ffprobe
+confirmed **VP9 1.000000s / AAC 1.000000s / container 1.000000s** (30 video frames,
+58 AAC packets retained). No packet or end audio is truncated. New mux unit test
+compares every packet byte before and after presentation editing. Click onset
+and final 100ms RMS are exercised in the browser regression; final measured
+values will be appended after the coordinated port becomes available.
+
+Feature gate core total: 134 tests; feature commit `00e4917`.
+
+AAC boundary regression PASS: a source click at 0.5s, stretched at 2×, begins at
+**0.251542s** versus target 0.250000s (**+1.542ms**, less than one 30fps frame).
+Final 100ms decoded RMS **0.250185** versus source sinusoid RMS **0.258950**
+(96.6%, within the 80–120% codec tolerance). Browser decoded length 1.001333s
+(+1.333ms), HTMLMediaElement container duration **1.000000s**. ffprobe also reports
+video/audio/container **1.000000s**. All 58 AAC packets are retained; the file and
+probe are in `assets/2026-09-06-pitch-speed/` for review.
+
+AAC follow-up gate: **PASS**, all 9 steps; core 134, web 559, desktop 72,
+scripts 11, E2E 56. Full summary: `2026-09-06-pitch-speed-aac-gate.md`.

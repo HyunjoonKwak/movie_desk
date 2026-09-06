@@ -20,3 +20,26 @@ trim, duration, speed curve and preserve flag. PCM cache is bounded by bytes.
 No DSP runs inline as a worker-error fallback: export reports an error, preview
 continues the immediate historical path. Linear interpolation improves the old
 nearest-neighbour path but does not claim band-limited resampling.
+
+## Existing AAC timing defect (separate approved export fix)
+
+The pinned mediabunny 1.55.5 has no priming compensation option and rejects
+negative packet timestamps when muxing. Its existing positive-start edit-list
+writer can reserve the required metadata. The same 1.066667s issue is reported
+upstream in [issue 447](https://github.com/Vanilagy/mediabunny/issues/447), with
+backend-dependent delay discussed in [issue 444](https://github.com/Vanilagy/mediabunny/issues/444).
+
+Calibrate the local AAC encoder/decoder with a deterministic probe once per
+bitrate. The measured delay on this Mac is 2112 samples; do not assume 1024 or
+choose a delay from a user-agent string. Add 4096 silent preroll samples before
+user PCM and a silent tail after it so codec startup/end behavior cannot erase
+the requested samples. Retain every encoded packet and all sample-table/data
+bytes. Rewrite only the reserved audio edit-list, audio track duration and movie
+duration to present `[preroll + measured delay, + requested sample count)`.
+The raw media duration stays truthful. This is container timing metadata work,
+not cutting compressed audio packets or modifying the dependency.
+
+Mediabunny's own duration-from-media APIs may report the retained raw tail;
+HTMLMediaElement, decodeAudioData and ffprobe are the presentation boundary
+oracles. Unit tests verify every encoded packet byte survives the edit and the
+first packet receives the expected negative demuxed presentation timestamp.

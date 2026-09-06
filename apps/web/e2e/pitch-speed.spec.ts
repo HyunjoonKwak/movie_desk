@@ -2,7 +2,7 @@ import { ALL_FORMATS, BufferSource, Input } from "mediabunny";
 import { expect, test } from "@playwright/test";
 import { configurePage, importMediaFiles, mediaCard } from "./support";
 
-const wav = (seconds: number): Buffer => {
+const wav = (seconds: number, diagnostic = false): Buffer => {
   const frames = seconds * 48000;
   const out = Buffer.alloc(44 + frames * 4);
   out.write("RIFF");
@@ -18,17 +18,26 @@ const wav = (seconds: number): Buffer => {
   out.write("data", 36);
   out.writeUInt32LE(frames * 4, 40);
   for (let i = 0; i < frames; i++) {
-    const sample = Math.round(Math.sin((2 * Math.PI * 440 * i) / 48000) * 12000);
+    const audible = !diagnostic || (i >= 24000 && i < 26400) || i >= frames - 9600;
+    const sample = audible ? Math.round(Math.sin((2 * Math.PI * 440 * i) / 48000) * 12000) : 0;
     out.writeInt16LE(sample, 44 + i * 4);
     out.writeInt16LE(-sample, 46 + i * 4);
   }
   return out;
 };
 
-const seedAudio = async (page: import("@playwright/test").Page, seconds: number) => {
+const seedAudio = async (
+  page: import("@playwright/test").Page,
+  seconds: number,
+  diagnostic = false,
+) => {
   await configurePage(page);
   await page.goto("/editor");
-  await importMediaFiles(page, { name: "tone.wav", mimeType: "audio/wav", buffer: wav(seconds) });
+  await importMediaFiles(page, {
+    name: "tone.wav",
+    mimeType: "audio/wav",
+    buffer: wav(seconds, diagnostic),
+  });
   await expect(mediaCard(page, "tone.wav")).toBeVisible();
   await page.waitForTimeout(500);
   if ((await page.locator("[data-clip]").count()) === 0) {
@@ -49,7 +58,7 @@ const seedAudio = async (page: import("@playwright/test").Page, seconds: number)
 
 test("pitch toggle is one undo and exported duration matches the timeline", async ({ page }) => {
   test.setTimeout(180000);
-  const toggle = await seedAudio(page, 2);
+  const toggle = await seedAudio(page, 2, true);
   await expect(toggle).not.toBeChecked();
   await toggle.check();
   await expect(toggle).toBeChecked();
@@ -73,6 +82,69 @@ test("pitch toggle is one undo and exported duration matches the timeline", asyn
   const video = (await input.getPrimaryVideoTrack())!;
   const durationSec = await video.computeDuration();
   input.dispose();
+  await file.saveAs(test.info().outputPath("pitch-aac-boundary.mp4"));
+  expect(Math.abs(durationSec - 1)).toBeLessThanOrEqual(1 / 30);
+  const aacSupported = await page.evaluate(
+    async () =>
+      typeof AudioEncoder !== "undefined" &&
+      (
+        await AudioEncoder.isConfigSupported({
+          codec: "mp4a.40.2",
+          sampleRate: 48000,
+          numberOfChannels: 2,
+          bitrate: 128000,
+        })
+      ).supported,
+  );
+  if (!aacSupported) {
+    test
+      .info()
+      .annotations.push({
+        type: "codec",
+        description: "AAC unavailable; video-only export length verified",
+      });
+    return;
+  }
+  const audio = await page.evaluate(
+    async (data) => {
+      const bytes = new Uint8Array(data);
+      const ctx = new OfflineAudioContext(2, 1, 48000);
+      const buffer = await ctx.decodeAudioData(bytes.slice().buffer);
+      const pcm = buffer.getChannelData(0);
+      let onset = -1;
+      for (let i = 0; i < pcm.length; i++)
+        if (Math.abs(pcm[i]!) > 0.05) {
+          onset = i / buffer.sampleRate;
+          break;
+        }
+      let energy = 0;
+      for (let i = 43200; i < 48000; i++) energy += (pcm[i] ?? 0) ** 2;
+      const video = document.createElement("video");
+      video.src = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = reject;
+      });
+      const containerDuration = video.duration;
+      URL.revokeObjectURL(video.src);
+      return {
+        duration: buffer.duration,
+        onset,
+        tailRms: Math.sqrt(energy / 4800),
+        containerDuration,
+      };
+    },
+    [...bytes],
+  );
+  // 0.5s source click maps to 0.25s at 2×. AAC edit-list presentation must
+  // preserve both this onset and the requested last 100ms (RMS ≈0.259).
+  expect(Math.abs(audio.onset - 0.25)).toBeLessThanOrEqual(1 / 30);
+  expect(audio.tailRms).toBeGreaterThan(0.259 * 0.8);
+  expect(audio.tailRms).toBeLessThan(0.259 * 1.2);
+  expect(Math.abs(audio.duration - 1)).toBeLessThanOrEqual(1 / 30);
+  expect(Math.abs(audio.containerDuration - 1)).toBeLessThanOrEqual(1 / 30);
+  // biome-ignore lint/suspicious/noConsole: boundary regression evidence.
+  console.log("AAC boundary", audio);
   expect(Math.abs(durationSec - 1)).toBeLessThanOrEqual(1 / 30);
 });
 

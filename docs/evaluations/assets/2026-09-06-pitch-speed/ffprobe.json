@@ -1,0 +1,25 @@
+{
+    "programs": [
+
+    ],
+    "stream_groups": [
+
+    ],
+    "streams": [
+        {
+            "codec_name": "vp9",
+            "start_time": "0.000000",
+            "duration": "1.000000",
+            "nb_frames": "30"
+        },
+        {
+            "codec_name": "aac",
+            "start_time": "0.000000",
+            "duration": "1.000000",
+            "nb_frames": "58"
+        }
+    ],
+    "format": {
+        "duration": "1.000000"
+    }
+}

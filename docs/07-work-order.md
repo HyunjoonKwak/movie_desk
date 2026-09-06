@@ -516,3 +516,12 @@ Worker 60s stereo 2×: 116.59ms DSP / 179.94ms first start / 0.29ms new main cop
 Existing native AudioContext cold startup exceeds 16ms; DSP introduces no such stall.
 Separate coordinator-approved **기존 결함 수정** follows: AAC priming/end padding
 currently makes a 1s export 1.066667s despite exact 1s video and mixed PCM.
+
+B′2 기능 커밋: `00e4917` (`pnpm gate` 9/9 PASS; core 134, web 558,
+desktop 72, scripts 11; E2E 56). 후속 기존 결함 수정은 AAC 지연을 로컬
+보정(현재 2112 samples)하고 preroll 4096을 추가한 뒤 edit list만 조정한다.
+패킷·샘플 테이블은 모두 보존하며 ffprobe 영상/오디오/컨테이너 1.000000초 확인.
+
+| Follow-up | State | Evidence |
+| --- | --- | --- |
+| 기존 결함 수정 — AAC priming/padding presentation | PASS, gate 9/9; core 134 / web 559 / desktop 72 / scripts 11; E2E 56 | `docs/evaluations/2026-09-06-pitch-speed-aac-gate.md`; click +1.542ms, tail RMS 0.250185, ffprobe 1.000000s |

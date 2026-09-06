@@ -1,3 +1,4 @@
+import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
@@ -95,6 +96,9 @@ export class WebCodecsExporter implements Exporter {
         preset.audioCodec === "aac" &&
         (await aacEncoderSupported(preset.audioBitrateKbps));
 
+      const primingSamples = includeAudio
+        ? await measureAacPriming(preset.audioBitrateKbps * 1000)
+        : 0;
       const muxer = new Mp4Writer({
         video: {
           codec: codecForMuxer(preset.videoCodec),
@@ -103,7 +107,18 @@ export class WebCodecsExporter implements Exporter {
           frameRate: preset.fps,
         },
         ...(includeAudio
-          ? { audio: { codec: "aac", numberOfChannels: 2, sampleRate: 48_000 } }
+          ? {
+              audio: {
+                codec: "aac",
+                numberOfChannels: 2,
+                sampleRate: 48_000,
+                presentation: {
+                  offsetSamples: AAC_PREROLL_SAMPLES + primingSamples,
+                  lengthSamples: Math.round(exportDurationMs * 48),
+                  sampleRate: 48_000,
+                },
+              },
+            }
           : {}),
       });
 
@@ -202,6 +217,22 @@ export class WebCodecsExporter implements Exporter {
               numberOfChannels: 2,
               bitrate: preset.audioBitrateKbps * 1000,
             });
+            const encodePadding = (atSample: number) => {
+              const padding = new AudioData({
+                format: "f32-planar",
+                sampleRate: mixer.sampleRate,
+                numberOfChannels: 2,
+                numberOfFrames: AAC_PREROLL_SAMPLES,
+                timestamp: Math.round((atSample / mixer.sampleRate) * 1_000_000),
+                data: new Float32Array(AAC_PREROLL_SAMPLES * 2),
+              });
+              try {
+                audioEncoder.encode(padding);
+              } finally {
+                padding.close();
+              }
+            };
+            encodePadding(0);
             const encoderChunkSize = 1024;
             for await (const chunk of mixer.chunks(mixOptions)) {
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
@@ -219,7 +250,9 @@ export class WebCodecsExporter implements Exporter {
                   sampleRate: chunk.sampleRate,
                   numberOfFrames,
                   numberOfChannels: 2,
-                  timestamp: Math.round(((chunk.startSample + i) / chunk.sampleRate) * 1_000_000),
+                  timestamp: Math.round(
+                    ((AAC_PREROLL_SAMPLES + chunk.startSample + i) / chunk.sampleRate) * 1_000_000,
+                  ),
                   data: planar,
                 });
                 try {
@@ -229,6 +262,7 @@ export class WebCodecsExporter implements Exporter {
                 }
               }
             }
+            encodePadding(AAC_PREROLL_SAMPLES + Math.round(exportDurationMs * 48));
             await audioEncoder.flush();
           } finally {
             if (audioEncoder.state !== "closed") audioEncoder.close();

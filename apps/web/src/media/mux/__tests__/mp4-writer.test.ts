@@ -111,6 +111,48 @@ describe("Mp4Writer", () => {
     );
   });
 
+  it("applies a sample-accurate audio edit without dropping or changing encoded packets", async () => {
+    const input = open(new Uint8Array(await readFile(FIXTURE)));
+    const source = (await input.getPrimaryAudioTrack())!;
+    const packets = await packetsOf(source);
+    const config = (await source.getDecoderConfig())!;
+    const offsetSamples = 1024;
+    const writer = new Mp4Writer({
+      audio: {
+        codec: "aac",
+        sampleRate: source.sampleRate,
+        numberOfChannels: source.numberOfChannels,
+        presentation: {
+          offsetSamples,
+          lengthSamples: source.sampleRate / 2,
+          sampleRate: source.sampleRate,
+        },
+      },
+    });
+    packets.forEach((packet, i) =>
+      writer.addAudioChunkRaw(
+        packet.data,
+        packet.type,
+        packet.timestamp * 1e6,
+        packet.duration * 1e6,
+        i === 0 ? { decoderConfig: config } : undefined,
+      ),
+    );
+    const resultBytes = new Uint8Array(await writer.finalize());
+    const result = open(resultBytes);
+    const track = (await result.getPrimaryAudioTrack())!;
+    const roundTrip = await packetsOf(track);
+    expect(roundTrip).toHaveLength(packets.length);
+    expect(roundTrip[0]!.timestamp).toBeCloseTo(-offsetSamples / source.sampleRate, 5);
+    for (let i = 0; i < packets.length; i++) expect(roundTrip[i]!.data).toEqual(packets[i]!.data);
+    const elst = boxOffset(resultBytes, "elst") - 4;
+    const view = new DataView(resultBytes.buffer, resultBytes.byteOffset, resultBytes.byteLength);
+    expect(view.getInt32(elst + 20)).toBe(offsetSamples);
+    expect(view.getUint32(elst + 28)).toBe(0); // empty trailing edit, no packet truncation
+    input.dispose();
+    result.dispose();
+  });
+
   it("refuses writes for tracks that were not declared", () => {
     expect(() => new Mp4Writer({})).toThrow(/video or an audio track/);
     const writer = new Mp4Writer({ video: { codec: "avc", width: 16, height: 16 } });
