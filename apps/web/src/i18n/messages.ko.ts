@@ -808,4 +808,11 @@ export const ko = {
     "state.auto.noCandidates": "초안에 쓸 분석 후보가 없으니 다른 사진이나 영상을 가져오거나 타임라인에서 직접 편집하세요.",
     "state.backToEditor": "편집으로 돌아가기",
     "state.export.failed": "내보내기를 완료하지 못했으니 편집으로 돌아가 원본과 내보내기 범위를 확인한 뒤 다시 시도하세요: {msg}",
+    "state.auto.runningProgress": "미디어를 분석 중입니다 ({done}/{total}). 편집을 계속하거나 아래에서 분석을 중단할 수 있습니다.",
+    "state.media.missingSources": "읽을 수 없는 원본: {n}개. 원본 드라이브를 연결하거나 해당 카드의 다시 연결 버튼으로 파일을 지정하세요.",
+    "state.media.showMissing": "누락 미디어 보기: {name}",
+    "state.dismiss": "이 안내 닫기",
+    "state.clearSearchFilters": "검색·필터 초기화",
+    "state.inspector.multipleFirstSelected": "{n}개를 선택했습니다. 여기서는 먼저 선택한 클립을 편집하므로 다른 클립을 바꾸려면 하나만 선택하세요.",
+    "state.export.recovery": "내보내기를 완료하지 못했습니다. 편집으로 돌아가 원본과 내보내기 범위를 확인한 뒤 다시 시도하세요.",
 } as const;

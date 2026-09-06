@@ -76,12 +76,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   // What the last run produced; shown in place of the presets until the
   // user closes or chooses to export again.
   const [completed, setCompleted] = useState<readonly ExportedFile[] | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  const [failure, setFailure] = useState(false);
   const [missingNames, setMissingNames] = useState<readonly string[] | null>(null);
   // The dialog stays mounted while closed; a reopen starts from the presets.
   useEffect(() => {
     if (open) return;
-    setFailure(null);
+    setFailure(false);
     setCompleted(null);
     setMissingNames(null);
   }, [open]);
@@ -109,7 +109,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   const handleExport = async () => {
     const queue = PRESETS.filter((p) => selectedIds.has(p.id));
     if (queue.length === 0) return;
-    setFailure(null);
+    setFailure(false);
     setRunning(true);
     setMissingNames(null);
     const files: ExportedFile[] = [];
@@ -138,7 +138,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         toast.error(t("export.missingMedia", { names: names.join(", ") }));
       } else {
         const msg = err instanceof Error ? err.message : "Unknown error";
-        setFailure(msg);
+        setFailure(true);
         toast.error(t("export.failed", { msg }));
       }
     } finally {
@@ -211,7 +211,8 @@ export function ExportDialog({ open, onOpenChange }: Props) {
 
           {failure && (
             <StateHint
-              text={t("state.export.failed", { msg: failure })}
+              tone="error"
+              text={t("state.export.recovery")}
               action={{ label: t("state.backToEditor"), onClick: () => onOpenChange(false) }}
             />
           )}
@@ -220,6 +221,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
               <div className="font-medium">{t("export.missingTitle")}</div>
               <div className="mt-1 break-words text-ink-2">{missingNames.join(", ")}</div>
               <StateHint
+                tone="error"
                 text={t("export.missingHint")}
                 action={{ label: t("state.backToEditor"), onClick: () => onOpenChange(false) }}
               />

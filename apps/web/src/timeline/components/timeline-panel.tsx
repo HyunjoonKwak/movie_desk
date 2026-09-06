@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { clipIdsInMarquee, type ID } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
@@ -18,7 +18,7 @@ import { SnapGuide } from "./snap-guide";
 import { SkimLine } from "./skim-line";
 import { TRACK_HEADER_W, clampZoom } from "../constants";
 
-import { timelineGuidance } from "@/components/state-guidance";
+import { timelineGuidance } from "@/timeline/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 export function TimelinePanel() {
@@ -32,7 +32,7 @@ export function TimelinePanel() {
   const hasRange = useRangeStore((s) => s.inMs !== null || s.outMs !== null);
   const t = useT();
   const selected = useSelectionStore((s) => s.clipIds);
-  const guidance = timelineGuidance(tracks, selected);
+  const guidance = useMemo(() => timelineGuidance(tracks, selected), [tracks, selected]);
 
   // Zoom keeping the timeline instant under the anchor x (viewport px from
   // the container's left edge) stationary — FCP-style pointer-centric zoom.
@@ -342,11 +342,7 @@ export function TimelinePanel() {
         <TimelineZoom />
       </div>
 
-      <StateHint
-        testId="timeline-state-hint"
-        text={t(`state.timeline.${guidance.state}`, { n: guidance.count })}
-      />
-      {guidance.locked && <StateHint text={t("state.timeline.locked")} />}
+      {guidance.state === "empty" && <StateHint testId="timeline-state-hint" text={t("state.timeline.empty")} />}
       <div
         ref={containerRef}
         data-tl-scroll

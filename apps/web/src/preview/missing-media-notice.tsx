@@ -49,9 +49,13 @@ export function MissingMediaNotice() {
   const missing = assetsAtPlayhead.filter((asset) => isSourceMissing(entries[asset.id]?.health));
   if (missing.length === 0) return null;
   return (
-    <div className="w-full min-w-0 shrink-0" data-preview-missing>
+    <div
+      className="pointer-events-none absolute inset-x-0 top-0 max-h-full overflow-y-auto bg-black/80 p-2"
+      data-preview-missing
+    >
       <StateHint
-        text={`${t("preview.missingMedia", { names: missing.map((asset) => asset.name).join(", ") })} ${t("preview.missingHint")}`}
+        tone="error"
+        text={`${t("preview.missingMedia", { names: missing.map((asset) => asset.name).join(", ") })}. ${t("preview.missingHint")}`}
       />
     </div>
   );

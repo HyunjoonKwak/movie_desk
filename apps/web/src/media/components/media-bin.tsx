@@ -57,7 +57,6 @@ import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
 import {
-  canRelinkFromFile,
   clearStalePreviewsAfterFailedStore,
   compareRelinkCandidate,
   relinkAssetFromFile,
@@ -78,7 +77,7 @@ import {
   type VirtualMediaGroup,
 } from "@/media/virtual-layout";
 
-import { mediaGuidance } from "@/components/state-guidance";
+import { mediaGuidance } from "@/media/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -297,7 +296,7 @@ export function MediaBin() {
       // capture would otherwise retarget the click to this container).
       if (
         (e.target as HTMLElement).closest(
-          "[data-asset-card], [data-group-header], [data-state-hint], button",
+          "[data-asset-card], [data-group-header], [data-state-hint]",
         )
       )
         return;
@@ -617,24 +616,58 @@ export function MediaBin() {
     });
   }, []);
 
-  const missingRelinkAsset = media.find(
-    (asset) => sourceHealth[asset.id] && canRelinkFromFile(asset),
+  const guidance = mediaGuidance(media.length, filtered.length);
+  const missing = useMemo(
+    () => ({
+      count: Object.keys(sourceHealth).length,
+      first: media.find((asset) => sourceHealth[asset.id]),
+    }),
+    [media, sourceHealth],
   );
+  const [dismissedProjects, setDismissedProjects] = useState<ReadonlySet<ID>>(new Set());
+  const [pendingReveal, setPendingReveal] = useState<ID | null>(null);
+  useLayoutEffect(() => {
+    if (!pendingReveal) return;
+    const location = locateAsset(pendingReveal);
+    const scroll = listRef.current;
+    const cards = cardsRef.current;
+    if (!location || !scroll || !cards) return;
+    // Reuse the virtual layout and forced focus location so offscreen cards mount before focus.
+    setFocusedAssetId(pendingReveal);
+    const group = layout.groups[location.groupIndex];
+    if (!group) return;
+    scroll.scrollTop =
+      cards.offsetTop +
+      group.top +
+      group.headerHeight +
+      Math.floor(location.assetIndex / columns) * (layout.cardHeight + MEDIA_GRID_GAP);
+    const frame = requestAnimationFrame(() => {
+      const card = [...cards.querySelectorAll<HTMLElement>("[data-asset-card]")].find(
+        (element) => element.dataset.assetCard === pendingReveal,
+      );
+      card?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      card?.scrollIntoView({ block: "nearest" });
+      setPendingReveal(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pendingReveal, locateAsset, layout, columns]);
 
   return (
     <div className="flex h-full flex-col">
       <div className="panel-header flex-wrap gap-y-1">
         <span className="shrink-0">{t("media.title")}</span>
         <div className="flex flex-wrap items-center gap-1">
-          <button
-            type="button"
-            className="btn-ghost text-xs"
-            onClick={onChooseFiles}
-            disabled={importing}
-          >
-            <FolderUp className="size-3.5" />
-            {t("media.import")}
-          </button>
+          {media.length > 0 && (
+            <button
+              type="button"
+              className="btn-ghost text-xs"
+              onClick={onChooseFiles}
+              disabled={importing}
+            >
+              <FolderUp className="size-3.5" />
+              {t("media.import")}
+            </button>
+          )}
           <button
             type="button"
             className="btn-ghost text-xs"
@@ -751,18 +784,27 @@ export function MediaBin() {
         </div>
       )}
 
-      {Object.keys(sourceHealth).length > 0 && (
+      {missing.count > 0 && !dismissedProjects.has(projectId) && (
         <StateHint
-          text={t("state.media.missing", { n: Object.keys(sourceHealth).length })}
+          testId="media-missing-hint"
+          tone="warning"
+          text={t("state.media.missingSources", { n: missing.count })}
           action={
-            missingRelinkAsset
-              ? { label: t("media.relink"), onClick: () => startRelink(missingRelinkAsset) }
+            missing.first
+              ? {
+                  label: t("state.media.showMissing", { name: missing.first.name }),
+                  onClick: () => {
+                    resetSearch();
+                    setPendingReveal(missing.first!.id);
+                  },
+                }
               : undefined
           }
+          dismiss={{
+            label: t("state.dismiss"),
+            onClick: () => setDismissedProjects((previous) => new Set([...previous, projectId])),
+          }}
         />
-      )}
-      {selected.size > 0 && !marquee && (
-        <StateHint text={t("state.media.selected", { n: selected.size })} />
       )}
       {selected.size > 0 && !marquee && (
         <BulkBar
@@ -809,18 +851,22 @@ export function MediaBin() {
             style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }}
           />
         )}
-        {mediaGuidance(media.length, filtered.length) === "empty" && (
-          <StateHint
-            testId="media-empty-hint"
-            text={t("state.media.empty")}
-            action={{ label: t("media.dropHere"), onClick: onChooseFiles, disabled: importing }}
-          />
+        {guidance === "empty" && (
+          <div className="mt-4 rounded-lg border border-dashed border-line-strong bg-panel-2/40 p-2 transition-colors hover:border-accent/55 hover:bg-panel-2">
+            <p className="px-2 text-xs text-ink-2">{t("media.dropHere")}</p>
+            <p className="px-2 text-2xs text-ink-3">{t("media.browseHere")}</p>
+            <StateHint
+              testId="media-empty-hint"
+              text={t("state.media.empty")}
+              action={{ label: t("media.import"), onClick: onChooseFiles, disabled: importing }}
+            />
+          </div>
         )}
-        {mediaGuidance(media.length, filtered.length) === "filtered" && (
+        {guidance === "filtered" && (
           <StateHint
             testId="media-filtered-hint"
             text={`${t("media.noMatches")} ${t("state.media.filtered")}`}
-            action={{ label: t("state.resetFilters"), onClick: resetSearch }}
+            action={{ label: t("state.clearSearchFilters"), onClick: resetSearch }}
           />
         )}
 

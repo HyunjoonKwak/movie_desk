@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Check,
   Copy,
@@ -31,7 +31,8 @@ import type { EditMode } from "../types";
 import { formatCutReasons } from "../reasons";
 
 import { buildCandidates } from "../assembler";
-import { analysisGuidance } from "@/components/state-guidance";
+import { candidateWindowMs } from "../candidate-window";
+import { ANALYSIS_HINT_KEYS, analysisGuidance } from "@/autoedit/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 const MODES: readonly EditMode[] = ["highlight", "record", "shorts", "growth", "scenic"];
@@ -98,17 +99,58 @@ export function AutoEditPanel() {
   }, [entries, media, visualAssets]);
 
   const analysisSettled = stats.total > 0 && stats.doneCount + stats.failedCount === stats.total;
-  const candidateCount = useMemo(
+  const musicAsset = media.find((asset) => asset.id === wiz.musicAssetId);
+  const [tempo, setTempo] = useState<{ asset: typeof musicAsset; bpm: number } | null>(null);
+  useEffect(() => {
+    if (analysisRunning || !analysisSettled || stats.doneCount === 0 || !musicAsset) return;
+    let cancelled = false;
+    void analyzeMusic(musicAsset.id, musicAsset.opfsPath, musicAsset.durationMs)
+      .then((music) => {
+        if (!cancelled) setTempo({ asset: musicAsset, bpm: music?.bpm ?? 0 });
+      })
+      .catch(() => {
+        if (!cancelled) setTempo({ asset: musicAsset, bpm: 0 });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisRunning, analysisSettled, stats.doneCount, musicAsset]);
+  const guidance = useMemo(
     () =>
-      buildCandidates(
-        media,
-        doneAnalyses(entries),
-        { pinned: wiz.pinned, excluded: wiz.excluded },
-        1200,
-      ).candidates.length,
-    [media, entries, wiz.pinned, wiz.excluded],
+      stats.total === 0
+        ? null
+        : analysisGuidance(
+            {
+              total: stats.total,
+              running: analysisRunning,
+              doneCount: stats.doneCount,
+              failedCount: stats.failedCount,
+            },
+            () => {
+              // A newly selected music file must finish tempo analysis before a candidate verdict.
+              if (musicAsset && tempo?.asset !== musicAsset) return null;
+              return buildCandidates(
+                media,
+                doneAnalyses(entries),
+                { pinned: wiz.pinned, excluded: wiz.excluded },
+                candidateWindowMs(wiz.mode, musicAsset ? tempo?.bpm : 0),
+              ).candidates.length;
+            },
+          ),
+    [
+      stats.total,
+      stats.doneCount,
+      stats.failedCount,
+      analysisRunning,
+      musicAsset,
+      tempo,
+      media,
+      entries,
+      wiz.pinned,
+      wiz.excluded,
+      wiz.mode,
+    ],
   );
-  const guidance = analysisGuidance(stats.total, analysisRunning, analysisSettled, candidateCount);
   const analysisReady = analysisSettled && stats.doneCount > 0;
   const rec = useMemo(
     () =>
@@ -216,13 +258,25 @@ export function AutoEditPanel() {
                     : t("auto.reportUnavailable")
                   : t("auto.reportScanning", { total: stats.total })}
               </p>
-              <StateHint
-                text={
-                  guidance
-                    ? t(`state.auto.${guidance}`)
-                    : t("auto.reportReadyHint", { done: stats.doneCount, total: stats.total })
-                }
-              />
+              {guidance ? (
+                <StateHint
+                  tone={
+                    guidance === "analysisFailed"
+                      ? "error"
+                      : guidance === "noCandidates"
+                        ? "warning"
+                        : "info"
+                  }
+                  text={t(ANALYSIS_HINT_KEYS[guidance], {
+                    done: stats.doneCount + stats.failedCount,
+                    total: stats.total,
+                  })}
+                />
+              ) : (
+                <p className="mt-1 break-keep text-2xs leading-relaxed text-ink-3">
+                  {t("auto.reportReadyHint", { done: stats.doneCount, total: stats.total })}
+                </p>
+              )}
               {!analysisSettled && (
                 <div className="mt-2 flex items-center gap-2">
                   <div

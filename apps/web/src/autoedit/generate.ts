@@ -1,3 +1,4 @@
+import { candidateWindowMs } from "./candidate-window";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import { assemble, buildCandidates, type Candidate, type ChapterBreak } from "./assembler";
 import { MODE_PRESETS } from "./modes";
@@ -60,8 +61,7 @@ export const generate = async (
     const m = assets.find((a) => a.id === opts.musicAssetId);
     if (m) music = (await analyzeMusic(m.id, m.opfsPath, m.durationMs)) ?? undefined;
   }
-  const beatMs = music && music.bpm > 0 ? 60000 / music.bpm : preset.fallbackCutMs;
-  const minWindowMs = Math.max(1200, Math.round(preset.beatsMid * beatMs));
+  const minWindowMs = candidateWindowMs(opts.mode, music?.bpm);
 
   const { candidates, rejected } = buildCandidates(assets, analyses, opts.constraints, minWindowMs);
 

@@ -810,4 +810,11 @@ export const en = {
     "state.auto.noCandidates": "No analyzed candidates are usable for a draft; import other photos or videos, or edit directly on the timeline.",
     "state.backToEditor": "Back to editor",
     "state.export.failed": "Export could not finish; return to the editor to check sources and the export range, then retry: {msg}",
+    "state.auto.runningProgress": "Analyzing media ({done}/{total}). Keep editing or stop analysis below.",
+    "state.media.missingSources": "Unreadable sources: {n}. Reconnect the original drive or use Relink on the affected card.",
+    "state.media.showMissing": "Show missing media: {name}",
+    "state.dismiss": "Dismiss this hint",
+    "state.clearSearchFilters": "Clear filters",
+    "state.inspector.multipleFirstSelected": "Selected clips: {n}. These controls edit the clip you selected first; select a single clip to edit another one.",
+    "state.export.recovery": "Export could not finish. Return to the editor to check sources and the export range, then retry.",
 } as const;

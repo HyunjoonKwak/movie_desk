@@ -54,7 +54,7 @@ export function InspectorPanel() {
       <div className="flex-1 overflow-y-auto p-3 text-sm">
         {!clip && <StateHint testId="inspector-empty-hint" text={t("state.inspector.empty")} />}
         {clip && selected.size > 1 && (
-          <StateHint text={t("state.inspector.multiple", { n: selected.size })} />
+          <StateHint text={t("state.inspector.multipleFirstSelected", { n: selected.size })} />
         )}
 
         {clip && (

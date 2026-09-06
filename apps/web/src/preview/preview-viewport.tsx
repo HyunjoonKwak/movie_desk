@@ -148,12 +148,8 @@ export function PreviewViewport() {
   const { w, h } = project.resolution;
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center p-4">
+    <div className="relative flex h-full w-full items-center justify-center p-4">
       <PreviewControls />
-      <MissingMediaNotice />
-      {!project.timeline.tracks.some((track) => track.clips.length > 0) && (
-        <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />
-      )}
       <div
         className="relative max-h-full max-w-full overflow-hidden rounded-md border border-line bg-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]"
         style={{ aspectRatio: `${w} / ${h}` }}
@@ -161,6 +157,12 @@ export function PreviewViewport() {
         <canvas ref={canvasRef} data-preview-canvas className="size-full" />
         <RegionOverlay />
         <GuidesOverlay />
+        <MissingMediaNotice />
+        {!project.timeline.tracks.some((track) => track.clips.length > 0) && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+            <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />
+          </div>
+        )}
       </div>
     </div>
   );
