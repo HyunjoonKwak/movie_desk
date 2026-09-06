@@ -18,6 +18,9 @@ import { SnapGuide } from "./snap-guide";
 import { SkimLine } from "./skim-line";
 import { TRACK_HEADER_W, clampZoom } from "../constants";
 
+import { timelineGuidance } from "@/components/state-guidance";
+import { StateHint } from "@/components/state-hint";
+
 export function TimelinePanel() {
   const containerRef = useRef<HTMLDivElement>(null);
   const tracks = useProjectStore((s) => s.project.timeline.tracks);
@@ -28,6 +31,8 @@ export function TimelinePanel() {
   const addNewTrack = useProjectStore((s) => s.addNewTrack);
   const hasRange = useRangeStore((s) => s.inMs !== null || s.outMs !== null);
   const t = useT();
+  const selected = useSelectionStore((s) => s.clipIds);
+  const guidance = timelineGuidance(tracks, selected);
 
   // Zoom keeping the timeline instant under the anchor x (viewport px from
   // the container's left edge) stationary — FCP-style pointer-centric zoom.
@@ -337,6 +342,11 @@ export function TimelinePanel() {
         <TimelineZoom />
       </div>
 
+      <StateHint
+        testId="timeline-state-hint"
+        text={t(`state.timeline.${guidance.state}`, { n: guidance.count })}
+      />
+      {guidance.locked && <StateHint text={t("state.timeline.locked")} />}
       <div
         ref={containerRef}
         data-tl-scroll

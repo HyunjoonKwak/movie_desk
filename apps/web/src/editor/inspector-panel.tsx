@@ -20,6 +20,8 @@ import { InspectorSection } from "@/components/inspector-section";
 import { NumberScrubber } from "@/components/number-scrubber";
 import { useT } from "@/i18n/use-t";
 
+import { StateHint } from "@/components/state-hint";
+
 export function InspectorPanel() {
   const timeline = useProjectStore((s) => s.project.timeline);
   const media = useProjectStore((s) => s.project.mediaLibrary);
@@ -50,13 +52,9 @@ export function InspectorPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 text-sm">
-        {!clip && (
-          <div className="flex min-h-48 flex-col items-center justify-center px-4 text-center">
-            <span className="mb-3 flex size-10 items-center justify-center rounded-lg border border-line bg-panel-2 text-ink-3">
-              <Sliders className="size-4" />
-            </span>
-            <p className="max-w-56 text-xs leading-5 text-ink-3">{t("inspector.empty")}</p>
-          </div>
+        {!clip && <StateHint testId="inspector-empty-hint" text={t("state.inspector.empty")} />}
+        {clip && selected.size > 1 && (
+          <StateHint text={t("state.inspector.multiple", { n: selected.size })} />
         )}
 
         {clip && (

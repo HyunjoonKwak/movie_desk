@@ -1,12 +1,13 @@
 "use client";
 
-import { AlertTriangle } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { useT } from "@/i18n/use-t";
 import { useSourceHealthStore } from "@/media/source-health-store";
 import { isSourceMissing } from "@/media/source/probe-source";
 import { selectPlayhead, useProjectStore } from "@/stores/project-store";
 import { type MediaAsset, clipsAt } from "@movie-desk/core";
+
+import { StateHint } from "@/components/state-hint";
 
 // The compositor draws nothing for a clip whose original cannot be read, so
 // the preview would just go black. This names the missing files for the
@@ -48,19 +49,10 @@ export function MissingMediaNotice() {
   const missing = assetsAtPlayhead.filter((asset) => isSourceMissing(entries[asset.id]?.health));
   if (missing.length === 0) return null;
   return (
-    <div
-      className="pointer-events-none absolute inset-x-0 top-0 flex justify-center p-3"
-      data-preview-missing
-    >
-      <div className="max-w-full rounded-md border border-red-400/40 bg-black/75 px-3 py-2 text-2xs text-ink-1 shadow-lg backdrop-blur">
-        <div className="flex items-center gap-1.5 font-medium">
-          <AlertTriangle className="size-3.5 text-red-400" aria-hidden />
-          <span className="truncate">
-            {t("preview.missingMedia", { names: missing.map((asset) => asset.name).join(", ") })}
-          </span>
-        </div>
-        <div className="mt-0.5 text-ink-3">{t("preview.missingHint")}</div>
-      </div>
+    <div className="w-full min-w-0 shrink-0" data-preview-missing>
+      <StateHint
+        text={`${t("preview.missingMedia", { names: missing.map((asset) => asset.name).join(", ") })} ${t("preview.missingHint")}`}
+      />
     </div>
   );
 }

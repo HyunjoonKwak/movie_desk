@@ -23,6 +23,8 @@ import { useNormalizeStore } from "./normalize-store";
 import { PRESETS, estimateExportSizeMb } from "./presets";
 import type { ExportProgress } from "./types";
 
+import { StateHint } from "@/components/state-hint";
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -74,10 +76,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   // What the last run produced; shown in place of the presets until the
   // user closes or chooses to export again.
   const [completed, setCompleted] = useState<readonly ExportedFile[] | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
   const [missingNames, setMissingNames] = useState<readonly string[] | null>(null);
   // The dialog stays mounted while closed; a reopen starts from the presets.
   useEffect(() => {
     if (open) return;
+    setFailure(null);
     setCompleted(null);
     setMissingNames(null);
   }, [open]);
@@ -105,6 +109,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   const handleExport = async () => {
     const queue = PRESETS.filter((p) => selectedIds.has(p.id));
     if (queue.length === 0) return;
+    setFailure(null);
     setRunning(true);
     setMissingNames(null);
     const files: ExportedFile[] = [];
@@ -133,6 +138,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         toast.error(t("export.missingMedia", { names: names.join(", ") }));
       } else {
         const msg = err instanceof Error ? err.message : "Unknown error";
+        setFailure(msg);
         toast.error(t("export.failed", { msg }));
       }
     } finally {
@@ -203,11 +209,20 @@ export function ExportDialog({ open, onOpenChange }: Props) {
             </Dialog.Close>
           </div>
 
+          {failure && (
+            <StateHint
+              text={t("state.export.failed", { msg: failure })}
+              action={{ label: t("state.backToEditor"), onClick: () => onOpenChange(false) }}
+            />
+          )}
           {missingNames && (
             <div className="mt-4 rounded-md border border-red-400/30 bg-red-400/10 p-3 text-meta text-ink-1">
               <div className="font-medium">{t("export.missingTitle")}</div>
               <div className="mt-1 break-words text-ink-2">{missingNames.join(", ")}</div>
-              <div className="mt-2 text-ink-2">{t("export.missingHint")}</div>
+              <StateHint
+                text={t("export.missingHint")}
+                action={{ label: t("state.backToEditor"), onClick: () => onOpenChange(false) }}
+              />
             </div>
           )}
 

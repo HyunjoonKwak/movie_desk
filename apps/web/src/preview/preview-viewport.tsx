@@ -5,7 +5,6 @@ import { usePlaybackStore } from "@/stores/playback-store";
 import { selectPlayhead, useProjectStore } from "@/stores/project-store";
 import type { ID } from "@movie-desk/core";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Clapperboard } from "lucide-react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for
 // console-driven render benchmarks.
 import "@/renderer/bench";
@@ -14,6 +13,8 @@ import { GuidesOverlay } from "./guides-overlay";
 import { MissingMediaNotice } from "./missing-media-notice";
 import { PreviewControls } from "./preview-controls";
 import { RegionOverlay } from "./region-overlay";
+
+import { StateHint } from "@/components/state-hint";
 
 // Phase 3 preview: WebGL2 compositor. Visible clips at the playhead are
 // stacked and drawn into a single canvas, replacing the phase-1 single
@@ -147,8 +148,12 @@ export function PreviewViewport() {
   const { w, h } = project.resolution;
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center p-4">
+    <div className="relative flex h-full w-full flex-col items-center justify-center p-4">
       <PreviewControls />
+      <MissingMediaNotice />
+      {!project.timeline.tracks.some((track) => track.clips.length > 0) && (
+        <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />
+      )}
       <div
         className="relative max-h-full max-w-full overflow-hidden rounded-md border border-line bg-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]"
         style={{ aspectRatio: `${w} / ${h}` }}
@@ -156,16 +161,6 @@ export function PreviewViewport() {
         <canvas ref={canvasRef} data-preview-canvas className="size-full" />
         <RegionOverlay />
         <GuidesOverlay />
-        <MissingMediaNotice />
-        {project.mediaLibrary.length === 0 && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(96,93,255,0.08),transparent_55%)] px-8 text-center">
-            <span className="mb-4 flex size-12 items-center justify-center rounded-xl border border-line-strong bg-panel-2 text-accent">
-              <Clapperboard className="size-5" />
-            </span>
-            <p className="text-sm font-medium text-ink-1">{t("preview.empty")}</p>
-            <p className="mt-2 max-w-sm text-2xs leading-5 text-ink-3">{t("preview.emptyHint")}</p>
-          </div>
-        )}
       </div>
     </div>
   );

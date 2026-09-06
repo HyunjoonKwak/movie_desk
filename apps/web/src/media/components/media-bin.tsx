@@ -57,6 +57,7 @@ import { RangeEditor } from "./range-editor";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useSourceHealth } from "@/media/use-source-health";
 import {
+  canRelinkFromFile,
   clearStalePreviewsAfterFailedStore,
   compareRelinkCandidate,
   relinkAssetFromFile,
@@ -76,6 +77,9 @@ import {
   type MediaSegmentLayout,
   type VirtualMediaGroup,
 } from "@/media/virtual-layout";
+
+import { mediaGuidance } from "@/components/state-guidance";
+import { StateHint } from "@/components/state-hint";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 const NO_COLLECTIONS: readonly MediaCollection[] = [];
@@ -291,7 +295,12 @@ export function MediaBin() {
     (e: React.PointerEvent) => {
       // Cards keep drag-to-timeline; group headers keep their click (pointer
       // capture would otherwise retarget the click to this container).
-      if ((e.target as HTMLElement).closest("[data-asset-card], [data-group-header]")) return;
+      if (
+        (e.target as HTMLElement).closest(
+          "[data-asset-card], [data-group-header], [data-state-hint], button",
+        )
+      )
+        return;
       if (e.button !== 0) return;
       marqueeStart.current = toLocal(e);
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
@@ -608,11 +617,15 @@ export function MediaBin() {
     });
   }, []);
 
+  const missingRelinkAsset = media.find(
+    (asset) => sourceHealth[asset.id] && canRelinkFromFile(asset),
+  );
+
   return (
     <div className="flex h-full flex-col">
-      <div className="panel-header">
-        <span>{t("media.title")}</span>
-        <div className="flex items-center gap-1">
+      <div className="panel-header flex-wrap gap-y-1">
+        <span className="shrink-0">{t("media.title")}</span>
+        <div className="flex flex-wrap items-center gap-1">
           <button
             type="button"
             className="btn-ghost text-xs"
@@ -738,6 +751,19 @@ export function MediaBin() {
         </div>
       )}
 
+      {Object.keys(sourceHealth).length > 0 && (
+        <StateHint
+          text={t("state.media.missing", { n: Object.keys(sourceHealth).length })}
+          action={
+            missingRelinkAsset
+              ? { label: t("media.relink"), onClick: () => startRelink(missingRelinkAsset) }
+              : undefined
+          }
+        />
+      )}
+      {selected.size > 0 && !marquee && (
+        <StateHint text={t("state.media.selected", { n: selected.size })} />
+      )}
       {selected.size > 0 && !marquee && (
         <BulkBar
           count={selected.size}
@@ -783,24 +809,19 @@ export function MediaBin() {
             style={{ left: marquee.x, top: marquee.y, width: marquee.w, height: marquee.h }}
           />
         )}
-        {media.length === 0 && (
-          <button
-            type="button"
-            onClick={onChooseFiles}
-            className="group mx-auto mt-8 flex min-h-52 w-full flex-col items-center justify-center gap-2
-                       rounded-lg border border-dashed border-line-strong bg-panel-2/40 px-5 text-center
-                       text-ink-3 transition-colors hover:border-accent/55 hover:bg-panel-2 hover:text-ink-2"
-          >
-            <span className="mb-2 flex size-11 items-center justify-center rounded-lg border border-line-strong bg-panel-2 text-accent transition-colors group-hover:bg-panel-3">
-              <FolderUp className="size-5" />
-            </span>
-            <span className="text-sm font-medium text-ink-1">{t("media.dropHere")}</span>
-            <span className="text-2xs">{t("media.browseHere")}</span>
-          </button>
+        {mediaGuidance(media.length, filtered.length) === "empty" && (
+          <StateHint
+            testId="media-empty-hint"
+            text={t("state.media.empty")}
+            action={{ label: t("media.dropHere"), onClick: onChooseFiles, disabled: importing }}
+          />
         )}
-
-        {filtered.length === 0 && media.length > 0 && (
-          <p className="px-2 py-6 text-center text-xs text-ink-3">{t("media.noMatches")}</p>
+        {mediaGuidance(media.length, filtered.length) === "filtered" && (
+          <StateHint
+            testId="media-filtered-hint"
+            text={`${t("media.noMatches")} ${t("state.media.filtered")}`}
+            action={{ label: t("state.resetFilters"), onClick: resetSearch }}
+          />
         )}
 
         <div

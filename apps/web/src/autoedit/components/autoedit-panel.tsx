@@ -30,6 +30,10 @@ import { enableSemantic, isSemanticEnabled } from "../semantic";
 import type { EditMode } from "../types";
 import { formatCutReasons } from "../reasons";
 
+import { buildCandidates } from "../assembler";
+import { analysisGuidance } from "@/components/state-guidance";
+import { StateHint } from "@/components/state-hint";
+
 const MODES: readonly EditMode[] = ["highlight", "record", "shorts", "growth", "scenic"];
 
 export function AutoEditPanel() {
@@ -94,6 +98,17 @@ export function AutoEditPanel() {
   }, [entries, media, visualAssets]);
 
   const analysisSettled = stats.total > 0 && stats.doneCount + stats.failedCount === stats.total;
+  const candidateCount = useMemo(
+    () =>
+      buildCandidates(
+        media,
+        doneAnalyses(entries),
+        { pinned: wiz.pinned, excluded: wiz.excluded },
+        1200,
+      ).candidates.length,
+    [media, entries, wiz.pinned, wiz.excluded],
+  );
+  const guidance = analysisGuidance(stats.total, analysisRunning, analysisSettled, candidateCount);
   const analysisReady = analysisSettled && stats.doneCount > 0;
   const rec = useMemo(
     () =>
@@ -190,7 +205,7 @@ export function AutoEditPanel() {
       {/* ② 분석 리포트 */}
       <Section title={t("auto.report")}>
         {stats.total === 0 ? (
-          <p className="text-ink-3">{t("auto.noMedia")}</p>
+          <StateHint text={t("auto.noMedia")} />
         ) : (
           <>
             <div className="rounded-md border border-line bg-panel-2 p-2.5" aria-live="polite">
@@ -201,19 +216,13 @@ export function AutoEditPanel() {
                     : t("auto.reportUnavailable")
                   : t("auto.reportScanning", { total: stats.total })}
               </p>
-              <p className="mt-1 break-keep text-2xs leading-relaxed text-ink-3">
-                {analysisSettled
-                  ? stats.doneCount > 0
-                    ? t("auto.reportReadyHint", {
-                        done: stats.doneCount,
-                        total: stats.total,
-                      })
-                    : t("auto.reportUnavailableHint")
-                  : t("auto.reportScanningHint", {
-                      done: stats.doneCount,
-                      total: stats.total,
-                    })}
-              </p>
+              <StateHint
+                text={
+                  guidance
+                    ? t(`state.auto.${guidance}`)
+                    : t("auto.reportReadyHint", { done: stats.doneCount, total: stats.total })
+                }
+              />
               {!analysisSettled && (
                 <div className="mt-2 flex items-center gap-2">
                   <div
