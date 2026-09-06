@@ -53,6 +53,13 @@ export const parseFunnelRow = (input: unknown): FunnelRow | null => {
 };
 export const PROJECT_LIMIT = 1000;
 export const TOTAL_LIMIT = 5000;
+let funnelLimits = { perProject: PROJECT_LIMIT, total: TOTAL_LIMIT };
+// Tests exercise the same IndexedDB retention path with small fixtures.
+export const setFunnelLimitsForTests = (
+  limits = { perProject: PROJECT_LIMIT, total: TOTAL_LIMIT },
+): void => {
+  funnelLimits = limits;
+};
 type FunnelRetentionRow = Pick<FunnelRow, "id" | "projectId" | "at" | "event">;
 export const trimFunnelRows = <T extends FunnelRetentionRow>(
   rows: readonly T[],
@@ -111,6 +118,7 @@ export const flushFunnelLog = (): Promise<void> => {
   const batch = queue;
   queue = [];
   const epoch = generation;
+  const { perProject, total } = funnelLimits;
   writes = writes
     .catch(() => {})
     .then(async () => {
@@ -120,12 +128,10 @@ export const flushFunnelLog = (): Promise<void> => {
         await database.transaction("rw", database.rows, async () => {
           await database.rows.bulkAdd(batch);
           const totalCount = await database.rows.count();
-          let needsTrim = totalCount > TOTAL_LIMIT;
+          let needsTrim = totalCount > total;
           if (!needsTrim) {
             for (const projectId of new Set(batch.map((row) => row.projectId))) {
-              if (
-                (await database.rows.where("projectId").equals(projectId).count()) > PROJECT_LIMIT
-              ) {
+              if ((await database.rows.where("projectId").equals(projectId).count()) > perProject) {
                 needsTrim = true;
                 break;
               }
@@ -142,7 +148,7 @@ export const flushFunnelLog = (): Promise<void> => {
             ];
             return { projectId, at, event, id };
           });
-          const keep = new Set(trimFunnelRows(rows).map((row) => row.id));
+          const keep = new Set(trimFunnelRows(rows, perProject, total).map((row) => row.id));
           await database.rows.bulkDelete(
             rows.filter((row) => !keep.has(row.id)).map((row) => row.id),
           );
