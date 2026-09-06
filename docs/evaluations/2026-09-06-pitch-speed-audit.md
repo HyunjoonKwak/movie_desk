@@ -206,16 +206,22 @@ onset **0.251542s** vs 0.25s expected, tail RMS **0.250185**, container 1s.
   does not add calibration preroll/end padding to the actual export. Audio
   encoding continues and `aacCorrectionFallback` reaches the completion panel
   and informational toast (en/ko: “AAC 시작 보정을 적용하지 못했습니다”).
-- `Mp4Writer` catches presentation-edit failures only, then re-muxes retained
-  encoded packet references with unshifted timestamps and no presentation option.
-  This avoids leaking its +1s reservation or partially edited metadata; packet
-  payloads remain unchanged. The +1s reservation now has an explanatory comment.
-  Rare fallback temporarily holds a second mux output; ordinary encoding/mux
-  failures remain errors, rather than claiming success with an invalid file.
-- Three full exporter-path regressions use real AAC/video fixture packets and
-  real Mp4Writer: missing AudioDecoder, correlation failure, and a deliberately
-  missing edit-list reservation. All produce both tracks, preserve every AAC
-  packet byte, start audio at timestamp zero, and set the result notice flag.
+- `Mp4Writer` no longer retains encoded packets for a re-mux. The two-entry
+  edit-list reservation is a structural property of the pinned Mediabunny
+  version (asserted by `mp4-writer.test.ts`), so a presentation failure at
+  finalize can only follow a dependency change; in that case the packets
+  already sit one second late and no in-place rewrite can save the file, so
+  `finalize()` throws `AAC presentation could not be applied: …` instead of
+  shipping late audio. Holding every packet for the rare re-mux kept a second
+  full copy of the encoded payload alive past Mediabunny's own release at
+  finalize (about the size of the file itself at the peak, so ~2.6 GB for a
+  10-minute 4K export). The +1s reservation now has an explanatory comment.
+- Full exporter-path regressions use real AAC/video fixture packets and the
+  real Mp4Writer. Two fallback cases (missing AudioDecoder, correlation
+  failure) produce both tracks, preserve every AAC packet byte, feed the
+  encoder unshifted, unpadded frames, start audio at timestamp zero and set
+  the result notice flag. A deliberately missing edit-list reservation is a
+  third case that must reject with `AAC presentation could not be applied`.
 - [Unified benchmark script](../../scripts/pitch-export-benchmark.mjs) defaults
   to ancestor `27128d1` and reports a clear error for an unresolved Git ref before
   launching a browser. The former documentation-directory script was removed;

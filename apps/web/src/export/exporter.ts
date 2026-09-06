@@ -301,7 +301,7 @@ export class WebCodecsExporter implements Exporter {
       const name = sanitizeName(project.name) || "export";
       return {
         pitchFallback,
-        aacCorrectionFallback: aacCorrectionFallback || muxer.audioPresentationFallback === true,
+        aacCorrectionFallback,
         blob: new Blob([buffer], { type: "video/mp4" }),
         mime: "video/mp4",
         suggestedName: `${name}.mp4`,

@@ -54,106 +54,139 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it.each(["missing decoder", "failed correlation", "missing edit reservation"])(
-  "finishes an audio/video export with a notice on %s",
-  async (mode) => {
-    const fixture = await readFile(
-      path.join(__dirname, "../../media/__tests__/fixtures/aac-video.mp4"),
-    );
-    const input = open(Uint8Array.from(fixture).buffer);
-    const audio = (await input.getPrimaryAudioTrack())!;
-    const video = (await input.getPrimaryVideoTrack())!;
-    const audioConfig = (await audio.getDecoderConfig())!;
-    const videoConfig = (await video.getDecoderConfig())!;
-    const audioPackets: EncodedPacket[] = [];
-    const videoPackets: EncodedPacket[] = [];
-    for await (const packet of new EncodedPacketSink(audio).packets()) audioPackets.push(packet);
-    for await (const packet of new EncodedPacketSink(video).packets()) videoPackets.push(packet);
-    class FakeAudioEncoder {
-      static async isConfigSupported() {
-        return { supported: true };
-      }
-      state = "configured";
-      encodeQueueSize = 0;
-      constructor(private init: AudioEncoderInit) {}
-      configure() {}
-      encode() {}
-      close() {
-        this.state = "closed";
-      }
-      async flush() {
-        audioPackets.forEach((p, i) =>
-          this.init.output(
-            webChunk(p) as unknown as EncodedAudioChunk,
-            i === 0 ? { decoderConfig: audioConfig } : {},
-          ),
-        );
-      }
+type Mode = "missing decoder" | "failed correlation" | "missing edit reservation";
+
+// Real AAC/AVC packets from the fixture are replayed through fake WebCodecs
+// encoders so the muxer sees genuine bitstreams; the decoder side is what
+// each mode breaks. `audioDataInits` records what the export fed the encoder.
+const setup = async (mode: Mode) => {
+  const audioDataInits: { timestamp: number; numberOfFrames: number }[] = [];
+  let encodeCalls = 0;
+  const fixture = await readFile(
+    path.join(__dirname, "../../media/__tests__/fixtures/aac-video.mp4"),
+  );
+  const input = open(Uint8Array.from(fixture).buffer);
+  const audio = (await input.getPrimaryAudioTrack())!;
+  const video = (await input.getPrimaryVideoTrack())!;
+  const audioConfig = (await audio.getDecoderConfig())!;
+  const videoConfig = (await video.getDecoderConfig())!;
+  const audioPackets: EncodedPacket[] = [];
+  const videoPackets: EncodedPacket[] = [];
+  for await (const packet of new EncodedPacketSink(audio).packets()) audioPackets.push(packet);
+  for await (const packet of new EncodedPacketSink(video).packets()) videoPackets.push(packet);
+  class FakeAudioEncoder {
+    static async isConfigSupported() {
+      return { supported: true };
     }
-    class FakeVideoEncoder {
-      state = "configured";
-      encodeQueueSize = 0;
-      constructor(private init: VideoEncoderInit) {}
-      configure() {}
-      encode() {}
-      close() {
-        this.state = "closed";
-      }
-      async flush() {
-        videoPackets.forEach((p, i) =>
-          this.init.output(
-            webChunk(p) as unknown as EncodedVideoChunk,
-            i === 0 ? { decoderConfig: videoConfig } : {},
-          ),
-        );
-      }
+    state = "configured";
+    encodeQueueSize = 0;
+    constructor(private init: AudioEncoderInit) {}
+    configure() {}
+    encode() {
+      encodeCalls += 1;
     }
-    vi.stubGlobal("window", { VideoEncoder: FakeVideoEncoder, VideoDecoder: class {} });
-    vi.stubGlobal("VideoEncoder", FakeVideoEncoder);
-    vi.stubGlobal("AudioEncoder", FakeAudioEncoder);
-    vi.stubGlobal(
-      "VideoFrame",
-      class {
-        close() {}
-      },
-    );
-    vi.stubGlobal(
-      "AudioData",
-      class {
-        close() {}
-      },
-    );
-    vi.stubGlobal("document", { createElement: () => ({ width: 0, height: 0 }) });
-    vi.stubGlobal(
-      "AudioDecoder",
-      mode === "missing decoder"
-        ? undefined
-        : class {
-            state = "configured";
-            configure() {}
-            decode() {}
-            async flush() {}
-            close() {
-              this.state = "closed";
-            }
-          },
-    );
-    if (mode === "missing edit reservation") {
-      vi.spyOn(priming, "measureAacPriming").mockResolvedValueOnce(1024);
-      const apply = presentation.applyAudioPresentation;
-      vi.spyOn(presentation, "applyAudioPresentation").mockImplementationOnce((buffer, spec) => {
-        const elst = Buffer.from(buffer).indexOf("elst") - 4;
-        expect(elst).toBeGreaterThan(0);
-        new DataView(buffer).setUint32(elst + 12, 1);
-        apply(buffer, spec); // production validation throws; writer must remux
-      });
+    close() {
+      this.state = "closed";
     }
-    const result = await new WebCodecsExporter().start(
+    async flush() {
+      audioPackets.forEach((p, i) =>
+        this.init.output(
+          webChunk(p) as unknown as EncodedAudioChunk,
+          i === 0 ? { decoderConfig: audioConfig } : {},
+        ),
+      );
+    }
+  }
+  class FakeVideoEncoder {
+    state = "configured";
+    encodeQueueSize = 0;
+    constructor(private init: VideoEncoderInit) {}
+    configure() {}
+    encode() {}
+    close() {
+      this.state = "closed";
+    }
+    async flush() {
+      videoPackets.forEach((p, i) =>
+        this.init.output(
+          webChunk(p) as unknown as EncodedVideoChunk,
+          i === 0 ? { decoderConfig: videoConfig } : {},
+        ),
+      );
+    }
+  }
+  vi.stubGlobal("window", { VideoEncoder: FakeVideoEncoder, VideoDecoder: class {} });
+  vi.stubGlobal("VideoEncoder", FakeVideoEncoder);
+  vi.stubGlobal("AudioEncoder", FakeAudioEncoder);
+  vi.stubGlobal(
+    "VideoFrame",
+    class {
+      close() {}
+    },
+  );
+  vi.stubGlobal(
+    "AudioData",
+    class {
+      constructor(init: { timestamp: number; numberOfFrames: number }) {
+        audioDataInits.push({ timestamp: init.timestamp, numberOfFrames: init.numberOfFrames });
+      }
+      close() {}
+    },
+  );
+  vi.stubGlobal("document", { createElement: () => ({ width: 0, height: 0 }) });
+  vi.stubGlobal(
+    "AudioDecoder",
+    mode === "missing decoder"
+      ? undefined
+      : class {
+          state = "configured";
+          configure() {}
+          decode() {}
+          async flush() {}
+          close() {
+            this.state = "closed";
+          }
+        },
+  );
+  if (mode === "missing edit reservation") {
+    vi.spyOn(priming, "measureAacPriming").mockResolvedValueOnce(1024);
+    const apply = presentation.applyAudioPresentation;
+    vi.spyOn(presentation, "applyAudioPresentation").mockImplementationOnce((buffer, spec) => {
+      const elst = Buffer.from(buffer).indexOf("elst") - 4;
+      expect(elst).toBeGreaterThan(0);
+      new DataView(buffer).setUint32(elst + 12, 1);
+      apply(buffer, spec); // production validation throws
+    });
+  }
+  const start = () =>
+    new WebCodecsExporter().start(
       { projectId: createEmptyProject().id, preset: PRESETS[0]! },
       vi.fn(),
     );
+  return { start, input, audioPackets, audioDataInits, encodeCalls: () => encodeCalls };
+};
+
+it.each(["missing decoder", "failed correlation"] as const)(
+  "finishes an audio/video export with a notice on %s",
+  async (mode) => {
+    const { start, input, audioPackets, audioDataInits, encodeCalls } = await setup(mode);
+    const result = await start();
     expect(result.aacCorrectionFallback).toBe(true);
     expect(result.blob.size).toBeGreaterThan(1000);
+    // Without the correction nothing is padded: the mixer's single 48,000
+    // sample chunk is fed as ceil(48000/1024) frames whose timestamps start
+    // at 0 (the calibration probe adds its own AudioData before the export).
+    const frames = Math.ceil(48000 / 1024);
+    const expectedTimestamps = Array.from({ length: frames }, (_, i) =>
+      Math.round(((i * 1024) / 48000) * 1_000_000),
+    );
+    // The export loop runs after the calibration probe, so its frames are the
+    // last `frames` entries; a preroll shift would offset every timestamp by
+    // 85,333 µs and an end pad would append a 4,096-frame entry.
+    const exportInits = audioDataInits.slice(-frames);
+    expect(exportInits.map((init) => init.timestamp)).toEqual(expectedTimestamps);
+    expect(audioDataInits.some((init) => init.numberOfFrames === 4096)).toBe(false);
+    expect(encodeCalls()).toBe(frames + 1); // export frames plus the calibration probe
     const output = open(await result.blob.arrayBuffer());
     const outAudio = (await output.getPrimaryAudioTrack())!;
     expect(outAudio).not.toBeNull();
@@ -167,3 +200,9 @@ it.each(["missing decoder", "failed correlation", "missing edit reservation"])(
     output.dispose();
   },
 );
+
+it("fails loudly instead of shipping late audio when the edit-list reservation is missing", async () => {
+  const { start, input } = await setup("missing edit reservation");
+  await expect(start()).rejects.toThrow(/AAC presentation could not be applied/);
+  input.dispose();
+});
