@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTimecode } from "@movie-desk/core";
 import { Plus, Trash2, Download, MapPin } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
@@ -16,6 +17,7 @@ const stamp = (ms: number): string => {
 };
 
 export function MarkerPanel() {
+  const fps = useProjectStore((s) => s.project.framerate);
   const markers = useProjectStore((s) => s.project.timeline.markers ?? []);
   const playhead = useProjectStore((s) => s.project.timeline.playhead);
   const projectName = useProjectStore((s) => s.project.name);
@@ -31,7 +33,7 @@ export function MarkerPanel() {
     // YouTube-style chapters require a 0:00 first entry; prepend one if absent.
     const lines: string[] = [];
     if (sorted.length === 0 || sorted[0]!.at > 0) lines.push(`0:00 ${t("marker.intro")}`);
-    for (const m of sorted) lines.push(`${stamp(m.at)} ${m.label || t("marker.untitled")}`);
+    for (const m of sorted) lines.push(`${formatTimecode(m.at, fps)} ${m.label || t("marker.untitled")}`);
     const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -80,7 +82,7 @@ export function MarkerPanel() {
                 className="shrink-0 font-mono text-2xs text-accent hover:underline"
                 title={t("marker.jump")}
               >
-                {stamp(m.at)}
+                {formatTimecode(m.at, fps)}
               </button>
               <input
                 value={m.label}

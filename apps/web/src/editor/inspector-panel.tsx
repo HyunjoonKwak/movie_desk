@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Sliders } from "lucide-react";
-import { findClip, isMediaClip, isTextClip, isShapeClip } from "@movie-desk/core";
+import { formatTimecode, findClip, isMediaClip, isTextClip, isShapeClip } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { EffectsSection } from "./effects-section";
@@ -17,12 +17,13 @@ import { AudioSection } from "./audio-section";
 import { KeyframeGraph } from "./keyframe-graph";
 import { AiPanel } from "@/ai/ai-panel";
 import { InspectorSection } from "@/components/inspector-section";
-import { NumberScrubber } from "@/components/number-scrubber";
+import { PrecisionInput } from "@/components/precision-input";
 import { useT } from "@/i18n/use-t";
 
 import { StateHint } from "@/components/state-hint";
 
 export function InspectorPanel() {
+  const fps = useProjectStore((s) => s.project.framerate);
   const timeline = useProjectStore((s) => s.project.timeline);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const setClipStartMs = useProjectStore((s) => s.setClipStartMs);
@@ -58,45 +59,43 @@ export function InspectorPanel() {
         )}
 
         {clip && (
-          <div className="space-y-3">
+          <div key={clip.id} className="space-y-3">
             <InspectorSection title={t("inspector.info")}>
               <dl className="space-y-2">
                 <Row label={t("inspector.kind")} value={clip.kind} />
                 <EditableRow label={t("inspector.start")}>
-                  <NumberScrubber
+                  <PrecisionInput
+                    label={t("inspector.start")}
+                    fps={fps}
                     value={clip.start}
                     onChange={(v) => setClipStartMs(clip.id, v)}
                     min={0}
-                    step={10}
-                    commitOnRelease
-                    format={(v) => `${Math.round(v)} ms`}
                   />
                 </EditableRow>
                 <EditableRow label={t("inspector.duration")}>
-                  <NumberScrubber
+                  <PrecisionInput
+                    label={t("inspector.duration")}
+                    fps={fps}
                     value={clip.duration}
                     onChange={(v) => trimEnd(clip.id, clip.start + v)}
-                    min={1}
-                    step={10}
-                    commitOnRelease
-                    format={(v) => `${Math.round(v)} ms`}
+                    min={1000 / fps}
                   />
                 </EditableRow>
                 <EditableRow label={t("inspector.speed")}>
-                  <NumberScrubber
+                  <PrecisionInput
+                    label={t("inspector.speed")}
+                    unit="×"
                     value={clip.speed}
                     onChange={(v) => setClipSpeed(clip.id, v)}
                     min={0.1}
                     max={8}
                     step={0.01}
-                    commitOnRelease
-                    format={(v) => `${v.toFixed(2)}x`}
                   />
                 </EditableRow>
                 {asset && (
                   <>
                     <Row label={t("inspector.asset")} value={asset.name} />
-                    <Row label={t("inspector.assetDuration")} value={`${asset.durationMs} ms`} />
+                    <Row label={t("inspector.assetDuration")} value={formatTimecode(asset.durationMs, fps)} />
                     {asset.width && asset.height && (
                       <Row
                         label={t("inspector.resolution")}

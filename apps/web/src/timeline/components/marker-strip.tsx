@@ -1,10 +1,12 @@
 "use client";
 
+import { formatTimecode } from "@movie-desk/core";
 import { useProjectStore, selectZoom } from "@/stores/project-store";
 
 // Marker pins drawn beneath the ruler. Click a pin to jump there; alt-click
 // (or the context menu) to remove it.
 export function MarkerStrip() {
+  const fps = useProjectStore((s) => s.project.framerate);
   const markers = useProjectStore((s) => s.project.timeline.markers) ?? [];
   const zoom = useProjectStore(selectZoom);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
@@ -22,7 +24,7 @@ export function MarkerStrip() {
             if (e.altKey) removeMarker(m.id);
             else setPlayhead(m.at);
           }}
-          title={m.label || `${m.at} ms`}
+          title={m.label || formatTimecode(m.at, fps)}
           className="pointer-events-auto absolute h-3 w-2 -translate-x-1 rounded-sm"
           style={{ left: m.at * zoom, backgroundColor: m.color }}
         />

@@ -5,6 +5,8 @@ import type { Clip, ID } from "@movie-desk/core";
 import { hasSpeedRamp, isMediaClip } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
+import { PrecisionInput } from "@/components/precision-input";
+import { PrecisionSlider } from "@/components/precision-slider";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -62,16 +64,15 @@ export function SpeedSection({ clipId, clip }: Props) {
     >
       <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("speed.constant")}</span>
-        <span className="font-mono text-ink-1">{clip.speed.toFixed(2)}x</span>
+        <PrecisionInput label={t("speed.constant")} unit="×" value={clip.speed} min={0.1} max={8} step={0.01} onChange={(v) => setClipSpeed(clipId, v)} />
       </div>
-      <input
-        type="range"
+      <PrecisionSlider
+        label={t("speed.constant")}
         min={0.1}
-        max={4}
-        step={0.05}
+        max={8}
+        step={0.01}
         value={clip.speed}
-        onChange={(e) => setClipSpeed(clipId, Number(e.target.value))}
-        className="w-full accent-accent"
+        onChange={(v) => setClipSpeed(clipId, v)}
       />
       <div className="flex flex-wrap gap-1">
         {PRESETS.map((s) => (

@@ -23,3 +23,15 @@ export const formatTimecode = (ms: Ms, fps: Fps): string => {
   const pad = (n: number, w = 2) => n.toString().padStart(w, "0");
   return `${pad(h)}:${pad(m)}:${pad(s)}:${pad(f)}`;
 };
+
+/** Strict non-drop-frame timecode; actual frame duration always uses project fps. */
+export const parseTimecode = (text: string, fps: Fps): Ms | null => {
+  if (!Number.isFinite(fps) || fps < 1) return null;
+  const match = /^(\d{2,}):(\d{2}):(\d{2}):(\d{2,})$/.exec(text.trim());
+  if (!match) return null;
+  const [h, m, s, f] = match.slice(1).map(Number) as [number, number, number, number];
+  const nominal = Math.round(fps);
+  if (m >= 60 || s >= 60 || f >= nominal) return null;
+  const frames = ((h * 60 + m) * 60 + s) * nominal + f;
+  return Number.isSafeInteger(frames) ? framesToMs(frames, fps) : null;
+};

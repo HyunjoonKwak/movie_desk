@@ -4,6 +4,8 @@ import { MoveHorizontal } from "lucide-react";
 import type { MediaClip, SpatialFit } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
+import { PrecisionInput } from "@/components/precision-input";
+import { PrecisionSlider } from "@/components/precision-slider";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
@@ -16,6 +18,8 @@ const FITS: readonly SpatialFit[] = ["stretch", "fill", "fit"];
 // The slider's range is the slack between the clip's source span and the
 // asset's full duration.
 export function SlipSection({ clip }: Props) {
+  const fps = useProjectStore((s) => s.project.framerate);
+  const setSourceTrim = useProjectStore((s) => s.setSourceTrim);
   const slip = useProjectStore((s) => s.slipClipBy);
   const setFit = useProjectStore((s) => s.setClipFit);
   const asset = useProjectStore((s) => s.project.mediaLibrary.find((a) => a.id === clip.assetId));
@@ -42,17 +46,20 @@ export function SlipSection({ clip }: Props) {
       </div>
       <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("slip.sourceIn")}</span>
-        <span className="font-mono text-ink-1">{Math.round(clip.trimIn)} ms</span>
+        <PrecisionInput label={t("slip.sourceIn")} fps={fps} value={clip.trimIn} min={0} max={clip.trimOut - 1000 / fps} onChange={(v) => setSourceTrim(clip.id, "in", v)} />
       </div>
-      <input
-        type="range"
+      <div className="flex items-center justify-between gap-2 text-2xs text-ink-3">
+        <span>{t("precision.sourceOut")}</span>
+        <PrecisionInput label={t("precision.sourceOut")} fps={fps} value={clip.trimOut} min={clip.trimIn + 1000 / fps} max={asset?.durationMs ?? clip.trimOut} onChange={(v) => setSourceTrim(clip.id, "out", v)} />
+      </div>
+      <p className="text-3xs text-ink-3">{t("precision.trimHint")}</p>
+      <PrecisionSlider
+        label={t("slip.title")}
         min={0}
         max={max}
         step={10}
         value={Math.min(clip.trimIn, max)}
-        disabled={max <= 0}
-        onChange={(e) => slip(clip.id, Number(e.target.value) - clip.trimIn)}
-        className="w-full accent-accent disabled:opacity-40"
+        onChange={(v) => slip(clip.id, v - clip.trimIn)}
       />
       {max <= 0 && <p className="text-3xs text-ink-3">{t("slip.noSlack")}</p>}
     </InspectorSection>

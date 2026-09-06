@@ -5,7 +5,8 @@ import type { Clip, ID, BlendMode } from "@movie-desk/core";
 import { clipTransform } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
-import { NumberScrubber } from "@/components/number-scrubber";
+import { PrecisionInput } from "@/components/precision-input";
+import { PrecisionSlider } from "@/components/precision-slider";
 import { useT } from "@/i18n/use-t";
 import { BLEND_GROUPS } from "./blend-groups";
 
@@ -25,7 +26,7 @@ const PIP_PRESETS = [
 ] as const;
 
 export function TransformSection({ clipId, clip }: Props) {
-  const setTransform = useProjectStore((s) => s.setTransform);
+  const setTransform = useProjectStore((s) => s.commitTransform);
   const setBlendMode = useProjectStore((s) => s.setBlendMode);
   const addKeyframe = useProjectStore((s) => s.addKeyframe);
   const removeKeyframe = useProjectStore((s) => s.removeKeyframe);
@@ -55,6 +56,7 @@ export function TransformSection({ clipId, clip }: Props) {
         min={-1}
         max={1}
         step={0.01}
+        unit="×W"
         value={tf.x}
         onChange={(v) => setTransform(clipId, { x: v })}
         keyed={hasAnyKeyframe("transform.x")}
@@ -66,6 +68,7 @@ export function TransformSection({ clipId, clip }: Props) {
         min={-1}
         max={1}
         step={0.01}
+        unit="×H"
         value={tf.y}
         onChange={(v) => setTransform(clipId, { y: v })}
         keyed={hasAnyKeyframe("transform.y")}
@@ -77,6 +80,7 @@ export function TransformSection({ clipId, clip }: Props) {
         min={0.1}
         max={4}
         step={0.01}
+        unit="×"
         value={tf.scale}
         onChange={(v) => setTransform(clipId, { scale: v })}
         keyed={hasAnyKeyframe("transform.scale")}
@@ -90,7 +94,7 @@ export function TransformSection({ clipId, clip }: Props) {
         step={1}
         value={(tf.rotation * 180) / Math.PI}
         onChange={(deg) => setTransform(clipId, { rotation: (deg * Math.PI) / 180 })}
-        format={(v) => `${v.toFixed(0)}°`}
+        unit="°"
         keyed={hasAnyKeyframe("transform.rotation")}
         keyedHere={hasKeyframeAt("transform.rotation")}
         onToggleKey={() => toggleKeyframe("transform.rotation", tf.rotation)}
@@ -100,6 +104,7 @@ export function TransformSection({ clipId, clip }: Props) {
         min={0}
         max={1}
         step={0.01}
+        unit="×"
         value={tf.opacity}
         onChange={(v) => setTransform(clipId, { opacity: v })}
         keyed={hasAnyKeyframe("transform.opacity")}
@@ -160,7 +165,7 @@ function NumRow({
   step,
   value,
   onChange,
-  format,
+  unit,
   keyed,
   keyedHere,
   onToggleKey,
@@ -171,7 +176,7 @@ function NumRow({
   step: number;
   value: number;
   onChange: (v: number) => void;
-  format?: (v: number) => string;
+  unit?: string;
   keyed: boolean;
   keyedHere: boolean;
   onToggleKey: () => void;
@@ -196,23 +201,23 @@ function NumRow({
           </button>
           {label}
         </span>
-        <NumberScrubber
+        <PrecisionInput
           value={value}
           onChange={onChange}
           min={min}
           max={max}
           step={step}
-          format={format}
+          label={label}
+          unit={unit}
         />
       </div>
-      <input
-        type="range"
+      <PrecisionSlider
+        label={label}
         min={min}
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="mt-1 w-full accent-accent"
+        onChange={onChange}
       />
     </div>
   );

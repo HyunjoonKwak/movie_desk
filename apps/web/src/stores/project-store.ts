@@ -30,6 +30,7 @@ import {
   crossfadeWithPrevious,
   detachAudio,
   duplicateClip,
+  durationForSourceSpan,
   emptyHistory,
   findClip,
   groupClips,
@@ -172,6 +173,8 @@ interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
   moveClipToOtherTrack: (clipId: ID, destTrackId: ID) => void;
   trimEnd: (clipId: ID, newEnd: Ms) => void;
   trimStart: (clipId: ID, newStart: Ms) => void;
+  setSourceTrim: (clipId: ID, edge: "in" | "out", ms: Ms) => void;
+  commitTransform: (clipId: ID, patch: Partial<ClipTransform>) => void;
   setClipStartMs: (clipId: ID, startMs: Ms) => void;
   splitAt: (clipId: ID, at: Ms) => void;
   splitAllAt: (at: Ms) => void;
@@ -406,6 +409,21 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     trimStart: (clipId, newStart) =>
       runWith(set, "Trim clip", (p) => trimClipStart(p, clipId, newStart)),
+
+    setSourceTrim: (clipId, edge, ms) => runWith(set, "Set source trim", (p) => {
+      const c = findClip(p.timeline, clipId);
+      if (!c || c.kind !== "media" || !Number.isFinite(ms)) return p;
+      const at = snapMsToFrame(ms, p.framerate);
+      const trimIn = edge === "in" ? at : c.trimIn;
+      const trimOut = edge === "out" ? at : c.trimOut;
+      const asset = p.mediaLibrary.find((a) => a.id === c.assetId);
+      if (trimIn < 0 || trimOut <= trimIn || trimOut > (asset?.durationMs ?? c.trimOut) + 1e-9) return p;
+      if (trimIn === c.trimIn && trimOut === c.trimOut) return p;
+      return updateClip(p, clipId, (clip) => ({ ...clip, trimIn, trimOut, duration: Math.max(1000 / p.framerate, snapMsToFrame(durationForSourceSpan(c, trimOut - trimIn), p.framerate)) }));
+    }),
+
+    commitTransform: (clipId, patch) =>
+      runWith(set, "Set transform", (p) => setClipTransform(p, clipId, patch)),
 
     // Exact (typed) clip start — frame-snapped but free of edge snapping,
     // unlike moveClipBy which magnetises to neighbours while dragging.

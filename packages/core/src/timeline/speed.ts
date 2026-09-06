@@ -42,3 +42,20 @@ export const averageRate = (clip: Clip): number => {
   }
   return sum / samples;
 };
+
+// Inverse of sourceOffsetForRamp using the same 10ms integration grid.
+// After the final keyframe the rate is constant, so long tails are O(1).
+export const durationForSourceSpan = (clip: Clip, sourceMs: Ms): Ms => {
+  const track = clip.keyframes.find((k) => k.target === SPEED_TARGET);
+  if (!track || track.keyframes.length < 2) return sourceMs / Math.max(0.05, clip.speed);
+  let remaining = Math.max(0, sourceMs);
+  let at = 0;
+  const last = track.keyframes[track.keyframes.length - 1]!.at;
+  while (at < last) {
+    const rate = Math.max(0.05, sampleKeyframeTrack(track, at) ?? clip.speed);
+    if (remaining <= rate * 10) return at + remaining / rate;
+    remaining -= rate * 10;
+    at += 10;
+  }
+  return at + remaining / Math.max(0.05, sampleKeyframeTrack(track, at) ?? clip.speed);
+};

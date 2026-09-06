@@ -7,6 +7,7 @@ import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { toast } from "sonner";
 import { useT } from "@/i18n/use-t";
+import { PrecisionInput } from "@/components/precision-input";
 import { LevelMeter } from "./level-meter";
 import { exportStillFrame } from "@/export/still";
 
@@ -86,7 +87,7 @@ export function TransportBar() {
       <div className="flex shrink-0 items-center gap-3">
         <LevelMeter />
         <div className="rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-2xs text-ink-2">
-          <span className="text-ink-1">{formatTimecode(playhead, fps)}</span>
+          <PrecisionInput label={t("precision.playhead")} value={playhead} fps={fps} min={0} onChange={setPlayhead} />
           <span className="mx-1 text-ink-3">/</span>
           <span>{formatTimecode(duration, fps)}</span>
         </div>
