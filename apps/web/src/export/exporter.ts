@@ -250,8 +250,8 @@ export class WebCodecsExporter implements Exporter {
             const encoderChunkSize = 1024;
             const peakMeter = new TruePeakMeter(2);
             let limitedSamples = 0;
+            let clippedSamples = 0;
             for await (const chunk of mixer.chunks(mixOptions)) {
-              peakMeter.push(chunk.channels, masterGain);
               limitedSamples += chunk.limitedSamples ?? 0;
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
               for (let i = 0; i < totalSamples; i += encoderChunkSize) {
@@ -260,9 +260,16 @@ export class WebCodecsExporter implements Exporter {
                 const planar = packStereoPlanar(chunk.channels, i, numberOfFrames);
                 if (masterGain !== 1) {
                   for (let sample = 0; sample < planar.length; sample++) {
-                    planar[sample] = Math.max(-1, Math.min(1, planar[sample]! * masterGain));
+                    const normalized = planar[sample]! * masterGain;
+                    if (Math.abs(normalized) > 1) clippedSamples++;
+                    planar[sample] = Math.max(-1, Math.min(1, normalized));
                   }
                 }
+                // Measure exactly the post-normalization/clamp Float32 PCM sent to the encoder.
+                peakMeter.push([
+                  planar.subarray(0, numberOfFrames),
+                  planar.subarray(numberOfFrames),
+                ]);
                 const data = new AudioData({
                   format: "f32-planar",
                   sampleRate: chunk.sampleRate,
@@ -281,7 +288,7 @@ export class WebCodecsExporter implements Exporter {
               }
             }
             if (prerollSamples) encodePadding(prerollSamples + Math.round(exportDurationMs * 48));
-            audioPeaks = { ...peakMeter.finish(), limitedSamples };
+            audioPeaks = { ...peakMeter.finish(), clippedSamples, limitedSamples };
             await audioEncoder.flush();
           } finally {
             if (audioEncoder.state !== "closed") audioEncoder.close();

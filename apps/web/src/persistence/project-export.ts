@@ -85,21 +85,25 @@ const clipSchema = z.discriminatedUnion("kind", [
 ]);
 
 const gainDbSchema = finite.min(-60).max(12);
-const projectAudioSchema = z.object({
-  buses: z
-    .array(
-      z.object({
-        id: z.string().min(1),
-        name: z.string().min(1).max(100),
-        gainDb: gainDbSchema,
-        muted: z.boolean().optional(),
+const projectAudioSchema = z
+  .object({
+    buses: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1),
+            name: z.string().min(1).max(100),
+            gainDb: gainDbSchema,
+            muted: z.boolean().optional(),
+          })
+          .passthrough(),
+      )
+      .refine((buses) => new Set(buses.map((bus) => bus.id)).size === buses.length, {
+        message: "Duplicate audio bus ID",
       }),
-    )
-    .refine((buses) => new Set(buses.map((bus) => bus.id)).size === buses.length, {
-      message: "Duplicate audio bus ID",
-    }),
-  master: z.object({ gainDb: gainDbSchema }),
-});
+    master: z.object({ gainDb: gainDbSchema }).passthrough(),
+  })
+  .passthrough();
 
 const trackSchema = z
   .object({
@@ -117,6 +121,7 @@ const trackSchema = z
         pan: finite.min(-1).max(1).optional(),
         busId: z.string().min(1).optional(),
       })
+      .passthrough()
       .optional(),
     clips: z.array(clipSchema),
   })

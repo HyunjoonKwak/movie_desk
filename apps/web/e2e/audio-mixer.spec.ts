@@ -90,6 +90,17 @@ const prepare = async (page: Page) => {
 
 test("track -6 dB halves export PCM RMS and one undo restores gain", async ({ page }) => {
   await prepare(page);
+  expect(
+    await page.locator("[data-track] > div:first-child").evaluateAll((headers) =>
+      headers.every((header) => {
+        const bounds = header.getBoundingClientRect();
+        return [...header.querySelectorAll("button")].every((button) => {
+          const rect = button.getBoundingClientRect();
+          return rect.left >= bounds.left && rect.right <= bounds.right;
+        });
+      }),
+    ),
+  ).toBe(true);
   const before = await run<number>(page, "() => exportMixerRms()");
   expect(before).toBeGreaterThan(0.01);
   const gain = page.getByRole("spinbutton", { name: "A1 Gain", exact: true });
@@ -107,10 +118,19 @@ test("track -6 dB halves export PCM RMS and one undo restores gain", async ({ pa
   expect(after / before).toBeCloseTo(10 ** (-6 / 20), 4);
   await page.getByRole("button", { name: "Undo (Cmd+Z)" }).click();
   await expect(gain).toHaveValue("0");
+  // Insert/undo can leave the transport at the clip end; measure audible PCM from the start.
+  await page.getByRole("button", { name: "Go to start", exact: true }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect(
-    page.getByRole("meter", { name: "Measured master", exact: true }).first(),
-  ).toHaveAttribute("aria-valuenow", /-(?:[1-4]?[0-9])(?:\.[0-9]+)?/);
+  await expect
+    .poll(async () =>
+      Number(
+        await page
+          .getByRole("meter", { name: "Measured master", exact: true })
+          .first()
+          .getAttribute("aria-valuenow"),
+      ),
+    )
+    .toBeGreaterThan(-60);
   const pause = page.getByRole("button", { name: "Pause", exact: true });
   if (await pause.isVisible()) await pause.click();
   await page.screenshot({ path: test.info().outputPath("audio-mixer-desktop.png") });

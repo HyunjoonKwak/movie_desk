@@ -93,17 +93,17 @@ export function TimelineTrack({ track, width }: Props) {
     <div className="flex items-stretch gap-0" data-track={track.id} data-track-kind={track.kind}>
       <div
         className={cn(
-          "group sticky left-0 z-10 flex shrink-0 items-center justify-between gap-1",
+          "group sticky left-0 z-10 flex shrink-0 flex-col items-stretch justify-center gap-0.5",
           "border-y border-r border-white/5 bg-panel-2 px-2 text-meta",
         )}
         style={{ height: track.height, width: TRACK_HEADER_W }}
       >
-        <span className="font-medium text-ink-1">
-          {track.name}
+        <div className="flex min-w-0 items-center gap-1 font-medium text-ink-1">
+          <span className="truncate">{track.name}</span>
           {(track.kind === "audio" || track.kind === "video") && (
             <MixerMeter id={`track:${track.id}`} compact />
           )}
-        </span>
+        </div>
         <span className="flex items-center gap-0.5">
           <button
             type="button"

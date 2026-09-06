@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -6,10 +7,25 @@ const { chromium } = require("@playwright/test");
 const { build } = createRequire(createRequire(require.resolve("vitest")).resolve("vite"))(
   "esbuild",
 );
+// Extract the actual reviewed estimator to keep the paired baseline reproducible.
+const baselineSource = execFileSync("git", ["show", "13e7506:apps/web/src/mixer/mixer-meter.tsx"], {
+  encoding: "utf8",
+});
+const baselineBody = baselineSource
+  .split("const estimate = useMemo(() => {")[1]
+  .split("}, [playing,")[0]
+  .replace("if (playing) return 0;", "")
+  .replace("const project = useProjectStore.getState().project;", "");
 const result = await build({
   stdin: {
-    contents:
-      'export * from "./packages/core/src/audio-routing/index.ts"; export { MixerAudioGraph, loadMeterWorklet } from "./apps/web/src/mixer/audio-graph.ts"; export { ProjectAudioMixer } from "./apps/web/src/export/audio-mixer.ts";',
+    contents: `export * from "./packages/core/src/audio-routing/index.ts";
+       export { createEmptyProject } from "./packages/core/src/index.ts";
+       export { estimatedLevels } from "./apps/web/src/mixer/estimated-levels.ts";
+       import { resolveTrackRoute, stereoPanMatrix } from "./packages/core/src/audio-routing/index.ts";
+       import { playheadLevel } from "./apps/web/src/preview/playhead-level.ts";
+       export const baselineEstimate = (project, id, waveforms) => { ${baselineBody} };
+       export { MixerAudioGraph, loadMeterWorklet } from "./apps/web/src/mixer/audio-graph.ts";
+       export { ProjectAudioMixer } from "./apps/web/src/export/audio-mixer.ts";`,
     resolveDir: process.cwd(),
     loader: "ts",
   },
@@ -135,8 +151,88 @@ try {
     graph.dispose();
     globalThis.requestAnimationFrame = nativeRaf;
     frameMs.sort((a, b) => a - b);
+    const base = AudioBench.createEmptyProject();
+    const mediaLibrary = Array.from({ length: 1000 }, (_, i) => ({
+      id: `asset${i}`,
+      name: `Asset ${i}`,
+      kind: "audio",
+      mime: "audio/wav",
+      importedAt: 0,
+      durationMs: 1000,
+      waveformPeaks: [0.5, 0.25],
+    }));
+    const tracks = Array.from({ length: 8 }, (_, t) => ({
+      ...base.timeline.tracks[0],
+      id: `track${t}`,
+      clips: Array.from({ length: 125 }, (_, c) => ({
+        id: `clip${t}-${c}`,
+        kind: "media",
+        assetId: mediaLibrary[t * 125 + c].id,
+        start: c * 1000,
+        duration: 1000,
+        trimIn: 0,
+        trimOut: 1000,
+        speed: 1,
+        effects: [],
+        keyframes: [],
+      })),
+    }));
+    const fixture = { ...base, mediaLibrary, timeline: { ...base.timeline, tracks } };
+    const ids = [
+      ...tracks.map((t) => `track:${t.id}`),
+      ...tracks.map((t) => `track:${t.id}`),
+      "master",
+    ];
+    const waveforms = {};
+    const nativeMap = globalThis.Map;
+    let maps = 0;
+    globalThis.Map = class extends nativeMap {
+      constructor(...args) {
+        super(...args);
+        maps++;
+      }
+    };
+    const scrubRun = (baseline) => {
+      maps = 0;
+      const times = [];
+      let checksum = 0;
+      for (let i = 0; i < 100; i++) {
+        const project = { ...fixture, timeline: { ...fixture.timeline, playhead: i * 10 } };
+        const start = performance.now();
+        for (const id of ids)
+          checksum += baseline
+            ? AudioBench.baselineEstimate(project, id, waveforms)
+            : (AudioBench.estimatedLevels(project, waveforms)[id] ?? 0);
+        times.push(performance.now() - start);
+      }
+      times.sort((a, b) => a - b);
+      return {
+        totalMs: times.reduce((a, b) => a + b, 0),
+        medianMs: times[50],
+        p95Ms: times[95],
+        maxMs: times[99],
+        assetMapBuilds: maps,
+        checksum,
+      };
+    };
+    const before = scrubRun(true);
+    const after = scrubRun(false);
+    globalThis.Map = nativeMap;
+    if (Math.abs(before.checksum - after.checksum) > 1e-6)
+      throw new Error("Scrub estimate mismatch");
     return {
       cases,
+      scrub: {
+        assets: 1000,
+        tracks: 8,
+        clips: 1000,
+        frames: 100,
+        consumers: ids.length,
+        before,
+        after,
+        scope:
+          "100 playhead moves; actual old estimator per 17 UI consumers versus shared estimates; excludes React layout/paint",
+      },
       meterFrame: {
         tracks: 8,
         samples: 1000,

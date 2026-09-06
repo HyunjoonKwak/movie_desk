@@ -10,7 +10,10 @@ it("a late pre-relink decode cannot overwrite or replay the replacement asset", 
   const pending: ((buffer: AudioBuffer) => void)[] = [];
   const started: AudioBuffer[] = [];
   // Meter publication is unrelated to decode/job invalidation in this Node test.
-  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+  vi.stubGlobal(
+    "requestAnimationFrame",
+    vi.fn(() => 1),
+  );
   vi.stubGlobal("cancelAnimationFrame", vi.fn());
   vi.stubGlobal(
     "AudioContext",
@@ -22,10 +25,10 @@ it("a late pre-relink decode cannot overwrite or replay the replacement asset", 
         return new Promise<AudioBuffer>((resolve) => pending.push(resolve));
       }
       createGain() {
-        return { gain: { value: 1 }, connect() {}, disconnect() {} };
+        return { gain: { value: 1, setTargetAtTime() {} }, connect() {}, disconnect() {} };
       }
       createStereoPanner() {
-        return { pan: { value: 0 }, connect() {}, disconnect() {} };
+        return { pan: { value: 0, setTargetAtTime() {} }, connect() {}, disconnect() {} };
       }
       createBufferSource() {
         return {

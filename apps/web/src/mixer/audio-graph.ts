@@ -34,6 +34,7 @@ interface Strip {
   panner?: StereoPannerNode;
   output: AudioNode;
   meter?: AudioWorkletNode;
+  destination?: AudioNode;
   hold: PeakHold;
   level: LiveLevel;
 }
@@ -42,6 +43,7 @@ const silence: SignalLevel = { peak: 0, rms: 0, clippedSamples: 0 };
 export class MixerAudioGraph {
   private readonly strips = new Map<string, Strip>();
   private frame = 0;
+  private readonly targets = new WeakMap<AudioParam, number>();
   private disposed = false;
   private dirty = false;
   private active = false;
@@ -94,6 +96,21 @@ export class MixerAudioGraph {
     return strip;
   }
 
+  private parameter(param: AudioParam, value: number): void {
+    const previous = this.targets.get(param);
+    // Initialize before playback without a startup fade; smooth subsequent edits.
+    if (previous === undefined) param.value = value;
+    else if (previous !== value) param.setTargetAtTime(value, this.ctx.currentTime, 0.01);
+    this.targets.set(param, value);
+  }
+
+  private route(strip: Strip, destination: AudioNode): void {
+    if (strip.destination === destination) return;
+    if (strip.destination) strip.output.disconnect();
+    strip.output.connect(destination);
+    strip.destination = destination;
+  }
+
   update(project: Project): void {
     const wanted = new Set([
       "master",
@@ -106,22 +123,19 @@ export class MixerAudioGraph {
       this.strips.delete(id);
     }
     const master = this.strip("master");
-    master.gain.gain.value = dbToLinear(project.audio?.master.gainDb ?? 0);
-    master.output.disconnect();
-    master.output.connect(this.ctx.destination);
+    this.parameter(master.gain.gain, dbToLinear(project.audio?.master.gainDb ?? 0));
+    this.route(master, this.ctx.destination);
     for (const bus of project.audio?.buses ?? []) {
       const strip = this.strip(`bus:${bus.id}`);
-      strip.gain.gain.value = bus.muted ? 0 : dbToLinear(bus.gainDb);
-      strip.output.disconnect();
-      strip.output.connect(master.gain);
+      this.parameter(strip.gain.gain, bus.muted ? 0 : dbToLinear(bus.gainDb));
+      this.route(strip, master.gain);
     }
     for (const track of project.timeline.tracks) {
       const route = resolveTrackRoute(project, track);
       const strip = this.strip(`track:${track.id}`, true);
-      strip.gain.gain.value = route.trackGain;
-      strip.panner!.pan.value = route.pan;
-      strip.output.disconnect();
-      strip.output.connect(route.busId ? this.strip(`bus:${route.busId}`).gain : master.gain);
+      this.parameter(strip.gain.gain, route.trackGain);
+      this.parameter(strip.panner!.pan, route.pan);
+      this.route(strip, route.busId ? this.strip(`bus:${route.busId}`).gain : master.gain);
     }
     if (!this.active) {
       this.active = true;
@@ -131,7 +145,13 @@ export class MixerAudioGraph {
   }
 
   input(trackId: string): AudioNode {
-    return this.strip(`track:${trackId}`, true).gain;
+    const strip = this.strip(`track:${trackId}`, true);
+    if (!strip.destination) {
+      const master = this.strip("master");
+      this.route(master, this.ctx.destination);
+      this.route(strip, master.gain);
+    }
+    return strip.gain;
   }
 
   private publish = (): void => {
@@ -142,7 +162,8 @@ export class MixerAudioGraph {
         levels: Object.fromEntries([...this.strips].map(([id, strip]) => [id, strip.level])),
       });
     }
-    this.frame = requestAnimationFrame(this.publish);
+    if (typeof requestAnimationFrame === "function")
+      this.frame = requestAnimationFrame(this.publish);
   };
 
   private disconnect(strip: Strip): void {
@@ -158,7 +179,7 @@ export class MixerAudioGraph {
 
   dispose(): void {
     this.disposed = true;
-    cancelAnimationFrame(this.frame);
+    if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this.frame);
     for (const strip of this.strips.values()) this.disconnect(strip);
     this.strips.clear();
     useMeterStore.setState({ live: false, levels: {} });

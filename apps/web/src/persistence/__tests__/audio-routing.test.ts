@@ -27,6 +27,26 @@ describe("audio routing persistence", () => {
     for (const p of [fixture(), createEmptyProject()])
       expect(parseStoredProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
   });
+  it("preserves future fields on project, master, bus and track audio", () => {
+    const p = fixture();
+    const future = {
+      ...p,
+      audio: {
+        ...p.audio!,
+        future: 1,
+        master: { ...p.audio!.master, future: 2 },
+        buses: p.audio!.buses.map((b) => ({ ...b, future: 3 })),
+      },
+      timeline: {
+        ...p.timeline,
+        tracks: p.timeline.tracks.map((t) => ({ ...t, audio: { ...t.audio, future: 4 } })),
+      },
+    };
+    expect(parseStoredProject(JSON.parse(JSON.stringify(future)))).toEqual(future);
+    expect(parseProjectExport(JSON.parse(JSON.stringify(toProjectExport(future)))).project).toEqual(
+      future,
+    );
+  });
   it("round trips the versioned JSON export envelope", () => {
     const p = fixture();
     expect(parseProjectExport(JSON.parse(JSON.stringify(toProjectExport(p)))).project).toEqual(p);

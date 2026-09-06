@@ -275,9 +275,10 @@ export class ProjectAudioMixer {
     this.clips = project.timeline.tracks.flatMap((track) => {
       if (track.muted || (soloing && !track.solo)) return [];
       const bus = track.kind === "audio" ? "music" : "voice";
+      const route = resolveTrackRoute(project, track);
       return track.clips
         .filter((clip): clip is MediaClip => isMediaClip(clip) && !clip.disabled)
-        .map((clip) => ({ clip, bus, route: resolveTrackRoute(project, track) }));
+        .map((clip) => ({ clip, bus, route }));
     });
   }
 
@@ -382,13 +383,18 @@ export class ProjectAudioMixer {
           }
         }
 
-        const routed = routeStereo(processed, route);
         const target = bus === "music" ? musicChannels : voiceChannels;
         const targetOffset = overlapStart - chunkStartSample;
         const processedOffset = overlapStart - processStart;
         const mixedSamples = overlapEnd - overlapStart;
+        const routed = routeStereo(
+          processed.map((channel) =>
+            channel.subarray(processedOffset, processedOffset + mixedSamples),
+          ),
+          route,
+        );
         for (let channel = 0; channel < 2; channel++) {
-          const input = routed[channel]!.subarray(processedOffset, processedOffset + mixedSamples);
+          const input = routed[channel]!;
           const output = target[channel]!;
           for (let i = 0; i < input.length; i++) output[targetOffset + i]! += input[i] ?? 0;
         }

@@ -320,7 +320,18 @@ export const useProjectStore = create<ProjectStoreState>()(
     ...createMusicActions(set),
     ...createPlaceAssetActions(set),
     ...createTrackActions(set),
-    updateMixer: (edit) => runWith(set, "Adjust audio mixer", (p) => editMixer(p, edit)),
+    updateMixer: (edit) =>
+      runWith(
+        set,
+        {
+          track: "Adjust track audio",
+          master: "Adjust master gain",
+          bus: "Adjust audio bus",
+          "bus-add": "Add audio bus",
+          "bus-delete": "Delete audio bus",
+        }[edit.kind],
+        (p) => editMixer(p, edit),
+      ),
     previewMixer: (edit) => set((s) => ({ project: editMixer(s.project, edit) })),
     ...createMarkerActions(set),
     ...createKeyframeActions(set),

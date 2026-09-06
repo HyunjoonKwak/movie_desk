@@ -492,7 +492,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | C3 첫 완성률 측정 | Codex 구현 · Claude 감독·리뷰 |  구현·리뷰 4라운드 완료, main 통합(59a2ef7); B7 도그푸딩에서 리포트 확인 대기 | `codex/c3-completion-funnel` · 로컬 옵트인 Dexie 로그, baseline 제외 퍼널·복구 결과·JSON 다운로드·삭제. [결정](decisions/2026-09-06-first-completion-metric.md). 2라운드 gate 9/9 PASS(단위 779·E2E 55), 1,000자산 로그 15행·최초 start/import 생존. B7에서 측정 켜고 새 프로젝트 완주 후 리포트 확인 |
 | B'2 피치 보존 속도 | Codex 구현 · Claude 감독·리뷰(3라운드 마무리는 Claude) | 구현·리뷰 3라운드 완료, main 통합(29987f7) | `claude/b2-pitch-speed` · 자체 WSOLA(외부 의존 없음, `packages/core/src/audio/time-stretch.ts`), 옵트인 `preservePitch`(기존 프로젝트 동작 불변), 워커 렌더·창 단위 전송·128MiB LRU, 속도 섹션 토글·상태 힌트, 내보내기 믹서 적용·varispeed 폴백, AAC priming/preroll edit list 보정(기존 결함) + 보정 실패 강등 안내. [감사](evaluations/2026-09-06-pitch-speed-audit.md), [결정](decisions/2026-09-06-pitch-preserving-speed.md). 10분 내보내기 14.75→3.11초. 남은 후순위: 상관 서브샘플링·30초 경계 위상 지표·worker 재사용·측정 분리·detachAudio volume 키프레임(B'3) |
 
-| B'3 오디오 미터·버스 | Codex 구현 · Claude 감독·리뷰 | 구현·전체 gate 완료, 코디네이터 리뷰 대기 | `codex/b3-audio-bus` · [감사](evaluations/2026-09-07-audio-bus-audit.md), [모델 결정](decisions/2026-09-07-audio-bus-model.md). 선택 모델·CRDT/JSON 저장, 공용 라우팅·스테레오 팬, 실측 peak/RMS/3초 LUFS, 버스·마스터 UI·정밀 undo, export 근사 true peak·과부하 안내. PCM 최대 오차 1.49e-8, 8트랙 미터 처리 최대 0.10ms, 전체 E2E 59 PASS. 승인된 피치 테스트 mock 2개 보완 후 full gate 9/9 PASS, 단위 847·E2E 59 PASS |
+| B'3 오디오 미터·버스 | Codex 구현 · Claude 감독·리뷰 | 2라운드 반영·전체 gate 완료, 코디네이터 리뷰 대기 | `codex/b3-audio-bus` · [감사](evaluations/2026-09-07-audio-bus-audit.md), [모델 결정](decisions/2026-09-07-audio-bus-model.md). 선택 모델·CRDT/JSON 저장, 공용 라우팅·스테레오 팬, 실측 peak/RMS/3초 LUFS, 버스·마스터 UI·정밀 undo, export 근사 true peak·과부하 안내. PCM 최대 오차 1.49e-8, 8트랙 미터 처리 최대 0.10ms, 전체 E2E 59 PASS. 2라운드 H1–H3·M2–M10·LOW 4건 반영, full gate 9/9 PASS, 단위 854·E2E 59 PASS; M1 true peak 워커 이전 후속 |
 
 ### C3 구현 메모 (2026-09-06)
 
@@ -569,3 +569,11 @@ AAC 길이 1.00133s·onset 0.25154s, 미리보기 첫 소리 69.89ms·DSP 121.92
 코디네이터가 팬 법칙과 피치 테스트 2개 수정 예외를 승인했다. `createStereoPanner`·`disconnect`와 Node 테스트의 rAF stub만 보완하여 실제 믹서 그래프를 유지했고 기존 relink/job 취소 검증은 그대로다. 대체 graph mock patch는 사용·커밋하지 않았다. 포트 32119와 동시 gate 부재를 확인한 뒤 [full `pnpm gate`](evaluations/2026-09-07-audio-bus-gate.md) **9/9 PASS**, 단위 **847**(core 143·web 621·desktop 72·scripts 11), Chromium E2E **59/59 PASS**를 확인했다. 모델·저장·미리보기·export·UI·검증 자료는 통합 오디오 버스 기능 커밋으로 묶으며, main 통합·push는 수행하지 않는다.
 
 1,000자산 기준 비교: 가져오기 7451→7392ms, grid-ready p95 373→375ms, reload heap 111.2→107.3MB, DOM 16개·JSON 244659 bytes 유지. 원본 비교는 임시 git archive와 별도 서버를 사용했으며 다른 worktree/사용자 드라이브는 변경하지 않았다. 측정 범위·남은 미리보기/export 효과 차이·단일 LWW 프로젝트 audio 설정의 동시 편집 한계는 감사/결정 문서에 기록했다.
+
+### 2026-09-07 B′3 — 2라운드 리뷰 반영
+
+H1: 재생 중 gain/pan은 10ms `setTargetAtTime`으로 평활화하고 목적지가 바뀔 때만 재연결한다(게인만 바꿀 때 connect/disconnect 0회). H2: 자산 Map과 스트립 추정치를 공유해 1,000자산·8트랙·100회 스크럽 비용을 55.9→1.6ms, 프레임 p95 0.70→0.10ms, Map 생성 1700→1회로 줄였고 값 합계 637.5는 동일했다. H3: Worklet 불가 시 재생 중에도 파형 추정값·추정 라벨을 유지한다.
+
+M7/M10 지연 입력 master 연결·정리와 rAF 가드, M4 DOM 구조, M3 audio 스키마 passthrough, M6 상관 mono 채널 peak +6.02/+4.65dB와 stereo power +3.01dB 구분, M9 인코더 입력(정규화·클램프 후) true peak 측정을 반영했다. M2는 실제 겹치는 PCM 범위만 라우팅하며 M5 모바일 아이콘·M8 미터 >−60 단언과 LOW 4건도 반영했다. M1 true peak 워커 이동만 후속으로 남긴다: 현재 combine 워커는 정규화 전 단계이므로 최종 PCM을 측정하는 별도 상태·취소·fallback 프로토콜 검증이 필요하다.
+
+[2라운드 측정](evaluations/2026-09-07-audio-bus-round2-measurements.json): 실제 미리보기/export PCM 최대 오차 1.49e-8, 8트랙 미터 main 메시지 처리·store 발행 최대 0.10ms 유지(React 제외). [항목별 감사](evaluations/2026-09-07-audio-bus-audit.md)와 [결정](decisions/2026-09-07-audio-bus-model.md)에 근거·범위·미처리를 기록했다. [2라운드 full gate](evaluations/2026-09-07-audio-bus-round2-gate.md) **9/9 PASS**, 단위 **854**(core 143·web 628·desktop 72·scripts 11), Chromium E2E **59/59 PASS**. 헤더 레이아웃 회귀를 수정한 뒤 믹서·타임라인 반복 E2E도 **14/14 PASS**했다.

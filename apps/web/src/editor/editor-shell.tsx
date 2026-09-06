@@ -20,7 +20,7 @@ import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelinePanel } from "@/timeline/components/timeline-panel";
-import { FolderOpen, Sliders, Wand2, X } from "lucide-react";
+import { FolderOpen, Sliders, AudioLines, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
@@ -287,7 +287,7 @@ function MobileShell({
           aria-label={t("mixer.title")}
           title={t("mixer.title")}
         >
-          <Sliders className="size-5" />
+          <AudioLines className="size-5" />
         </button>
       </nav>
 

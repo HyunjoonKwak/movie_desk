@@ -1,11 +1,10 @@
 "use client";
 
-import { resolveTrackRoute, stereoPanMatrix } from "@movie-desk/core";
 import { useEffect, useMemo } from "react";
 import { useProjectStore } from "@/stores/project-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { requestWaveforms, retainWaveform, usePreviewStore } from "@/stores/preview-store";
-import { playheadLevel } from "@/preview/playhead-level";
+import { estimatedLevels } from "./estimated-levels";
 import { StateHint } from "@/components/state-hint";
 import { useT } from "@/i18n/use-t";
 import { useMeterStore } from "./meter-store";
@@ -18,10 +17,11 @@ export function MixerMeter({ id, compact = false }: { id: string; compact?: bool
   const playing = usePlaybackStore((s) => s.playing);
   const measured = useMeterStore((s) => s.levels[id]);
   const live = useMeterStore((s) => s.live);
+  const measuring = playing && live;
   const allTracks = useProjectStore((s) => s.project.timeline.tracks);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const audio = useProjectStore((s) => s.project.audio);
-  const playhead = useProjectStore((s) => (playing ? 0 : s.project.timeline.playhead));
+  const playhead = useProjectStore((s) => (measuring ? 0 : s.project.timeline.playhead));
   const waveforms = usePreviewStore((s) => s.waveforms);
   const assetKey = useMemo(
     () =>
@@ -49,40 +49,13 @@ export function MixerMeter({ id, compact = false }: { id: string; compact?: bool
   // Read the project only on stopped-view or routing changes, never on a live playhead tick.
   // biome-ignore lint/correctness/useExhaustiveDependencies: dependencies invalidate the fresh store snapshot below.
   const estimate = useMemo(() => {
-    if (playing) return 0;
-    const project = useProjectStore.getState().project;
-    const tracks =
-      id === "master"
-        ? project.timeline.tracks
-        : project.timeline.tracks.filter(
-            (track) => id === `track:${track.id}` || id === `bus:${track.audio?.busId}`,
-          );
-    const assets = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
-    let peak = 0;
-    for (const track of tracks) {
-      const route = resolveTrackRoute(project, track);
-      const [ll, lr, rl, rr] = stereoPanMatrix(route.pan);
-      const scale =
-        route.trackGain *
-        Math.max(ll + lr, rl + rr) *
-        (id.startsWith("track:") ? 1 : route.busGain) *
-        (id === "master" ? route.masterGain : 1);
-      peak = Math.max(
-        peak,
-        scale *
-          playheadLevel(
-            { ...project, timeline: { ...project.timeline, tracks: [track] } },
-            (assetId) => assets.get(assetId),
-            (assetId) => assets.get(assetId)?.waveformPeaks ?? waveforms[assetId],
-          ),
-      );
-    }
-    return peak;
-  }, [playing, allTracks, media, audio, playhead, id, waveforms]);
-  const peak = playing ? (measured?.peak ?? 0) : estimate;
-  const held = playing ? (measured?.heldPeak ?? 0) : estimate;
-  const clipping = playing && measured?.clipping;
-  const source = t(playing ? (live ? "mixer.live" : "mixer.unavailable") : "mixer.estimated");
+    if (measuring) return 0;
+    return estimatedLevels(useProjectStore.getState().project, waveforms)[id] ?? 0;
+  }, [measuring, allTracks, media, audio, playhead, id, waveforms]);
+  const peak = measuring ? (measured?.peak ?? 0) : estimate;
+  const held = measuring ? (measured?.heldPeak ?? 0) : estimate;
+  const clipping = measuring && measured?.clipping;
+  const source = t(measuring ? "mixer.live" : "mixer.estimated");
   return (
     <div
       title={`${source} · ${t("mixer.peak")} ${display(peak)} dBFS`}
@@ -112,12 +85,12 @@ export function MixerMeter({ id, compact = false }: { id: string; compact?: bool
           <div className="font-mono text-3xs">
             {t("mixer.peak")} {display(held)} dBFS
           </div>
-          {playing && (
+          {measuring && (
             <div className="font-mono text-3xs">
               {t("mixer.rms")} {display(measured?.rms ?? 0)} dBFS
             </div>
           )}
-          {id === "master" && playing && (
+          {id === "master" && measuring && (
             <div className="font-mono text-3xs">
               {t("mixer.shortLufs")}{" "}
               {measured?.shortLufs == null ? "—" : measured.shortLufs.toFixed(1)}

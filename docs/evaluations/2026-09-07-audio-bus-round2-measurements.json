@@ -1,0 +1,86 @@
+{
+  "cases": [
+    {
+      "mono": false,
+      "pan": -1,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": -0.5,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 0,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 0.5,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 1,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": true,
+      "pan": -1,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": -0.5,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": 0,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": true,
+      "pan": 0.5,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": 1,
+      "maxError": 1.4901161193847656e-8
+    }
+  ],
+  "scrub": {
+    "assets": 1000,
+    "tracks": 8,
+    "clips": 1000,
+    "frames": 100,
+    "consumers": 17,
+    "before": {
+      "totalMs": 55.900000005960464,
+      "medianMs": 0.5,
+      "p95Ms": 0.7000000178813934,
+      "maxMs": 1.0999999940395355,
+      "assetMapBuilds": 1700,
+      "checksum": 637.5
+    },
+    "after": {
+      "totalMs": 1.5999999940395355,
+      "medianMs": 0,
+      "p95Ms": 0.09999999403953552,
+      "maxMs": 0.30000001192092896,
+      "assetMapBuilds": 1,
+      "checksum": 637.5
+    },
+    "scope": "100 playhead moves; actual old estimator per 17 UI consumers versus shared estimates; excludes React layout/paint"
+  },
+  "meterFrame": {
+    "tracks": 8,
+    "samples": 1000,
+    "medianMs": 0,
+    "p95Ms": 0,
+    "maxMs": 0.10000002384185791,
+    "scope": "all worklet message handlers + one actual store publication; excludes React layout/paint"
+  }
+}

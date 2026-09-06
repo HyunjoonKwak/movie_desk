@@ -93,3 +93,42 @@ Independent integration gate: **4/4 PASS**, OSV audit, production build, Chromiu
 Coordinator approval retains explicit stereo upmix and the same stereo crossfeed law in preview/export, preserving legacy center gain. Limiter and normalization defaults remain unchanged; pre-limiter overload and normalized pre-clamp approximate true peak are separate diagnostics. The unused proposed graph-mock patch is excluded from the commit.
 
 Full `pnpm gate` result: **9/9 PASS**, unit tests **847** (core 143, web 621, desktop 72, scripts 11), Chromium E2E **59/59 PASS**. Port 32119 was free before launch, and no concurrent release gate was running. The implementation, targeted mock compatibility fixes, numerical evidence and documentation form one integrated audio-bus feature commit. No push/main merge, other worktree modifications, user media access or dependency changes are part of this task.
+
+## Round 2 review response — 2026-09-07
+
+Base: `13e7506` on the same `codex/b3-audio-bus` checkout. The coordinator explicitly permits only the release gate's install/OSV/Chromium network operations; application code adds no network access. The protected B′2 implementation paths and `mutate-edit.ts` remain unchanged; the two authorized test mocks add AudioParam smoothing support.
+
+| Review | Result and evidence |
+| --- | --- |
+| H1 | Initial parameter values remain exact before playback; subsequent gain/pan changes use `setTargetAtTime(value, currentTime, 0.01)`. Cached parameter targets prevent redundant automation; cached destinations prevent graph rewiring. Fake-context test: gain/pan-only edit has **0 connect and 0 disconnect calls**; one bus-route change has exactly one of each. |
+| H2 | Media maps use weak memoization keyed by immutable `mediaLibrary`; one shared estimate pass serves all track headers/strips/buses/master for a playhead/routing/waveform snapshot. Paired actual-old-estimator benchmark below verifies unchanged values. |
+| H3 | Both value and source label use `playing && live`. When worklets are absent/rejected, playback follows waveform estimates and the label remains estimated; rendered-component test checks non-silence and changes after moving the playhead. RMS/LUFS are only presented for live measurements. |
+| M7 / M10 | A late track input connects to master immediately and is cleaned by the next update if absent. Graph tests cover route changes, late-input cleanup, missing/rejected worklets and missing request/cancelAnimationFrame globals. |
+| M4 | Track-name/meter wrapper is a flex div, removing div-inside-span nesting. Name/meter and controls use two rows within the 96 px header: the first horizontal attempt overflowed and intercepted clip clicks. A header-button bounds assertion plus 14/14 repeated mixer/marquee E2E verifies the corrected layout. |
+| M3 | Project audio, bus, master and track audio schemas preserve unknown fields with passthrough; stored JSON and versioned export tests verify all four levels. |
+| M6 | Decision separates maximum +3.01 dB summed stereo power from +6.02 dB hard-pan / +4.65 dB half-pan channel peak gain. Channel peak drives limiting. |
+| M9 | True/sample peak now measures the exact normalized, clamped Float32 planar blocks passed to AudioEncoder. Pre-clamp clipping count and pre-limiter overload count remain separate; the export integration test observes actual AudioData input across mixer/encoder chunk boundaries and verifies sample peak 1, 4,100 pre-clamp samples and 6 pre-limiter samples. This measures pre-encoding PCM, not decoded AAC. |
+| M2 | Routing allocates only the overlapping output sample span via source subarray views, excluding effect/pitch padding. Existing multi-chunk routing tests and actual preview/export PCM comparison pass. |
+| M5 / M8 | Mobile mixer uses AudioLines while inspector retains Sliders; live E2E explicitly requires numeric meter level greater than −60 and rewinds to the start rather than depending on the insertion/undo playhead. |
+| LOW | History labels distinguish track/master/bus edits and bus add/delete; export routing coefficients resolve once per track; transient empty-string bus-clear command is documented; unused measureSignal is removed from the public core barrel (still directly exercised by its module tests). |
+| M1 — deferred | TruePeakMeter still runs on main. The combine worker runs before the normalization gain is known and before the final clamp; moving measurement beside limitedSamples there would regress M9. A follow-up needs a final-PCM worker stage with continuous interpolation state, export-scoped cancellation/cleanup, timeout fallback and transfer-cost measurements. The review's reported 278 ms per 60 seconds remains a known performance limitation, not a new round-2 measurement. |
+
+### Paired scrub and PCM remeasurement
+
+Run: `node scripts/audio-routing-benchmark.mjs docs/evaluations/2026-09-07-audio-bus-round2-measurements.json`. The baseline estimator body is extracted from the reviewed `13e7506` source, then bundled together with the new implementation and evaluated in the same local Chromium page; no other checkout/server or external media is used.
+
+| 1,000 assets, 8 tracks, 1,000 clips, 100 playhead moves | Before | After |
+| --- | ---: | ---: |
+| UI consumers per move (8 headers + 8 strips + master) | 17 | 17 |
+| Total estimator time | 55.9 ms | 1.6 ms |
+| Per-move median / p95 / max | 0.50 / 0.70 / 1.10 ms | 0 / 0.10 / 0.30 ms |
+| Asset Map constructions across 100 moves | 1,700 | 1 |
+| Sum of all reported estimates | 637.5 | 637.5 |
+
+This is estimator JavaScript cost, excluding React layout/paint, and a single paired run with browser timer quantization. The new cache calculates eight track estimates per move instead of recomputing the same track in each consumer. The previous 1,000-asset import/search/grid/heap figures above remain round-1 evidence; this round adds the requested scrub workload rather than claiming another library import run.
+
+Real OfflineAudioContext versus export mixer: maximum PCM error **1.4901161193847656e-8**, unchanged for ten mono/stereo pan cases. Eight-track worklet message handling plus one store publication: **0.10 ms maximum** in 1,000 iterations, excluding React layout/paint.
+
+[Verified round-2 desktop/header screenshot](audio-bus/round2-desktop.png).
+
+Round-2 full `pnpm gate`: **9/9 PASS**, unit tests **854** (core 143, web 628, desktop 72, scripts 11), Chromium E2E **59/59 PASS**; see [gate report](2026-09-07-audio-bus-round2-gate.md). Port 32119 was checked before each browser/gate launch. Only M1 is deferred; all mandatory review items and the other suggested items are implemented.
