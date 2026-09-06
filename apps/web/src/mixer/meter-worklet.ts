@@ -25,8 +25,8 @@ class MixerMeterProcessor extends AudioWorkletProcessor {
   }
   process(inputs, outputs) {
     if (!this.running) return false;
-    const input = inputs[0], output = outputs[0];
-    const length = output[0]?.length ?? 128;
+    const input = inputs[0], output = outputs[0] ?? [];
+    const length = input[0]?.length ?? output[0]?.length ?? 128;
     for (let c = 0; c < output.length; c++) {
       if (input[c]) output[c].set(input[c]); else output[c].fill(0);
     }

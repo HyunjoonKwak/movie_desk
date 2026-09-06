@@ -42,6 +42,7 @@ class AudioEngine {
   private active: AudioBufferSourceNode[] = [];
   private refillTimer: ReturnType<typeof setTimeout> | null = null;
   private generation = 0;
+  private meterGeneration = 0;
   private transportPlayhead = 0;
   private transportStartedAt = 0;
   private transportRate = 1;
@@ -104,9 +105,9 @@ class AudioEngine {
     const ctx = this.getCtx();
     this.retain(new Set(project.mediaLibrary.map((asset) => asset.id)));
     await ctx.resume();
-    const metering = await loadMeterWorklet(ctx);
     if (generation !== this.generation) return;
-    this.graph = new MixerAudioGraph(ctx, metering);
+    const graph = new MixerAudioGraph(ctx, false);
+    this.graph = graph;
     const current = useProjectStore.getState().project;
     this.graph.update(current.id === project.id ? current : project);
 
@@ -127,6 +128,13 @@ class AudioEngine {
     await this.scheduleRange(project, effectiveFromMs, this.scheduledThroughMs, rate, generation);
     if (generation !== this.generation) return;
     this.queueRefill(project, rate, generation);
+    // Start measuring only after scheduling the first sound. Pitch replacement
+    // advances source generation but keeps this graph, so also capture its identity.
+    const meterGeneration = this.meterGeneration;
+    void loadMeterWorklet(ctx).then((available) => {
+      if (available && meterGeneration === this.meterGeneration && this.graph === graph)
+        graph.enableMetering();
+    });
   }
 
   updateRouting(project: Project): void {
@@ -134,6 +142,7 @@ class AudioEngine {
   }
 
   stop(): void {
+    this.meterGeneration++;
     this.graph?.dispose();
     this.graph = null;
     this.clipTracks.clear();

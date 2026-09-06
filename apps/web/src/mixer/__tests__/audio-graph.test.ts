@@ -1,6 +1,7 @@
 import { createEmptyProject, type Project } from "@movie-desk/core";
 import { afterEach, expect, it, vi } from "vitest";
 import { MixerAudioGraph, loadMeterWorklet } from "../audio-graph";
+import { useMeterStore } from "../meter-store";
 
 const fakeContext = () => {
   const nodes: ReturnType<typeof node>[] = [];
@@ -109,7 +110,7 @@ it("supports unavailable/rejected worklets and missing animation-frame globals",
   }).not.toThrow();
 });
 
-it("routes through worklet outputs and disposes their ports", () => {
+it("attaches measurement taps without changing audible routes and disposes their ports", () => {
   const { ctx } = fakeContext();
   const meters: FakeMeter[] = [];
   class FakeMeter {
@@ -128,16 +129,27 @@ it("routes through worklet outputs and disposes their ports", () => {
     audio: { buses: [{ id: "b", name: "Bus", gainDb: 0 }], master: { gainDb: 0 } },
     timeline: { ...base.timeline, tracks: [track] },
   };
-  const graph = new MixerAudioGraph(ctx, true);
+  const graph = new MixerAudioGraph(ctx, false);
   graph.update(project);
   const gain = graph.input(track.id);
   const panner = vi.mocked(gain.connect).mock.calls[0]![0] as unknown as AudioNode;
+  const busGain = vi.mocked(panner.connect).mock.calls[0]![0] as unknown as AudioNode;
+  const masterGain = vi.mocked(busGain.connect).mock.calls[0]![0] as unknown as AudioNode;
+  expect(masterGain.connect).toHaveBeenCalledWith(ctx.destination);
+  expect(useMeterStore.getState().live).toBe(false);
+  graph.enableMetering();
+  expect(useMeterStore.getState().live).toBe(true);
+  expect(meters).toHaveLength(3);
   expect(panner.connect).toHaveBeenCalledWith(meters[2]);
-  const masterGain = meters[1]!.connect.mock.calls[0]![0];
-  const busGain = meters[2]!.connect.mock.calls[0]![0];
   expect(masterGain.connect).toHaveBeenCalledWith(meters[0]);
   expect(busGain.connect).toHaveBeenCalledWith(meters[1]);
-  expect(meters[0]!.connect).toHaveBeenCalledWith(ctx.destination);
+  for (const output of [panner, busGain, masterGain]) {
+    expect(output.disconnect).not.toHaveBeenCalled();
+    expect(output.connect).toHaveBeenCalledTimes(2); // original route + measurement tap
+  }
+  expect(meters.flatMap((meter) => meter.connect.mock.calls)).toHaveLength(0);
+  graph.enableMetering();
+  expect(meters).toHaveLength(3);
   for (const meter of meters) meter.connect.mockClear();
   graph.update({ ...project, audio: { ...project.audio!, master: { gainDb: -6 } } });
   expect(meters.flatMap((meter) => meter.connect.mock.calls)).toHaveLength(0);
@@ -147,4 +159,7 @@ it("routes through worklet outputs and disposes their ports", () => {
     expect(meter.port.close).toHaveBeenCalledOnce();
     expect(meter.port.postMessage).toHaveBeenCalledWith({ stop: true });
   }
+  graph.enableMetering();
+  expect(meters).toHaveLength(3);
+  expect(useMeterStore.getState().live).toBe(false);
 });

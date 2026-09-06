@@ -33,7 +33,7 @@ interface Strip {
   gain: GainNode;
   panner?: StereoPannerNode;
   output: AudioNode;
-  meter?: AudioWorkletNode;
+  meter?: AudioWorkletNode | undefined;
   destination?: AudioNode;
   hold: PeakHold;
   level: LiveLevel;
@@ -50,7 +50,7 @@ export class MixerAudioGraph {
 
   constructor(
     private readonly ctx: AudioContext,
-    private readonly metering: boolean,
+    private metering: boolean,
   ) {}
 
   private strip(id: string, pan = false): Strip {
@@ -62,38 +62,55 @@ export class MixerAudioGraph {
     gain.channelCountMode = "explicit";
     const panner = pan ? this.ctx.createStereoPanner() : undefined;
     if (panner) gain.connect(panner);
-    const meter = this.metering
-      ? new AudioWorkletNode(this.ctx, "movie-desk-meter", {
-          numberOfInputs: 1,
-          numberOfOutputs: 1,
-          outputChannelCount: [2],
-          channelCount: 2,
-          channelCountMode: "explicit",
-          processorOptions: { master: id === "master" },
-        })
-      : undefined;
-    const output = meter ?? panner ?? gain;
-    if (meter) (panner ?? gain).connect(meter);
+    const output = panner ?? gain;
     const hold = new PeakHold();
     const strip: Strip = {
       gain,
       ...(panner ? { panner } : {}),
       output,
-      ...(meter ? { meter } : {}),
       hold,
       level: { ...hold.update(silence, 0), shortLufs: null },
     };
-    if (meter)
-      meter.port.onmessage = (event: MessageEvent<SignalLevel & { shortLufs: number | null }>) => {
-        if (this.disposed) return;
-        strip.level = {
-          ...hold.update(event.data, performance.now()),
-          shortLufs: event.data.shortLufs,
-        };
-        this.dirty = true;
-      };
+    if (this.metering) this.attachMeter(id, strip);
     this.strips.set(id, strip);
     return strip;
+  }
+
+  // A zero-output measurement tap never replaces or duplicates the audible route.
+  private attachMeter(id: string, strip: Strip): void {
+    const meter = new AudioWorkletNode(this.ctx, "movie-desk-meter", {
+      numberOfInputs: 1,
+      numberOfOutputs: 0,
+      channelCount: 2,
+      channelCountMode: "explicit",
+      processorOptions: { master: id === "master" },
+    });
+    strip.meter = meter;
+    meter.port.onmessage = (event: MessageEvent<SignalLevel & { shortLufs: number | null }>) => {
+      if (this.disposed) return;
+      strip.level = {
+        ...strip.hold.update(event.data, performance.now()),
+        shortLufs: event.data.shortLufs,
+      };
+      this.dirty = true;
+    };
+    strip.output.connect(meter);
+  }
+
+  enableMetering(): void {
+    if (this.disposed || this.metering) return;
+    try {
+      for (const [id, strip] of this.strips) this.attachMeter(id, strip);
+      this.metering = true;
+      if (this.active) useMeterStore.setState({ live: true });
+    } catch {
+      // Node construction can fail even after module loading succeeds.
+      for (const strip of this.strips.values()) {
+        if (!strip.meter) continue;
+        strip.output.disconnect(strip.meter);
+        this.closeMeter(strip);
+      }
+    }
   }
 
   private parameter(param: AudioParam, value: number): void {
@@ -106,7 +123,7 @@ export class MixerAudioGraph {
 
   private route(strip: Strip, destination: AudioNode): void {
     if (strip.destination === destination) return;
-    if (strip.destination) strip.output.disconnect();
+    if (strip.destination) strip.output.disconnect(strip.destination);
     strip.output.connect(destination);
     strip.destination = destination;
   }
@@ -170,10 +187,16 @@ export class MixerAudioGraph {
     strip.gain.disconnect();
     strip.panner?.disconnect();
     strip.output.disconnect();
+    this.closeMeter(strip);
+  }
+
+  private closeMeter(strip: Strip): void {
     if (strip.meter) {
+      strip.meter.disconnect();
       strip.meter.port.postMessage({ stop: true });
       strip.meter.port.onmessage = null;
       strip.meter.port.close();
+      strip.meter = undefined;
     }
   }
 

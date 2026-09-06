@@ -183,107 +183,127 @@ test("pitch toggle is one undo and exported duration matches the timeline", asyn
   expect(Math.abs(durationSec - 1)).toBeLessThanOrEqual(1 / 30);
 });
 
-test("60s stereo preview starts immediately and renders pitch in a worker", async ({
-  page,
-}, testInfo) => {
-  test.setTimeout(120000);
-  await page.addInitScript(() => {
-    const stats = {
-      requestedAt: 0,
-      firstSoundMs: 0,
-      workerMs: 0,
-      dspMs: 0,
-      workerCount: 0,
-      longestTaskMs: 0,
-      pitchMainSliceMs: 0,
-    };
-    Object.assign(window, { pitchStats: stats });
-    const start = AudioBufferSourceNode.prototype.start;
-    AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) {
-      if (stats.requestedAt && !stats.firstSoundMs)
-        stats.firstSoundMs = performance.now() - stats.requestedAt;
-      return start.apply(this, args);
-    };
-    const NativeWorker = window.Worker;
-    window.Worker = class extends NativeWorker {
-      constructor(url: string | URL, options?: WorkerOptions) {
-        super(url, options);
-        const started = performance.now();
-        this.addEventListener("message", (event) => {
-          if (event.data.channels && event.data.dspMs !== undefined) {
-            stats.workerCount++;
-            stats.workerMs = performance.now() - started;
-            stats.dspMs = event.data.dspMs;
-          }
-        });
-      }
-    };
-    new PerformanceObserver((list) => {
-      if (stats.requestedAt)
-        for (const entry of list.getEntries())
-          if (entry.startTime >= stats.requestedAt)
-            stats.longestTaskMs = Math.max(stats.longestTaskMs, entry.duration);
-    }).observe({ type: "longtask", buffered: false });
-    new PerformanceObserver((list) => {
-      for (const entry of list.getEntries())
-        if (entry.name === "pitch-main-slice")
-          stats.pitchMainSliceMs = Math.max(stats.pitchMainSliceMs, entry.duration);
-    }).observe({ type: "measure", buffered: false });
-  });
-  const toggle = await seedAudio(page, 60);
-  await page.getByRole("button", { name: "2x", exact: true }).click();
-  const duration = page.getByRole("spinbutton", { name: "Duration", exact: true });
-  await duration.fill("00:00:30:00");
-  await duration.press("Enter");
-  await toggle.check();
-  await page.evaluate(() => {
-    (window as unknown as { pitchStats: { requestedAt: number } }).pitchStats.requestedAt =
-      performance.now();
-  });
-  await page.getByRole("button", { name: "Play", exact: true }).click();
-  await expect
-    .poll(
-      () =>
-        page.evaluate(
-          () => (window as unknown as { pitchStats: { workerMs: number } }).pitchStats.workerMs,
-        ),
-      { timeout: 30000 },
-    )
-    .toBeGreaterThan(0);
-  const stats = await page.evaluate(
-    () =>
-      (
-        window as unknown as {
-          pitchStats: {
-            firstSoundMs: number;
-            workerMs: number;
-            dspMs: number;
-            longestTaskMs: number;
-            pitchMainSliceMs: number;
-          };
+for (const meterDelayMs of [0, 1000]) {
+  test(`60s stereo preview starts immediately and renders pitch in a worker (meter delay ${meterDelayMs}ms)`, async ({
+    page,
+  }, testInfo) => {
+    test.setTimeout(120000);
+    await page.addInitScript((meterDelayMs) => {
+      const stats = {
+        meterDelayMs,
+        meterReadyMs: 0,
+        requestedAt: 0,
+        firstSoundMs: 0,
+        workerMs: 0,
+        dspMs: 0,
+        workerCount: 0,
+        longestTaskMs: 0,
+        pitchMainSliceMs: 0,
+      };
+      Object.assign(window, { pitchStats: stats });
+      const addModule = Worklet.prototype.addModule;
+      Worklet.prototype.addModule = async function (...args: Parameters<typeof addModule>) {
+        await new Promise((resolve) => setTimeout(resolve, meterDelayMs));
+        await addModule.apply(this, args);
+        stats.meterReadyMs = performance.now() - stats.requestedAt;
+      };
+      const start = AudioBufferSourceNode.prototype.start;
+      AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) {
+        if (stats.requestedAt && !stats.firstSoundMs)
+          stats.firstSoundMs = performance.now() - stats.requestedAt;
+        return start.apply(this, args);
+      };
+      const NativeWorker = window.Worker;
+      window.Worker = class extends NativeWorker {
+        constructor(url: string | URL, options?: WorkerOptions) {
+          super(url, options);
+          const started = performance.now();
+          this.addEventListener("message", (event) => {
+            if (event.data.channels && event.data.dspMs !== undefined) {
+              stats.workerCount++;
+              stats.workerMs = performance.now() - started;
+              stats.dspMs = event.data.dspMs;
+            }
+          });
         }
-      ).pitchStats,
-  );
-  // biome-ignore lint/suspicious/noConsole: reproducible performance evidence for the B2 audit.
-  console.log("B2 pitch benchmark", stats);
-  await testInfo.attach("pitch-benchmark", {
-    body: JSON.stringify(stats),
-    contentType: "application/json",
-  });
-  expect(stats.firstSoundMs).toBeGreaterThan(0);
-  expect(stats.firstSoundMs).toBeLessThanOrEqual(500);
-  expect(stats.dspMs).toBeLessThanOrEqual(2000);
-  expect(stats.pitchMainSliceMs).toBeLessThanOrEqual(16);
-  await page.getByRole("button", { name: "0.5x", exact: true }).click();
-  await expect
-    .poll(
-      () =>
+      };
+      new PerformanceObserver((list) => {
+        if (stats.requestedAt)
+          for (const entry of list.getEntries())
+            if (entry.startTime >= stats.requestedAt)
+              stats.longestTaskMs = Math.max(stats.longestTaskMs, entry.duration);
+      }).observe({ type: "longtask", buffered: false });
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries())
+          if (entry.name === "pitch-main-slice")
+            stats.pitchMainSliceMs = Math.max(stats.pitchMainSliceMs, entry.duration);
+      }).observe({ type: "measure", buffered: false });
+    }, meterDelayMs);
+    const toggle = await seedAudio(page, 60);
+    await page.getByRole("button", { name: "2x", exact: true }).click();
+    const duration = page.getByRole("spinbutton", { name: "Duration", exact: true });
+    await duration.fill("00:00:30:00");
+    await duration.press("Enter");
+    await toggle.check();
+    await page.evaluate(() => {
+      (window as unknown as { pitchStats: { requestedAt: number } }).pitchStats.requestedAt =
+        performance.now();
+    });
+    await page.getByRole("button", { name: "Play", exact: true }).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => (window as unknown as { pitchStats: { workerMs: number } }).pitchStats.workerMs,
+          ),
+        { timeout: 30000 },
+      )
+      .toBeGreaterThan(0);
+    await expect
+      .poll(() =>
         page.evaluate(
           () =>
-            (window as unknown as { pitchStats: { workerCount: number } }).pitchStats.workerCount,
+            (window as unknown as { pitchStats: { meterReadyMs: number } }).pitchStats.meterReadyMs,
         ),
-      { timeout: 30000 },
-    )
-    .toBeGreaterThanOrEqual(2);
-  await page.getByRole("button", { name: "Pause", exact: true }).click();
-});
+      )
+      .toBeGreaterThan(0);
+    const stats = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            pitchStats: {
+              firstSoundMs: number;
+              meterReadyMs: number;
+              workerMs: number;
+              dspMs: number;
+              longestTaskMs: number;
+              pitchMainSliceMs: number;
+            };
+          }
+        ).pitchStats,
+    );
+    // biome-ignore lint/suspicious/noConsole: reproducible performance evidence for the B2 audit.
+    console.log("B2 pitch benchmark", stats);
+    await testInfo.attach("pitch-benchmark", {
+      body: JSON.stringify(stats),
+      contentType: "application/json",
+    });
+    expect(stats.firstSoundMs).toBeGreaterThan(0);
+    expect(stats.firstSoundMs).toBeLessThanOrEqual(500);
+    if (meterDelayMs) expect(stats.firstSoundMs).toBeLessThan(stats.meterReadyMs);
+    expect(stats.dspMs).toBeLessThanOrEqual(2000);
+    expect(stats.pitchMainSliceMs).toBeLessThanOrEqual(16);
+    await page.getByRole("button", { name: "0.5x", exact: true }).click();
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () =>
+              (window as unknown as { pitchStats: { workerCount: number } }).pitchStats.workerCount,
+          ),
+        { timeout: 30000 },
+      )
+      .toBeGreaterThanOrEqual(2);
+    await page.getByRole("button", { name: "Pause", exact: true }).click();
+  });
+}

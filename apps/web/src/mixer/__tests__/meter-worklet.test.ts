@@ -27,6 +27,15 @@ const create = (master = false, sampleRate = 48000) => {
 };
 
 describe("meter worklet", () => {
+  it("measures a zero-output tap without an audible output connection", () => {
+    const { processor, messages } = create();
+    const left = new Float32Array(128).fill(0.5);
+    const right = new Float32Array(128).fill(-0.5);
+    for (let block = 0; block < 16; block++)
+      expect(processor.process([[left, right]], [])).toBe(true);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({ peak: 0.5, rms: 0.5, clippedSamples: 0 });
+  });
   it("passes stereo PCM unchanged, including opposite phase, and captures isolated overload", () => {
     const { processor, messages } = create();
     for (let block = 0; block < 16; block++) {
