@@ -53,6 +53,7 @@ const formatSize = (megabytes: number): string => {
 
 interface ExportedFile {
   readonly pitchFallback?: boolean;
+  readonly aacCorrectionFallback?: boolean;
   readonly name: string;
   readonly preset: string;
   readonly destination: ExportDestination;
@@ -131,11 +132,13 @@ export function ExportDialog({ open, onOpenChange }: Props) {
           preset: label,
           destination,
           pitchFallback: result.pitchFallback === true,
+          aacCorrectionFallback: result.aacCorrectionFallback === true,
         });
         measurement.record(destination.kind === "cancelled" ? "cancelled" : "success");
         if (destination.kind !== "cancelled") {
           toast.success(t("export.success", { name: result.suggestedName }));
           if (result.pitchFallback) toast.info(t("export.pitchFallback"));
+          if (result.aacCorrectionFallback) toast.info(t("export.aacCorrectionFallback"));
         }
         exporterRef.current = null;
       }
@@ -256,6 +259,9 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                     <div className="text-ink-3">{file.preset}</div>
                     {file.pitchFallback && (
                       <StateHint tone="info" text={t("export.pitchFallback")} />
+                    )}
+                    {file.aacCorrectionFallback && (
+                      <StateHint tone="info" text={t("export.aacCorrectionFallback")} />
                     )}
                     {file.destination.kind === "file" && (
                       <div className="mt-1 flex items-center justify-between gap-2">

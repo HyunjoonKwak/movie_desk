@@ -68,6 +68,13 @@ export class Mp4Writer {
   // await, so the chain carries the first failure to finalize().
   private queue: Promise<void>;
   private failure: Error | null = null;
+  private presentationFailed = false;
+  get audioPresentationFallback(): boolean {
+    return this.presentationFailed;
+  }
+  // Keep references to encoded packets only while correction can still fail.
+  // Re-muxing removes the reservation offset even if timing edits partly wrote.
+  private readonly replay: ((writer: Mp4Writer) => void)[] = [];
 
   constructor(private readonly options: Mp4WriterOptions) {
     if (!options.video && !options.audio)
@@ -101,6 +108,10 @@ export class Mp4Writer {
   ): void {
     const source = this.video;
     if (!source) throw new Error("Mp4Writer has no video track");
+    if (this.options.audio?.presentation)
+      this.replay.push((writer) =>
+        writer.addVideoChunkRaw(data, type, timestampUs, durationUs, meta),
+      );
     const { timestamp, sequence } = this.videoClock.next(timestampUs);
     const packet = new EncodedPacket(data, type, timestamp, durationUs / 1_000_000, sequence);
     this.enqueue(() => source.add(packet, meta));
@@ -119,10 +130,16 @@ export class Mp4Writer {
   ): void {
     const source = this.audio;
     if (!source) throw new Error("Mp4Writer has no audio track");
+    if (this.options.audio?.presentation)
+      this.replay.push((writer) =>
+        writer.addAudioChunkRaw(data, type, timestampUs, durationUs, meta),
+      );
     const { timestamp, sequence } = this.audioClock.next(timestampUs);
     const packet = new EncodedPacket(
       data,
       type,
+      // A positive 1s start makes Mediabunny reserve a two-entry edit list.
+      // Finalization rewrites it to the measured AAC presentation window.
       timestamp + (this.options.audio?.presentation ? 1 : 0),
       durationUs / 1_000_000,
       sequence,
@@ -137,9 +154,22 @@ export class Mp4Writer {
     await this.output.finalize();
     const buffer = this.target.buffer;
     if (!buffer) throw new Error("MP4 finalize produced no data");
-    if (this.options.audio?.presentation)
-      applyAudioPresentation(buffer, this.options.audio.presentation);
-    return buffer;
+    try {
+      if (this.options.audio?.presentation) {
+        try {
+          applyAudioPresentation(buffer, this.options.audio.presentation);
+        } catch {
+          this.presentationFailed = true;
+          const { presentation: _presentation, ...audio } = this.options.audio;
+          const fallback = new Mp4Writer({ ...this.options, audio });
+          for (const write of this.replay) write(fallback);
+          return await fallback.finalize();
+        }
+      }
+      return buffer;
+    } finally {
+      this.replay.length = 0;
+    }
   }
 
   private enqueue(step: () => Promise<void>): void {

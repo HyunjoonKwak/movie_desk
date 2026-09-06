@@ -84,6 +84,7 @@ export class WebCodecsExporter implements Exporter {
     const compositor = new Compositor(canvas);
     let encoder: VideoEncoder | null = null;
     let pitchFallback = false;
+    let aacCorrectionFallback = false;
     try {
       compositor.resize(preset.width, preset.height);
       let virtualPlayheadMs = 0;
@@ -97,9 +98,15 @@ export class WebCodecsExporter implements Exporter {
         preset.audioCodec === "aac" &&
         (await aacEncoderSupported(preset.audioBitrateKbps));
 
-      const primingSamples = includeAudio
-        ? await measureAacPriming(preset.audioBitrateKbps * 1000)
-        : 0;
+      let primingSamples = 0;
+      if (includeAudio) {
+        try {
+          primingSamples = await measureAacPriming(preset.audioBitrateKbps * 1000);
+        } catch {
+          aacCorrectionFallback = true;
+        }
+      }
+      const prerollSamples = includeAudio && !aacCorrectionFallback ? AAC_PREROLL_SAMPLES : 0;
       const muxer = new Mp4Writer({
         video: {
           codec: codecForMuxer(preset.videoCodec),
@@ -113,11 +120,15 @@ export class WebCodecsExporter implements Exporter {
                 codec: "aac",
                 numberOfChannels: 2,
                 sampleRate: 48_000,
-                presentation: {
-                  offsetSamples: AAC_PREROLL_SAMPLES + primingSamples,
-                  lengthSamples: Math.round(exportDurationMs * 48),
-                  sampleRate: 48_000,
-                },
+                ...(!aacCorrectionFallback
+                  ? {
+                      presentation: {
+                        offsetSamples: prerollSamples + primingSamples,
+                        lengthSamples: Math.round(exportDurationMs * 48),
+                        sampleRate: 48_000,
+                      },
+                    }
+                  : {}),
               },
             }
           : {}),
@@ -233,7 +244,7 @@ export class WebCodecsExporter implements Exporter {
                 padding.close();
               }
             };
-            encodePadding(0);
+            if (prerollSamples) encodePadding(0);
             const encoderChunkSize = 1024;
             for await (const chunk of mixer.chunks(mixOptions)) {
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
@@ -252,7 +263,7 @@ export class WebCodecsExporter implements Exporter {
                   numberOfFrames,
                   numberOfChannels: 2,
                   timestamp: Math.round(
-                    ((AAC_PREROLL_SAMPLES + chunk.startSample + i) / chunk.sampleRate) * 1_000_000,
+                    ((prerollSamples + chunk.startSample + i) / chunk.sampleRate) * 1_000_000,
                   ),
                   data: planar,
                 });
@@ -263,7 +274,7 @@ export class WebCodecsExporter implements Exporter {
                 }
               }
             }
-            encodePadding(AAC_PREROLL_SAMPLES + Math.round(exportDurationMs * 48));
+            if (prerollSamples) encodePadding(prerollSamples + Math.round(exportDurationMs * 48));
             await audioEncoder.flush();
           } finally {
             if (audioEncoder.state !== "closed") audioEncoder.close();
@@ -290,6 +301,7 @@ export class WebCodecsExporter implements Exporter {
       const name = sanitizeName(project.name) || "export";
       return {
         pitchFallback,
+        aacCorrectionFallback: aacCorrectionFallback || muxer.audioPresentationFallback === true,
         blob: new Blob([buffer], { type: "video/mp4" }),
         mime: "video/mp4",
         suggestedName: `${name}.mp4`,

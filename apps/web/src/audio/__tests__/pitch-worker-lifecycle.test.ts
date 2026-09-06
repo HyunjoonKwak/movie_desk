@@ -104,28 +104,50 @@ it("terminates aborted DSP and starts a replacement without waiting for its repl
   await Promise.all([old, fresh]);
 });
 
-it("cropped source offsets reproduce full-source DSP at a nonzero chunk offset", async () => {
-  let cropped: Float32Array[] = [];
-  vi.stubGlobal(
-    "Worker",
-    class {
-      onmessage = (_event: unknown) => {};
-      terminate() {}
-      postMessage(req: StretchRequest) {
-        cropped = renderClipAudio(req);
-        this.onmessage({ data: { channels: cropped } });
-      }
-    },
-  );
-  const req = {
-    ...request(4),
-    offsetMs: 2000,
-    outputSamples: 48000,
-    channels: [
-      Float32Array.from({ length: 4 * 48000 }, (_, i) => Math.sin((i * 2 * Math.PI * 440) / 48000)),
-    ],
-  };
-  const full = renderClipAudio(req);
-  await renderPitchInWorker(req);
-  expect(cropped).toEqual(full);
-});
+it.each([false, true])(
+  "cropped source matches full DSP with nonzero offset (trim/ramp: %s)",
+  async (ramp) => {
+    let cropped: Float32Array[] = [];
+    vi.stubGlobal(
+      "Worker",
+      class {
+        onmessage = (_event: unknown) => {};
+        terminate() {}
+        postMessage(req: StretchRequest) {
+          cropped = renderClipAudio(req);
+          this.onmessage({ data: { channels: cropped } });
+        }
+      },
+    );
+    const req = {
+      ...request(4),
+      clip: ramp
+        ? {
+            ...clip,
+            trimIn: 500,
+            trimOut: 4000,
+            duration: 3000,
+            keyframes: [
+              {
+                target: "speed",
+                keyframes: [
+                  { at: 0, value: 0.5, easing: "linear" as const },
+                  { at: 3000, value: 1.5, easing: "linear" as const },
+                ],
+              },
+            ],
+          }
+        : clip,
+      offsetMs: 2000,
+      outputSamples: 48000,
+      channels: [
+        Float32Array.from({ length: 4 * 48000 }, (_, i) =>
+          Math.sin((i * 2 * Math.PI * 440) / 48000),
+        ),
+      ],
+    };
+    const full = renderClipAudio(req);
+    await renderPitchInWorker(req);
+    expect(cropped).toEqual(full);
+  },
+);

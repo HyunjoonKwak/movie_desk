@@ -20,8 +20,8 @@ it("speed edits abort stale jobs, immediately render the new key and only cache 
   const started: unknown[] = [];
   const buffer = {
     sampleRate: 48000,
-    length: 48000,
-    numberOfChannels: 1,
+    length: 48000 * 600, // a short clip from a ten-minute source must be admitted
+    numberOfChannels: 2,
     getChannelData: () => new Float32Array(48000),
   };
   vi.stubGlobal(

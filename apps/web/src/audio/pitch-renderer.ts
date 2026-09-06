@@ -111,6 +111,37 @@ const acquireJob = (signal?: AbortSignal): Promise<() => void> =>
     }
   });
 
+export const pitchSourceWindow = (
+  req: Pick<
+    StretchRequest,
+    "clip" | "offsetMs" | "outputSamples" | "sourceSampleRate" | "outputSampleRate"
+  >,
+): { lower: number; upper: number } => {
+  // Four pre-roll hops, overlap window and search margin in source time.
+  const marginMs = 250;
+  const lower = Math.max(
+    0,
+    Math.floor(
+      ((req.clip.trimIn +
+        sourceOffsetForRamp(req.clip, Math.max(0, req.offsetMs - marginMs)) -
+        marginMs) *
+        req.sourceSampleRate) /
+        1000,
+    ),
+  );
+  const upper = Math.ceil(
+    ((req.clip.trimIn +
+      sourceOffsetForRamp(
+        req.clip,
+        req.offsetMs + (req.outputSamples * 1000) / req.outputSampleRate + marginMs,
+      ) +
+      marginMs) *
+      req.sourceSampleRate) /
+      1000,
+  );
+  return { lower, upper };
+};
+
 const yieldMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 export const renderPitchInWorker = (
   req: StretchRequest,
@@ -119,28 +150,7 @@ export const renderPitchInWorker = (
   const run = async () => {
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     if (typeof Worker === "undefined") throw new Error("Pitch worker unavailable");
-    // Four pre-roll hops, overlap window and search margin in source time.
-    const marginMs = 250;
-    const lower = Math.max(
-      0,
-      Math.floor(
-        ((req.clip.trimIn +
-          sourceOffsetForRamp(req.clip, Math.max(0, req.offsetMs - marginMs)) -
-          marginMs) *
-          req.sourceSampleRate) /
-          1000,
-      ),
-    );
-    const upper = Math.ceil(
-      ((req.clip.trimIn +
-        sourceOffsetForRamp(
-          req.clip,
-          req.offsetMs + (req.outputSamples * 1000) / req.outputSampleRate + marginMs,
-        ) +
-        marginMs) *
-        req.sourceSampleRate) /
-        1000,
-    );
+    const { lower, upper } = pitchSourceWindow(req);
     const channels: Float32Array[] = [];
     // Copy in bounded blocks and transfer ownership, never detach decoded PCM.
     for (const original of req.channels) {

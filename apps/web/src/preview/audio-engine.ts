@@ -2,6 +2,7 @@ import {
   PitchCache,
   pitchCacheKey,
   pitchMainSlice,
+  pitchSourceWindow,
   renderPitchInWorker,
 } from "@/audio/pitch-renderer";
 import { setPitchState } from "@/audio/pitch-state";
@@ -256,11 +257,19 @@ class AudioEngine {
     const stateKey = pitchCacheKey(clip, 0);
     const outputSamples = Math.floor((clip.duration * buffer.sampleRate) / 1000);
     const bytes = outputSamples * buffer.numberOfChannels * 4;
-    // Admission bounds retained output and in-flight source copies separately.
-    if (
-      bytes > this.pitchCache.limit ||
-      buffer.length * buffer.numberOfChannels * 4 > this.pitchCache.limit
-    ) {
+    const { lower, upper } = pitchSourceWindow({
+      clip,
+      offsetMs: 0,
+      outputSamples,
+      sourceSampleRate: buffer.sampleRate,
+      outputSampleRate: buffer.sampleRate,
+    });
+    const sourceBytes =
+      Math.max(0, Math.min(buffer.length, upper) - Math.min(buffer.length, lower)) *
+      buffer.numberOfChannels *
+      4;
+    // Admission bounds retained output and the transmitted source window separately.
+    if (bytes > this.pitchCache.limit || sourceBytes > this.pitchCache.limit) {
       setPitchState(clip.id, stateKey, "fallback");
       return;
     }

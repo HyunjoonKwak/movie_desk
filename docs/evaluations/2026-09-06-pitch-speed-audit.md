@@ -30,7 +30,7 @@ Implementation measurements and reproducible fixture coverage are recorded below
 
 ## Baseline additional fixtures
 
-Reproduce from repository root: `node docs/evaluations/pitch-speed-baseline.mjs`
+Reproduce from repository root: `node scripts/pitch-export-benchmark.mjs --varispeed`
 (using the already installed Playwright Chromium).
 
 | Fixture at 2× | Preview | Export |
@@ -153,7 +153,7 @@ Rewritten commits: `00e4917 → f5e4fe9`, `566e271 → 85628fb`,
 
 ### Same-machine audio export timing
 
-Reproduce: `node scripts/pitch-export-benchmark.mjs bf5ce34` from repository root.
+Reproduce: `node scripts/pitch-export-benchmark.mjs 27128d1` from repository root.
 Uses local installed Chromium, real compiled worker DSP and ProjectAudioMixer,
 48kHz ten-minute stereo 440Hz PCM at 1×, 20×30-second output chunks, no effects.
 The decoded fixture is preallocated; these are **audio mixing/export-stage**
@@ -198,3 +198,46 @@ scripts 11), **57 Chromium E2E PASS**. AAC decoded duration **1.001333s**,
 onset **0.251542s** vs 0.25s expected, tail RMS **0.250185**, container 1s.
 60s preview: first sound **69.89ms**, worker roundtrip **133.00ms**, DSP
 **121.92ms**, largest new main copy slice **0.36ms**. No skipped gate steps.
+
+## B′2 round 3 — AAC fallback and integration cleanup (2026-09-06)
+
+- AAC calibration is optional: absent decoder, unsupported decode or correlation
+  failure leaves `primingSamples = 0`, omits correction edit-list metadata and
+  does not add calibration preroll/end padding to the actual export. Audio
+  encoding continues and `aacCorrectionFallback` reaches the completion panel
+  and informational toast (en/ko: “AAC 시작 보정을 적용하지 못했습니다”).
+- `Mp4Writer` catches presentation-edit failures only, then re-muxes retained
+  encoded packet references with unshifted timestamps and no presentation option.
+  This avoids leaking its +1s reservation or partially edited metadata; packet
+  payloads remain unchanged. The +1s reservation now has an explanatory comment.
+  Rare fallback temporarily holds a second mux output; ordinary encoding/mux
+  failures remain errors, rather than claiming success with an invalid file.
+- Three full exporter-path regressions use real AAC/video fixture packets and
+  real Mp4Writer: missing AudioDecoder, correlation failure, and a deliberately
+  missing edit-list reservation. All produce both tracks, preserve every AAC
+  packet byte, start audio at timestamp zero, and set the result notice flag.
+- [Unified benchmark script](../../scripts/pitch-export-benchmark.mjs) defaults
+  to ancestor `27128d1` and reports a clear error for an unresolved Git ref before
+  launching a browser. The former documentation-directory script was removed;
+  its original varispeed frequency/alias/speech probes are retained with
+  `node scripts/pitch-export-benchmark.mjs --varispeed`. Both modes ran successfully.
+  A fresh comparison gave 13,421.10ms / 3,429.50ms and unchanged transfer bytes
+  4,608,000,000 / 237,696,000 (baseline/current); same audio-stage scope as round 2.
+- Deleted only the branch-added unused `speed.pitchRendering` keys; appended the
+  AAC notice to both locale files. No other existing translation lines changed.
+- Preview admission now uses the shared renderer source-window calculation and
+  output bytes, so a short clip in a ten-minute stereo source can render. The
+  controlled preview regression now uses that long-source case; cropped/full
+  DSP equivalence additionally covers trimIn 500ms, a 0.5–1.5× ramp and 2s offset.
+- `ExportResult.pitchFallback` and the new AAC flag are readonly.
+
+B′3 audio-bus follow-up (record only): `detachAudio` currently copies only speed
+keyframes, drops the volume curve on the detached clip, and sets the original
+clip's base volume to zero while leaving its keyframes intact. Define volume
+curve/effect ownership and true source muting in B′3; this round deliberately
+makes no detach behavior change.
+
+Round-2 deferred list is superseded only for baseline-script consolidation;
+M5–M8, revision cleanup, trim energy reference, malformed-number hardening and
+the core audio barrel remain deferred. Validation: see
+[round-3 gate](2026-09-06-pitch-speed-round3-gate.md).

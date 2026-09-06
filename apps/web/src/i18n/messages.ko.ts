@@ -909,8 +909,8 @@ export const ko = {
     "funnel.retention": "프로젝트 1,000행 / 전체 5,000행 초과 시 활동 행만 정리하며 퍼널·복구 행은 보존합니다. 시간은 휴식 포함이며 도움 유무를 판별하지 않습니다.",
     "speed.preservePitch": "피치 유지",
     "speed.pitchUnsupported": "피치 유지는 정방향 0.25×–4× 구간에만 적용됩니다. 그 외 구간은 속도에 따라 피치가 변합니다.",
-    "speed.pitchRendering": "오디오 렌더링 중 첫 재생은 속도에 따라 피치가 변하며, 다음 재생부터 렌더링된 오디오를 사용합니다.",
     "export.pitchFallback": "피치 보존을 사용할 수 없어 일반 속도 변경으로 내보냈습니다.",
     "speed.pitchWorking": "피치 유지 오디오를 렌더링 중입니다. 완료되면 재생에 적용합니다.",
     "speed.pitchFallback": "피치 유지를 사용할 수 없어 일반 속도 변경으로 재생합니다.",
+    "export.aacCorrectionFallback": "AAC 시작 보정을 적용하지 못했습니다.",
 } as const;
