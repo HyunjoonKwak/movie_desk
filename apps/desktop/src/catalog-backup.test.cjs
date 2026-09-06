@@ -9,6 +9,7 @@ const {
   restoreCatalogSnapshot,
   listCatalogSnapshots,
   validateSnapshot,
+  retainedSnapshots,
 } = require("./catalog-backup.cjs");
 
 test("WAL snapshot restores source identity and user metadata with explicit consent", async (t) => {
@@ -72,4 +73,49 @@ test("corrupt snapshot never replaces catalog; failed backup leaves good snapsho
     /disk full/,
   );
   assert.deepEqual(await listCatalogSnapshots(backups), ["snapshot-100-abc.sqlite3"]);
+});
+
+test("unchanged catalogs skip snapshots; source status only writes transitions", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "backup-revision-"));
+  const catalog = new MediaCatalog(path.join(dir, "catalog.sqlite3"));
+  t.after(async () => { await catalog.close(); await fs.rm(dir, { recursive: true, force: true }); });
+  await catalog.ready();
+  await catalog.registerRoot({ id: "r", kind: "local", lastKnownAbsolutePath: dir });
+  await catalog.upsertAsset({ id: "a", rootId: "r", relativePath: "a.mov", sizeBytes: 1, modifiedAtMs: 1 });
+  const backups = path.join(dir, "backups");
+  const first = await createCatalogSnapshot(catalog, backups);
+  assert.equal(await createCatalogSnapshot(catalog, backups), first);
+  await catalog.recordSourceState("a", "offline");
+  const revision = await catalog.changeToken();
+  await catalog.recordSourceState("a", "offline");
+  assert.equal(await catalog.changeToken(), revision);
+  assert.deepEqual(await catalog.lastSourceStates(["a"]), { a: "offline" });
+  assert.notEqual(await createCatalogSnapshot(catalog, backups), first);
+});
+
+test("retention keeps at most seven snapshots across recent, hourly and daily generations", () => {
+  const now = 10 * 86_400_000;
+  const names = Array.from({ length: 800 }, (_, i) => `snapshot-${now - i * 900_000}-abc.sqlite3`);
+  const kept = retainedSnapshots(names);
+  assert.equal(kept.size, 7);
+  for (const name of names.slice(0, 3)) assert.ok(kept.has(name));
+  assert.ok([...kept].some((name) => Number(name.split("-")[1]) <= now - 86_400_000));
+});
+
+test("successful snapshot removes obsolete generations from disk", async (t) => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "backup-retention-"));
+  const catalog = new MediaCatalog(path.join(dir, "catalog.sqlite3"));
+  t.after(async () => { await catalog.close(); await fs.rm(dir, { recursive: true, force: true }); });
+  await catalog.ready();
+  const backups = path.join(dir, "backups");
+  await fs.mkdir(backups);
+  const now = Date.now();
+  for (let i = 1; i <= 12; i++) {
+    await fs.writeFile(path.join(backups, `snapshot-${now - i * 86_400_000}-abc.sqlite3`), "old snapshot fixture");
+  }
+  const newest = await createCatalogSnapshot(catalog, backups);
+  const names = await listCatalogSnapshots(backups);
+  assert.equal(names.length, 7);
+  assert.ok(names.includes(path.basename(newest)));
+  assert.deepEqual(new Set(names), retainedSnapshots(names));
 });

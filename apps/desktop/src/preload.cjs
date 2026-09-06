@@ -33,6 +33,13 @@ contextBridge.exposeInMainWorld("cutDesktop", {
   fetchMusicCredits: async (url) => ipcRenderer.invoke("movie-desk:fetch-music-credits", url),
   media: {
     chooseRelink: async (assetIds, folder) => ipcRenderer.invoke("movie-desk:media-relink-choose", assetIds, folder),
+    lastSourceStates: (ids) => ipcRenderer.invoke("movie-desk:media-last-source-states", ids),
+    cancelRelink: () => ipcRenderer.invoke("movie-desk:media-relink-cancel"),
+    onRelinkProgress: (callback) => {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("movie-desk:media-relink-progress", listener);
+      return () => ipcRenderer.removeListener("movie-desk:media-relink-progress", listener);
+    },
     commitRelink: async (token, confirmed) => ipcRenderer.invoke("movie-desk:media-relink-commit", token, confirmed),
     // Returns an opaque, revocable media:// URL. Absolute source paths never
     // cross the context-isolated preload boundary.

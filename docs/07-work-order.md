@@ -119,10 +119,16 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
   재인라인과 최대 200개 메모리 LRU를 파형까지 확장하고, 타임라인/range editor/level meter를 필요 시 로드로
   전환했다. 레코드에는 검색용 `hasAudio` 사실만 유지한다. 후측정 JSON 244,659B(-92.6%), 이름 변경→Saved
   63ms(전 136ms). 상세: `docs/evaluations/2026-09-05-library-json-composition.md`.
+- 2026-09-06 Codex 리뷰 반영: 동일 지문만 기본 선택하고 선택한 행만 확인 후 연결한다.
+  폴더 준비는 최대 1,000개·2분, 볼륨 조회 1회와 quick hash를 사용하며 진행률·취소를 제공한다.
+  전체 지문은 커밋에서 대조한다. 숨김 화면의 자동 검사는 생략하고 offline 결과가 다른 볼륨 캐시를 지우지 않는다.
+  백업은 변경 시에만 생성하고 최근 3개·시간별 2개·일별 2개를 보존하며 종료 대기는 4초로 제한한다.
+  schema v2 상태 표는 초기 표시용 읽기 경로를 추가했고 fresh probe의 생략 근거로 쓰지 않는다.
+
 - 2026-09-06 Codex: A4 데스크톱 후속(`codex/a4-desktop-relink`, base `07d5d33`).
   네이티브 파일/폴더 선택은 메인 프로세스에서 helper inspect/fingerprint로 검사하고, 다른 지문은
   명시적 확인 후에만 카탈로그 참조를 바꾼다. 일괄 후보는 정확한 상대 경로만 사용하며 적용 직전 다시 검증한다.
-  10초 간격 health 재검사로 볼륨 복귀를 감지하고 source root와 상태를 카탈로그에 기록한다.
+  30초 간격의 disk 부분집합 health 재검사로 볼륨 복귀를 감지하고 source root와 상태를 카탈로그에 기록한다.
   SQLite worker가 15분 간격/정상 종료 시 최대 7개 스냅샷을 유지하며, File 메뉴에서 수동 백업/복원이 가능하다.
   손상 시 복원을 제안하고, 확인 전에는 덮어쓰지 않으며 이전 DB/WAL/SHM은 별도 보존한다.
   검증·스크린샷과 임시 APFS 볼륨 정리 결과는 [실기 기록](evaluations/2026-09-06-desktop-relink.md) 참조.
@@ -472,7 +478,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A5 새로고침·프리뷰 백로그 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 3라운드 완료, main 통합(05739df); dev 복원 p95만 예산 초과(production 충족) | `codex/a5-reload-path`: 원본 범위 읽기·부분 프리뷰 보존·중복 방지, 목록 확인식 스냅샷 정리. 기존 400ms 목표 폐기: 그리드 mark / 복원 합계 <150ms / 백그라운드 비경합으로 대체. 5회 복원 p50/p95 dev 144/167ms·prod 72/78ms, 비경합 각 5/5·E2E 45개. [평가 문서](evaluations/2026-09-06-reload-path.md) |
 | A5 후속 파형 저장소 분리 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 3라운드 완료, main 통합(7163c51) | 1,000개 프로젝트 행 3.32MB 중 waveformPeaks 92.7% → 분리 후 245KB(-92.6%), 이름 변경→Saved 136→63ms. 레코드에는 `hasAudio` 사실만(모름은 false로 쓰지 않음). 리뷰에서 파형 LRU retain·레벨 미터 요청 범위·hasAudio 오판을 수정. `docs/evaluations/2026-09-05-library-json-composition.md` |
 | A5 후속 미디어 패널 가상화 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 4라운드 완료, main 통합(f37941c) | 날짜 그룹·단일 목록을 IntersectionObserver 행 세그먼트로 가상화하고 마퀴를 순수 레이아웃 모델로 계산. 첫 세그먼트 활성 카드 강제 마운트 + 마지막 세그먼트 스크롤 조건에서 수정 전 +14px(구성별 최대 +64px) → 수정 후 드리프트 0px, 좁은 폭 173/200/240px 헤더 버튼 16px 유지. 1,000개 필터 345→48ms, 검색 37ms, DOM 카드 16장, 힙 116/51MB, 가져오기 7.4ms/자산. 새로고침 준비 510ms로 <400ms 목표는 미달해 복원 경로 후속 측정 필요 |
-| A4 누락 재연결·휴지통 | Claude → Codex | 데스크톱 후속 구현 | disk 파일 지문 대조·확인 재연결, 상대 경로 폴더 일괄 미리보기, 볼륨 복귀 자동 검사, 카탈로그 스냅샷·확인 복원. [검증 기록](evaluations/2026-09-06-desktop-relink.md), 물리 USB 확인은 릴리스 §3 |
+| A4 누락 재연결·휴지통 | Claude → Codex | 데스크톱 후속·리뷰 반영 | 행별 선택·진행률·취소, disk 파일 지문 대조·확인 재연결, 상대 경로 폴더 일괄 미리보기, 볼륨 복귀 자동 검사, 카탈로그 스냅샷·확인 복원. [검증 기록](evaluations/2026-09-06-desktop-relink.md), 물리 USB 확인은 릴리스 §3 |
 | C1 새 프로젝트 출발점 | Codex + Claude 검토 | 구현·교차 리뷰 완료, main 통합 | 가져오기·정리, 수동 편집, 안내형 초안의 세 출발점을 같은 전문 편집 작업 공간에 연결했다. Claude 교차 리뷰에서 찾은 미선택 새로고침·전역 드롭·키보드 포커스·모바일 검증·E2E 결합 문제를 후속 수정. `267eee2` + `8342164`, Chromium E2E 36개·Chrome HEVC·원격 CI 통과. 다음은 C2 |
 | C2 빈·선택·오류 상태 설명 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 4라운드 완료, main 통합(ac112a6) | `codex/c2-state-guidance` · 정상 편집 안내 줄 제거, 누락 오버레이·점선 드롭존 복원, 분석 지연 판정·BPM 창 공유·이름 있는 카드 포커스; 판정/렌더/음악 캐시 21개·E2E 2개, `pnpm gate` 9/9 PASS(단위 662·Chromium E2E 45), 재연결 메타데이터 기반 최근 4개 Promise 캐시·접근성 설명·disabled 드롭존 trusted drop 검증·누락 집합별 닫기 후속 반영 및 최소 폭 화면 갱신. [상태 목록·검증 메모](evaluations/2026-09-06-c2-state-guidance.md), 다음은 C3 |
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |

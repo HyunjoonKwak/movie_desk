@@ -3,6 +3,7 @@
 import type { MediaAsset } from "@movie-desk/core";
 import { useEffect, useMemo, useRef } from "react";
 import { FIRST_PASS_DELAY_MS, useSourceHealthStore } from "./source-health-store";
+import { readDesktopMediaBridge, parseDesktopSourceStateReport } from "./source/desktop-media-bridge";
 import { type SourceHealth, isSourceMissing } from "./source/probe-source";
 
 // Keeps the library's source health current: probes new or changed assets
@@ -21,6 +22,32 @@ export const useSourceHealth = (
   const started = useRef(false);
 
   useEffect(() => {
+    let disposed = false;
+    const disk = assets.filter((asset) => asset.sourceRef?.kind === "disk" && !useSourceHealthStore.getState().entries[asset.id]);
+    const bridge = readDesktopMediaBridge();
+    if (bridge?.lastSourceStates) {
+      for (let offset = 0; offset < disk.length; offset += 1000) {
+        const batch = disk.slice(offset, offset + 1000);
+        void bridge.lastSourceStates(batch.map((asset) => asset.id)).then((value) => {
+          if (disposed || typeof value !== "object" || value === null) return;
+          useSourceHealthStore.setState((state) => {
+            const entries = { ...state.entries };
+            for (const asset of batch) {
+              if (entries[asset.id]) continue;
+              try {
+                const { state: saved } = parseDesktopSourceStateReport({ state: (value as Record<string, unknown>)[asset.id] });
+                entries[asset.id] = { asset, health: saved === "online" ? "ok" : saved, checkedAt: Number.NEGATIVE_INFINITY };
+              } catch { /* Unknown saved states never suppress a fresh probe. */ }
+            }
+            return { entries };
+          });
+        }).catch(() => {});
+      }
+    }
+    return () => { disposed = true; };
+  }, [assets]);
+
+  useEffect(() => {
     // Let restoration and visible previews finish before opening every original.
     // Preview/export preflight still checks a requested source immediately.
     const timer = setTimeout(() => {
@@ -37,11 +64,13 @@ export const useSourceHealth = (
   useEffect(() => {
     const recheck = () => {
       if (document.visibilityState === "hidden") return;
-      void check(assets, { force: true, prune: true });
+      void check(latest.current, { force: true, prune: true });
     };
-    const timer = assets.some((asset) => asset.sourceRef?.kind === "disk")
-      ? setInterval(recheck, 10_000)
-      : undefined;
+    const timer = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      const disk = latest.current.filter((asset) => asset.sourceRef?.kind === "disk");
+      if (disk.length) void check(disk, { force: true });
+    }, 30_000);
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
     return () => {
@@ -49,7 +78,7 @@ export const useSourceHealth = (
       window.removeEventListener("focus", recheck);
       document.removeEventListener("visibilitychange", recheck);
     };
-  }, [assets, check]);
+  }, [check]);
 
   // Only the missing subset. The same object is returned while that subset
   // is unchanged, so a probe pass over a thousand healthy assets does not

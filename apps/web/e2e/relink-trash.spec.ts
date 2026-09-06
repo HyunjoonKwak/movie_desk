@@ -188,3 +188,80 @@ test("desktop same-size fingerprint mismatch waits for explicit relink confirmat
     await page.evaluate(() => (window as unknown as { relinkConfirmed?: boolean }).relinkConfirmed),
   ).toBe(true);
 });
+
+test("desktop folder mismatch stays unchecked until the user selects that row", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const sourceRef = {
+      kind: "disk",
+      version: 1,
+      rootId: "r",
+      rootSnapshot: {},
+      relativePath: "photo.heic",
+      sizeBytes: 8,
+      modifiedAtMs: 1,
+      quickHash: "sha256:old",
+    };
+    const host = window as unknown as { cutDesktop: unknown; relinkConfirmed?: boolean };
+    host.cutDesktop = {
+      isDesktop: true,
+      media: {
+        acquirePlaybackUrl: async () => ({ state: "offline" }),
+        releasePlaybackUrl: async () => true,
+        sourceState: async () => ({ state: "offline" }),
+        importHeicFile: async () => ({
+          ok: true,
+          asset: {
+            id: "disk-photo",
+            name: "photo.heic",
+            kind: "image",
+            mime: "image/heic",
+            durationMs: 5000,
+            opfsPath: "disk-v1/disk-photo",
+            sourceRef,
+            sizeBytes: 8,
+            sourceImageMetadata: {},
+            thumbDataUrl: "data:image/jpeg;base64,/9j/2Q==",
+            importedAt: 1,
+          },
+        }),
+        chooseRelink: async () => [
+          {
+            assetId: "disk-photo",
+            token: "selection",
+            name: "copy.heic",
+            relativePath: "photo.heic",
+            verdict: "fingerprint",
+            sizeBytes: 8,
+            expectedSizeBytes: 8,
+          },
+        ],
+        commitRelink: async (_token: string, confirmed: boolean) => {
+          host.relinkConfirmed = confirmed;
+          return {
+            assetId: "disk-photo",
+            identical: false,
+            mime: "image/heic",
+            sourceRef: { ...sourceRef, quickHash: "sha256:new" },
+          };
+        },
+      },
+    };
+  });
+  await page.goto("/editor");
+  await importMediaFiles(page, { name: "photo.heic", mimeType: "image/heic", buffer: PNG });
+  const card = await revealMediaCard(page, "photo.heic");
+  await expect(card.locator("[data-missing]")).toBeVisible({ timeout: 15_000 });
+  await page.getByRole("button", { name: "Reconnect missing files from a folder…" }).click();
+  const dialog = page.getByRole("dialog");
+  const selection = dialog.getByRole("checkbox", { name: "photo.heic" });
+  await expect(selection).not.toBeChecked();
+  const connect = dialog.getByRole("button", { name: "Confirm and connect selected files" });
+  await expect(connect).toBeDisabled();
+  expect(await page.evaluate(() => (window as unknown as { relinkConfirmed?: boolean }).relinkConfirmed)).toBeUndefined();
+  await selection.check();
+  await connect.click();
+  await expect(dialog.getByText("Connected", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { relinkConfirmed?: boolean }).relinkConfirmed)).toBe(true);
+});

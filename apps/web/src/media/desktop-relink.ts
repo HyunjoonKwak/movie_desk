@@ -12,6 +12,7 @@ const candidateSchema = z.object({
   assetId: z.string(),
   token: z.string().optional(),
   name: z.string().optional(),
+  reason: z.enum(["kind", "unsupported", "decode", "outside", "unavailable"]).optional(),
   relativePath: z.string().refine(isSafeRelativePath),
   verdict: z.enum(["identical", "size", "fingerprint", "unavailable"]),
   sizeBytes: z.number().nonnegative().optional(),
@@ -22,7 +23,10 @@ export type DesktopRelinkCandidate = z.infer<typeof candidateSchema>;
 export const chooseDesktopRelink = async (ids: readonly string[], folder = false) => {
   const bridge = readDesktopMediaBridge();
   if (!bridge?.chooseRelink) throw new Error("Desktop relinking is unavailable");
-  return z.array(candidateSchema).parse(await bridge.chooseRelink(ids, folder));
+  const result = await bridge.chooseRelink(ids, folder);
+  if (typeof result === "object" && result !== null && "tooMany" in result) throw new Error("tooMany");
+  if (typeof result === "object" && result !== null && "error" in result) throw new Error(String(result.error));
+  return z.array(candidateSchema).parse(result);
 };
 
 // The preview only enables exact-path rows which were inspected successfully.
@@ -44,9 +48,9 @@ const resultSchema = z.object({
   assetId: z.string(),
   identical: z.boolean(),
   mime: z.string(),
-  width: z.number().positive().nullish(),
-  height: z.number().positive().nullish(),
-  durationMs: z.number().nonnegative().nullish(),
+  width: z.number().positive().nullish().catch(null),
+  height: z.number().positive().nullish().catch(null),
+  durationMs: z.number().nonnegative().nullish().catch(null),
   sourceRef: z.object({
     kind: z.literal("disk"),
     version: z.literal(1),
@@ -147,3 +151,9 @@ export const commitDesktopRelink = async (
       : {}),
   };
 };
+
+export const defaultDesktopRelinkSelection = (rows: readonly DesktopRelinkCandidate[]) =>
+  new Set(rows.filter((row) => row.token && row.verdict === "identical").map((row) => row.assetId));
+
+export const selectedDesktopRelinkRows = (rows: readonly DesktopRelinkCandidate[], selected: ReadonlySet<string>, done: ReadonlySet<string>) =>
+  rows.filter((row) => row.token && selected.has(row.assetId) && !done.has(row.assetId));

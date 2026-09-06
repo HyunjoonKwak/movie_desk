@@ -1,5 +1,7 @@
 "use client";
 
+import { readDesktopMediaBridge } from "../source/desktop-media-bridge";
+
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -99,6 +101,7 @@ export function MediaBin() {
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
   const relinkInputRef = useRef<HTMLInputElement>(null);
+  const [relinkProgress, setRelinkProgress] = useState<{ completed: number; total: number } | null>(null);
   const [relinkRows, setRelinkRows] = useState<DesktopRelinkCandidate[] | null>(null);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -455,7 +458,7 @@ export function MediaBin() {
     [handleDelete],
   );
   const applyDesktopRelink = useCallback(
-    async (row: DesktopRelinkCandidate, confirmed = true) => {
+    async (row: DesktopRelinkCandidate, confirmed: boolean) => {
       try {
         const asset = useProjectStore
           .getState()
@@ -488,7 +491,7 @@ export function MediaBin() {
               void applyDesktopRelink(row, false);
               return;
             }
-            toast.warning(t("media.relinkDifferentFingerprint"), {
+            toast.warning(row.verdict === "size" ? t("media.relinkMismatchSize", { expected: row.expectedSizeBytes ?? asset.sizeBytes ?? 0, actual: row.sizeBytes ?? 0 }) : t("media.relinkDifferentFingerprint"), {
               duration: 15_000,
               action: {
                 label: t("media.relinkAnyway"),
@@ -756,23 +759,40 @@ export function MediaBin() {
             const assets = media.filter(
               (asset) => asset.sourceRef?.kind === "disk" && sourceHealth[asset.id],
             );
+            const bridge = readDesktopMediaBridge();
+            let canceled = false;
+            setRelinkProgress({ completed: 0, total: assets.length });
+            const unsubscribe = bridge?.onRelinkProgress?.((value) => {
+              const progress = value as { completed: number; total: number };
+              if (Number.isFinite(progress.completed) && Number.isFinite(progress.total)) setRelinkProgress(progress);
+            });
             void chooseDesktopRelink(
               assets.map((asset) => asset.id),
               true,
             )
               .then((rows) => {
-                if (rows.length) setRelinkRows(matchDesktopRelinkRows(assets, rows));
+                if (!canceled && rows.length) setRelinkRows(matchDesktopRelinkRows(assets, rows));
               })
-              .catch(() => toast.error(t("media.relinkFailed")));
+              .catch((error) => toast.error(t(error instanceof Error && error.message === "tooMany" ? "media.relinkTooMany" : error instanceof Error && error.message === "capacity" ? "media.relinkCapacity" : error instanceof Error && error.message === "timeout" ? "media.relinkTimeout" : "media.relinkFailed")))
+              .finally(() => { canceled = true; unsubscribe?.(); setRelinkProgress(null); });
           }}
+          disabled={relinkProgress !== null}
         >
           {t("media.relinkFolder")}
         </button>
       )}
+      {relinkProgress && (
+        <dialog open aria-label={t("media.relinkFolder")} className="fixed left-1/2 top-1/2 z-50 m-0 w-[min(90vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-xl">
+          <p>{t("media.relinkPreparing")} {relinkProgress.completed} / {relinkProgress.total}</p>
+          <button type="button" className="btn-ghost mt-3" onClick={() => { void readDesktopMediaBridge()?.cancelRelink?.(); }}>
+            {t("media.relinkCancel")}
+          </button>
+        </dialog>
+      )}
       {relinkRows && (
         <DesktopRelinkDialog
           rows={relinkRows}
-          onClose={() => setRelinkRows(null)}
+          onClose={() => { setRelinkRows(null); void readDesktopMediaBridge()?.cancelRelink?.(); }}
           onCommit={applyDesktopRelink}
         />
       )}

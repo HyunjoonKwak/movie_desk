@@ -33,6 +33,10 @@ class MediaCatalog {
     });
   }
 
+  changeToken() { return this.#request("changeToken"); }
+
+  lastSourceStates(ids) { return this.#request("lastSourceStates", ids.map((id) => requiredText(id, "assetId"))); }
+
   snapshot(destination) {
     return this.#request("snapshot", requiredAbsolutePath(destination, "snapshot destination"));
   }

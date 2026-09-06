@@ -42,8 +42,18 @@ const requireDatabase = () => {
 
 const handlers = {
   recordSourceState({ assetId, state }) {
-    requireDatabase().prepare("INSERT INTO asset_source_state VALUES (?, ?, ?) ON CONFLICT(asset_id) DO UPDATE SET state=excluded.state, checked_at_ms=excluded.checked_at_ms").run(assetId, state, Date.now());
+    requireDatabase().prepare("INSERT INTO asset_source_state VALUES (?, ?, ?) ON CONFLICT(asset_id) DO UPDATE SET state=excluded.state, checked_at_ms=excluded.checked_at_ms WHERE state != excluded.state").run(assetId, state, Date.now());
     return null;
+  },
+
+  changeToken() {
+    const db = requireDatabase();
+    return `${db.prepare("PRAGMA data_version").get().data_version}:${db.prepare("SELECT total_changes() AS n").get().n}`;
+  },
+
+  lastSourceStates(ids) {
+    const query = requireDatabase().prepare("SELECT state FROM asset_source_state WHERE asset_id = ?");
+    return Object.fromEntries(ids.flatMap((id) => { const row = query.get(id); return row ? [[id, row.state]] : []; }));
   },
 
   snapshot(destination) {

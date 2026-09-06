@@ -2,7 +2,7 @@
 import { useT } from "@/i18n/use-t";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
-import type { DesktopRelinkCandidate } from "../desktop-relink";
+import { type DesktopRelinkCandidate, defaultDesktopRelinkSelection, selectedDesktopRelinkRows } from "../desktop-relink";
 
 export function DesktopRelinkDialog({
   rows,
@@ -11,12 +11,15 @@ export function DesktopRelinkDialog({
 }: {
   rows: readonly DesktopRelinkCandidate[];
   onClose: () => void;
-  onCommit: (row: DesktopRelinkCandidate) => Promise<boolean>;
+  onCommit: (row: DesktopRelinkCandidate, confirmed: boolean) => Promise<boolean>;
 }) {
   const t = useT();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<ReadonlySet<string>>(new Set());
-  const pending = rows.filter((row) => row.token && !done.has(row.assetId));
+  const [selected, setSelected] = useState<ReadonlySet<string>>(
+    () => defaultDesktopRelinkSelection(rows),
+  );
+  const pending = selectedDesktopRelinkRows(rows, selected, done);
   return (
     <Dialog.Root
       open
@@ -34,7 +37,16 @@ export function DesktopRelinkDialog({
           <ul className="my-4 space-y-2 text-sm">
             {rows.map((row) => (
               <li key={row.assetId} className="flex justify-between gap-4">
-                <span className="break-all">{row.relativePath}</span>
+                <label className="break-all">
+                  <input type="checkbox" aria-label={row.relativePath} checked={selected.has(row.assetId)}
+                    disabled={busy || !row.token || done.has(row.assetId)}
+                    onChange={(event) => setSelected((previous) => {
+                      const next = new Set(previous);
+                      if (event.target.checked) next.add(row.assetId); else next.delete(row.assetId);
+                      return next;
+                    })} /> {row.relativePath}
+                  {row.sizeBytes !== undefined && <small className="block">{row.expectedSizeBytes} → {row.sizeBytes} B</small>}
+                </label>
                 <span>
                   {done.has(row.assetId)
                     ? t("media.relinkDone")
@@ -45,6 +57,11 @@ export function DesktopRelinkDialog({
                             ? "media.relinkUnavailable"
                             : "media.relinkDifferentFingerprint",
                       )}
+                  {row.reason && <small className="block">{t(({
+                    kind: "media.relinkReasonKind", unsupported: "media.relinkReasonUnsupported",
+                    decode: "media.relinkReasonDecode", outside: "media.relinkReasonOutside",
+                    unavailable: "media.relinkUnavailable",
+                  } as const)[row.reason])}</small>}
                 </span>
               </li>
             ))}
@@ -61,7 +78,7 @@ export function DesktopRelinkDialog({
                 setBusy(true);
                 try {
                   for (const row of pending) {
-                    if (await onCommit(row))
+                    if (await onCommit(row, row.verdict !== "identical"))
                       setDone((previous) => new Set([...previous, row.assetId]));
                   }
                 } finally {
@@ -69,7 +86,7 @@ export function DesktopRelinkDialog({
                 }
               }}
             >
-              {t("media.relinkConfirmBatch")}
+              {t("media.relinkSelected")}
             </button>
           </div>
         </Dialog.Content>

@@ -7,7 +7,7 @@ const { createHash } = require("node:crypto");
 const { MediaCatalog } = require("./catalog.cjs");
 const { DesktopRelinker, compareFingerprint, matchFolderPaths } = require("./desktop-relink.cjs");
 
-const setup = async (t) => {
+const setup = async (t, options = {}) => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "desktop-relink-"));
   const catalog = new MediaCatalog(path.join(dir, "catalog.sqlite3"));
   await catalog.ready();
@@ -43,7 +43,7 @@ const setup = async (t) => {
       throw new Error(command);
     },
   };
-  return { dir, catalog, original, service: new DesktopRelinker({ catalog, helper }) };
+  return { dir, catalog, original, helper, service: new DesktopRelinker({ catalog, helper, ...options }) };
 };
 
 test("same-size different bytes require confirmation, and original bytes and metadata survive", async (t) => {
@@ -119,4 +119,56 @@ test("folder relink preserves nested relative structure for the next reconnectio
   const result = await service.commit(row.token, true, 1);
   assert.equal(result.sourceRef.relativePath, "day1/original.png");
   assert.equal((await catalog.getAsset("asset")).root.lastKnownAbsolutePath, await fs.realpath(folder));
+});
+
+test("tokens expire after fifteen minutes and catalog edits invalidate preview", async (t) => {
+  let now = 100;
+  const { service, catalog, original } = await setup(t, { now: () => now });
+  const first = await service.prepare("asset", original, 1);
+  now += 15 * 60_000 + 1;
+  await assert.rejects(service.commit(first.token, true, 1), /expired/);
+  const second = await service.prepare("asset", original, 1);
+  await catalog.upsertAsset({ ...await catalog.getAsset("asset"), quickHash: "changed" });
+  await assert.rejects(service.commit(second.token, true, 1), /Catalog changed/);
+});
+
+test("identical full fingerprint relink preserves the stored quick fingerprint", async (t) => {
+  const { service, catalog, original } = await setup(t);
+  const asset = await catalog.getAsset("asset");
+  await catalog.upsertAsset({ ...asset, fullHash: asset.quickHash });
+  const row = await service.prepare("asset", original, 1);
+  await service.commit(row.token, false, 1);
+  const updated = await catalog.getAsset("asset");
+  assert.equal(updated.quickHash, asset.quickHash);
+  assert.equal(updated.fullHash, asset.quickHash);
+});
+
+test("folder preview resolves volume once, skips full hashing and supports cancellation", async (t) => {
+  const { dir, catalog, original, helper } = await setup(t);
+  const asset = await catalog.getAsset("asset");
+  await catalog.upsertAsset({ ...asset, fullHash: asset.quickHash });
+  const calls = [];
+  const service = new DesktopRelinker({ catalog, helper: { request: async (command, input) => {
+    calls.push([command, input.mode]); return helper.request(command, input);
+  } } });
+  const progress = [];
+  const rows = await service.prepareFolder(["asset"], dir, 1, (value) => progress.push(value));
+  assert.equal(rows[0].verdict, "fingerprint");
+  assert.deepEqual(calls, [["volume-resolve", undefined], ["inspect", undefined], ["fingerprint", "quick"]]);
+  assert.deepEqual(progress, [{ completed: 1, total: 1 }]);
+  assert.equal((await service.commit(rows[0].token, true, 1)).identical, true);
+  assert.deepEqual(await service.prepareFolder(Array(1001).fill("asset"), dir, 1), { tooMany: true });
+  const blocked = new DesktopRelinker({ catalog, helper: { request: () => new Promise(() => {}) } });
+  const pending = blocked.prepareFolder(["asset"], dir, 7);
+  setImmediate(() => blocked.cancel(7));
+  await assert.rejects(pending, /abort/i);
+  assert.equal(await fs.readFile(original, "utf8"), "original");
+});
+
+test("pending capacity is bounded and cancellation releases sender capabilities", async (t) => {
+  const { service, original } = await setup(t);
+  for (let i = 0; i < 2000; i++) await service.prepare("asset", original, 1);
+  await assert.rejects(service.prepare("asset", original, 1), (error) => error.code === "capacity");
+  service.cancel(1);
+  assert.ok((await service.prepare("asset", original, 1)).token);
 });

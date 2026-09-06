@@ -262,7 +262,17 @@ const initializeMediaInfrastructure = async () => {
   volumeRootResolver = new VolumeRootResolver({ helper: mediaHelper });
   if (mediaCatalog) {
     desktopRelinker = new DesktopRelinker({ catalog: mediaCatalog, helper: mediaHelper });
-    backupTimer = setInterval(() => { void snapshotCatalog().catch(() => {}); }, 15 * 60_000);
+    let failures = 0;
+    let warned = false;
+    backupTimer = setInterval(() => {
+      void snapshotCatalog().then(() => { failures = 0; }).catch(() => {
+        if (++failures >= 3 && !warned) {
+          warned = true;
+          void dialog.showMessageBox({ type: "warning", message: "Catalog backups could not be saved",
+            detail: "Three scheduled backups failed. Check free disk space and access to the app data folder, then use File → Back up media catalog to retry. Original media are unchanged." });
+        }
+      });
+    }, 15 * 60_000);
     backupTimer.unref();
     imageImporter = createDesktopImageImporter({
       catalog: mediaCatalog,
@@ -279,13 +289,12 @@ const initializeMediaInfrastructure = async () => {
 
 const resolveCatalogSource = async (asset) => {
   const resolved = await volumeRootResolver.resolve(asset);
-  if (resolved.state === "offline") volumeRootResolver.clear();
   if (mediaCatalog) {
     await mediaCatalog.recordSourceState(asset.id, resolved.state);
     if (resolved.state === "online") {
       const segments = asset.relativePath.split(path.sep).length;
-      const rootPath = path.resolve(resolved.absolutePath, ...Array(segments).fill(".."));
-      if (rootPath !== asset.root.lastKnownAbsolutePath) {
+      const rootPath = await fs.promises.realpath(path.resolve(resolved.absolutePath, ...Array(segments).fill("..")));
+      if (rootPath !== await fs.promises.realpath(asset.root.lastKnownAbsolutePath).catch(() => asset.root.lastKnownAbsolutePath)) {
         const root = await mediaCatalog.getRoot(asset.rootId);
         await mediaCatalog.registerRoot({ ...root, lastKnownAbsolutePath: rootPath });
       }
@@ -296,7 +305,7 @@ const resolveCatalogSource = async (asset) => {
 
 const snapshotCatalog = async () => {
   if (!mediaCatalog || restoringCatalog) throw new Error("Catalog is unavailable");
-  if (!backupRunning) backupRunning = createCatalogSnapshot(mediaCatalog, backupDirectory()).finally(() => { backupRunning = undefined; });
+  if (!backupRunning) backupRunning = createCatalogSnapshot(mediaCatalog, backupDirectory()).then((result) => { lastSnapshotAt = Date.now(); return result; }).finally(() => { backupRunning = undefined; });
   return backupRunning;
 };
 
@@ -326,8 +335,10 @@ const restoreCatalog = async (win) => {
     try {
       await restoreCatalogSnapshot({ databasePath: catalogPath(), snapshotPath, confirmed: true });
     } catch (error) {
-      // Keep degraded mode recoverable through the same menu; never overwrite on failure.
+      // Reopen the rolled-back catalog in a fresh process.
       dialog.showErrorBox("Catalog could not be restored", "The snapshot could not be read. Your previous catalog and original media are preserved. Restart the app to reopen the previous catalog.");
+      app.relaunch();
+      app.quit();
       return;
     }
     app.relaunch();
@@ -338,14 +349,26 @@ const restoreCatalog = async (win) => {
 ipcMain.handle("movie-desk:media-relink-choose", async (event, assetIds, folder = false) => {
   requireTrustedIpc(event);
   if (!desktopRelinker || restoringCatalog) throw new Error("Catalog unavailable; restore a catalog backup from the File menu");
-  if (!Array.isArray(assetIds) || assetIds.length === 0 || assetIds.length > 1000 || assetIds.some((id) => typeof id !== "string")) throw new Error("Invalid asset selection");
+  if (!Array.isArray(assetIds) || assetIds.length === 0 || assetIds.some((id) => typeof id !== "string")) throw new Error("Invalid asset selection");
+  if (assetIds.length > 1000) return { tooMany: true };
   const win = BrowserWindow.fromWebContents(event.sender);
   const chosen = await dialog.showOpenDialog(win, { properties: [folder ? "openDirectory" : "openFile"], title: folder ? "Reconnect missing files by relative path" : "Reconnect original file" });
   if (chosen.canceled || !chosen.filePaths[0]) return [];
   try {
-    return folder ? await desktopRelinker.prepareFolder(assetIds, chosen.filePaths[0], event.sender.id)
+    return folder ? await desktopRelinker.prepareFolder(assetIds, chosen.filePaths[0], event.sender.id, (progress) => {
+        if (!event.sender.isDestroyed()) event.sender.send("movie-desk:media-relink-progress", progress);
+      })
       : [await desktopRelinker.prepare(assetIds[0], chosen.filePaths[0], event.sender.id)];
-  } catch { throw new Error("Cannot read that file or its media type differs. Check access and choose it again."); }
+  } catch (error) {
+    if (error.name === "AbortError") return [];
+    if (["capacity", "timeout"].includes(error.code)) return { error: error.code };
+    throw new Error("Cannot read that file or its media type differs. Check access and choose it again.");
+  }
+});
+
+ipcMain.handle("movie-desk:media-relink-cancel", (event) => {
+  requireTrustedIpc(event);
+  desktopRelinker?.cancel(event.sender.id);
 });
 
 ipcMain.handle("movie-desk:media-relink-commit", async (event, token, confirmed) => {
@@ -415,6 +438,12 @@ ipcMain.handle("movie-desk:media-release", (event, leaseId) => {
   requireTrustedIpc(event);
   if (typeof leaseId !== "string") return false;
   return mediaLeases.release(leaseId);
+});
+
+ipcMain.handle("movie-desk:media-last-source-states", async (event, ids) => {
+  requireTrustedIpc(event);
+  if (!Array.isArray(ids) || ids.length > 1000 || ids.some((id) => typeof id !== "string")) throw new Error("Invalid assets");
+  return mediaCatalog ? mediaCatalog.lastSourceStates(ids) : {};
 });
 
 ipcMain.handle("movie-desk:media-source-state", async (event, assetId) => {
@@ -674,20 +703,22 @@ app.on("window-all-closed", () => {
 
 let shutdownComplete = false;
 let shuttingDown = false;
+let lastSnapshotAt = 0;
 app.on("before-quit", (event) => {
   if (shutdownComplete) return;
   event.preventDefault();
   if (shuttingDown) return;
   shuttingDown = true;
   clearInterval(backupTimer);
-  void (async () => {
-    if (mediaCatalog && !restoringCatalog) await snapshotCatalog().catch(() => {});
+  void Promise.race([new Promise((resolve) => setTimeout(resolve, 4_000)), (async () => {
+    if (mediaCatalog && !restoringCatalog && Date.now() - lastSnapshotAt > 5 * 60_000) await snapshotCatalog().catch(() => {});
     mediaLeases.releaseAll();
     if (mediaCatalog) await mediaCatalog.close();
     if (mediaHelper) await mediaHelper.close();
+  })()]).catch(() => {}).finally(() => {
     shutdownComplete = true;
     app.quit();
-  })();
+  });
 });
 
 // Diagnostic helper for verifying the bundle in CI.

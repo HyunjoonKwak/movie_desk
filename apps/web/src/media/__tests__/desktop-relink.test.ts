@@ -3,6 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   type DesktopRelinkCandidate,
   commitDesktopRelink,
+  defaultDesktopRelinkSelection,
+  selectedDesktopRelinkRows,
   matchDesktopRelinkRows,
 } from "../desktop-relink";
 
@@ -98,4 +100,14 @@ it("keeps original image dimensions and size when the editing preview is rescale
     previewsStored: true,
     dropProxy: true,
   });
+});
+
+it("batch defaults to identical only and commits no unselected fingerprint or size mismatch", () => {
+  const rows = [row("a", "a.mov"), row("b", "b.mov", "fingerprint"), row("c", "c.mov", "size")].map((item) => ({ ...item, token: item.assetId }));
+  const selected = defaultDesktopRelinkSelection(rows);
+  expect([...selected]).toEqual(["a"]);
+  expect(selectedDesktopRelinkRows(rows, selected, new Set())).toEqual([rows[0]]);
+  expect(selectedDesktopRelinkRows(rows, new Set(), new Set())).toEqual([]);
+  selected.add("b");
+  expect(selectedDesktopRelinkRows(rows, selected, new Set(["a"]))).toEqual([rows[1]]);
 });

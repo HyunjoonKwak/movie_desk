@@ -144,3 +144,25 @@ describe("normalizeRelativePath", () => {
     assert.throws(() => normalizeRelativePath("/tmp/secret.mov"), /safe relative path/);
   });
 });
+
+it("migrates a populated v1 catalog idempotently without losing identity or metadata", async () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "catalog-v1-"));
+  temporaryDirectories.add(directory);
+  const file = path.join(directory, "catalog.sqlite3");
+  let catalog = new MediaCatalog(file);
+  await catalog.ready();
+  await catalog.registerRoot({ id: "r", kind: "local", lastKnownAbsolutePath: directory });
+  await catalog.upsertAsset({ id: "a", rootId: "r", relativePath: "a.mov", sizeBytes: 4, modifiedAtMs: 2 });
+  await catalog.setUserMetadata({ assetId: "a", note: "keep", tags: ["v1"] });
+  await catalog.close();
+  const db = new DatabaseSync(file);
+  db.exec("DROP TABLE asset_source_state; PRAGMA user_version = 1");
+  db.close();
+  for (let i = 0; i < 2; i++) {
+    catalog = new MediaCatalog(file);
+    assert.equal((await catalog.ready()).schemaVersion, 2);
+    assert.equal((await catalog.getAsset("a")).relativePath, "a.mov");
+    assert.equal((await catalog.getUserMetadata("a")).note, "keep");
+    await catalog.close();
+  }
+});
