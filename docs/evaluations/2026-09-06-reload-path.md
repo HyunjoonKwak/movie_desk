@@ -1,6 +1,6 @@
 # Reload path and preview recovery — 2026-09-06 review revision
 
-Branch `codex/a5-reload-path`, review base `e451255` (ancestor `main 71fabdb`).
+Branch `codex/a5-reload-path`, final review base `a28ba6e` (ancestor `main 71fabdb`).
 
 ## Current performance contract
 
@@ -77,16 +77,22 @@ Both background starts follow the grid mark in **5/5 dev and 5/5 production samp
 - OPFS reconstruction references `readMediaFile`'s Blob through a File without materializing
   bytes. Desktop video is passed to the shared ranged frame sampler directly; image decoding
   uses a leased playback URL. There is no whole-original `source.read(0, sizeBytes)`.
-- Waveforms use `ensureAudioVariant` and decode only the audio variant. An unavailable variant
-  is a failed waveform kind, with no whole-video fallback. Unsupported/silent video may therefore
-  report a waveform warning while retaining its existing preview.
-- Full replacement is allowed only for all expected kinds: image thumb; audio waveform; video
-  thumb, filmstrip and waveform. Partial output uses `replaceMissing: false`, preserves stored
-  previews, and reports the failed translated kind names in a warning, never a success toast.
+- Waveforms prefer `ensureAudioVariant`. When no variant exists, an OPFS audio-only asset
+  (MP3/WAV/FLAC/AIFF/AAC) can decode its original Blob. Disk audio remains conservative (no
+  whole-source fallback), and video containers are never decoded whole for waveform recovery.
+- A missing waveform is a partial failure only when the record's durable `hasAudio` is true;
+  silent/unknown-audio videos can complete their visual previews and clear legacy inline data.
+  **WebM/Opus video with `hasAudio: true` still cannot regenerate its waveform** through the AAC
+  variant path; it reports a warning and preserves existing data without loss.
+- Full replacement requires the expected visual kinds and any waveform required by `hasAudio`.
+  Partial output uses `replaceMissing: false`, preserves stored previews, and reports failed
+  translated kind names in a warning, never a success toast.
   Total decode failure and storage failure remain errors. Source errors suggest relinking.
 - Module-owned jobs deduplicate by asset id and cap active regeneration at two. A subscribed
   pending set keeps remounted cards disabled. A release stack covers later lease acquisition
-  failure as well as decode/storage failure.
+  failure as well as decode/storage failure. Each active rebuild has a 60-second deadline;
+  expiration clears its job, releases its slot/leases and allows retry. Non-cancellable work
+  that eventually returns is fenced before further generation or preview writes.
 - Metrics read sessionStorage once inside try/catch and share a no-op when storage is denied.
 - The first source-health timer is armed once and reads the latest asset ref when it fires;
   later changes check immediately. It uses `FIRST_PASS_DELAY_MS` beside `FORCE_THROTTLE_MS`.
@@ -103,11 +109,15 @@ Both background starts follow the grid mark in **5/5 dev and 5/5 production samp
 
 `pnpm gate` **PASS**, including install, version policy, lint, typecheck, unit tests,
 OSV audit, production build, Playwright install, and **45/45 Chromium E2E**.
-Unit counts: core 107, web 477, desktop 56, scripts 11 (**651 total**).
+Unit counts: core 107, web 481, desktop 56, scripts 11 (**655 total**).
 New/updated regression coverage includes throwing storage access, zero eager disk reads,
 OPFS Blob handling, audio-variant decoding, partial filmstrip preservation, no video fallback,
 lease acquisition failure, storage errors, shared deduplication/concurrency, snapshot bulk cleanup,
-and app-dialog cancel/confirm flows with preview regeneration surviving reload.
+and app-dialog cancel/confirm flows with preview regeneration surviving reload. The final small
+review adds OPFS audio fallback, conservative disk-audio behavior, silent-video completion,
+and fake-timer coverage of timeout cleanup/retry with rejection of a late stale result.
+The performance samples above are unchanged from `a28ba6e`; this correction does not modify
+restoration behavior or its measurement boundaries.
 
 The earlier `e451255` single-run values (dev 675→616 ms, production 528 ms) measured a different,
 now-retired DOM polling boundary. They are historical evidence, not comparable budget results.

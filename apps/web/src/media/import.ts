@@ -150,11 +150,14 @@ export class PreviewRegenerationError extends Error {
 export const usePreviewRegenerationStore = create<{ readonly pending: ReadonlySet<string> }>(
   () => ({ pending: new Set() }),
 );
+export const REGENERATION_TIMEOUT_MS = 60_000;
+const MAX_ACTIVE_REGENERATIONS = 2;
 const regenerationJobs = new Map<string, Promise<RegenerationResult>>();
 const slots: (() => void)[] = [];
 let activeRegenerations = 0;
 const acquireSlot = async () => {
-  if (activeRegenerations >= 2) await new Promise<void>((resolve) => slots.push(resolve));
+  if (activeRegenerations >= MAX_ACTIVE_REGENERATIONS)
+    await new Promise<void>((resolve) => slots.push(resolve));
   else activeRegenerations++;
 };
 const releaseSlot = () => {
@@ -165,22 +168,30 @@ const releaseSlot = () => {
 
 const rebuildPreviews = async (asset: MediaAsset): Promise<RegenerationResult> => {
   const releases: (() => void)[] = [];
-  try {
+  let expired = false;
+  const assertActive = () => {
+    if (expired) throw new PreviewRegenerationError("decode");
+  };
+  const build = async (): Promise<RegenerationResult> => {
     const ref = sourceRefOf(asset);
     releases.push(leasePreview(asset.id));
     releases.push(leaseMediaKey(ref.kind === "opfs" ? ref.key : asset.opfsPath));
     releases.push(leaseMediaKey(audioVariantKey(asset)));
     const blob = ref.kind === "opfs" ? await readMediaFile(ref.key) : null;
+    assertActive();
     if (ref.kind === "opfs" && !blob) throw new MediaSourceError("offline", "Original unavailable");
     // OPFS File references its backing Blob; disk sources stay ranged through the sampler.
     const source = blob
       ? new File([blob], asset.name, { type: asset.mime })
       : await resolveMediaSource(asset);
+    assertActive();
     const attempt = async <T>(run: () => Promise<T>): Promise<T | null> => {
       try {
-        return await run();
+        const result = await run();
+        assertActive();
+        return result;
       } catch (error) {
-        if (error instanceof MediaSourceError) throw error;
+        if (expired || error instanceof MediaSourceError) throw error;
         return null;
       }
     };
@@ -198,14 +209,16 @@ const rebuildPreviews = async (asset: MediaAsset): Promise<RegenerationResult> =
     const waveform =
       asset.kind !== "image"
         ? await attempt(async () => {
-            const audio = await ensureAudioVariant(asset);
+            const variant = await ensureAudioVariant(asset);
+            assertActive();
+            const audio = variant ?? (asset.kind === "audio" ? blob : null);
             return audio ? extractWaveformPeaks(audio) : null;
           })
         : null;
     const failed: PreviewKind[] = [];
     if (asset.kind !== "audio" && !thumb) failed.push("thumb");
     if (asset.kind === "video" && !filmstrip) failed.push("filmstrip");
-    if (asset.kind !== "image" && !waveform) failed.push("waveform");
+    if (asset.kind !== "image" && asset.hasAudio && !waveform) failed.push("waveform");
     if (!thumb && !filmstrip && !waveform) throw new PreviewRegenerationError("decode");
     try {
       await putAssetPreviews(
@@ -221,8 +234,20 @@ const rebuildPreviews = async (asset: MediaAsset): Promise<RegenerationResult> =
       throw new PreviewRegenerationError("storage", { cause });
     }
     return { failed };
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => {
+      expired = true;
+      reject(new PreviewRegenerationError("decode"));
+    }, REGENERATION_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([build(), timeout]);
   } finally {
-    for (const release of releases.reverse()) release();
+    expired = true;
+    clearTimeout(timer);
+    for (const release of [...releases].reverse()) release();
   }
 };
 

@@ -218,7 +218,9 @@ const makeBatch = <T>(
       if (generation === previewGeneration && found.size > 0) await apply(found, generation);
     } catch {
       for (const id of ids) asked.delete(id);
-    } finally { end(); }
+    } finally {
+      end();
+    }
   };
   return (assetIds: readonly string[]): void => {
     for (const id of assetIds) {

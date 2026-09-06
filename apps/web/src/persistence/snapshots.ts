@@ -89,7 +89,7 @@ export const cleanupSnapshots = async (
   await getDb().transaction("rw", getDb().snapshots, async () => {
     const rows = await getDb().snapshots.bulkGet([...confirmedIds]);
     await getDb().snapshots.bulkDelete(
-      rows.filter((row) => row?.projectId === projectId).map((row) => row!.id),
+      rows.flatMap((row) => (row?.projectId === projectId ? [row.id] : [])),
     );
   });
 };

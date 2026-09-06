@@ -255,6 +255,7 @@ export const MediaCard = memo(function MediaCard({
             disabled={regenerating}
             className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40 disabled:opacity-50"
             title={t("media.previewRebuild")}
+            aria-label={t("media.previewRebuild")}
           >
             <RefreshCw className={cn("size-3", regenerating && "animate-spin")} />
           </button>

@@ -310,13 +310,21 @@ for (const [field, value] of Object.entries(result.libraryJsonComposition).sort(
   (a, b) => b[1].bytes - a[1].bytes,
 )) {
   console.log(
-    ["", field, value.bytes.toLocaleString("en-US"),
-      share(value.bytes), value.assets, ""].join(" | "),
+    ["", field, value.bytes.toLocaleString("en-US"), share(value.bytes), value.assets, ""]
+      .join(" | ")
+      .trim(),
   );
 }
 console.log(
-  ["", "other project data/structure",
+  [
+    "",
+    "other project data/structure",
     result.libraryOtherProjectBytes.toLocaleString("en-US"),
-    share(result.libraryOtherProjectBytes), "—", ""].join(" | "),
+    share(result.libraryOtherProjectBytes),
+    "—",
+    "",
+  ]
+    .join(" | ")
+    .trim(),
 );
 if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);

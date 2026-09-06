@@ -1,5 +1,5 @@
 import type { MediaAsset } from "@movie-desk/core";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   read: vi.fn(),
@@ -32,13 +32,18 @@ vi.mock("@/persistence/previews", () => ({
   leasePreview: () => mocks.release,
 }));
 vi.mock("@/persistence/media-gc", () => ({ leaseMediaKey: mocks.lease }));
-import { regenerateAssetPreviews, usePreviewRegenerationStore } from "../import";
+import {
+  REGENERATION_TIMEOUT_MS,
+  regenerateAssetPreviews,
+  usePreviewRegenerationStore,
+} from "../import";
 const asset = {
   id: "a",
   name: "clip.mp4",
   kind: "video",
   opfsPath: "original",
   rotation: 90,
+  hasAudio: true,
 } as MediaAsset;
 const audio = new Blob(["audio"]);
 beforeEach(() => {
@@ -108,4 +113,49 @@ it("deduplicates across mounts and bounds active work to two assets", async () =
   resolvers[2]?.("thumb");
   await Promise.all([second, third]);
   expect(usePreviewRegenerationStore.getState().pending.size).toBe(0);
+});
+
+afterEach(() => vi.useRealTimers());
+it("rebuilds an OPFS audio-only waveform when no variant can be made", async () => {
+  mocks.audio.mockResolvedValue(null);
+  const original = new Blob(["wav audio"], { type: "audio/wav" });
+  mocks.file.mockResolvedValue(original);
+  expect((await regenerateAssetPreviews({ ...asset, kind: "audio" })).failed).toEqual([]);
+  expect(mocks.waveform).toHaveBeenCalledWith(original);
+  expect(mocks.put).toHaveBeenCalledWith("a", { waveform: [1] }, { replaceMissing: true });
+});
+it("does not materialize disk audio when no variant exists", async () => {
+  mocks.audio.mockResolvedValue(null);
+  await expect(
+    regenerateAssetPreviews({ ...asset, kind: "audio", sourceRef: { kind: "disk" } } as MediaAsset),
+  ).rejects.toMatchObject({ kind: "decode" });
+  expect(mocks.read).not.toHaveBeenCalled();
+  expect(mocks.waveform).not.toHaveBeenCalled();
+});
+it("does not require a waveform for a video without durable audio presence", async () => {
+  mocks.audio.mockResolvedValue(null);
+  expect((await regenerateAssetPreviews({ ...asset, hasAudio: false })).failed).toEqual([]);
+  expect(mocks.put.mock.calls[0]?.[2]).toEqual({ replaceMissing: true });
+});
+it("expires stalled work, releases its slot and leases, and prevents a late stale write", async () => {
+  vi.useFakeTimers();
+  let resolveStalled!: (value: string) => void;
+  mocks.thumb.mockImplementationOnce(
+    () =>
+      new Promise<string>((resolve) => {
+        resolveStalled = resolve;
+      }),
+  );
+  const stalled = regenerateAssetPreviews(asset);
+  const rejected = expect(stalled).rejects.toMatchObject({ kind: "decode" });
+  await vi.advanceTimersByTimeAsync(REGENERATION_TIMEOUT_MS);
+  await rejected;
+  expect(usePreviewRegenerationStore.getState().pending.has(asset.id)).toBe(false);
+  expect(mocks.release).toHaveBeenCalledTimes(3);
+  expect(mocks.put).not.toHaveBeenCalled();
+  expect((await regenerateAssetPreviews(asset)).failed).toEqual([]);
+  resolveStalled("obsolete thumb");
+  await vi.advanceTimersByTimeAsync(0);
+  expect(mocks.put).toHaveBeenCalledTimes(1);
+  expect(vi.getTimerCount()).toBe(0);
 });
