@@ -865,4 +865,5 @@ export const en = {
     "precision.keyframe": "Keyframe time",
     "precision.selectKeyframe": "Select keyframe",
     "precision.keyframeValue": "Keyframe value",
+    "precision.slider": "{label} slider",
 } as const;

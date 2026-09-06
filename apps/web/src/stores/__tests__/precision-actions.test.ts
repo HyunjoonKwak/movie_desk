@@ -83,3 +83,102 @@ describe("precision edit commands", () => {
       expect(durationForSourceSpan(clip, sourceOffsetForRamp(clip, time))).toBeCloseTo(time, 6);
   });
 });
+
+describe("live precision transactions", () => {
+  it.each(["transform", "speed", "slip", "keyframe"] as const)(
+    "publishes %s during the gesture and records one undo on release",
+    (kind) => {
+      const clip = setup();
+      const store = useProjectStore.getState();
+      const token = store.beginPrecisionEdit();
+      const preview = (value: number) =>
+        store.previewPrecisionEdit(token, () => {
+          if (kind === "transform") store.setTransform(clip.id, { scale: value });
+          if (kind === "speed") store.previewClipSpeed(clip.id, value);
+          if (kind === "slip") store.previewSlipClipTo(clip.id, value);
+          if (kind === "keyframe") store.previewKeyframe(clip.id, "transform.scale", 0, value);
+        });
+      preview(1.1);
+      preview(1.2);
+      const after = current(clip.id) as MediaClip;
+      if (kind === "transform") expect(after.transform?.scale).toBe(1.2);
+      if (kind === "speed") expect(after.speed).toBe(1.2);
+      if (kind === "slip") expect(after.trimIn).toBeCloseTo(1.2);
+      if (kind === "keyframe") expect(after.keyframes[0]?.keyframes[0]?.value).toBe(1.2);
+      expect(useProjectStore.getState().history.past).toHaveLength(0);
+      store.endPrecisionEdit(token);
+      expect(useProjectStore.getState().history.past).toHaveLength(1);
+      store.endPrecisionEdit(token);
+      expect(useProjectStore.getState().history.past).toHaveLength(1);
+      store.undo();
+      expect(current(clip.id)).toEqual(clip);
+      store.redo();
+      expect(current(clip.id)).toEqual(after);
+    },
+  );
+  it("restores cancelled live edits without consuming undo or changing view state", () => {
+    const clip = setup();
+    const store = useProjectStore.getState();
+    const token = store.beginPrecisionEdit();
+    store.previewPrecisionEdit(token, () => store.setTransform(clip.id, { opacity: 0.25 }));
+    store.setPlayheadMs(2300);
+    store.endPrecisionEdit(token, true);
+    expect(current(clip.id)).toEqual(clip);
+    expect(useProjectStore.getState().project.timeline.playhead).toBe(2300);
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+  it("invalidates a gesture when a project is reloaded, including the same project id", () => {
+    const clip = setup();
+    const store = useProjectStore.getState();
+    const original = store.project;
+    const token = store.beginPrecisionEdit();
+    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 2));
+    store.loadProject(original);
+    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 3));
+    store.endPrecisionEdit(token, true);
+    expect(current(clip.id)).toEqual(clip);
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+  it("does not overwrite an intervening history action on cancellation", () => {
+    const clip = setup();
+    const store = useProjectStore.getState();
+    const token = store.beginPrecisionEdit();
+    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 2));
+    store.renameProject("Keep this edit");
+    const beforeCancel = useProjectStore.getState();
+    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 3));
+    store.endPrecisionEdit(token, true);
+    expect(useProjectStore.getState().project).toBe(beforeCancel.project);
+    expect(useProjectStore.getState().history).toBe(beforeCancel.history);
+  });
+  it("makes a standalone slip action undoable", () => {
+    const clip = setup();
+    useProjectStore.getState().slipClipBy(clip.id, 100);
+    expect((current(clip.id) as MediaClip).trimIn).toBe(100);
+    expect(useProjectStore.getState().history.past).toHaveLength(1);
+    useProjectStore.getState().undo();
+    expect(current(clip.id)).toEqual(clip);
+  });
+  it("does not source-trim or slip the virtual duration of a still image", () => {
+    const clip = setup();
+    const p = useProjectStore.getState().project;
+    useProjectStore.getState().loadProject({
+      ...p,
+      mediaLibrary: [
+        {
+          id: clip.assetId,
+          name: "still.png",
+          kind: "image",
+          mime: "image/png",
+          durationMs: 5000,
+          opfsPath: "still",
+          importedAt: 0,
+        },
+      ],
+    });
+    useProjectStore.getState().setSourceTrim(clip.id, "out", 1000);
+    useProjectStore.getState().slipClipBy(clip.id, 100);
+    expect(current(clip.id)).toEqual(clip);
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+  });
+});

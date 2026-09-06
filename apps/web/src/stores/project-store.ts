@@ -63,6 +63,7 @@ import {
   undo as undoHistory,
   ungroupClips,
   updateClip,
+  upsertClipKeyframe,
 } from "@movie-desk/core";
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
@@ -174,6 +175,12 @@ interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
   trimEnd: (clipId: ID, newEnd: Ms) => void;
   trimStart: (clipId: ID, newStart: Ms) => void;
   setSourceTrim: (clipId: ID, edge: "in" | "out", ms: Ms) => void;
+  beginPrecisionEdit: () => symbol;
+  previewPrecisionEdit: (token: symbol, apply: () => void) => void;
+  endPrecisionEdit: (token: symbol, cancel?: boolean) => void;
+  previewClipSpeed: (clipId: ID, speed: number) => void;
+  previewSlipClipTo: (clipId: ID, sourceIn: Ms) => void;
+  previewKeyframe: (clipId: ID, target: string, atMs: Ms, value: number) => void;
   commitTransform: (clipId: ID, patch: Partial<ClipTransform>) => void;
   setClipStartMs: (clipId: ID, startMs: Ms) => void;
   splitAt: (clipId: ID, at: Ms) => void;
@@ -234,6 +241,16 @@ let clipDragBefore: Project | null = null;
 // session pins the exact history entry it may extend — identity, not label,
 // so an undo (or any other edit) in between can never be merged over.
 let nudgeSession: { key: string; at: number; entry: AppliedCommand } | null = null;
+let precisionSession: { token: symbol; before: Project; history: CommandHistory } | null = null;
+
+const applySlip = (project: Project, clipId: ID, deltaMs: Ms): Project => {
+  const clip = findClip(project.timeline, clipId);
+  if (!clip || clip.kind !== "media") return project;
+  const asset = project.mediaLibrary.find((a) => a.id === clip.assetId);
+  if (asset?.kind === "image") return project;
+  return slipClip(project, clipId, deltaMs, asset?.durationMs ?? Number.POSITIVE_INFINITY);
+};
+
 const NUDGE_COALESCE_MS = 800;
 
 // Pure nudge: move each selected clip/group by `deltaMs`. A group moves
@@ -274,6 +291,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     loadProject: (p) => {
       const end = reloadSpan("loadProject");
       nudgeSession = null;
+      precisionSession = null;
       set({ project: p, history: emptyHistory });
       end();
     },
@@ -299,6 +317,59 @@ export const useProjectStore = create<ProjectStoreState>()(
     ...createKeyframeActions(set),
     ...createEffectActions(set),
     ...createClipCreateActions(set),
+
+    // Precision gestures publish live values without history, then record the
+    // pre-gesture snapshot once. Tokens fence unmounted or replaced editors.
+    beginPrecisionEdit: () => {
+      if (precisionSession) get().endPrecisionEdit(precisionSession.token);
+      const token = Symbol("precision edit");
+      precisionSession = { token, before: get().project, history: get().history };
+      return token;
+    },
+    previewPrecisionEdit: (token, apply) => {
+      const session = precisionSession;
+      if (
+        session?.token !== token ||
+        session.history !== get().history ||
+        session.before.id !== get().project.id
+      )
+        return;
+      apply();
+    },
+    endPrecisionEdit: (token, cancel = false) => {
+      const session = precisionSession;
+      if (session?.token !== token) return;
+      precisionSession = null;
+      const { project: after, history } = get();
+      if (session.history !== history || session.before.id !== after.id || after === session.before)
+        return;
+      if (cancel) {
+        set({
+          project: {
+            ...session.before,
+            timeline: {
+              ...session.before.timeline,
+              playhead: after.timeline.playhead,
+              zoom: after.timeline.zoom,
+            },
+          },
+        });
+      } else {
+        set({ history: recordApplied(session.before, after, history, "Adjust value") });
+      }
+    },
+    previewClipSpeed: (clipId, speed) =>
+      set((s) => ({
+        project: updateClip(s.project, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) })),
+      })),
+    previewSlipClipTo: (clipId, sourceIn) =>
+      set((s) => {
+        const clip = findClip(s.project.timeline, clipId);
+        if (!clip || clip.kind !== "media") return s;
+        return { project: applySlip(s.project, clipId, sourceIn - clip.trimIn) };
+      }),
+    previewKeyframe: (clipId, target, atMs, value) =>
+      set((s) => ({ project: upsertClipKeyframe(s.project, clipId, target, atMs, value) })),
 
     // Drag session: all pointer-move updates are computed from the project
     // captured at drag start (idempotent magnetics, no per-pixel history)
@@ -410,17 +481,28 @@ export const useProjectStore = create<ProjectStoreState>()(
     trimStart: (clipId, newStart) =>
       runWith(set, "Trim clip", (p) => trimClipStart(p, clipId, newStart)),
 
-    setSourceTrim: (clipId, edge, ms) => runWith(set, "Set source trim", (p) => {
-      const c = findClip(p.timeline, clipId);
-      if (!c || c.kind !== "media" || !Number.isFinite(ms)) return p;
-      const at = snapMsToFrame(ms, p.framerate);
-      const trimIn = edge === "in" ? at : c.trimIn;
-      const trimOut = edge === "out" ? at : c.trimOut;
-      const asset = p.mediaLibrary.find((a) => a.id === c.assetId);
-      if (trimIn < 0 || trimOut <= trimIn || trimOut > (asset?.durationMs ?? c.trimOut) + 1e-9) return p;
-      if (trimIn === c.trimIn && trimOut === c.trimOut) return p;
-      return updateClip(p, clipId, (clip) => ({ ...clip, trimIn, trimOut, duration: Math.max(1000 / p.framerate, snapMsToFrame(durationForSourceSpan(c, trimOut - trimIn), p.framerate)) }));
-    }),
+    setSourceTrim: (clipId, edge, ms) =>
+      runWith(set, "Set source trim", (p) => {
+        const c = findClip(p.timeline, clipId);
+        if (!c || c.kind !== "media" || !Number.isFinite(ms)) return p;
+        const at = snapMsToFrame(ms, p.framerate);
+        const trimIn = edge === "in" ? at : c.trimIn;
+        const trimOut = edge === "out" ? at : c.trimOut;
+        const asset = p.mediaLibrary.find((a) => a.id === c.assetId);
+        if (asset?.kind === "image") return p;
+        if (trimIn < 0 || trimOut <= trimIn || trimOut > (asset?.durationMs ?? c.trimOut) + 1e-9)
+          return p;
+        if (trimIn === c.trimIn && trimOut === c.trimOut) return p;
+        return updateClip(p, clipId, (clip) => ({
+          ...clip,
+          trimIn,
+          trimOut,
+          duration: Math.max(
+            1000 / p.framerate,
+            snapMsToFrame(durationForSourceSpan(c, trimOut - trimIn), p.framerate),
+          ),
+        }));
+      }),
 
     commitTransform: (clipId, patch) =>
       runWith(set, "Set transform", (p) => setClipTransform(p, clipId, patch)),
@@ -446,16 +528,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     detachAudioFrom: (clipId) => runWith(set, "Detach audio", (p) => detachAudio(p, clipId)),
 
     slipClipBy: (clipId, deltaMs) =>
-      // No history entry for smooth slider drags; mirrors setTransform.
-      set((s) => {
-        const clip = s.project.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
-        const asset =
-          clip && clip.kind === "media"
-            ? s.project.mediaLibrary.find((a) => a.id === clip.assetId)
-            : undefined;
-        const maxSource = asset?.durationMs ?? Number.POSITIVE_INFINITY;
-        return { project: slipClip(s.project, clipId, deltaMs, maxSource) };
-      }),
+      runWith(set, "Slip clip", (p) => applySlip(p, clipId, deltaMs)),
 
     toggleClipDisabledById: (clipId) =>
       runWith(set, "Toggle clip", (p) => toggleClipDisabled(p, clipId)),

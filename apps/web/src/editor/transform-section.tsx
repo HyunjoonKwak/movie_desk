@@ -27,6 +27,7 @@ const PIP_PRESETS = [
 
 export function TransformSection({ clipId, clip }: Props) {
   const setTransform = useProjectStore((s) => s.commitTransform);
+  const previewTransform = useProjectStore((s) => s.setTransform);
   const setBlendMode = useProjectStore((s) => s.setBlendMode);
   const addKeyframe = useProjectStore((s) => s.addKeyframe);
   const removeKeyframe = useProjectStore((s) => s.removeKeyframe);
@@ -52,6 +53,7 @@ export function TransformSection({ clipId, clip }: Props) {
   return (
     <InspectorSection title={t("transform.title")}>
       <NumRow
+        key={`${clipId}.x`}
         label={t("transform.x")}
         min={-1}
         max={1}
@@ -59,11 +61,13 @@ export function TransformSection({ clipId, clip }: Props) {
         unit="×W"
         value={tf.x}
         onChange={(v) => setTransform(clipId, { x: v })}
+        onPreview={(v) => previewTransform(clipId, { x: v })}
         keyed={hasAnyKeyframe("transform.x")}
         keyedHere={hasKeyframeAt("transform.x")}
         onToggleKey={() => toggleKeyframe("transform.x", tf.x)}
       />
       <NumRow
+        key={`${clipId}.y`}
         label={t("transform.y")}
         min={-1}
         max={1}
@@ -71,11 +75,13 @@ export function TransformSection({ clipId, clip }: Props) {
         unit="×H"
         value={tf.y}
         onChange={(v) => setTransform(clipId, { y: v })}
+        onPreview={(v) => previewTransform(clipId, { y: v })}
         keyed={hasAnyKeyframe("transform.y")}
         keyedHere={hasKeyframeAt("transform.y")}
         onToggleKey={() => toggleKeyframe("transform.y", tf.y)}
       />
       <NumRow
+        key={`${clipId}.scale`}
         label={t("transform.scale")}
         min={0.1}
         max={4}
@@ -83,23 +89,27 @@ export function TransformSection({ clipId, clip }: Props) {
         unit="×"
         value={tf.scale}
         onChange={(v) => setTransform(clipId, { scale: v })}
+        onPreview={(v) => previewTransform(clipId, { scale: v })}
         keyed={hasAnyKeyframe("transform.scale")}
         keyedHere={hasKeyframeAt("transform.scale")}
         onToggleKey={() => toggleKeyframe("transform.scale", tf.scale)}
       />
       <NumRow
+        key={`${clipId}.rotation`}
         label={t("transform.rotation")}
         min={-180}
         max={180}
         step={1}
         value={(tf.rotation * 180) / Math.PI}
         onChange={(deg) => setTransform(clipId, { rotation: (deg * Math.PI) / 180 })}
+        onPreview={(deg) => previewTransform(clipId, { rotation: (deg * Math.PI) / 180 })}
         unit="°"
         keyed={hasAnyKeyframe("transform.rotation")}
         keyedHere={hasKeyframeAt("transform.rotation")}
         onToggleKey={() => toggleKeyframe("transform.rotation", tf.rotation)}
       />
       <NumRow
+        key={`${clipId}.opacity`}
         label={t("transform.opacity")}
         min={0}
         max={1}
@@ -107,6 +117,7 @@ export function TransformSection({ clipId, clip }: Props) {
         unit="×"
         value={tf.opacity}
         onChange={(v) => setTransform(clipId, { opacity: v })}
+        onPreview={(v) => previewTransform(clipId, { opacity: v })}
         keyed={hasAnyKeyframe("transform.opacity")}
         keyedHere={hasKeyframeAt("transform.opacity")}
         onToggleKey={() => toggleKeyframe("transform.opacity", tf.opacity)}
@@ -147,9 +158,7 @@ export function TransformSection({ clipId, clip }: Props) {
       </div>
       <button
         type="button"
-        onClick={() =>
-          setTransform(clipId, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 })
-        }
+        onClick={() => setTransform(clipId, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 })}
         className="w-full rounded border border-white/5 bg-panel-2 px-2 py-1 text-2xs text-ink-3 hover:border-accent hover:text-accent"
       >
         {t("transform.reset")}
@@ -165,6 +174,7 @@ function NumRow({
   step,
   value,
   onChange,
+  onPreview,
   unit,
   keyed,
   keyedHere,
@@ -176,6 +186,7 @@ function NumRow({
   step: number;
   value: number;
   onChange: (v: number) => void;
+  onPreview: (v: number) => void;
   unit?: string;
   keyed: boolean;
   keyedHere: boolean;
@@ -190,11 +201,7 @@ function NumRow({
             onClick={onToggleKey}
             title="Toggle keyframe at playhead"
             className={
-              keyedHere
-                ? "text-accent"
-                : keyed
-                  ? "text-amber-400"
-                  : "text-ink-3 hover:text-ink-1"
+              keyedHere ? "text-accent" : keyed ? "text-amber-400" : "text-ink-3 hover:text-ink-1"
             }
           >
             <Diamond className="size-3" fill={keyedHere ? "currentColor" : "none"} />
@@ -204,6 +211,7 @@ function NumRow({
         <PrecisionInput
           value={value}
           onChange={onChange}
+          onPreview={onPreview}
           min={min}
           max={max}
           step={step}
@@ -218,6 +226,7 @@ function NumRow({
         step={step}
         value={value}
         onChange={onChange}
+        onPreview={onPreview}
       />
     </div>
   );

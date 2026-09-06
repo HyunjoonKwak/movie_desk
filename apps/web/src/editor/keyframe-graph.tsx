@@ -19,7 +19,14 @@ interface Props {
 const GRAPH_W = 280;
 const GRAPH_H = 120;
 
-const EASINGS: readonly EasingFn[] = ["linear", "ease-in", "ease-out", "ease-in-out", "step", "bezier"];
+const EASINGS: readonly EasingFn[] = [
+  "linear",
+  "ease-in",
+  "ease-out",
+  "ease-in-out",
+  "step",
+  "bezier",
+];
 const DEFAULT_BEZIER: BezierHandles = [0.25, 0.1, 0.25, 1];
 
 // Visualizes a clip's keyframe tracks as value curves over clip time and lets
@@ -28,6 +35,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
   const t = useT();
   const fps = useProjectStore((s) => s.project.framerate);
   const playhead = useProjectStore(selectPlayhead);
+  const previewKeyframe = useProjectStore((s) => s.previewKeyframe);
   const addKeyframe = useProjectStore((s) => s.addKeyframe);
   const setKeyframeEasing = useProjectStore((s) => s.setKeyframeEasing);
   const pasteKeyframes = useProjectStore((s) => s.pasteKeyframesTo);
@@ -54,8 +62,11 @@ export function KeyframeGraph({ clipId, clip }: Props) {
   };
   const [, effectId, paramKey] = target.split(".");
   const effect = clip.effects.find((fx) => fx.id === effectId);
-  const param = effect && getEffect(effect.type)?.params.find((p) => p.key === paramKey && p.kind === "number");
-  const numericConfig = configs[target] ?? (param?.kind === "number" ? { min: param.min, max: param.max, step: param.step } : {});
+  const param =
+    effect && getEffect(effect.type)?.params.find((p) => p.key === paramKey && p.kind === "number");
+  const numericConfig =
+    configs[target] ??
+    (param?.kind === "number" ? { min: param.min, max: param.max, step: param.step } : {});
   const selectedKf = track?.keyframes.find((k) => k.at === selectedAt) ?? null;
 
   const range = useMemo(() => {
@@ -110,15 +121,20 @@ export function KeyframeGraph({ clipId, clip }: Props) {
     e.stopPropagation();
     cleanupDrag.current?.();
     const svg = e.currentTarget.ownerSVGElement!;
-    let next: number | null = null;
+    const store = useProjectStore.getState();
+    const token = store.beginPrecisionEdit();
     const move = (ev: PointerEvent) => {
       const rect = svg.getBoundingClientRect();
       const y = Math.max(0, Math.min(GRAPH_H, ev.clientY - rect.top));
       const value = range.min + (1 - y / GRAPH_H) * (range.max - range.min);
-      next = value;
+      if (track)
+        store.previewPrecisionEdit(token, () =>
+          store.previewKeyframe(clipId, track.target, atMs, value),
+        );
       setDragValue(value);
     };
-    const cleanup = () => {
+    const cleanup = (abandon = true) => {
+      store.endPrecisionEdit(token, abandon);
       cleanupDrag.current = null;
       setDragValue(null);
       window.removeEventListener("pointercancel", cancel);
@@ -127,11 +143,15 @@ export function KeyframeGraph({ clipId, clip }: Props) {
       window.removeEventListener("pointerup", up);
     };
     const up = () => {
-      cleanup();
-      if (track && next !== null) addKeyframe(clipId, track.target, atMs, next);
+      cleanup(false);
     };
     const cancel = () => cleanup();
-    const onEscape = (ev: KeyboardEvent) => { if (ev.key === "Escape") { ev.stopPropagation(); cancel(); } };
+    const onEscape = (ev: KeyboardEvent) => {
+      if (ev.key === "Escape") {
+        ev.stopPropagation();
+        cancel();
+      }
+    };
     cleanupDrag.current = cleanup;
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", onEscape);
@@ -163,7 +183,10 @@ export function KeyframeGraph({ clipId, clip }: Props) {
           </button>
           <select
             value={active ?? ""}
-            onChange={(e) => { setActive(e.target.value); setSelectedAt(null); }}
+            onChange={(e) => {
+              setActive(e.target.value);
+              setSelectedAt(null);
+            }}
             className="rounded bg-white/5 px-1.5 py-0.5 text-2xs text-ink-1 outline-none"
           >
             {tracks.map((tr) => (
@@ -182,7 +205,13 @@ export function KeyframeGraph({ clipId, clip }: Props) {
         aria-hidden="true"
       >
         {/* grid */}
-        <line x1={0} y1={GRAPH_H / 2} x2={GRAPH_W} y2={GRAPH_H / 2} stroke="rgba(255,255,255,0.06)" />
+        <line
+          x1={0}
+          y1={GRAPH_H / 2}
+          x2={GRAPH_W}
+          y2={GRAPH_H / 2}
+          stroke="rgba(255,255,255,0.06)"
+        />
         {/* playhead */}
         <line
           x1={toX(relPlayhead)}
@@ -215,17 +244,44 @@ export function KeyframeGraph({ clipId, clip }: Props) {
       {track && (
         <label className="flex items-center justify-between gap-2 text-2xs text-ink-3">
           {t("precision.keyframe")}
-          <select aria-label={t("precision.keyframe")} value={selectedKf?.at ?? ""} onChange={(e) => setSelectedAt(e.target.value === "" ? null : Number(e.target.value))} className="rounded bg-panel-2 px-1 py-0.5">
+          <select
+            aria-label={t("precision.keyframe")}
+            value={selectedKf?.at ?? ""}
+            onChange={(e) => setSelectedAt(e.target.value === "" ? null : Number(e.target.value))}
+            className="rounded bg-panel-2 px-1 py-0.5"
+          >
             <option value="">{t("precision.selectKeyframe")}</option>
-            {track.keyframes.map((k) => <option key={k.at} value={k.at}>{formatTimecode(k.at, fps)}</option>)}
+            {track.keyframes.map((k) => (
+              <option key={k.at} value={k.at}>
+                {formatTimecode(k.at, fps)}
+              </option>
+            ))}
           </select>
         </label>
       )}
       {selectedKf && track && (
-        <div key={`${track.target}:${selectedKf.at}`} className="space-y-2 rounded border border-white/5 bg-panel-2 p-2">
+        <div
+          key={`${track.target}:${selectedKf.at}`}
+          className="space-y-2 rounded border border-white/5 bg-panel-2 p-2"
+        >
           <div className="flex items-center justify-between text-2xs text-ink-3">
             <span>{t("precision.keyframeValue")}</span>
-            <PrecisionInput label={t("precision.keyframeValue")} value={rotation ? selectedKf.value * 180 / Math.PI : selectedKf.value} {...numericConfig} onChange={(v) => addKeyframe(clipId, track.target, selectedKf.at, rotation ? v * Math.PI / 180 : v)} />
+            <PrecisionInput
+              label={t("precision.keyframeValue")}
+              onPreview={(v) =>
+                previewKeyframe(
+                  clipId,
+                  track.target,
+                  selectedKf.at,
+                  rotation ? (v * Math.PI) / 180 : v,
+                )
+              }
+              value={rotation ? (selectedKf.value * 180) / Math.PI : selectedKf.value}
+              {...numericConfig}
+              onChange={(v) =>
+                addKeyframe(clipId, track.target, selectedKf.at, rotation ? (v * Math.PI) / 180 : v)
+              }
+            />
           </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-2xs text-ink-3">{t("kfgraph.easing")}</span>

@@ -5,16 +5,7 @@ import { Plus, Trash2, Download, MapPin } from "lucide-react";
 import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 
-// Formats milliseconds as a chapter timestamp: H:MM:SS when over an hour,
-// otherwise M:SS. Used both in the list and the chapter export.
-const stamp = (ms: number): string => {
-  const total = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  const s = total % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
-};
+import { chapterExportLines } from "./chapter-export";
 
 export function MarkerPanel() {
   const fps = useProjectStore((s) => s.project.framerate);
@@ -30,10 +21,7 @@ export function MarkerPanel() {
   const sorted = [...markers].sort((a, b) => a.at - b.at);
 
   const exportChapters = () => {
-    // YouTube-style chapters require a 0:00 first entry; prepend one if absent.
-    const lines: string[] = [];
-    if (sorted.length === 0 || sorted[0]!.at > 0) lines.push(`0:00 ${t("marker.intro")}`);
-    for (const m of sorted) lines.push(`${formatTimecode(m.at, fps)} ${m.label || t("marker.untitled")}`);
+    const lines = chapterExportLines(markers, t("marker.intro"), t("marker.untitled"));
     const blob = new Blob([`${lines.join("\n")}\n`], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

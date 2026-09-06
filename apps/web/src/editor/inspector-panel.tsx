@@ -28,6 +28,7 @@ export function InspectorPanel() {
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const setClipStartMs = useProjectStore((s) => s.setClipStartMs);
   const trimEnd = useProjectStore((s) => s.trimEnd);
+  const previewSpeed = useProjectStore((s) => s.previewClipSpeed);
   const setClipSpeed = useProjectStore((s) => s.setClipSpeed);
   const selected = useSelectionStore((s) => s.clipIds);
   const t = useT();
@@ -59,12 +60,13 @@ export function InspectorPanel() {
         )}
 
         {clip && (
-          <div key={clip.id} className="space-y-3">
+          <div className="space-y-3">
             <InspectorSection title={t("inspector.info")}>
               <dl className="space-y-2">
                 <Row label={t("inspector.kind")} value={clip.kind} />
                 <EditableRow label={t("inspector.start")}>
                   <PrecisionInput
+                    key={clip.id}
                     label={t("inspector.start")}
                     fps={fps}
                     value={clip.start}
@@ -74,6 +76,7 @@ export function InspectorPanel() {
                 </EditableRow>
                 <EditableRow label={t("inspector.duration")}>
                   <PrecisionInput
+                    key={clip.id}
                     label={t("inspector.duration")}
                     fps={fps}
                     value={clip.duration}
@@ -83,8 +86,10 @@ export function InspectorPanel() {
                 </EditableRow>
                 <EditableRow label={t("inspector.speed")}>
                   <PrecisionInput
+                    key={clip.id}
                     label={t("inspector.speed")}
                     unit="×"
+                    onPreview={(v) => previewSpeed(clip.id, v)}
                     value={clip.speed}
                     onChange={(v) => setClipSpeed(clip.id, v)}
                     min={0.1}
@@ -95,7 +100,10 @@ export function InspectorPanel() {
                 {asset && (
                   <>
                     <Row label={t("inspector.asset")} value={asset.name} />
-                    <Row label={t("inspector.assetDuration")} value={formatTimecode(asset.durationMs, fps)} />
+                    <Row
+                      label={t("inspector.assetDuration")}
+                      value={formatTimecode(asset.durationMs, fps)}
+                    />
                     {asset.width && asset.height && (
                       <Row
                         label={t("inspector.resolution")}
@@ -119,7 +127,9 @@ export function InspectorPanel() {
             )}
             <TransitionSection clipId={clip.id} clip={clip} />
             <EffectsSection clipId={clip.id} effects={clip.effects} />
-            {clip.keyframes.length > 0 && <KeyframeGraph clipId={clip.id} clip={clip} />}
+            {clip.keyframes.length > 0 && (
+              <KeyframeGraph key={clip.id} clipId={clip.id} clip={clip} />
+            )}
             <AiPanel />
           </div>
         )}

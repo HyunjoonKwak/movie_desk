@@ -17,6 +17,7 @@ interface Props {
 const PRESETS = [0.25, 0.5, 1, 1.5, 2, 4];
 
 export function SpeedSection({ clipId, clip }: Props) {
+  const previewSpeed = useProjectStore((s) => s.previewClipSpeed);
   const setClipSpeed = useProjectStore((s) => s.setClipSpeed);
   const addKeyframe = useProjectStore((s) => s.addKeyframe);
   const removeKeyframe = useProjectStore((s) => s.removeKeyframe);
@@ -56,7 +57,9 @@ export function SpeedSection({ clipId, clip }: Props) {
           type="button"
           onClick={toggleKey}
           title={t("speed.keyHint")}
-          className={keyHere ? "text-accent" : ramp ? "text-amber-400" : "text-ink-3 hover:text-ink-1"}
+          className={
+            keyHere ? "text-accent" : ramp ? "text-amber-400" : "text-ink-3 hover:text-ink-1"
+          }
         >
           <Diamond className="size-3" fill={keyHere ? "currentColor" : "none"} />
         </button>
@@ -64,9 +67,21 @@ export function SpeedSection({ clipId, clip }: Props) {
     >
       <div className="flex items-center justify-between text-2xs text-ink-3">
         <span>{t("speed.constant")}</span>
-        <PrecisionInput label={t("speed.constant")} unit="×" value={clip.speed} min={0.1} max={8} step={0.01} onChange={(v) => setClipSpeed(clipId, v)} />
+        <PrecisionInput
+          key={clipId}
+          onPreview={(v) => previewSpeed(clipId, v)}
+          label={t("speed.constant")}
+          unit="×"
+          value={clip.speed}
+          min={0.1}
+          max={8}
+          step={0.01}
+          onChange={(v) => setClipSpeed(clipId, v)}
+        />
       </div>
       <PrecisionSlider
+        key={clipId}
+        onPreview={(v) => previewSpeed(clipId, v)}
         label={t("speed.constant")}
         min={0.1}
         max={8}
@@ -95,21 +110,37 @@ export function SpeedSection({ clipId, clip }: Props) {
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            onClick={() => applyRamp([[0, 0.4], [1, 2]])}
+            onClick={() =>
+              applyRamp([
+                [0, 0.4],
+                [1, 2],
+              ])
+            }
             className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampUp")}
           </button>
           <button
             type="button"
-            onClick={() => applyRamp([[0, 2], [1, 0.4]])}
+            onClick={() =>
+              applyRamp([
+                [0, 2],
+                [1, 0.4],
+              ])
+            }
             className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampDown")}
           </button>
           <button
             type="button"
-            onClick={() => applyRamp([[0, 1], [0.5, 0.25], [1, 1]])}
+            onClick={() =>
+              applyRamp([
+                [0, 1],
+                [0.5, 0.25],
+                [1, 1],
+              ])
+            }
             className="rounded bg-panel-2 px-1.5 py-0.5 text-3xs text-ink-3 hover:text-ink-1"
           >
             {t("speed.rampDip")}
@@ -125,9 +156,7 @@ export function SpeedSection({ clipId, clip }: Props) {
           )}
         </div>
       </div>
-      {ramp && (
-        <p className="text-3xs text-amber-400">{t("speed.rampActive")}</p>
-      )}
+      {ramp && <p className="text-3xs text-amber-400">{t("speed.rampActive")}</p>}
 
       {isMediaClip(clip) && (
         <button

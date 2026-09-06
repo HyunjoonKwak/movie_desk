@@ -94,7 +94,7 @@ P0 공용 커밋형 숫자/시간 입력, 인스펙터 시작·길이·소스 �
 | white-balance | temperature | Temperature | -1…1 | 0.01 |
 | white-balance | tint | Tint | -1…1 | 0.01 |
 
-## 구현 후 적용 결과
+## 1차 구현(c52851b)의 적용 결과
 
 | 적용 표면 | 결과 | undo / 남은 제약 |
 | --- | --- | --- |
@@ -116,4 +116,26 @@ P0 공용 커밋형 숫자/시간 입력, 인스펙터 시작·길이·소스 �
 - 한국어 1440×900 실제 렌더 화면 확인: 시간 문자열, 단위, 숫자 필드와 기존 슬라이더가 인스펙터 안에 배치됨.
 - 첫 전체 gate는 install부터 build/browsers까지 PASS, 다른 워커의 32119 포트 사용으로 E2E precondition이 차단됐다. 해당 서버를 종료하지 않고 비워진 후 전체 gate를 재실행했다. 최종 결과는 [gate 기록](2026-09-06-precision-input-gate.md)에 둔다.
 
-최종 `pnpm gate --report docs/evaluations/2026-09-06-precision-input-gate.md`: **9/9 PASS**, 단위 718(core 125/web 526/desktop 56/scripts 11), Chromium E2E 49건 PASS. 이번 배치에 순수 함수/store 42건과 E2E 2건을 추가했다. 사용처가 없어진 기존 NumberScrubber를 제거한 뒤 lint도 재확인했다. 브랜치만 커밋하며 push/main merge는 하지 않았다.
+`c52851b` 1차 구현 검증: `pnpm gate --report docs/evaluations/2026-09-06-precision-input-gate.md`: **9/9 PASS**, 단위 718(core 125/web 526/desktop 56/scripts 11), Chromium E2E 49건 PASS. 이번 배치에 순수 함수/store 42건과 E2E 2건을 추가했다. 사용처가 없어진 기존 NumberScrubber를 제거한 뒤 lint도 재확인했다. 브랜치만 커밋하며 push/main merge는 하지 않았다.
+
+
+## c52851b 리뷰 반영
+
+- 챕터 파일 생성은 `chapterExportLines` 순수 함수의 M:SS/H:MM:SS로 복구했다. 마커 목록은 HH:MM:SS:FF를 유지하며, 분/시 경계와 0:00 자동 추가를 회귀 테스트한다.
+- 스크럽 버튼은 Tab 순서에서 제외하고 자신의 키 입력을 흡수하며, 전역 단축키도 `[data-precision-scrub]`을 편집 대상으로 취급한다. Tab으로 옆 숫자 필드에 이동할 수 있고 Backspace/Delete가 클립으로 누출되지 않는다.
+- 변형·속도·소스 슬립 slider 및 변형/속도/키프레임 숫자 스크럽·키프레임 그래프는 무이력 값을 즉시 store에 반영해 캔버스와 오디오가 라이브 값을 받는다. 시작 스냅샷과 세션 토큰을 보관하고 종료에 `recordApplied` 한 번, Esc/포인터 취소/입력 unmount에는 시작 상태를 복원한다. 다른 프로젝트 로드 또는 중간 history 변경 뒤의 오래된 세션은 쓰기/복원을 하지 않는다.
+- `slipClipBy` 자체도 undo 가능한 명령으로 바꾸고 드래그는 별도 transient 액션으로 연결했다. 기존 transient `setTransform`은 슬라이더·숫자 스크럽에 재사용한다.
+- 인스펙터 전체의 clip key를 제거하고 입력/NumRow/KeyframeGraph 단위에만 key를 둬 InspectorSection 접힘과 AiPanel 상태를 유지한다. 잘못된 Enter 입력은 안내를 유지하고 잘못된 blur 입력은 모델 값으로 복귀하며 IME 조합 중 Enter는 커밋하지 않는다.
+- 이미지에는 fit 설정만 유지하고 소스 트림·슬립 UI를 숨긴다. store도 이미지 source trim/slip을 거부해 가상 5000ms 소스가 표시 길이를 바꾸지 않는다.
+- 플레이헤드 입력의 상한을 프로젝트 길이로 제한하고 슬라이더 접근 이름에 한국어/영어 별도 접미사를 붙인다. 기존 8개 수정 파일은 biome format으로 복구했고 i18n은 4칸 append-only를 유지했다.
+
+### 추가 후속 감사 목록
+
+- `SpeedSection.applyRamp`: 트랙 clear 1회 + keyframe 추가 N회로 undo가 N+1개로 나뉜다. 램프 프리셋을 한 명령으로 묶는 후속이 필요하다.
+- 현재 타임코드는 엄격한 HH:MM:SS:FF 입력만 받는다. 초/프레임 숫자·오른쪽 채움 같은 약식 입력은 정책과 파서 테스트를 갖춘 후 추가한다.
+- 키프레임 시각 선택 메뉴는 클립 상대 시각이다. 상대 시각을 명시하는 라벨과 프로젝트 절대 시각 병기, 시각 이동 입력은 후속이다.
+
+
+리뷰 회귀 검증은 챕터 순수 함수 3건, live preview/undo/취소/세션 무효화/이미지 보호 store 테스트 9건을 추가하고 E2E를 2→4건으로 확장했다. 기존 E2E에는 invalid blur와 IME 조합 중 Enter도 추가했으며, 새로운 E2E는 슬라이더 드래그 중 인접 숫자 값 갱신·스크럽 중 슬라이더 값 갱신·한 번 undo·Backspace/Delete 격리·Tab 이동과 클립 전환 시 섹션 접힘 보존을 확인한다. 중간 전체 gate의 컬렉션 E2E 한 건은 소스 보강과 실행이 겹친 상태에서 실패했으므로 최종 코드를 고정하고 전체 gate를 다시 실행했다.
+
+리뷰 반영 최종 검증: `pnpm gate` **9/9 PASS**, 단위 **730**(core 125/web 538/desktop 56/scripts 11), Chromium E2E **51**건 PASS. 앞서 실패한 컬렉션 E2E도 최종 코드 고정 실행에서 통과했다. `biome format` 대상 8개 파일 검사와 `git diff --check`도 PASS이며, i18n 변경은 한국어/영어 각 1키 append뿐이다.

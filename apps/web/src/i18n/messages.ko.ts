@@ -863,4 +863,5 @@ export const ko = {
     "precision.keyframe": "키프레임 시각",
     "precision.selectKeyframe": "키프레임 선택",
     "precision.keyframeValue": "키프레임 값",
+    "precision.slider": "{label} 슬라이더",
 } as const;

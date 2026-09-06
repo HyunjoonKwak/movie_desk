@@ -3,11 +3,13 @@
 import { useId, useRef, useState } from "react";
 import { formatTimecode, parseTimecode } from "@movie-desk/core";
 import { useT } from "@/i18n/use-t";
+import { usePrecisionGesture } from "./use-precision-gesture";
 import { parsePrecisionNumber, stepPrecisionValue } from "./precision-input-utils";
 
 interface Props {
   value: number;
   onChange: (value: number) => void;
+  onPreview?: ((value: number) => void) | undefined;
   label: string;
   unit?: string | undefined;
   min?: number | undefined;
@@ -17,9 +19,20 @@ interface Props {
   fps?: number | undefined;
 }
 
-/** One edit session = one command. Typing/arrows and scrub preview stay local. */
-export function PrecisionInput({ value, onChange, label, unit, min, max, step = 1, fps }: Props) {
+/** Typing/arrows stay local; supported scrubs publish live values in one undo session. */
+export function PrecisionInput({
+  value,
+  onChange,
+  onPreview,
+  label,
+  unit,
+  min,
+  max,
+  step = 1,
+  fps,
+}: Props) {
   const t = useT();
+  const gesture = usePrecisionGesture(onPreview);
   const id = useId();
   const display = (v: number) => (fps ? formatTimecode(v, fps) : String(Number(v.toFixed(6))));
   const [draft, setDraft] = useState<string | null>(null);
@@ -32,7 +45,7 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
     setInvalid(false);
   };
   const parse = (text: string) => (fps ? parseTimecode(text, fps) : parsePrecisionNumber(text));
-  const commit = () => {
+  const commit = (onBlur = false) => {
     if (draftRef.current === null) return;
     const next = parse(draftRef.current);
     if (
@@ -40,7 +53,8 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
       next < (min ?? Number.NEGATIVE_INFINITY) - 1e-9 ||
       next > (max ?? Number.POSITIVE_INFINITY) + 1e-9
     ) {
-      setInvalid(true);
+      if (onBlur) update(null);
+      else setInvalid(true);
       return;
     }
     update(null);
@@ -48,6 +62,7 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
   };
   const cancel = () => {
     drag.current = null;
+    gesture.finish(true);
     update(null);
   };
   const hint = fps ? t("precision.timeHint", { fps }) : t("precision.numberHint");
@@ -56,20 +71,31 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
       <span className="inline-flex items-center gap-1">
         <button
           type="button"
+          tabIndex={-1}
+          data-precision-scrub
           aria-label={t("precision.scrub", { label })}
           title={hint}
           className="touch-none cursor-ew-resize rounded px-1 text-ink-3 hover:bg-white/10"
           onKeyDown={(e) => {
+            e.stopPropagation();
+            if (e.key !== "Tab") e.preventDefault();
             if (e.key === "Escape") {
-              e.stopPropagation();
               cancel();
             }
           }}
           onPointerDown={(e) => {
             if (e.button !== 0) return;
             e.preventDefault();
+            const entered = draftRef.current === null ? value : parse(draftRef.current);
+            const start =
+              entered !== null &&
+              entered >= (min ?? Number.NEGATIVE_INFINITY) &&
+              entered <= (max ?? Number.POSITIVE_INFINITY)
+                ? entered
+                : value;
+            commit(true);
             e.currentTarget.focus();
-            drag.current = { x: e.clientX, value, next: value, moved: false };
+            drag.current = { x: e.clientX, value: start, next: start, moved: false };
             e.currentTarget.setPointerCapture(e.pointerId);
           }}
           onPointerMove={(e) => {
@@ -85,13 +111,14 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
               alt: e.altKey,
             });
             update(display(d.next));
+            gesture.preview(d.next);
           }}
           onPointerUp={(e) => {
             const d = drag.current;
             drag.current = null;
             e.currentTarget.releasePointerCapture(e.pointerId);
             update(null);
-            if (d?.moved && Math.abs(d.next - value) > 1e-9) onChange(d.next);
+            if (!gesture.finish() && d?.moved && Math.abs(d.next - value) > 1e-9) onChange(d.next);
           }}
           onPointerCancel={cancel}
           onLostPointerCapture={() => {
@@ -114,14 +141,14 @@ export function PrecisionInput({ value, onChange, label, unit, min, max, step = 
           title={hint}
           value={draft ?? display(value)}
           onChange={(e) => update(e.target.value)}
-          onBlur={commit}
+          onBlur={() => commit(true)}
           onKeyDown={(e) => {
             e.stopPropagation();
             if (e.key === "Escape") {
               e.preventDefault();
               cancel();
             }
-            if (e.key === "Enter") {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
               e.preventDefault();
               commit();
             }

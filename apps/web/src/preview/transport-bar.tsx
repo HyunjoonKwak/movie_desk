@@ -87,7 +87,14 @@ export function TransportBar() {
       <div className="flex shrink-0 items-center gap-3">
         <LevelMeter />
         <div className="rounded-md border border-line bg-panel-2 px-2 py-1 font-mono text-2xs text-ink-2">
-          <PrecisionInput label={t("precision.playhead")} value={playhead} fps={fps} min={0} onChange={setPlayhead} />
+          <PrecisionInput
+            label={t("precision.playhead")}
+            value={playhead}
+            fps={fps}
+            min={0}
+            max={duration}
+            onChange={setPlayhead}
+          />
           <span className="mx-1 text-ink-3">/</span>
           <span>{formatTimecode(duration, fps)}</span>
         </div>

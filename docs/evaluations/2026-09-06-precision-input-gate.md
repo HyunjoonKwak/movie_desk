@@ -2,12 +2,12 @@ Release gate: PASS
 
 | result | step | time | detail |
 | --- | --- | --- | --- |
-| ✅ pass | install (frozen lockfile) | 971ms |  |
-| ✅ pass | version policy | 300ms |  |
-| ✅ pass | lint | 1.4s |  |
-| ✅ pass | typecheck | 5.5s |  |
-| ✅ pass | unit tests | 6.7s |  |
-| ✅ pass | OSV audit (network) | 1.1s |  |
-| ✅ pass | web production build | 12.9s |  |
-| ✅ pass | playwright chromium | 798ms |  |
-| ✅ pass | browser e2e | 96.1s |  |
+| ✅ pass | install (frozen lockfile) | 1.0s |  |
+| ✅ pass | version policy | 328ms |  |
+| ✅ pass | lint | 1.6s |  |
+| ✅ pass | typecheck | 4.5s |  |
+| ✅ pass | unit tests | 13.5s |  |
+| ✅ pass | OSV audit (network) | 1.3s |  |
+| ✅ pass | web production build | 24.5s |  |
+| ✅ pass | playwright chromium | 864ms |  |
+| ✅ pass | browser e2e | 130.4s |  |

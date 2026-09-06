@@ -24,6 +24,7 @@ const isEditable = (target: EventTarget | null): boolean => {
   if (!(target instanceof HTMLElement)) return false;
   return (
     target.isContentEditable ||
+    target.closest("[data-precision-scrub]") !== null ||
     target.tagName === "INPUT" ||
     target.tagName === "TEXTAREA" ||
     target.tagName === "SELECT"

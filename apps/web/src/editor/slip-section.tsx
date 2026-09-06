@@ -20,6 +20,7 @@ const FITS: readonly SpatialFit[] = ["stretch", "fill", "fit"];
 export function SlipSection({ clip }: Props) {
   const fps = useProjectStore((s) => s.project.framerate);
   const setSourceTrim = useProjectStore((s) => s.setSourceTrim);
+  const previewSlip = useProjectStore((s) => s.previewSlipClipTo);
   const slip = useProjectStore((s) => s.slipClipBy);
   const setFit = useProjectStore((s) => s.setClipFit);
   const asset = useProjectStore((s) => s.project.mediaLibrary.find((a) => a.id === clip.assetId));
@@ -44,24 +45,46 @@ export function SlipSection({ clip }: Props) {
           ))}
         </select>
       </div>
-      <div className="flex items-center justify-between text-2xs text-ink-3">
-        <span>{t("slip.sourceIn")}</span>
-        <PrecisionInput label={t("slip.sourceIn")} fps={fps} value={clip.trimIn} min={0} max={clip.trimOut - 1000 / fps} onChange={(v) => setSourceTrim(clip.id, "in", v)} />
-      </div>
-      <div className="flex items-center justify-between gap-2 text-2xs text-ink-3">
-        <span>{t("precision.sourceOut")}</span>
-        <PrecisionInput label={t("precision.sourceOut")} fps={fps} value={clip.trimOut} min={clip.trimIn + 1000 / fps} max={asset?.durationMs ?? clip.trimOut} onChange={(v) => setSourceTrim(clip.id, "out", v)} />
-      </div>
-      <p className="text-3xs text-ink-3">{t("precision.trimHint")}</p>
-      <PrecisionSlider
-        label={t("slip.title")}
-        min={0}
-        max={max}
-        step={10}
-        value={Math.min(clip.trimIn, max)}
-        onChange={(v) => slip(clip.id, v - clip.trimIn)}
-      />
-      {max <= 0 && <p className="text-3xs text-ink-3">{t("slip.noSlack")}</p>}
+      {asset?.kind !== "image" && (
+        <>
+          <div className="flex items-center justify-between text-2xs text-ink-3">
+            <span>{t("slip.sourceIn")}</span>
+            <PrecisionInput
+              key={clip.id}
+              label={t("slip.sourceIn")}
+              fps={fps}
+              value={clip.trimIn}
+              min={0}
+              max={clip.trimOut - 1000 / fps}
+              onChange={(v) => setSourceTrim(clip.id, "in", v)}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2 text-2xs text-ink-3">
+            <span>{t("precision.sourceOut")}</span>
+            <PrecisionInput
+              key={clip.id}
+              label={t("precision.sourceOut")}
+              fps={fps}
+              value={clip.trimOut}
+              min={clip.trimIn + 1000 / fps}
+              max={asset?.durationMs ?? clip.trimOut}
+              onChange={(v) => setSourceTrim(clip.id, "out", v)}
+            />
+          </div>
+          <p className="text-3xs text-ink-3">{t("precision.trimHint")}</p>
+          <PrecisionSlider
+            key={clip.id}
+            onPreview={(v) => previewSlip(clip.id, v)}
+            label={t("slip.title")}
+            min={0}
+            max={max}
+            step={10}
+            value={Math.min(clip.trimIn, max)}
+            onChange={(v) => slip(clip.id, v - clip.trimIn)}
+          />
+          {max <= 0 && <p className="text-3xs text-ink-3">{t("slip.noSlack")}</p>}
+        </>
+      )}
     </InspectorSection>
   );
 }
