@@ -255,6 +255,7 @@ const throwIfAborted = (signal?: AbortSignal): void => {
 // source memory while avoiding a decode of every project asset up front.
 export class ProjectAudioMixer {
   readonly sampleRate = 48_000;
+  pitchFallback = false;
   private static readonly DEFAULT_CHUNK_MS = 30_000;
   private static readonly EFFECT_PADDING_MS = 500;
   private static readonly MAX_DECODED_ASSETS = 2;
@@ -325,23 +326,41 @@ export class ProjectAudioMixer {
         const outputSamples = processEnd - processStart;
         const clipOffsetMs = ((processStart - clipStartSample) / this.sampleRate) * 1000;
         const [leftSource, rightSource] = decodedStereoChannels(decoded);
-        const rendered = clip.preservePitch === true && clip.speed > 0
-          ? await renderPitchInWorker({
-              channels: [leftSource, rightSource], sourceSampleRate: decoded.sampleRate,
-              outputSampleRate: this.sampleRate, clip, offsetMs: clipOffsetMs, outputSamples,
-            }, options.signal)
-          : [leftSource, rightSource].map((source) => resampleClipAudioRange(
-              source, decoded.sampleRate, this.sampleRate, clip, clipOffsetMs, outputSamples,
-            ));
+        const sources = decoded.numberOfChannels > 1 ? [leftSource, rightSource] : [leftSource];
+        let rendered: Float32Array[];
+        const fallback = () =>
+          sources.map((source) =>
+            resampleClipAudioRange(
+              source,
+              decoded.sampleRate,
+              this.sampleRate,
+              clip,
+              clipOffsetMs,
+              outputSamples,
+            ),
+          );
+        if (clip.preservePitch === true && clip.speed > 0 && !this.pitchFallback) {
+          try {
+            rendered = await renderPitchInWorker(
+              {
+                channels: sources,
+                sourceSampleRate: decoded.sampleRate,
+                outputSampleRate: this.sampleRate,
+                clip,
+                offsetMs: clipOffsetMs,
+                outputSamples,
+              },
+              options.signal,
+            );
+          } catch {
+            throwIfAborted(options.signal);
+            this.pitchFallback = true;
+            rendered = fallback();
+          }
+        } else rendered = fallback();
         const processed = await Promise.all(
           rendered.map((source) =>
-            applyAudioEffects(
-              source,
-              clip.effects,
-              this.sampleRate,
-              clipOffsetMs,
-              clip.duration,
-            ),
+            applyAudioEffects(source, clip.effects, this.sampleRate, clipOffsetMs, clip.duration),
           ),
         );
         throwIfAborted(options.signal);
@@ -365,7 +384,7 @@ export class ProjectAudioMixer {
         const processedOffset = overlapStart - processStart;
         const mixedSamples = overlapEnd - overlapStart;
         for (let channel = 0; channel < 2; channel++) {
-          const input = processed[channel]!.subarray(
+          const input = processed[Math.min(channel, processed.length - 1)]!.subarray(
             processedOffset,
             processedOffset + mixedSamples,
           );

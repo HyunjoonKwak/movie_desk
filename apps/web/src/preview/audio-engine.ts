@@ -1,7 +1,19 @@
-import { PitchCache, pitchCacheKey, pitchMainSlice, renderPitchInWorker } from "@/audio/pitch-renderer";
+import {
+  PitchCache,
+  pitchCacheKey,
+  pitchMainSlice,
+  renderPitchInWorker,
+} from "@/audio/pitch-renderer";
+import { setPitchState } from "@/audio/pitch-state";
+import { useProjectStore } from "@/stores/project-store";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
-import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@movie-desk/core";
+import {
+  hasSpeedRamp,
+  isMediaClip,
+  sampleKeyframeTrack,
+  sourceOffsetForRamp,
+} from "@movie-desk/core";
 import { sampleVolumeCurve } from "./volume-curve";
 
 // Live audio monitoring uses a rolling schedule instead of decoding and
@@ -14,8 +26,12 @@ class AudioEngine {
   private static readonly REFILL_MS = 15_000;
   private readonly pitchCache = new PitchCache<AudioBuffer>();
   private readonly pitchRevisions = new Map<string, number>();
-  private pitchPending = false;
-  private pitchNext: { buffer: AudioBuffer; clip: MediaClip; key: string } | null = null;
+  private readonly pitchJobs = new Map<
+    string,
+    { key: string; controller: AbortController; assetId: string; stateKey: string }
+  >();
+  private readonly pitchFailed = new Set<string>();
+  private readonly fades = new Map<AudioBufferSourceNode, GainNode>();
   private ctx: AudioContext | null = null;
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly pendingBuffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -29,6 +45,7 @@ class AudioEngine {
   private anchorContextTime = 0;
   private anchorTimelineMs = 0;
   private scheduledThroughMs = 0;
+  private fadeThroughTime = 0;
 
   private getCtx(): AudioContext {
     if (!this.ctx) this.ctx = new AudioContext();
@@ -105,6 +122,15 @@ class AudioEngine {
   }
 
   stop(): void {
+    for (const [id, job] of this.pitchJobs) {
+      job.controller.abort();
+      setPitchState(id, job.stateKey);
+    }
+    this.pitchJobs.clear();
+    this.stopSources();
+  }
+
+  private stopSources(fadeSeconds = 0): void {
     this.generation++;
     this.transportActive = false;
     if (this.refillTimer !== null) clearTimeout(this.refillTimer);
@@ -112,12 +138,22 @@ class AudioEngine {
     for (const source of this.active) {
       source.onended = null;
       try {
-        source.stop();
+        const fade = this.fades.get(source);
+        if (fadeSeconds && fade && this.ctx) {
+          fade.gain.setValueAtTime(1, this.ctx.currentTime);
+          fade.gain.linearRampToValueAtTime(0, this.ctx.currentTime + fadeSeconds);
+          source.stop(this.ctx.currentTime + fadeSeconds);
+          source.onended = () => {
+            source.disconnect();
+            fade.disconnect();
+          };
+        } else source.stop();
       } catch {
         // already stopped/ended
       }
-      source.disconnect();
+      if (!fadeSeconds) source.disconnect();
     }
+    this.fades.clear();
     this.active = [];
   }
 
@@ -129,7 +165,13 @@ class AudioEngine {
   }
 
   forget(assetId: string): void {
-    if (this.pitchNext?.clip.assetId === assetId) this.pitchNext = null;
+    for (const [id, job] of this.pitchJobs)
+      if (job.assetId === assetId) {
+        job.controller.abort();
+        this.pitchJobs.delete(id);
+        setPitchState(id, job.stateKey);
+      }
+    this.pitchFailed.clear();
     this.pitchCache.forget(assetId);
     this.pitchRevisions.set(assetId, (this.pitchRevisions.get(assetId) ?? 0) + 1);
     this.buffers.delete(assetId);
@@ -192,45 +234,104 @@ class AudioEngine {
         if (!isMediaClip(clip)) continue;
         const key = pitchCacheKey(clip, buffer.sampleRate, this.pitchRevisions.get(asset.id) ?? 0);
         const pitched = clip.preservePitch ? this.pitchCache.get(key) : undefined;
-        this.scheduleClip(pitched ?? buffer, clip, rangeStartMs, rangeEndMs, rate, generation, !!pitched);
+        this.scheduleClip(
+          pitched ?? buffer,
+          clip,
+          rangeStartMs,
+          rangeEndMs,
+          rate,
+          generation,
+          !!pitched,
+        );
         if (clip.preservePitch && !pitched) void this.preparePitch(buffer, clip, key);
       }
     }
   }
 
   private async preparePitch(buffer: AudioBuffer, clip: MediaClip, key: string): Promise<void> {
-    if (this.pitchPending) {
-      this.pitchNext = { buffer, clip, key };
-      return;
-    }
-    const outputSamples = Math.floor(clip.duration * buffer.sampleRate / 1000);
+    const existing = this.pitchJobs.get(clip.id);
+    if (existing?.key === key || this.pitchFailed.has(key)) return;
+    existing?.controller.abort();
+    const controller = new AbortController();
+    const stateKey = pitchCacheKey(clip, 0);
+    const outputSamples = Math.floor((clip.duration * buffer.sampleRate) / 1000);
     const bytes = outputSamples * buffer.numberOfChannels * 4;
     // Admission bounds retained output and in-flight source copies separately.
-    if (bytes > this.pitchCache.limit || buffer.length * buffer.numberOfChannels * 4 > this.pitchCache.limit) return;
-    this.pitchPending = true;
+    if (
+      bytes > this.pitchCache.limit ||
+      buffer.length * buffer.numberOfChannels * 4 > this.pitchCache.limit
+    ) {
+      setPitchState(clip.id, stateKey, "fallback");
+      return;
+    }
+    this.pitchJobs.set(clip.id, { key, controller, assetId: clip.assetId, stateKey });
+    setPitchState(clip.id, stateKey, "rendering");
     try {
-      const channels = await renderPitchInWorker({
-        channels: Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c)),
-        sourceSampleRate: buffer.sampleRate, outputSampleRate: buffer.sampleRate,
-        clip, offsetMs: 0, outputSamples,
-      });
-      const rendered = pitchMainSlice(() => this.getCtx().createBuffer(channels.length, outputSamples, buffer.sampleRate));
+      const channels = await renderPitchInWorker(
+        {
+          channels: Array.from({ length: buffer.numberOfChannels }, (_, c) =>
+            buffer.getChannelData(c),
+          ),
+          sourceSampleRate: buffer.sampleRate,
+          outputSampleRate: buffer.sampleRate,
+          clip,
+          offsetMs: 0,
+          outputSamples,
+        },
+        controller.signal,
+      );
+      if (controller.signal.aborted) return;
+      const rendered = pitchMainSlice(() =>
+        this.getCtx().createBuffer(channels.length, outputSamples, buffer.sampleRate),
+      );
       for (let c = 0; c < channels.length; c++) {
         for (let at = 0; at < outputSamples; at += 65536) {
-          pitchMainSlice(() => rendered.copyToChannel(Float32Array.from(channels[c]!.subarray(at, at + 65536)), c, at));
+          pitchMainSlice(() =>
+            rendered.copyToChannel(Float32Array.from(channels[c]!.subarray(at, at + 65536)), c, at),
+          );
           if (at % 524288 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
         }
       }
-      if (key === pitchCacheKey(clip, buffer.sampleRate, this.pitchRevisions.get(clip.assetId) ?? 0)) {
+      const project = useProjectStore.getState().project;
+      const current = project.timeline.tracks
+        .flatMap((track) => track.clips)
+        .find((candidate) => candidate.id === clip.id);
+      if (
+        !controller.signal.aborted &&
+        current &&
+        isMediaClip(current) &&
+        key ===
+          pitchCacheKey(current, buffer.sampleRate, this.pitchRevisions.get(clip.assetId) ?? 0)
+      ) {
         this.pitchCache.set(key, rendered, bytes, clip.assetId);
+        setPitchState(clip.id, stateKey, "ready");
+        if (this.transportActive) {
+          const ctx = this.getCtx();
+          const now =
+            this.anchorTimelineMs +
+            Math.max(0, ctx.currentTime - this.anchorContextTime) * 1000 * this.transportRate;
+          const rate = this.transportRate;
+          this.stopSources(0.02);
+          this.transportActive = true;
+          this.fadeThroughTime = ctx.currentTime + 0.03;
+          this.anchorContextTime = ctx.currentTime;
+          this.anchorTimelineMs = now;
+          this.scheduledThroughMs = Math.min(
+            project.timeline.duration,
+            now + AudioEngine.INITIAL_LOOKAHEAD_MS,
+          );
+          const generation = this.generation;
+          await this.scheduleRange(project, now, this.scheduledThroughMs, rate, generation);
+          if (generation === this.generation) this.queueRefill(project, rate, generation);
+        }
       }
     } catch {
-      // Immediate varispeed remains audible. Never execute expensive DSP inline.
+      if (!controller.signal.aborted) {
+        this.pitchFailed.add(key);
+        setPitchState(clip.id, stateKey, "fallback");
+      }
     } finally {
-      this.pitchPending = false;
-      const next = this.pitchNext;
-      this.pitchNext = null;
-      if (next && next.key !== key) void this.preparePitch(next.buffer, next.clip, next.key);
+      if (this.pitchJobs.get(clip.id)?.controller === controller) this.pitchJobs.delete(clip.id);
     }
   }
 
@@ -298,7 +399,14 @@ class AudioEngine {
     } else {
       gain.gain.value = clip.volume ?? 1;
     }
-    source.connect(gain).connect(ctx.destination);
+    const fade = ctx.createGain();
+    if (when < this.fadeThroughTime) {
+      fade.gain.setValueAtTime(0, when);
+      fade.gain.linearRampToValueAtTime(1, when + 0.02);
+    }
+    source.connect(gain).connect(fade);
+    fade.connect(ctx.destination);
+    this.fades.set(source, fade);
     try {
       source.start(
         when,
@@ -312,6 +420,8 @@ class AudioEngine {
     this.active.push(source);
     source.onended = () => {
       source.disconnect();
+      fade.disconnect();
+      this.fades.delete(source);
       const index = this.active.indexOf(source);
       if (index >= 0) this.active.splice(index, 1);
     };

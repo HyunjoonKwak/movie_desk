@@ -1,5 +1,7 @@
 "use client";
 
+import { usePitchState } from "@/audio/pitch-state";
+import { pitchCacheKey } from "@/audio/pitch-renderer";
 import { Diamond, Gauge, Snowflake } from "lucide-react";
 import type { Clip, ID } from "@movie-desk/core";
 import { hasSpeedRamp, isMediaClip, pitchHasUnsupportedRange } from "@movie-desk/core";
@@ -28,6 +30,9 @@ export function SpeedSection({ clipId, clip }: Props) {
   const playhead = useProjectStore(selectPlayhead);
   const t = useT();
 
+  const entry = usePitchState((s) => s.entries[clipId]);
+  const pitchState =
+    isMediaClip(clip) && entry?.key === pitchCacheKey(clip, 0) ? entry.state : undefined;
   const frozen = isMediaClip(clip) && clip.freeze !== undefined;
 
   const ramp = hasSpeedRamp(clip);
@@ -110,14 +115,29 @@ export function SpeedSection({ clipId, clip }: Props) {
       {isMediaClip(clip) && (
         <>
           <label className="flex items-center gap-2 text-2xs text-ink-3">
-            <input type="checkbox" checked={clip.preservePitch === true}
-              onChange={(event) => setPreservePitch(clipId, event.target.checked)} />
+            <input
+              type="checkbox"
+              checked={clip.preservePitch === true}
+              onChange={(event) => setPreservePitch(clipId, event.target.checked)}
+            />
             {t("speed.preservePitch")}
           </label>
-          {clip.preservePitch && <StateHint
-            text={t(pitchHasUnsupportedRange(clip) ? "speed.pitchUnsupported" : "speed.pitchRendering")}
-            tone={pitchHasUnsupportedRange(clip) ? "warning" : "info"}
-            testId="pitch-state-hint" />}
+          {clip.preservePitch &&
+            (pitchHasUnsupportedRange(clip) ||
+              pitchState === "rendering" ||
+              pitchState === "fallback") && (
+              <StateHint
+                text={t(
+                  pitchHasUnsupportedRange(clip)
+                    ? "speed.pitchUnsupported"
+                    : pitchState === "fallback"
+                      ? "speed.pitchFallback"
+                      : "speed.pitchWorking",
+                )}
+                tone={pitchHasUnsupportedRange(clip) ? "warning" : "info"}
+                testId="pitch-state-hint"
+              />
+            )}
         </>
       )}
       <div className="pt-1">

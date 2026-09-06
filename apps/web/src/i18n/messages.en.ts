@@ -912,4 +912,7 @@ export const en = {
     "speed.preservePitch": "Preserve pitch",
     "speed.pitchUnsupported": "Pitch preservation applies only to forward speeds from 0.25× to 4×. Other sections use varispeed.",
     "speed.pitchRendering": "First playback uses varispeed while audio renders; the rendered audio is reused on subsequent playback.",
+    "export.pitchFallback": "Pitch preservation is unavailable; exported using standard speed changes.",
+    "speed.pitchWorking": "Rendering pitch-preserved audio. Playback will update when ready.",
+    "speed.pitchFallback": "Pitch preservation is unavailable. Playback uses standard speed changes.",
 } as const;

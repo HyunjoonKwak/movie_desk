@@ -4,16 +4,19 @@ import { sourceOffsetForRamp } from "../timeline/speed";
 
 export const pitchRateSupported = (rate: number): boolean => rate >= 0.25 && rate <= 4;
 
-export const pitchHasUnsupportedRange = (clip: MediaClip): boolean =>
-  !pitchRateSupported(clip.speed) ||
-  clip.keyframes.some(
-    (track) =>
-      track.target === "speed" && track.keyframes.some((key) => !pitchRateSupported(key.value)),
+export const pitchHasUnsupportedRange = (clip: MediaClip): boolean => {
+  const ramp = clip.keyframes.find(
+    (track) => track.target === "speed" && track.keyframes.length >= 2,
   );
+  return ramp
+    ? ramp.keyframes.some((key) => !pitchRateSupported(key.value))
+    : !pitchRateSupported(clip.speed);
+};
 
 export interface StretchRequest {
   channels: Float32Array[];
   sourceSampleRate: number;
+  sourceStartSample?: number;
   outputSampleRate: number;
   clip: MediaClip;
   offsetMs: number;
@@ -35,13 +38,17 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
   const track = clip.keyframes.find((t) => t.target === "speed" && t.keyframes.length >= 2);
   const rateAt = (ms: number) =>
     track ? Math.max(0.05, sampleKeyframeTrack(track, ms) ?? clip.speed) : clip.speed;
+  const sourceStart = req.sourceStartSample ?? 0;
   const lower = Math.max(0, (clip.trimIn * srcRate) / 1000);
-  const upper = Math.min(channels[0]!.length, (clip.trimOut * srcRate) / 1000);
+  const upper = Math.min(sourceStart + channels[0]!.length, (clip.trimOut * srcRate) / 1000);
   const sample = (channel: Float32Array, position: number): number => {
     if (position < lower || position >= upper) return 0;
-    const i = Math.floor(position);
+    const i = Math.floor(position) - sourceStart;
     const a = channel[i] ?? 0;
-    return a + ((i + 1 < upper ? (channel[i + 1] ?? 0) : a) - a) * (position - i);
+    return (
+      a +
+      ((i + 1 + sourceStart < upper ? (channel[i + 1] ?? 0) : a) - a) * (position - sourceStart - i)
+    );
   };
   // Align ranges to the same hop grid; bounded pre-roll settles overlap search.
   const startSample = Math.round((req.offsetMs * sr) / 1000);

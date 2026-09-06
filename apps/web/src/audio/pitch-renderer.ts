@@ -1,4 +1,10 @@
-import { isMediaClip, type Track, type MediaClip, type StretchRequest } from "@movie-desk/core";
+import {
+  sourceOffsetForRamp,
+  isMediaClip,
+  type Track,
+  type MediaClip,
+  type StretchRequest,
+} from "@movie-desk/core";
 
 export const PITCH_CACHE_BYTES = 128 * 1024 * 1024;
 export const pitchCacheKey = (clip: MediaClip, sampleRate: number, revision = 0): string =>
@@ -63,9 +69,9 @@ export class PitchCache<T> {
   }
 }
 
-// One worker per job makes cancellation/error isolation explicit. Only one job
-// is admitted at a time; callers never queue unbounded cloned PCM.
-let queue: Promise<unknown> = Promise.resolve();
+// One worker per job makes cancellation/error isolation explicit. Termination
+// stops synchronous worker-side DSP immediately; stale jobs cannot block new jobs.
+
 export const pitchMainSlice = <T>(run: () => T): T => {
   const start = performance.now();
   try {
@@ -75,6 +81,36 @@ export const pitchMainSlice = <T>(run: () => T): T => {
     performance.clearMeasures("pitch-main-slice");
   }
 };
+// Bound concurrent source copies while allowing independent visible clips to
+// render. Aborted waiters leave the queue before allocating PCM.
+let activeJobs = 0;
+const waiting: (() => void)[] = [];
+const acquireJob = (signal?: AbortSignal): Promise<() => void> =>
+  new Promise((resolve, reject) => {
+    const abort = () => {
+      const index = waiting.indexOf(start);
+      if (index >= 0) waiting.splice(index, 1);
+      reject(new DOMException("Cancelled", "AbortError"));
+    };
+    const start = () => {
+      signal?.removeEventListener("abort", abort);
+      activeJobs++;
+      resolve(() => {
+        activeJobs--;
+        waiting.shift()?.();
+      });
+    };
+    if (signal?.aborted) {
+      abort();
+      return;
+    }
+    if (activeJobs < 2) start();
+    else {
+      waiting.push(start);
+      signal?.addEventListener("abort", abort, { once: true });
+    }
+  });
+
 const yieldMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 export const renderPitchInWorker = (
   req: StretchRequest,
@@ -82,9 +118,33 @@ export const renderPitchInWorker = (
 ): Promise<Float32Array[]> => {
   const run = async () => {
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
+    if (typeof Worker === "undefined") throw new Error("Pitch worker unavailable");
+    // Four pre-roll hops, overlap window and search margin in source time.
+    const marginMs = 250;
+    const lower = Math.max(
+      0,
+      Math.floor(
+        ((req.clip.trimIn +
+          sourceOffsetForRamp(req.clip, Math.max(0, req.offsetMs - marginMs)) -
+          marginMs) *
+          req.sourceSampleRate) /
+          1000,
+      ),
+    );
+    const upper = Math.ceil(
+      ((req.clip.trimIn +
+        sourceOffsetForRamp(
+          req.clip,
+          req.offsetMs + (req.outputSamples * 1000) / req.outputSampleRate + marginMs,
+        ) +
+        marginMs) *
+        req.sourceSampleRate) /
+        1000,
+    );
     const channels: Float32Array[] = [];
     // Copy in bounded blocks and transfer ownership, never detach decoded PCM.
-    for (const source of req.channels) {
+    for (const original of req.channels) {
+      const source = original.subarray(lower, upper);
       const copy = pitchMainSlice(() => new Float32Array(source.length));
       for (let at = 0; at < source.length; at += 65536) {
         pitchMainSlice(() => copy.set(source.subarray(at, at + 65536), at));
@@ -93,6 +153,7 @@ export const renderPitchInWorker = (
       }
       channels.push(copy);
     }
+    if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     return new Promise<Float32Array[]>((resolve, reject) => {
       const worker = new Worker(new URL("./pitch-worker.ts", import.meta.url));
       const cleanup = () => {
@@ -118,13 +179,23 @@ export const renderPitchInWorker = (
         cleanup();
         reject(new Error("Pitch worker failed"));
       };
-      worker.postMessage(
-        { ...req, channels, id: 1 },
-        channels.map((c) => c.buffer),
-      );
+      try {
+        worker.postMessage(
+          { ...req, channels, sourceStartSample: lower, id: 1 },
+          channels.map((c) => c.buffer),
+        );
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
     });
   };
-  const result = queue.then(run);
-  queue = result.catch(() => {});
-  return result;
+  return (async () => {
+    const release = await acquireJob(signal);
+    try {
+      return await run();
+    } finally {
+      release();
+    }
+  })();
 };

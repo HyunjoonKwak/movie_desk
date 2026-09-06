@@ -2,6 +2,38 @@ import { ALL_FORMATS, BufferSource, Input } from "mediabunny";
 import { expect, test } from "@playwright/test";
 import { configurePage, importMediaFiles, mediaCard } from "./support";
 
+// Track presentation duration, independent of packet duration: AAC packets
+// deliberately retain preroll/end padding outside the audio edit-list window.
+const audioPresentationSeconds = (bytes: Buffer): number => {
+  const children = (from: number, end: number) => {
+    const boxes: { at: number; end: number; type: string }[] = [];
+    for (let at = from; at + 8 <= end; ) {
+      const size = bytes.readUInt32BE(at);
+      if (size < 8 || at + size > end) throw new Error("Invalid fixture MP4 box");
+      boxes.push({ at, end: at + size, type: bytes.toString("ascii", at + 4, at + 8) });
+      at += size;
+    }
+    return boxes;
+  };
+  const moov = children(0, bytes.length).find((box) => box.type === "moov")!;
+  const movie = children(moov.at + 8, moov.end);
+  const mvhd = movie.find((box) => box.type === "mvhd")!;
+  const scale = bytes.readUInt32BE(mvhd.at + (bytes[mvhd.at + 8] === 1 ? 28 : 20));
+  for (const track of movie.filter((box) => box.type === "trak")) {
+    const entries = children(track.at + 8, track.end);
+    const mdia = entries.find((box) => box.type === "mdia")!;
+    const hdlr = children(mdia.at + 8, mdia.end).find((box) => box.type === "hdlr")!;
+    if (bytes.toString("ascii", hdlr.at + 16, hdlr.at + 20) !== "soun") continue;
+    const tkhd = entries.find((box) => box.type === "tkhd")!;
+    return (
+      (bytes[tkhd.at + 8] === 1
+        ? Number(bytes.readBigUInt64BE(tkhd.at + 36))
+        : bytes.readUInt32BE(tkhd.at + 28)) / scale
+    );
+  }
+  throw new Error("Export has no audio track");
+};
+
 const wav = (seconds: number, diagnostic = false): Buffer => {
   const frames = seconds * 48000;
   const out = Buffer.alloc(44 + frames * 4);
@@ -81,6 +113,8 @@ test("pitch toggle is one undo and exported duration matches the timeline", asyn
   const input = new Input({ source: new BufferSource(bytes), formats: ALL_FORMATS });
   const video = (await input.getPrimaryVideoTrack())!;
   const durationSec = await video.computeDuration();
+  const audioTrack = await input.getPrimaryAudioTrack();
+  const audioTrackDuration = audioTrack ? await audioTrack.computeDuration() : null;
   input.dispose();
   await file.saveAs(test.info().outputPath("pitch-aac-boundary.mp4"));
   expect(Math.abs(durationSec - 1)).toBeLessThanOrEqual(1 / 30);
@@ -103,6 +137,9 @@ test("pitch toggle is one undo and exported duration matches the timeline", asyn
     });
     return;
   }
+  expect(audioTrackDuration).not.toBeNull();
+  expect(audioTrackDuration!).toBeGreaterThanOrEqual(1); // all padding packets retained
+  expect(Math.abs(audioPresentationSeconds(bytes) - 1)).toBeLessThanOrEqual(1 / 30);
   const audio = await page.evaluate(
     async (data) => {
       const bytes = new Uint8Array(data);

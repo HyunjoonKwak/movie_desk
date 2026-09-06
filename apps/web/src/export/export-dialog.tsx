@@ -52,6 +52,7 @@ const formatSize = (megabytes: number): string => {
 };
 
 interface ExportedFile {
+  readonly pitchFallback?: boolean;
   readonly name: string;
   readonly preset: string;
   readonly destination: ExportDestination;
@@ -125,10 +126,16 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         exporterRef.current = exporter;
         const result = await exporter.start({ projectId, preset }, setProgress);
         const destination = await downloadBlob(result.blob, result.suggestedName);
-        files.push({ name: result.suggestedName, preset: label, destination });
+        files.push({
+          name: result.suggestedName,
+          preset: label,
+          destination,
+          pitchFallback: result.pitchFallback === true,
+        });
         measurement.record(destination.kind === "cancelled" ? "cancelled" : "success");
         if (destination.kind !== "cancelled") {
           toast.success(t("export.success", { name: result.suggestedName }));
+          if (result.pitchFallback) toast.info(t("export.pitchFallback"));
         }
         exporterRef.current = null;
       }
@@ -247,6 +254,9 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                   >
                     <div className="font-medium text-ink-1">{file.name}</div>
                     <div className="text-ink-3">{file.preset}</div>
+                    {file.pitchFallback && (
+                      <StateHint tone="info" text={t("export.pitchFallback")} />
+                    )}
                     {file.destination.kind === "file" && (
                       <div className="mt-1 flex items-center justify-between gap-2">
                         <span className="truncate text-ink-2" title={file.destination.path}>

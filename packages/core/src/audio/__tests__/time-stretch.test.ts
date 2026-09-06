@@ -120,3 +120,22 @@ describe("linked-channel WSOLA", () => {
     }
   });
 });
+
+it("supported ramps override an unsupported constant speed hint", async () => {
+  const { pitchHasUnsupportedRange } = await import("../time-stretch");
+  const c = {
+    ...clip(8),
+    keyframes: [
+      {
+        target: "speed",
+        keyframes: [
+          { at: 0, value: 0.25, easing: "linear" as const },
+          { at: 1000, value: 4, easing: "linear" as const },
+        ],
+      },
+    ],
+  };
+  expect(pitchHasUnsupportedRange(c)).toBe(false);
+  c.keyframes[0]!.keyframes[1]!.value = 5;
+  expect(pitchHasUnsupportedRange(c)).toBe(true);
+});

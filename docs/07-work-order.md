@@ -534,3 +534,24 @@ B′2 후속 점검: 동일 키 재연결·늦은 decode 결과 무효화, 재�
 | B′2 final | State | Gate |
 | --- | --- | --- |
 | Cache/source invalidation, live speed rescheduling, detached-audio mapping | PASS; ready for Claude review | `pnpm gate` 9/9; 778 unit tests (core 134, web 561, desktop 72, scripts 11), E2E 56; `docs/evaluations/2026-09-06-pitch-speed-final-gate.md` |
+
+### B′2 2라운드 리뷰 반영 (2026-09-06)
+
+`codex/b2-pitch-speed`를 C3 통합 `origin/main ac10c1d` 위로 rebase했다.
+충돌은 en/ko i18n 끝 append와 이 문서였으며 양쪽 키·메모를 보존했고
+리뷰 수정 전 parity 5/5 PASS를 확인했다. 기존 AAC 보상 `566e271`은
+`85628fb`, stale 재생·relink 보강 `bf5ce34`는 `27128d1`로 재작성됐다.
+
+H1 청크별 소스 구간 전송, H2 키별 취소·현재 스토어 guard, H3 실패 시
+varispeed 내보내기 및 완료 패널/토스트 안내, M1 즉시 재스케줄·20ms 페이드,
+M3 실제 렌더 상태 안내, M4 램프 범위 판정을 반영했다. M2 2개 worker 동시
+처리·취소 가능한 대기열과 모노 1회 복사도 반영했다. AAC는 이미 패킷 보존·
+edit list·오디오 길이/onset/tail 회귀 검증이 있었으며, 오디오 트랙 presentation
+길이 검사를 보강했다. 항목별 기존 반영 근거와 잔여 M5–M8·기타 LOW는
+[감사 문서](evaluations/2026-09-06-pitch-speed-audit.md)에 명시했다.
+
+10분 스테레오 오디오 내보내기 단계: 14.75s → 3.11s, 전송 4.608GB →
+237.7MB(자산의 1.032배); 영상 인코딩·디코드는 제외한 동일 환경 비교다.
+[최종 gate](evaluations/2026-09-06-pitch-speed-round2-gate.md) **9/9 PASS**,
+단위 **823**(core 135·web 605·desktop 72·scripts 11), Chromium E2E **57**.
+AAC 길이 1.00133s·onset 0.25154s, 미리보기 첫 소리 69.89ms·DSP 121.92ms.

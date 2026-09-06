@@ -87,3 +87,58 @@ it("keeps reverse fallback and interpolates fractional source samples", () => {
     ...resampleClipAudioRange(Float32Array.from([0, 1, 2, 3, 4, 5, 6, 7]), 1000, 1000, c, 0, 4),
   ]).toEqual([4, 3.5, 3, 2.5]);
 });
+
+it.each(["worker unavailable", "worker failed", "worker timed out"])(
+  "exports varispeed and records a notice on %s",
+  async (message) => {
+    vi.mocked(renderPitchInWorker).mockRejectedValueOnce(new Error(message));
+    const source = new Float32Array(4800).fill(0.25);
+    vi.stubGlobal(
+      "OfflineAudioContext",
+      class {
+        async decodeAudioData() {
+          return { sampleRate: 48000, numberOfChannels: 1, getChannelData: () => source };
+        }
+      },
+    );
+    const p = createEmptyProject();
+    const assetId = newId();
+    const clip: MediaClip = {
+      id: newId(),
+      assetId,
+      kind: "media",
+      start: 0,
+      duration: 100,
+      trimIn: 0,
+      trimOut: 100,
+      speed: 1,
+      preservePitch: true,
+      effects: [],
+      keyframes: [],
+    };
+    const project = {
+      ...p,
+      timeline: {
+        ...p.timeline,
+        duration: 100,
+        tracks: p.timeline.tracks.map((t, i) => (i === 0 ? { ...t, clips: [clip] } : t)),
+      },
+    };
+    const mixer = new ProjectAudioMixer(project, () => ({
+      id: assetId,
+      kind: "audio",
+      name: "tone",
+      mime: "audio/wav",
+      opfsPath: "fixture",
+      durationMs: 1000,
+      importedAt: 0,
+    }));
+    const chunks = [];
+    for await (const chunk of mixer.chunks({ chunkDurationMs: 50 })) chunks.push(chunk);
+    expect(mixer.pitchFallback).toBe(true);
+    expect(renderPitchInWorker).toHaveBeenCalledOnce();
+    expect(chunks).toHaveLength(2);
+    expect(chunks[0]!.channels[0][100]).toBeCloseTo(0.25);
+    expect(chunks[0]!.channels[1]).toEqual(chunks[0]!.channels[0]);
+  },
+);

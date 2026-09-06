@@ -83,6 +83,7 @@ export class WebCodecsExporter implements Exporter {
     canvas.height = preset.height;
     const compositor = new Compositor(canvas);
     let encoder: VideoEncoder | null = null;
+    let pitchFallback = false;
     try {
       compositor.resize(preset.width, preset.height);
       let virtualPlayheadMs = 0;
@@ -274,6 +275,7 @@ export class WebCodecsExporter implements Exporter {
           const message = err instanceof Error ? err.message : String(err);
           throw new Error(`Audio export failed: ${message}`, { cause: err });
         } finally {
+          pitchFallback = mixer.pitchFallback;
           mixer.dispose();
         }
       }
@@ -287,6 +289,7 @@ export class WebCodecsExporter implements Exporter {
 
       const name = sanitizeName(project.name) || "export";
       return {
+        pitchFallback,
         blob: new Blob([buffer], { type: "video/mp4" }),
         mime: "video/mp4",
         suggestedName: `${name}.mp4`,

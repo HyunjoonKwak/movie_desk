@@ -30,6 +30,7 @@ export interface ExportProgress {
 }
 
 export interface ExportResult {
+  pitchFallback?: boolean;
   readonly blob: Blob;
   readonly mime: string;
   readonly suggestedName: string;
