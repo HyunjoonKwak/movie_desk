@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Filter,
@@ -87,6 +87,7 @@ const NO_TRACKS: readonly Track[] = [];
 
 export function MediaBin() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const importDescriptionId = useId();
   const folderInputRef = useRef<HTMLInputElement>(null);
   const media = useProjectStore((s) => s.project.mediaLibrary);
   const projectId = useProjectStore((s) => s.project.id);
@@ -297,7 +298,7 @@ export function MediaBin() {
       // capture would otherwise retarget the click to this container).
       if (
         (e.target as HTMLElement).closest(
-          '[data-asset-card], [data-group-header], [data-state-hint], [data-testid="media-empty-hint"]',
+          "[data-asset-card], [data-group-header], [data-state-hint]",
         )
       )
         return;
@@ -629,7 +630,7 @@ export function MediaBin() {
   const [dismissedMissing, setDismissedMissing] = useState<string | null>(null);
   const missingSignature = JSON.stringify([projectId, missing.signature]);
   useEffect(() => {
-    setDismissedMissing((previous) => previous === missingSignature ? previous : null);
+    setDismissedMissing((previous) => (previous === missingSignature ? previous : null));
   }, [missingSignature]);
   const [pendingReveal, setPendingReveal] = useState<ID | null>(null);
   useLayoutEffect(() => {
@@ -865,12 +866,16 @@ export function MediaBin() {
             onClick={onChooseFiles}
             disabled={importing}
             data-testid="media-empty-hint"
+            data-state-hint
+            aria-describedby={importDescriptionId}
             aria-label={t("media.import")}
             className="mt-4 flex w-full flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-panel-2/40 p-4 text-left transition-colors hover:border-accent/55 hover:bg-panel-2 disabled:opacity-50"
           >
-            <span className="text-xs text-ink-2">{t("media.dropHere")}</span>
-            <span className="text-2xs text-ink-3">{t("media.browseHere")}</span>
-            <span className="mt-1 text-xs leading-5 text-ink-3">{t(MEDIA_HINT_KEYS.empty)}</span>
+            <span id={importDescriptionId} className="flex flex-col gap-1">
+              <span className="text-xs text-ink-2">{t("media.dropHere")}</span>
+              <span className="text-2xs text-ink-3">{t("media.browseHere")}</span>
+              <span className="mt-1 text-xs leading-5 text-ink-3">{t(MEDIA_HINT_KEYS.empty)}</span>
+            </span>
             <span className="mt-1 text-xs text-accent">{t("media.import")}</span>
           </button>
         )}

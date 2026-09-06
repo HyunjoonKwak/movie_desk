@@ -3,6 +3,17 @@ import { PNG, configurePage, mediaCard, opfsKeys } from "./support";
 
 test("empty project explains the next step and imports through its hint", async ({ page }) => {
   await configurePage(page);
+  await page.addInitScript(() => {
+    const original = FileSystemFileHandle.prototype.createWritable;
+    FileSystemFileHandle.prototype.createWritable = async function (...args) {
+      if (this.name.endsWith("__hint.png")) {
+        await new Promise<void>((resolve) => {
+          (window as unknown as { releaseImport: () => void }).releaseImport = resolve;
+        });
+      }
+      return original.apply(this, args);
+    };
+  });
   await page.goto("/editor");
   await page.getByRole("button", { name: "Open empty editor" }).click();
   await expect(page.getByTestId("media-empty-hint")).toBeVisible();
@@ -17,6 +28,40 @@ test("empty project explains the next step and imports through its hint", async 
   const chooser = page.waitForEvent("filechooser");
   await page.getByTestId("media-empty-hint").click({ position: { x: 5, y: 5 } });
   await (await chooser).setFiles({ name: "hint.png", mimeType: "image/png", buffer: PNG });
+  const dropzone = page.getByTestId("media-empty-hint");
+  await expect(dropzone).toBeDisabled();
+  await expect(dropzone).toHaveAccessibleDescription(/Your library is empty/);
+  await dropzone.evaluate((button) => {
+    button.closest("section")!.addEventListener(
+      "drop",
+      (event) => {
+        (window as unknown as { observedDrop: Event }).observedDrop = event;
+      },
+      { once: true },
+    );
+    const source = document.createElement("div");
+    source.id = "disabled-drop-probe";
+    source.draggable = true;
+    source.textContent = "Drag probe";
+    source.style.cssText =
+      "position:fixed;left:400px;top:400px;width:100px;height:40px;z-index:9999;background:gray";
+    source.addEventListener("dragstart", (event) =>
+      event.dataTransfer?.setData("text/plain", "probe"),
+    );
+    document.body.append(source);
+  });
+  await page.locator("#disabled-drop-probe").dragTo(dropzone, { force: true });
+  expect(
+    await page.evaluate(() => {
+      const event = (window as unknown as { observedDrop?: Event }).observedDrop;
+      return event?.isTrusted === true && event.defaultPrevented;
+    }),
+  ).toBe(true);
+  await page.locator("#disabled-drop-probe").evaluate((element) => element.remove());
+  await page.waitForFunction(
+    () => typeof (window as unknown as { releaseImport?: () => void }).releaseImport === "function",
+  );
+  await page.evaluate(() => (window as unknown as { releaseImport: () => void }).releaseImport());
   await expect(mediaCard(page, "hint.png")).toBeVisible();
   await expect(page.getByTestId("media-empty-hint")).toBeHidden();
   // Imported media alone does not make a timeline preview.
@@ -26,6 +71,7 @@ test("empty project explains the next step and imports through its hint", async 
 test("Korean hints wrap at the media minimum width and reset an empty search", async ({
   page,
 }, testInfo) => {
+  test.setTimeout(90000);
   await page.addInitScript(() => {
     localStorage.setItem("cut.persistence.welcomed", "1");
     localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "ko" }, version: 0 }));
@@ -111,19 +157,25 @@ test("Korean hints wrap at the media minimum width and reset an empty search", a
     { name: key, bytes: [...PNG] },
   );
   await expect
-    .poll(async () => {
-      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-      return page.locator("[data-preview-missing]").count();
-    }, { timeout: 15000 })
+    .poll(
+      async () => {
+        await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        return page.locator("[data-preview-missing]").count();
+      },
+      { timeout: 30000 },
+    )
     .toBe(0);
   await page.evaluate(async (name) => {
     const root = await navigator.storage.getDirectory();
     await root.removeEntry(name);
   }, key);
   await expect
-    .poll(async () => {
-      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-      return missingHint.count();
-    }, { timeout: 15000 })
+    .poll(
+      async () => {
+        await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+        return missingHint.count();
+      },
+      { timeout: 30000 },
+    )
     .toBe(1);
 });

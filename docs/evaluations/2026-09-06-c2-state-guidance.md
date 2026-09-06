@@ -45,9 +45,9 @@
 
 ## 확인 리뷰 후속
 
-- 음악 분석은 `assetId + opfsPath` 키의 모듈 Promise 캐시를 공유한다. 동시 안내·생성·비트 스냅 및 탭 재진입은 같은 분석 결과를 사용하고 null/예외는 캐시에서 제거해 재시도할 수 있다.
-- 음악 안내 effect는 자산 객체 대신 ID·경로·길이 값에 의존한다.
-- 점선 드롭존의 바깥 버튼에서 파일 선택기를 연다. 안내는 span이며 중첩 버튼이 없다.
+- 음악 분석은 `assetId + opfsPath + (sizeBytes ?? -1) + durationMs` 키의 모듈 Promise 캐시를 공유한다. 동시 안내·생성·비트 스냅 및 탭 재진입은 같은 분석 결과를 사용하고 null/예외는 캐시에서 제거해 재시도할 수 있다.
+- 음악 안내 effect와 tempo 비교는 자산 객체 대신 ID·경로·크기·길이 값에 의존한다. 같은 OPFS 경로의 재연결도 크기나 길이가 바뀌면 재분석하며, 캐시는 최근 사용한 4개만 유지한다.
+- 점선 드롭존의 바깥 버튼에서 파일 선택기를 연다. 안내는 span이며 중첩 버튼이 없다. 짧은 가져오기 이름과 aria-describedby로 전체 안내를 함께 제공하고 data-state-hint 규약을 사용한다.
 - 카드 reveal에 필요한 위치·DOM·그룹이 없으면 pending 상태를 해제한다. 카드 높이 좌표는 reveal과 마퀴가 `cardTop`을 공유한다.
 - 전체 분석 실패에는 부분 성공 문구를 함께 표시하지 않는다.
 - 미리보기 누락 안내는 첫 이름과 ‘외 n개’로 요약하고 최대 3줄로 제한해 pointer-events-none 영역의 스크롤 충돌을 없앴다.
@@ -56,9 +56,11 @@
 ## 검증과 화면
 
 - 순수 판정 12개: 상태·stale 선택·키 실존·모드/BPM 및 1,000회 progress 호출에서 후보 계산 0회를 검증한다.
-- 음악 캐시 4개: 동시·후속 호출 공유, ID/경로 분리, null 실패 재시도, 읽기/디코딩 예외 재시도.
+- 음악 캐시 6개: 동시·후속 호출 공유, ID/경로 분리, null 실패 재시도, 읽기/디코딩 예외 재시도, 같은 경로의 크기/길이 변경 재분석, 최근 4개 유지.
 - StateHint 렌더 3개: 액션 없음, disabled 버튼, 긴 한국어 파일명·줄바꿈·실패 접근성 역할을 검증한다.
 - Chromium E2E 2개: 빈 상태 가시성과 파일 가져오기; 한국어 최소 폭 검색 초기화·정상 편집 안내 부재·잠긴 트랙·누락 캔버스 크기 보존·이름 있는 카드 포커스·안내 닫기·복구 후 새 누락 안내 재표시.
+- Chromium에서 실제 가져오기의 OPFS 쓰기를 보류해 disabled 드롭존을 유지한 뒤, Playwright 마우스 드래그로 텍스트 payload를 해당 버튼 위에 놓아 브라우저가 생성한 trusted drop 이벤트의 조상 section 도달 및 preventDefault 처리를 확인했다; 쓰기 재개 후 정상 가져오기까지 통과한다. 스크린 리더 설명도 accessible description 단언으로 확인한다.
+- 재검사 E2E poll 제한은 30초로 두어 10초 FORCE_THROTTLE_MS에 여유를 둔다.
 - E2E는 명시적 locale, testid/role 단언과 폭 경계 <180px를 사용한다. 스크린샷은 문서 증빙용으로 생성한다.
 - 화면: 한국어 Chromium 1440×900, 미디어 minSize=12%(약 172px).
   [빈 편집기](assets/c2-state-guidance/ko-empty-min-width.png),
@@ -67,7 +69,7 @@
   [클립 있는 정상 편집](assets/c2-state-guidance/ko-normal-edit-min-width.png),
   [누락 미디어](assets/c2-state-guidance/ko-missing-min-width.png).
 
-최종 `pnpm gate` **9/9 PASS**: core 107·web 486·desktop 56·scripts 11(단위 합계 660), Chromium E2E 45개 통과, OSV 167개 패키지 취약점 0건, 프로덕션 빌드 성공.
+최종 `pnpm gate` **9/9 PASS**: core 107·web 488·desktop 56·scripts 11(단위 합계 662), Chromium E2E 45개 통과, OSV 167개 패키지 취약점 0건, 프로덕션 빌드 성공.
 최종 게이트의 상태 안내 E2E **2/2 PASS**를 확인하고 위 스크린샷 5장을 갱신했다; 변경된 드롭존과 누락 안내 화면을 시각 확인했다.
 빈 문구는 캔버스 안에서 줄바꿈되고 정상 편집/잠금에는 타임라인 안내 줄이 없으며, 누락 상태에서도 캔버스 좌표·크기 차이는 0이다.
 

@@ -59,7 +59,7 @@ export const generate = async (
   let music: MusicAnalysis | undefined;
   if (opts.musicAssetId) {
     const m = assets.find((a) => a.id === opts.musicAssetId);
-    if (m) music = (await analyzeMusic(m.id, m.opfsPath, m.durationMs)) ?? undefined;
+    if (m) music = (await analyzeMusic(m)) ?? undefined;
   }
   const minWindowMs = candidateWindowMs(opts.mode, music?.bpm);
 

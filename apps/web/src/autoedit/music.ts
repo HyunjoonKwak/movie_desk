@@ -1,4 +1,4 @@
-import type { ID, Ms } from "@movie-desk/core";
+import type { ID, Ms, MediaAsset } from "@movie-desk/core";
 import { detectBeatsFromBlob } from "@/ai/beat-detect";
 import { readMediaFile } from "@/persistence/opfs";
 import type { MusicAnalysis } from "./types";
@@ -106,20 +106,23 @@ const analyzeMusicUncached = async (
 // Share in-flight and completed analysis across the panel, generation and beat snap.
 // Retain only derived analysis; failed reads/decodes must be retryable after reconnect.
 const musicAnalyses = new Map<string, Promise<MusicAnalysis | null>>();
-export const analyzeMusic = (
-  assetId: ID,
-  opfsPath: string,
-  durationMs: Ms,
-): Promise<MusicAnalysis | null> => {
-  const key = JSON.stringify([assetId, opfsPath]);
+export type MusicSource = Pick<MediaAsset, "id" | "opfsPath" | "sizeBytes" | "durationMs">;
+export const analyzeMusic = (asset: MusicSource): Promise<MusicAnalysis | null> => {
+  const key = JSON.stringify([asset.id, asset.opfsPath, asset.sizeBytes ?? -1, asset.durationMs]);
   const cached = musicAnalyses.get(key);
-  if (cached) return cached;
-  const pending = analyzeMusicUncached(assetId, opfsPath, durationMs)
+  if (cached) {
+    musicAnalyses.delete(key);
+    musicAnalyses.set(key, cached);
+    return cached;
+  }
+  const pending = analyzeMusicUncached(asset.id, asset.opfsPath, asset.durationMs)
     .catch(() => null)
     .then((result) => {
       if (!result && musicAnalyses.get(key) === pending) musicAnalyses.delete(key);
       return result;
     });
   musicAnalyses.set(key, pending);
+  // Bound retained analysis across projects, keeping the four most recently used sources.
+  if (musicAnalyses.size > 4) musicAnalyses.delete(musicAnalyses.keys().next().value!);
   return pending;
 };

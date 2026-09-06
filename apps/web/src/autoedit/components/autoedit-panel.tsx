@@ -103,7 +103,14 @@ export function AutoEditPanel() {
   const musicAssetId = wiz.musicAssetId;
   const musicPath = musicAsset?.opfsPath;
   const musicDuration = musicAsset?.durationMs;
-  const [tempo, setTempo] = useState<{ assetId: ID; path: string; bpm: number } | null>(null);
+  const musicSize = musicAsset?.sizeBytes ?? -1;
+  const [tempo, setTempo] = useState<{
+    assetId: ID;
+    path: string;
+    size: number;
+    duration: number;
+    bpm: number;
+  } | null>(null);
   useEffect(() => {
     if (
       analysisRunning ||
@@ -115,17 +122,44 @@ export function AutoEditPanel() {
     )
       return;
     let cancelled = false;
-    void analyzeMusic(musicAssetId, musicPath, musicDuration)
+    void analyzeMusic({
+      id: musicAssetId,
+      opfsPath: musicPath,
+      sizeBytes: musicSize,
+      durationMs: musicDuration,
+    })
       .then((music) => {
-        if (!cancelled) setTempo({ assetId: musicAssetId, path: musicPath, bpm: music?.bpm ?? 0 });
+        if (!cancelled)
+          setTempo({
+            assetId: musicAssetId,
+            path: musicPath,
+            size: musicSize,
+            duration: musicDuration,
+            bpm: music?.bpm ?? 0,
+          });
       })
       .catch(() => {
-        if (!cancelled) setTempo({ assetId: musicAssetId, path: musicPath, bpm: 0 });
+        if (!cancelled)
+          setTempo({
+            assetId: musicAssetId,
+            path: musicPath,
+            size: musicSize,
+            duration: musicDuration,
+            bpm: 0,
+          });
       });
     return () => {
       cancelled = true;
     };
-  }, [analysisRunning, analysisSettled, stats.doneCount, musicAssetId, musicPath, musicDuration]);
+  }, [
+    analysisRunning,
+    analysisSettled,
+    stats.doneCount,
+    musicAssetId,
+    musicPath,
+    musicDuration,
+    musicSize,
+  ]);
   const guidance = useMemo(
     () =>
       stats.total === 0
@@ -139,7 +173,13 @@ export function AutoEditPanel() {
             },
             () => {
               // A newly selected music file must finish tempo analysis before a candidate verdict.
-              if (musicPath && (tempo?.assetId !== musicAssetId || tempo.path !== musicPath))
+              if (
+                musicPath &&
+                (tempo?.assetId !== musicAssetId ||
+                  tempo.path !== musicPath ||
+                  tempo.size !== musicSize ||
+                  tempo.duration !== musicDuration)
+              )
                 return null;
               return buildCandidates(
                 media,
@@ -156,6 +196,8 @@ export function AutoEditPanel() {
       analysisRunning,
       musicAssetId,
       musicPath,
+      musicSize,
+      musicDuration,
       tempo,
       media,
       entries,
@@ -234,7 +276,7 @@ export function AutoEditPanel() {
     const assetId = wiz.musicAssetId;
     const asset = assetId ? media.find((a) => a.id === assetId) : undefined;
     if (!asset) return;
-    const music = await analyzeMusic(asset.id, asset.opfsPath, asset.durationMs);
+    const music = await analyzeMusic(asset);
     if (!music) {
       toast.error(t("auto.musicAnalyzeFailed"));
       return;
