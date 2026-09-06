@@ -13,12 +13,12 @@ class MediaCatalog {
   #startupError;
   #workerError;
 
-  constructor(databasePath) {
+  constructor(databasePath, { readOnly = false } = {}) {
     if (typeof databasePath !== "string" || databasePath.length === 0) {
       throw new TypeError("databasePath must be a non-empty string");
     }
     this.#worker = new Worker(path.join(__dirname, "catalog-worker.cjs"), {
-      workerData: { databasePath },
+      workerData: { databasePath, readOnly },
     });
     this.#worker.on("message", (message) => this.#onMessage(message));
     this.#worker.on("error", (error) => {
@@ -31,6 +31,10 @@ class MediaCatalog {
         this.#failAll(this.#workerError);
       }
     });
+  }
+
+  snapshot(destination) {
+    return this.#request("snapshot", requiredAbsolutePath(destination, "snapshot destination"));
   }
 
   ready() {
@@ -53,6 +57,10 @@ class MediaCatalog {
       updatedAtMs: nonNegativeInteger(input?.updatedAtMs ?? now, "root.updatedAtMs"),
     };
     return this.#request("registerRoot", root);
+  }
+
+  recordSourceState(assetId, state) {
+    return this.#request("recordSourceState", { assetId: requiredText(assetId, "assetId"), state });
   }
 
   getRoot(rootId) {

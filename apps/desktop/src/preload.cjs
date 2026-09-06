@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("cutDesktop", {
   // process fetch has no CORS). Returns parseable text or null.
   fetchMusicCredits: async (url) => ipcRenderer.invoke("movie-desk:fetch-music-credits", url),
   media: {
+    chooseRelink: async (assetIds, folder) => ipcRenderer.invoke("movie-desk:media-relink-choose", assetIds, folder),
+    commitRelink: async (token, confirmed) => ipcRenderer.invoke("movie-desk:media-relink-commit", token, confirmed),
     // Returns an opaque, revocable media:// URL. Absolute source paths never
     // cross the context-isolated preload boundary.
     acquirePlaybackUrl: async (assetId) => ipcRenderer.invoke("movie-desk:media-acquire", assetId),

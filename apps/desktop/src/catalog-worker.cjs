@@ -8,9 +8,13 @@ let database;
 
 const open = () => {
   if (database) return;
-  database = new DatabaseSync(workerData.databasePath);
+  database = new DatabaseSync(workerData.databasePath, { readOnly: workerData.readOnly });
+  const integrity = database.prepare("PRAGMA quick_check").all();
+  if (integrity.some((row) => row.quick_check !== "ok")) {
+    throw Object.assign(new Error("Catalog integrity check failed"), { code: "CATALOG_CORRUPT" });
+  }
   database.exec("PRAGMA foreign_keys = ON");
-  database.exec("PRAGMA journal_mode = WAL");
+  if (!workerData.readOnly) database.exec("PRAGMA journal_mode = WAL");
   database.exec("PRAGMA synchronous = NORMAL");
   const currentVersion = database.prepare("PRAGMA user_version").get().user_version;
   if (currentVersion > SCHEMA_VERSION) {
@@ -18,6 +22,12 @@ const open = () => {
       new Error(`catalog schema ${currentVersion} is newer than supported ${SCHEMA_VERSION}`),
       { code: "CATALOG_TOO_NEW" },
     );
+  }
+  if (workerData.readOnly) {
+    if (currentVersion < 1) throw new Error("Not a Movie Desk catalog snapshot");
+    database.prepare("SELECT id FROM media_assets LIMIT 1").all();
+    database.prepare("SELECT id FROM source_roots LIMIT 1").all();
+    return;
   }
   database.exec(SCHEMA_SQL);
   if (currentVersion < SCHEMA_VERSION) {
@@ -31,6 +41,18 @@ const requireDatabase = () => {
 };
 
 const handlers = {
+  recordSourceState({ assetId, state }) {
+    requireDatabase().prepare("INSERT INTO asset_source_state VALUES (?, ?, ?) ON CONFLICT(asset_id) DO UPDATE SET state=excluded.state, checked_at_ms=excluded.checked_at_ms").run(assetId, state, Date.now());
+    return null;
+  },
+
+  snapshot(destination) {
+    const db = requireDatabase();
+    const rows = db.prepare("PRAGMA integrity_check").all();
+    if (rows.some((row) => row.integrity_check !== "ok")) throw new Error("Catalog integrity check failed");
+    db.prepare("VACUUM INTO ?").run(destination);
+    return destination;
+  },
   ready() {
     const db = requireDatabase();
     return {

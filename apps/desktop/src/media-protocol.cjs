@@ -24,6 +24,12 @@ class MediaLeaseRegistry {
     return this.#leases.delete(leaseId);
   }
 
+  releaseAsset(assetId) {
+    for (const [id, lease] of this.#leases) {
+      if (lease.assetId === assetId) this.#leases.delete(id);
+    }
+  }
+
   releaseAll() {
     this.#leases.clear();
   }

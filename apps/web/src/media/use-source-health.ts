@@ -2,8 +2,8 @@
 
 import type { MediaAsset } from "@movie-desk/core";
 import { useEffect, useMemo, useRef } from "react";
-import { type SourceHealth, isSourceMissing } from "./source/probe-source";
 import { FIRST_PASS_DELAY_MS, useSourceHealthStore } from "./source-health-store";
+import { type SourceHealth, isSourceMissing } from "./source/probe-source";
 
 // Keeps the library's source health current: probes new or changed assets
 // when the list changes, and re-probes everything when the window comes
@@ -39,9 +39,13 @@ export const useSourceHealth = (
       if (document.visibilityState === "hidden") return;
       void check(assets, { force: true, prune: true });
     };
+    const timer = assets.some((asset) => asset.sourceRef?.kind === "disk")
+      ? setInterval(recheck, 10_000)
+      : undefined;
     window.addEventListener("focus", recheck);
     document.addEventListener("visibilitychange", recheck);
     return () => {
+      clearInterval(timer);
       window.removeEventListener("focus", recheck);
       document.removeEventListener("visibilitychange", recheck);
     };

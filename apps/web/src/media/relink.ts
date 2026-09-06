@@ -6,14 +6,15 @@ import type { MediaAsset, SourceRotation } from "@movie-desk/core";
 import { audioVariantKey } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
 import { probeMedia } from "./probe";
+import { readDesktopMediaBridge } from "./source/desktop-media-bridge";
 import { makeImageThumb, makeVideoFilmstrip, makeVideoThumb } from "./thumbnail";
 import { extractWaveformPeaks } from "./waveform";
 
 // Relinking a missing asset: the user points at a file, we make sure it is
 // the same media (size first; the D1 rule is never to swap in a look-alike
 // silently), then write it back under the asset's own OPFS key so every clip
-// keeps working. Referenced desktop files relink through the catalog instead
-// and are out of scope here.
+// keeps working. Referenced desktop files relink through the catalog and
+// share the derived-preview builder below.
 
 export type RelinkVerdict =
   | { readonly ok: true }
@@ -25,7 +26,9 @@ export type RelinkVerdict =
     };
 
 export const canRelinkFromFile = (asset: MediaAsset): boolean =>
-  !asset.sourceRef || asset.sourceRef.kind === "opfs";
+  !asset.sourceRef ||
+  asset.sourceRef.kind === "opfs" ||
+  (asset.sourceRef.kind === "disk" && !!readDesktopMediaBridge()?.chooseRelink);
 
 export type RelinkPreviewClearResult = "not-needed" | "cleared" | "failed";
 
@@ -160,54 +163,64 @@ export const relinkAssetFromFile = async (
     const base = { sizeBytes: file.size, mime: file.type || asset.mime };
     if (identical) return { ...base, dropProxy: false, previewsStored: true };
     if (asset.proxyPath) await deps.remove(asset.proxyPath);
-    const probe = await deps.probe(file).catch(() => null);
-    const container =
-      probe && probe.kind !== "image" ? await deps.containerInfo(file).catch(() => null) : null;
-    const rotation = container?.rotation;
-    const visuals = await derivedFacts(file, probe?.kind ?? asset.kind, rotation, deps);
-    // New pictures go to the preview store; the record only clears any
-    // inline (legacy) ones. If the store fails, the patch carries them.
-    let stored = false;
-    try {
-      await deps.storePreviews(asset.id, {
-        ...(visuals.thumbDataUrl ? { thumb: visuals.thumbDataUrl } : {}),
-        ...(visuals.filmstripDataUrl
-          ? {
-              filmstrip: {
-                dataUrl: visuals.filmstripDataUrl,
-                frames: visuals.filmstripFrames ?? 0,
-              },
-            }
-          : {}),
-        ...(visuals.waveformPeaks ? { waveform: visuals.waveformPeaks } : {}),
-      });
-      stored = true;
-    } catch {
-      stored = false;
-    }
-    return {
-      ...base,
-      dropProxy: true,
-      ...(probe ? { durationMs: probe.durationMs } : {}),
-      ...(probe?.width !== undefined ? { width: probe.width } : {}),
-      ...(probe?.height !== undefined ? { height: probe.height } : {}),
-      ...(rotation !== undefined ? { rotation } : {}),
-      videoCodec: container?.videoCodec ?? null,
-      audioCodec: container?.audioCodec ?? null,
-      hasAudio:
-        container?.audioCodec != null || (visuals.waveformPeaks?.length ?? 0) > 0 ? true : null,
-      ...visuals,
-      previewsStored: stored,
-      ...(stored
-        ? {
-            thumbDataUrl: null,
-            filmstripDataUrl: null,
-            filmstripFrames: null,
-            waveformPeaks: null,
-          }
-        : {}),
-    };
+    return buildRelinkPreviews(asset, file, deps);
   } finally {
     release();
   }
+};
+
+// Shared by disk and OPFS relinks; writes only derived previews.
+export const buildRelinkPreviews = async (
+  asset: MediaAsset,
+  file: File,
+  deps: RelinkDependencies = defaultDependencies,
+): Promise<RelinkPatch> => {
+  const probe = await deps.probe(file).catch(() => null);
+  const container =
+    probe && probe.kind !== "image" ? await deps.containerInfo(file).catch(() => null) : null;
+  const rotation = container?.rotation;
+  const visuals = await derivedFacts(file, probe?.kind ?? asset.kind, rotation, deps);
+  // New pictures go to the preview store; the record only clears any
+  // inline (legacy) ones. If the store fails, the patch carries them.
+  let stored = false;
+  try {
+    await deps.storePreviews(asset.id, {
+      ...(visuals.thumbDataUrl ? { thumb: visuals.thumbDataUrl } : {}),
+      ...(visuals.filmstripDataUrl
+        ? {
+            filmstrip: {
+              dataUrl: visuals.filmstripDataUrl,
+              frames: visuals.filmstripFrames ?? 0,
+            },
+          }
+        : {}),
+      ...(visuals.waveformPeaks ? { waveform: visuals.waveformPeaks } : {}),
+    });
+    stored = true;
+  } catch {
+    stored = false;
+  }
+  return {
+    sizeBytes: file.size,
+    mime: file.type || asset.mime,
+    dropProxy: true,
+    ...(probe ? { durationMs: probe.durationMs } : {}),
+    ...(probe?.width !== undefined ? { width: probe.width } : {}),
+    ...(probe?.height !== undefined ? { height: probe.height } : {}),
+    ...(rotation !== undefined ? { rotation } : {}),
+    videoCodec: container?.videoCodec ?? null,
+    audioCodec: container?.audioCodec ?? null,
+    hasAudio:
+      container?.audioCodec != null || (visuals.waveformPeaks?.length ?? 0) > 0 ? true : null,
+    ...visuals,
+    previewsStored: stored,
+    ...(stored
+      ? {
+          thumbDataUrl: null,
+          filmstripDataUrl: null,
+          filmstripFrames: null,
+          waveformPeaks: null,
+        }
+      : {}),
+  };
 };

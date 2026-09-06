@@ -1,4 +1,4 @@
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS source_roots (
@@ -27,6 +27,12 @@ CREATE TABLE IF NOT EXISTS media_assets (
   created_at_ms INTEGER NOT NULL,
   updated_at_ms INTEGER NOT NULL,
   UNIQUE (root_id, relative_path_key)
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS asset_source_state (
+  asset_id TEXT PRIMARY KEY REFERENCES media_assets(id) ON DELETE CASCADE,
+  state TEXT NOT NULL,
+  checked_at_ms INTEGER NOT NULL
 ) STRICT;
 
 CREATE INDEX IF NOT EXISTS media_assets_root_inode

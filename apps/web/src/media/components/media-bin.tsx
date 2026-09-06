@@ -82,6 +82,9 @@ import {
 import { MEDIA_HINT_KEYS, mediaGuidance } from "@/media/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
+import { type DesktopRelinkCandidate, chooseDesktopRelink, commitDesktopRelink, matchDesktopRelinkRows } from "@/media/desktop-relink";
+import { DesktopRelinkDialog } from "./desktop-relink-dialog";
+
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
 const NO_COLLECTIONS: readonly MediaCollection[] = [];
 const NO_TRACKS: readonly Track[] = [];
@@ -96,6 +99,7 @@ export function MediaBin() {
   const removeMediaAsset = useProjectStore((s) => s.removeMediaAsset);
   const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
   const relinkInputRef = useRef<HTMLInputElement>(null);
+  const [relinkRows, setRelinkRows] = useState<DesktopRelinkCandidate[] | null>(null);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
@@ -450,14 +454,62 @@ export function MediaBin() {
     },
     [handleDelete],
   );
-  const startRelink = useCallback((asset: MediaAsset) => {
-    setRelinking(asset);
-    const input = relinkInputRef.current;
-    if (!input) return;
-    // Set imperatively: the chooser opens before the state above has rendered.
-    input.accept = `${asset.kind}/*`;
-    input.click();
-  }, []);
+  const applyDesktopRelink = useCallback(
+    async (row: DesktopRelinkCandidate, confirmed = true) => {
+      try {
+        const asset = useProjectStore
+          .getState()
+          .project.mediaLibrary.find((item) => item.id === row.assetId);
+        const patch = await commitDesktopRelink(row, confirmed, asset);
+        await clearStalePreviewsAfterFailedStore(patch.previewsStored, () =>
+          deleteAssetPreviews([row.assetId]),
+        );
+        usePreviewStore.getState().forget([row.assetId]);
+        relinkMediaAsset(row.assetId as ID, patch);
+        toast.success(t("media.relinked", { name: row.name ?? row.relativePath }));
+        return true;
+      } catch (error) {
+        toast.error(
+          `${t("media.relinkFailed")}: ${error instanceof Error ? error.message : error}`,
+        );
+        return false;
+      }
+    },
+    [relinkMediaAsset, t],
+  );
+
+  const startRelink = useCallback(
+    (asset: MediaAsset) => {
+      if (asset.sourceRef?.kind === "disk") {
+        void chooseDesktopRelink([asset.id])
+          .then(([row]) => {
+            if (!row) return;
+            if (row.verdict === "identical") {
+              void applyDesktopRelink(row, false);
+              return;
+            }
+            toast.warning(t("media.relinkDifferentFingerprint"), {
+              duration: 15_000,
+              action: {
+                label: t("media.relinkAnyway"),
+                onClick: () => {
+                  void applyDesktopRelink(row, true);
+                },
+              },
+            });
+          })
+          .catch(() => toast.error(t("media.relinkFailed")));
+        return;
+      }
+      setRelinking(asset);
+      const input = relinkInputRef.current;
+      if (!input) return;
+      // Set imperatively: the chooser opens before the state above has rendered.
+      input.accept = `${asset.kind}/*`;
+      input.click();
+    },
+    [applyDesktopRelink, t],
+  );
 
   const onRelinkFileChosen = useCallback(
     (file: File | undefined) => {
@@ -695,6 +747,35 @@ export function MediaBin() {
           </button>
         </div>
       </div>
+
+      {media.some((asset) => asset.sourceRef?.kind === "disk" && sourceHealth[asset.id]) && (
+        <button
+          type="button"
+          className="btn-ghost m-2 text-xs"
+          onClick={() => {
+            const assets = media.filter(
+              (asset) => asset.sourceRef?.kind === "disk" && sourceHealth[asset.id],
+            );
+            void chooseDesktopRelink(
+              assets.map((asset) => asset.id),
+              true,
+            )
+              .then((rows) => {
+                if (rows.length) setRelinkRows(matchDesktopRelinkRows(assets, rows));
+              })
+              .catch(() => toast.error(t("media.relinkFailed")));
+          }}
+        >
+          {t("media.relinkFolder")}
+        </button>
+      )}
+      {relinkRows && (
+        <DesktopRelinkDialog
+          rows={relinkRows}
+          onClose={() => setRelinkRows(null)}
+          onCommit={applyDesktopRelink}
+        />
+      )}
 
       <ImportProgress />
       <ImportFailures onRetry={importFiles} />

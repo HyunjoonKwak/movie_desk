@@ -2,12 +2,14 @@ import { withoutInlinePreviews } from "@/media/inline-previews";
 import type { ID, MediaAsset, Ms, SourceRotation } from "@movie-desk/core";
 
 export interface RelinkAssetPatch {
+  readonly sourceImageMetadata?: MediaAsset["sourceImageMetadata"] | null;
+  readonly sourceRef?: MediaAsset["sourceRef"];
   readonly sizeBytes: number;
   readonly mime: string;
   readonly dropProxy: boolean;
   readonly durationMs?: number;
-  readonly width?: number;
-  readonly height?: number;
+  readonly width?: number | null;
+  readonly height?: number | null;
   readonly rotation?: SourceRotation;
   // null clears the field (the new file has none); undefined leaves it.
   readonly videoCodec?: string | null;
@@ -127,11 +129,13 @@ export const createMediaActions = <S extends ProjectMutating>(
             ...(patch.dropProxy ? (withoutProxy as MediaAsset) : a),
             sizeBytes: patch.sizeBytes,
             mime: patch.mime,
+            ...(patch.sourceRef ? { sourceRef: patch.sourceRef } : {}),
             ...(patch.durationMs !== undefined ? { durationMs: patch.durationMs } : {}),
-            ...(patch.width !== undefined ? { width: patch.width } : {}),
-            ...(patch.height !== undefined ? { height: patch.height } : {}),
             ...(patch.rotation !== undefined ? { rotation: patch.rotation } : {}),
           };
+          next = withNullable(next, "width", patch.width);
+          next = withNullable(next, "height", patch.height);
+          next = withNullable(next, "sourceImageMetadata", patch.sourceImageMetadata);
           next = withNullable(next, "videoCodec", patch.videoCodec);
           next = withNullable(next, "audioCodec", patch.audioCodec);
           next = withNullable(next, "hasAudio", patch.hasAudio);

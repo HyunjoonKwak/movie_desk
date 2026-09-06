@@ -64,6 +64,16 @@ const handlers = {
     requireMacOS("inspect");
     const sourcePath = absoluteInputPath(input.path, "input.path");
     await requireReadableFile(sourcePath);
+    const extension = path.extname(sourcePath).toLowerCase();
+    const kind = /\.(mp4|mov|m4v|webm|mkv|avi)$/.test(extension) ? "video"
+      : /\.(mp3|wav|m4a|aac|flac|ogg|aiff)$/.test(extension) ? "audio" : "image";
+    if (kind !== "image") {
+      const metadata = await inspectSpotlightMetadata(sourcePath);
+      const seconds = nullableNumber(metadata.get("kMDItemDurationSeconds"));
+      return { kind, durationMs: seconds === null ? null : Math.round(seconds * 1000),
+        width: nullableNumber(metadata.get("kMDItemPixelWidth")),
+        height: nullableNumber(metadata.get("kMDItemPixelHeight")) };
+    }
     const { stdout } = await runExecutable("/usr/bin/sips", [
       "-g",
       "pixelWidth",
@@ -238,6 +248,9 @@ const runExecutable = (executable, args) =>
 
 const inspectSpotlightMetadata = async (sourcePath) => {
   const keys = [
+    "kMDItemDurationSeconds",
+    "kMDItemPixelWidth",
+    "kMDItemPixelHeight",
     "kMDItemContentCreationDate",
     "kMDItemLatitude",
     "kMDItemLongitude",

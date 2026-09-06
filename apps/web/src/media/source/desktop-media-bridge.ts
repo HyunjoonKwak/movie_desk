@@ -8,6 +8,8 @@ export interface DesktopMediaBridge {
   acquirePlaybackUrl(assetId: string): Promise<unknown>;
   releasePlaybackUrl(leaseId: string): Promise<unknown>;
   sourceState(assetId: string): Promise<unknown>;
+  chooseRelink?: (assetIds: readonly string[], folder: boolean) => Promise<unknown>;
+  commitRelink?: (token: string, confirmed: boolean) => Promise<unknown>;
   importHeicFile?: (file: File) => Promise<unknown>;
 }
 

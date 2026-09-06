@@ -28,9 +28,9 @@ afterEach(async () => {
 });
 
 describe("MediaCatalog", () => {
-  it("opens WAL schema version 1 in its worker", async () => {
+  it("opens WAL schema version 2 in its worker", async () => {
     const catalog = await createCatalog();
-    assert.deepEqual(await catalog.ready(), { schemaVersion: 1, journalMode: "wal" });
+    assert.deepEqual(await catalog.ready(), { schemaVersion: 2, journalMode: "wal" });
   });
 
   it("refuses to overwrite a catalog created by a newer app", async () => {

@@ -109,3 +109,82 @@ test("a missing badge survives the preview checking only the clip under the play
   await page.waitForTimeout(1_000);
   await expect(mediaCard(page, "other.png").locator("[data-missing]")).toBeVisible();
 });
+
+test("desktop same-size fingerprint mismatch waits for explicit relink confirmation", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    const sourceRef = {
+      kind: "disk",
+      version: 1,
+      rootId: "r",
+      rootSnapshot: {},
+      relativePath: "photo.heic",
+      sizeBytes: 8,
+      modifiedAtMs: 1,
+      quickHash: "sha256:old",
+    };
+    const host = window as unknown as { cutDesktop: unknown; relinkConfirmed?: boolean };
+    host.cutDesktop = {
+      isDesktop: true,
+      media: {
+        acquirePlaybackUrl: async () => ({ state: "offline" }),
+        releasePlaybackUrl: async () => true,
+        sourceState: async () => ({ state: "offline" }),
+        importHeicFile: async () => ({
+          ok: true,
+          asset: {
+            id: "disk-photo",
+            name: "photo.heic",
+            kind: "image",
+            mime: "image/heic",
+            durationMs: 5000,
+            opfsPath: "disk-v1/disk-photo",
+            sourceRef,
+            sizeBytes: 8,
+            sourceImageMetadata: {},
+            thumbDataUrl: "data:image/jpeg;base64,/9j/2Q==",
+            importedAt: 1,
+          },
+        }),
+        chooseRelink: async () => [
+          {
+            assetId: "disk-photo",
+            token: "selection",
+            name: "copy.heic",
+            relativePath: "photo.heic",
+            verdict: "fingerprint",
+            sizeBytes: 8,
+            expectedSizeBytes: 8,
+          },
+        ],
+        commitRelink: async (_token: string, confirmed: boolean) => {
+          host.relinkConfirmed = confirmed;
+          return {
+            assetId: "disk-photo",
+            identical: false,
+            mime: "image/heic",
+            sourceRef: { ...sourceRef, quickHash: "sha256:new" },
+          };
+        },
+      },
+    };
+  });
+  await page.goto("/editor");
+  await importMediaFiles(page, { name: "photo.heic", mimeType: "image/heic", buffer: PNG });
+  const card = await revealMediaCard(page, "photo.heic");
+  await expect(card.locator("[data-missing]")).toBeVisible({ timeout: 15_000 });
+  await card.hover();
+  await page.locator("[data-relink]").click();
+  await expect(
+    page.getByText("Different or unknown fingerprint — confirmation required", { exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as { relinkConfirmed?: boolean }).relinkConfirmed),
+  ).toBeUndefined();
+  await page.getByRole("button", { name: "Relink anyway" }).click();
+  await expect(page.getByText('Relinked "copy.heic"', { exact: true })).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as unknown as { relinkConfirmed?: boolean }).relinkConfirmed),
+  ).toBe(true);
+});

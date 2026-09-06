@@ -837,4 +837,12 @@ export const en = {
     "snap.reviewCleanup": "Review snapshots to delete",
     "snap.deleteReviewed": "Delete listed snapshots",
     "snap.cleanupCancel": "Cancel cleanup",
+    "media.relinkFolder": "Reconnect missing files from a folder…",
+    "media.relinkFolderDescription": "Exact relative paths are shown below. Different fingerprints will replace the reference only after you confirm. Originals are never moved or overwritten.",
+    "media.relinkDone": "Connected",
+    "media.relinkSameFingerprint": "Same fingerprint",
+    "media.relinkDifferentFingerprint": "Different or unknown fingerprint — confirmation required",
+    "media.relinkUnavailable": "Unavailable — skipped",
+    "media.relinkClose": "Close",
+    "media.relinkConfirmBatch": "Confirm and connect listed files",
 } as const;

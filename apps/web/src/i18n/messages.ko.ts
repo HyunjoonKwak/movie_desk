@@ -835,4 +835,12 @@ export const ko = {
     "snap.reviewCleanup": "삭제할 스냅샷 검토",
     "snap.deleteReviewed": "목록의 스냅샷 삭제",
     "snap.cleanupCancel": "정리 취소",
+    "media.relinkFolder": "폴더에서 누락 파일 다시 연결…",
+    "media.relinkFolderDescription": "정확한 상대 경로의 후보입니다. 지문이 다른 파일도 아래 확인 버튼을 누르면 참조가 바뀝니다. 원본은 이동하거나 덮어쓰지 않습니다.",
+    "media.relinkDone": "연결됨",
+    "media.relinkSameFingerprint": "동일한 지문",
+    "media.relinkDifferentFingerprint": "지문이 다르거나 불명확함 — 확인 필요",
+    "media.relinkUnavailable": "사용할 수 없음 — 건너뜀",
+    "media.relinkClose": "닫기",
+    "media.relinkConfirmBatch": "목록 확인 후 연결",
 } as const;
