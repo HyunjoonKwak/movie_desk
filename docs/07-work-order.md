@@ -490,6 +490,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |
 | B'1 프레임·수치 정밀 입력 감사 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 3라운드 완료, main 통합(dcfd9ca) | `codex/b1-precision-input` · [감사·적용 범위](evaluations/2026-09-06-precision-input-audit.md), [전체 gate](evaluations/2026-09-06-precision-input-gate.md). 챕터 동일 초 중복·키보드 undo·제스처 리베이스·Yjs 종료 flush 확인 리뷰 반영, 공용 NDF 입력·인스펙터/변형/키프레임 값/플레이헤드 적용. `pnpm gate` 9/9 PASS(단위 739·Chromium E2E 52), 한국어 화면 확인. 잔여 P1/P2는 감사 문서에 명시 |
 | C3 첫 완성률 측정 | Codex 구현 · Claude 감독·리뷰 |  구현·리뷰 4라운드 완료, main 통합(59a2ef7); B7 도그푸딩에서 리포트 확인 대기 | `codex/c3-completion-funnel` · 로컬 옵트인 Dexie 로그, baseline 제외 퍼널·복구 결과·JSON 다운로드·삭제. [결정](decisions/2026-09-06-first-completion-metric.md). 2라운드 gate 9/9 PASS(단위 779·E2E 55), 1,000자산 로그 15행·최초 start/import 생존. B7에서 측정 켜고 새 프로젝트 완주 후 리포트 확인 |
+| B'2 피치 보존 속도 | Codex 구현 · Claude 감독·리뷰(3라운드 마무리는 Claude) | 구현·리뷰 3라운드 완료, main 통합(29987f7) | `claude/b2-pitch-speed` · 자체 WSOLA(외부 의존 없음, `packages/core/src/audio/time-stretch.ts`), 옵트인 `preservePitch`(기존 프로젝트 동작 불변), 워커 렌더·창 단위 전송·128MiB LRU, 속도 섹션 토글·상태 힌트, 내보내기 믹서 적용·varispeed 폴백, AAC priming/preroll edit list 보정(기존 결함) + 보정 실패 강등 안내. [감사](evaluations/2026-09-06-pitch-speed-audit.md), [결정](decisions/2026-09-06-pitch-preserving-speed.md). 10분 내보내기 14.75→3.11초. 남은 후순위: 상관 서브샘플링·30초 경계 위상 지표·worker 재사용·측정 분리·detachAudio volume 키프레임(B'3) |
 
 ### C3 구현 메모 (2026-09-06)
 
@@ -534,6 +535,8 @@ B′2 후속 점검: 동일 키 재연결·늦은 decode 결과 무효화, 재�
 | B′2 final | State | Gate |
 | --- | --- | --- |
 | Cache/source invalidation, live speed rescheduling, detached-audio mapping | PASS; ready for Claude review | `pnpm gate` 9/9; 778 unit tests (core 134, web 561, desktop 72, scripts 11), E2E 56; `docs/evaluations/2026-09-06-pitch-speed-final-gate.md` |
+
+- 2026-09-06 Claude: B'2 3라운드는 Codex가 gate 9/9까지 마친 뒤 사용량 한도로 커밋하지 못해, 미커밋 변경을 읽기 전용으로 가져와 `b0e7b03`으로 커밋했다(AAC 보정 측정 실패 시 강등·벤치 baseline `27128d1`·미사용 키 제거·창 기준 어드미션·trimIn+램프 창 테스트). 확인 리뷰에서 mp4-writer의 remux 폴백이 모든 오디오 내보내기에서 패킷 전량을 보관하는 문제를 찾아 `29987f7`로 제거했다(예약 누락은 명확한 오류로 실패, 인코드 루프 타임스탬프 단언). Claude 검증 core 135·web 609·desktop 72·E2E 28, production build 통과 후 main 통합.
 
 ### B′2 2라운드 리뷰 반영 (2026-09-06)
 
