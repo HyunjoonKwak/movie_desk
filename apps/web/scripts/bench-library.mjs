@@ -31,6 +31,7 @@ const positive = (name, fallback) => {
 const TOTAL = positive("assets", "1000");
 const VIDEOS = Math.min(positive("videos", "200"), TOTAL);
 const OUT = arg("out", null);
+const FUNNEL = arg("funnel", "off") === "on";
 const BASE = arg("url", "http://127.0.0.1:3000");
 
 const PNG = Buffer.from(
@@ -63,7 +64,8 @@ const untilAtLeast = async (read, target, timeoutMs) => {
 const browser = await chromium.launch({ channel: "chrome" });
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
 const page = await context.newPage();
-await page.addInitScript(() => {
+await page.addInitScript((funnel) => {
+  localStorage.setItem("movie-desk.funnel.enabled.v1", funnel ? "1" : "0");
   localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "en" }, version: 0 }));
   localStorage.setItem("cut.persistence.welcomed", "1");
   sessionStorage.setItem("bench.reload", "1");
@@ -76,7 +78,7 @@ await page.addInitScript(() => {
     stats.fileOpens += 1;
     return getFile.apply(this, args);
   };
-});
+}, FUNNEL);
 
 const shownCount = () =>
   page.getByTestId("media-count").evaluate((element) => Number(element.textContent?.split("/")[0]));
@@ -143,7 +145,7 @@ const untilStable = async (read, { settleMs = 1500, timeoutMs = 600_000 } = {}) 
   return { value: last, elapsed: lastChange - start };
 };
 
-const result = { assets: TOTAL, videos: VIDEOS };
+const result = { assets: TOTAL, videos: VIDEOS, funnel: FUNNEL };
 try {
   await page.goto(`${BASE}/editor`);
   const startInput = page.getByTestId("new-project-start").getByTestId("media-file-input");
@@ -173,23 +175,31 @@ try {
   const search = page.getByPlaceholder("Search media…");
   await page.getByRole("button", { name: "Filters" }).click();
   const count = page.getByTestId("media-count");
-  t0 = performance.now();
-  await search.fill("clip-01");
-  await count.filter({ hasText: /^\d+\/\d+$/ }).waitFor();
-  await page.waitForFunction(
-    (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
-    TOTAL,
-  );
-  result.searchMs = performance.now() - t0;
-  await search.fill("");
-  t0 = performance.now();
-  await page.getByLabel("Length").selectOption("short"); // videos only; images have no length
-  await page.waitForFunction(
-    (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
-    TOTAL,
-  );
-  result.filterMs = performance.now() - t0;
-  await page.getByRole("button", { name: "Reset", exact: true }).click();
+  result.searchRuns = [];
+  result.filterRuns = [];
+  for (let run = 0; run < 5; run++) {
+    t0 = performance.now();
+    await search.fill("clip-01");
+    await count.filter({ hasText: /^\d+\/\d+$/ }).waitFor();
+    await page.waitForFunction(
+      (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
+      TOTAL,
+    );
+    result.searchRuns.push(performance.now() - t0);
+    await search.fill("");
+    await untilAtLeast(shownCount, TOTAL, 5000);
+    t0 = performance.now();
+    await page.getByLabel("Length").selectOption("short");
+    await page.waitForFunction(
+      (n) => !document.querySelector('[data-testid="media-count"]')?.textContent?.startsWith(`${n}/`),
+      TOTAL,
+    );
+    result.filterRuns.push(performance.now() - t0);
+    await page.getByRole("button", { name: "Reset", exact: true }).click();
+    await untilAtLeast(shownCount, TOTAL, 5000);
+  }
+  result.searchMs = [...result.searchRuns].sort((a, b) => a - b)[2];
+  result.filterMs = [...result.filterRuns].sort((a, b) => a - b)[2];
 
   // 4. Source-health pass on window focus: every asset opens its OPFS file once.
   await page.waitForTimeout(11_000); // past the forced-pass throttle
@@ -273,6 +283,20 @@ try {
   await nameInput.press("Enter");
   await page.getByText(/^Saved/).waitFor();
   result.renameToSavedMs = performance.now() - t0;
+  result.funnelRows = await page.evaluate(async () => {
+    const databases = await indexedDB.databases();
+    if (!databases.some((db) => db.name === "movie-desk.funnel.v1")) return 0;
+    return new Promise((resolveRows, reject) => {
+      const open = indexedDB.open("movie-desk.funnel.v1");
+      open.onerror = () => reject(open.error);
+      open.onsuccess = () => {
+        const db = open.result;
+        const request = db.transaction("rows").objectStore("rows").count();
+        request.onsuccess = () => { db.close(); resolveRows(request.result); };
+        request.onerror = () => { db.close(); reject(request.error); };
+      };
+    });
+  });
 } finally {
   await browser.close();
 }

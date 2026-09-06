@@ -1,4 +1,5 @@
 "use client";
+import { recordRecovery } from "@/lib/funnel/collector";
 import { useT } from "@/i18n/use-t";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -20,11 +21,15 @@ export function DesktopRelinkDialog({
     () => defaultDesktopRelinkSelection(rows),
   );
   const pending = selectedDesktopRelinkRows(rows, selected, done);
+  const close = () => {
+    if (done.size < rows.length) recordRecovery("relink", "abandoned");
+    onClose();
+  };
   return (
     <Dialog.Root
       open
       onOpenChange={(open) => {
-        if (!open && !busy) onClose();
+        if (!open && !busy) close();
       }}
     >
       <Dialog.Portal>
@@ -67,7 +72,7 @@ export function DesktopRelinkDialog({
             ))}
           </ul>
           <div className="flex justify-end gap-2">
-            <button type="button" className="btn-ghost" disabled={busy} onClick={onClose}>
+            <button type="button" className="btn-ghost" disabled={busy} onClick={close}>
               {t("media.relinkClose")}
             </button>
             <button

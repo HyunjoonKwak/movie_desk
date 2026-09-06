@@ -1,5 +1,6 @@
 "use client";
 
+import { trackImportRetry, abandonImportFailures } from "@/lib/funnel/import-retry";
 import { AlertTriangle, ChevronDown, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/cn";
@@ -31,7 +32,7 @@ export function ImportFailures(props: {
   const retry = (selected: typeof failures) => {
     if (useImportProgressStore.getState().active) return;
     remove(selected.map((failure) => failure.id));
-    void props.onRetry(selected.map((failure) => failure.candidate));
+    void trackImportRetry(() => props.onRetry(selected.map((failure) => failure.candidate)));
   };
 
   return (
@@ -59,7 +60,7 @@ export function ImportFailures(props: {
         <button
           type="button"
           className="rounded px-1 py-0.5 text-ink-3 hover:text-ink-1"
-          onClick={clear}
+          onClick={() => { abandonImportFailures(failures.length); clear(); }}
           disabled={importActive}
         >
           {t("media.dismissFailures")}

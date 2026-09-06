@@ -1,5 +1,7 @@
 "use client";
 
+import { FunnelControls } from "@/lib/funnel/report-dialog";
+import { recordNewFunnelProject } from "./new-project-start-state";
 import { useT } from "@/i18n/use-t";
 import {
   ProjectVersionError,
@@ -96,6 +98,7 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
 
   const onNew = async () => {
     const fresh = createEmptyProject({ name: t("project.untitled") });
+    recordNewFunnelProject(fresh.id);
     loadProject(fresh);
     await upsertProject(fresh);
     await setActiveProjectId(fresh.id);
@@ -171,7 +174,7 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[480px] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-2xl">
+        <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(480px,calc(100vw-24px))] max-h-[90dvh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-2xl">
           <div className="flex items-center justify-between">
             <Dialog.Title className="text-base font-medium text-ink-1">
               {t("project.menu")}
@@ -212,6 +215,8 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
               }}
             />
           </div>
+
+          <FunnelControls />
 
           <ul className="mt-4 max-h-72 space-y-1 overflow-y-auto">
             {rows.length === 0 && (

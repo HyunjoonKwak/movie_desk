@@ -1,0 +1,774 @@
+{
+  "assets": 1000,
+  "videos": 200,
+  "funnel": false,
+  "importMs": 7443.580583999999,
+  "importPerAssetMs": 7.443580583999999,
+  "domCardsAfterImport": 16,
+  "heapAfterImport": 48187115,
+  "fileOpensDuringImport": 2886,
+  "libraryRowBytes": 244659,
+  "libraryJsonComposition": {
+    "id": {
+      "bytes": 20000,
+      "assets": 1000
+    },
+    "name": {
+      "bytes": 23800,
+      "assets": 1000
+    },
+    "kind": {
+      "bytes": 15000,
+      "assets": 1000
+    },
+    "mime": {
+      "bytes": 19000,
+      "assets": 1000
+    },
+    "durationMs": {
+      "bytes": 18000,
+      "assets": 1000
+    },
+    "width": {
+      "bytes": 10400,
+      "assets": 1000
+    },
+    "height": {
+      "bytes": 11200,
+      "assets": 1000
+    },
+    "opfsPath": {
+      "bytes": 41800,
+      "assets": 1000
+    },
+    "sizeBytes": {
+      "bytes": 15400,
+      "assets": 1000
+    },
+    "capturedAt": {
+      "bytes": 27000,
+      "assets": 1000
+    },
+    "hasAudio": {
+      "bytes": 3200,
+      "assets": 200
+    },
+    "videoCodec": {
+      "bytes": 5400,
+      "assets": 200
+    },
+    "audioCodec": {
+      "bytes": 5000,
+      "assets": 200
+    },
+    "importedAt": {
+      "bytes": 27000,
+      "assets": 1000
+    }
+  },
+  "libraryOtherProjectBytes": 2459,
+  "searchRuns": [
+    36.722083000000566,
+    9.215583000001061,
+    13.933750000000146,
+    8.863499999999476,
+    13.781584000000294
+  ],
+  "filterRuns": [
+    34.88091699999859,
+    11.417250000000422,
+    7.8049579999988055,
+    11.696291000000201,
+    7.628499999998894
+  ],
+  "searchMs": 13.781584000000294,
+  "filterMs": 11.417250000000422,
+  "healthPassMs": 508.16820799999914,
+  "healthPassOpens": 1000,
+  "reloadRuns": [
+    {
+      "gridReadyMs": 364.36500000953674,
+      "restorationMs": 121.39999997615814,
+      "backgroundSettleMs": 1919.5400000214577,
+      "backgroundAfterGrid": true,
+      "spans": [
+        {
+          "name": "reload:library-read",
+          "start": 303.3700000047684,
+          "duration": 0.28999999165534973
+        },
+        {
+          "name": "reload:library-read",
+          "start": 303.4200000166893,
+          "duration": 4.030000001192093
+        },
+        {
+          "name": "reload:json",
+          "start": 303.6700000166893,
+          "duration": 0.2199999988079071
+        },
+        {
+          "name": "reload:zod",
+          "start": 303.89500001072884,
+          "duration": 2.6949999928474426
+        },
+        {
+          "name": "reload:json",
+          "start": 307.455000013113,
+          "duration": 0.1899999976158142
+        },
+        {
+          "name": "reload:zod",
+          "start": 307.65000000596046,
+          "duration": 1.6800000071525574
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 309.33500000834465,
+          "duration": 2.405000001192093
+        },
+        {
+          "name": "reload:yjs-load",
+          "start": 311.7450000047684,
+          "duration": 104.75999999046326
+        },
+        {
+          "name": "reload:search-index",
+          "start": 322.57000002264977,
+          "duration": 1.3099999725818634
+        },
+        {
+          "name": "reload:search-index",
+          "start": 323.8799999952316,
+          "duration": 0.13500002026557922
+        },
+        {
+          "name": "reload:sort",
+          "start": 324.3850000202656,
+          "duration": 0.08499997854232788
+        },
+        {
+          "name": "reload:sort",
+          "start": 324.47500002384186,
+          "duration": 0.07499998807907104
+        },
+        {
+          "name": "reload:group",
+          "start": 324.55500000715256,
+          "duration": 0.20500001311302185
+        },
+        {
+          "name": "reload:group",
+          "start": 324.7600000202656,
+          "duration": 0.16999998688697815
+        },
+        {
+          "name": "reload:yjs-read-validate",
+          "start": 416.52000001072884,
+          "duration": 1.8100000023841858
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 418.33500000834465,
+          "duration": 0.23500001430511475
+        },
+        {
+          "name": "reload:applyFromDoc",
+          "start": 418.33500000834465,
+          "duration": 5.7249999940395355
+        },
+        {
+          "name": "reload:search-index",
+          "start": 428.97500002384186,
+          "duration": 1.1199999749660492
+        },
+        {
+          "name": "reload:search-index",
+          "start": 430.0949999988079,
+          "duration": 0.050000011920928955
+        },
+        {
+          "name": "reload:sort",
+          "start": 430.27500000596046,
+          "duration": 0.07500001788139343
+        },
+        {
+          "name": "reload:sort",
+          "start": 430.35000002384186,
+          "duration": 0.0599999725818634
+        },
+        {
+          "name": "reload:group",
+          "start": 430.4099999964237,
+          "duration": 0.1550000011920929
+        },
+        {
+          "name": "reload:group",
+          "start": 430.57000002264977,
+          "duration": 0.1499999761581421
+        },
+        {
+          "name": "reload:preview-request",
+          "start": 477.17500001192093,
+          "duration": 6.83500000834465
+        },
+        {
+          "name": "reload:source-health",
+          "start": 1355.5,
+          "duration": 564.0400000214577
+        }
+      ]
+    },
+    {
+      "gridReadyMs": 361.55500000715256,
+      "restorationMs": 119.49499997496605,
+      "backgroundSettleMs": 1943.094999998808,
+      "backgroundAfterGrid": true,
+      "spans": [
+        {
+          "name": "reload:library-read",
+          "start": 301.1700000166893,
+          "duration": 0.29499998688697815
+        },
+        {
+          "name": "reload:library-read",
+          "start": 301.2450000047684,
+          "duration": 2.8700000047683716
+        },
+        {
+          "name": "reload:json",
+          "start": 301.47499999403954,
+          "duration": 0.20500001311302185
+        },
+        {
+          "name": "reload:zod",
+          "start": 301.6850000023842,
+          "duration": 2.3400000035762787
+        },
+        {
+          "name": "reload:json",
+          "start": 304.1200000047684,
+          "duration": 0.17500001192092896
+        },
+        {
+          "name": "reload:zod",
+          "start": 304.2950000166893,
+          "duration": 1.449999988079071
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 305.75,
+          "duration": 2.4500000178813934
+        },
+        {
+          "name": "reload:yjs-load",
+          "start": 308.205000013113,
+          "duration": 108.91999998688698
+        },
+        {
+          "name": "reload:search-index",
+          "start": 319.1850000023842,
+          "duration": 1.3100000023841858
+        },
+        {
+          "name": "reload:search-index",
+          "start": 320.5,
+          "duration": 0.11500000953674316
+        },
+        {
+          "name": "reload:sort",
+          "start": 320.9650000035763,
+          "duration": 0.09000000357627869
+        },
+        {
+          "name": "reload:sort",
+          "start": 321.05500000715256,
+          "duration": 0.06999999284744263
+        },
+        {
+          "name": "reload:group",
+          "start": 321.125,
+          "duration": 0.2150000035762787
+        },
+        {
+          "name": "reload:group",
+          "start": 321.3449999988079,
+          "duration": 0.17500001192092896
+        },
+        {
+          "name": "reload:yjs-read-validate",
+          "start": 417.1400000154972,
+          "duration": 1.6399999856948853
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 418.7800000011921,
+          "duration": 0.2199999988079071
+        },
+        {
+          "name": "reload:applyFromDoc",
+          "start": 418.7800000011921,
+          "duration": 1.5999999940395355
+        },
+        {
+          "name": "reload:search-index",
+          "start": 425.2950000166893,
+          "duration": 1.0199999809265137
+        },
+        {
+          "name": "reload:search-index",
+          "start": 426.3250000178814,
+          "duration": 0.03999999165534973
+        },
+        {
+          "name": "reload:sort",
+          "start": 426.5,
+          "duration": 0.07500001788139343
+        },
+        {
+          "name": "reload:sort",
+          "start": 426.5750000178814,
+          "duration": 0.06499999761581421
+        },
+        {
+          "name": "reload:group",
+          "start": 426.6400000154972,
+          "duration": 0.16499999165534973
+        },
+        {
+          "name": "reload:group",
+          "start": 426.80500000715256,
+          "duration": 0.1550000011920929
+        },
+        {
+          "name": "reload:preview-request",
+          "start": 473.09999999403954,
+          "duration": 3.830000013113022
+        },
+        {
+          "name": "reload:source-health",
+          "start": 1352.9150000214577,
+          "duration": 590.1799999773502
+        }
+      ]
+    },
+    {
+      "gridReadyMs": 362.9849999845028,
+      "restorationMs": 121.25999999046326,
+      "backgroundSettleMs": 1947.8400000035763,
+      "backgroundAfterGrid": true,
+      "spans": [
+        {
+          "name": "reload:library-read",
+          "start": 302.2049999833107,
+          "duration": 0.3450000286102295
+        },
+        {
+          "name": "reload:library-read",
+          "start": 302.25,
+          "duration": 2.979999989271164
+        },
+        {
+          "name": "reload:json",
+          "start": 302.5600000023842,
+          "duration": 0.19999998807907104
+        },
+        {
+          "name": "reload:zod",
+          "start": 302.75999999046326,
+          "duration": 2.4099999964237213
+        },
+        {
+          "name": "reload:json",
+          "start": 305.22999998927116,
+          "duration": 0.1850000023841858
+        },
+        {
+          "name": "reload:zod",
+          "start": 305.419999986887,
+          "duration": 1.5850000083446503
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 307.00999999046326,
+          "duration": 2.3499999940395355
+        },
+        {
+          "name": "reload:yjs-load",
+          "start": 309.3700000047684,
+          "duration": 110.26999998092651
+        },
+        {
+          "name": "reload:search-index",
+          "start": 320.11500000953674,
+          "duration": 1.2849999964237213
+        },
+        {
+          "name": "reload:search-index",
+          "start": 321.4099999964237,
+          "duration": 0.09000000357627869
+        },
+        {
+          "name": "reload:sort",
+          "start": 321.84999999403954,
+          "duration": 0.09000000357627869
+        },
+        {
+          "name": "reload:sort",
+          "start": 321.9399999976158,
+          "duration": 0.06499999761581421
+        },
+        {
+          "name": "reload:group",
+          "start": 322.00999999046326,
+          "duration": 0.21000000834465027
+        },
+        {
+          "name": "reload:group",
+          "start": 322.2199999988079,
+          "duration": 0.19499999284744263
+        },
+        {
+          "name": "reload:yjs-read-validate",
+          "start": 419.6550000011921,
+          "duration": 1.655000001192093
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 421.3149999976158,
+          "duration": 0.2199999988079071
+        },
+        {
+          "name": "reload:applyFromDoc",
+          "start": 421.3149999976158,
+          "duration": 1.6299999952316284
+        },
+        {
+          "name": "reload:search-index",
+          "start": 427.9099999964237,
+          "duration": 1.145000010728836
+        },
+        {
+          "name": "reload:search-index",
+          "start": 429.0600000023842,
+          "duration": 0.06000000238418579
+        },
+        {
+          "name": "reload:sort",
+          "start": 429.2549999952316,
+          "duration": 0.07499998807907104
+        },
+        {
+          "name": "reload:sort",
+          "start": 429.33500000834465,
+          "duration": 0.06000000238418579
+        },
+        {
+          "name": "reload:group",
+          "start": 429.39500001072884,
+          "duration": 0.1550000011920929
+        },
+        {
+          "name": "reload:group",
+          "start": 429.55000001192093,
+          "duration": 0.1549999713897705
+        },
+        {
+          "name": "reload:preview-request",
+          "start": 477.09999999403954,
+          "duration": 4.33500000834465
+        },
+        {
+          "name": "reload:source-health",
+          "start": 1353.8100000023842,
+          "duration": 594.0300000011921
+        }
+      ]
+    },
+    {
+      "gridReadyMs": 366.8899999856949,
+      "restorationMs": 121.6550000011921,
+      "backgroundSettleMs": 1965.2699999809265,
+      "backgroundAfterGrid": true,
+      "spans": [
+        {
+          "name": "reload:library-read",
+          "start": 303.18000000715256,
+          "duration": 0.3799999952316284
+        },
+        {
+          "name": "reload:library-read",
+          "start": 303.2450000047684,
+          "duration": 3.744999974966049
+        },
+        {
+          "name": "reload:json",
+          "start": 303.5849999785423,
+          "duration": 0.27000001072883606
+        },
+        {
+          "name": "reload:zod",
+          "start": 303.8599999845028,
+          "duration": 3.0349999964237213
+        },
+        {
+          "name": "reload:json",
+          "start": 306.9950000047684,
+          "duration": 0.2549999952316284
+        },
+        {
+          "name": "reload:zod",
+          "start": 307.25,
+          "duration": 1.9000000059604645
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 309.1550000011921,
+          "duration": 3.009999990463257
+        },
+        {
+          "name": "reload:yjs-load",
+          "start": 312.169999986887,
+          "duration": 108.80500000715256
+        },
+        {
+          "name": "reload:search-index",
+          "start": 324.6099999845028,
+          "duration": 1.4900000095367432
+        },
+        {
+          "name": "reload:search-index",
+          "start": 326.10499998927116,
+          "duration": 0.1850000023841858
+        },
+        {
+          "name": "reload:sort",
+          "start": 326.6899999976158,
+          "duration": 0.09000000357627869
+        },
+        {
+          "name": "reload:sort",
+          "start": 326.7849999964237,
+          "duration": 0.07499998807907104
+        },
+        {
+          "name": "reload:group",
+          "start": 326.8599999845028,
+          "duration": 0.23000001907348633
+        },
+        {
+          "name": "reload:group",
+          "start": 327.0900000035763,
+          "duration": 0.17999997735023499
+        },
+        {
+          "name": "reload:yjs-read-validate",
+          "start": 420.9899999797344,
+          "duration": 1.7000000178813934
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 422.6899999976158,
+          "duration": 0.22999998927116394
+        },
+        {
+          "name": "reload:applyFromDoc",
+          "start": 422.6899999976158,
+          "duration": 1.5649999976158142
+        },
+        {
+          "name": "reload:search-index",
+          "start": 429.0949999988079,
+          "duration": 1.0449999868869781
+        },
+        {
+          "name": "reload:search-index",
+          "start": 430.1449999809265,
+          "duration": 0.050000011920928955
+        },
+        {
+          "name": "reload:sort",
+          "start": 430.3299999833107,
+          "duration": 0.07500001788139343
+        },
+        {
+          "name": "reload:sort",
+          "start": 430.4050000011921,
+          "duration": 0.06000000238418579
+        },
+        {
+          "name": "reload:group",
+          "start": 430.4650000035763,
+          "duration": 0.1599999964237213
+        },
+        {
+          "name": "reload:group",
+          "start": 430.625,
+          "duration": 0.1550000011920929
+        },
+        {
+          "name": "reload:preview-request",
+          "start": 476.6899999976158,
+          "duration": 4.409999996423721
+        },
+        {
+          "name": "reload:source-health",
+          "start": 1358.2699999809265,
+          "duration": 607
+        }
+      ]
+    },
+    {
+      "gridReadyMs": 368.0300000011921,
+      "restorationMs": 121.81499999761581,
+      "backgroundSettleMs": 1965.405000001192,
+      "backgroundAfterGrid": true,
+      "spans": [
+        {
+          "name": "reload:library-read",
+          "start": 303.9150000214577,
+          "duration": 0.4050000011920929
+        },
+        {
+          "name": "reload:library-read",
+          "start": 303.9800000190735,
+          "duration": 3.344999998807907
+        },
+        {
+          "name": "reload:json",
+          "start": 304.330000013113,
+          "duration": 0.24000000953674316
+        },
+        {
+          "name": "reload:zod",
+          "start": 304.5750000178814,
+          "duration": 2.6200000047683716
+        },
+        {
+          "name": "reload:json",
+          "start": 307.330000013113,
+          "duration": 0.20499998331069946
+        },
+        {
+          "name": "reload:zod",
+          "start": 307.5349999964237,
+          "duration": 1.6500000059604645
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 309.1899999976158,
+          "duration": 2.75
+        },
+        {
+          "name": "reload:yjs-load",
+          "start": 311.94500002264977,
+          "duration": 109.97999998927116
+        },
+        {
+          "name": "reload:search-index",
+          "start": 323.6200000047684,
+          "duration": 1.3650000095367432
+        },
+        {
+          "name": "reload:search-index",
+          "start": 324.99000000953674,
+          "duration": 0.16499999165534973
+        },
+        {
+          "name": "reload:sort",
+          "start": 325.5300000011921,
+          "duration": 0.08500000834465027
+        },
+        {
+          "name": "reload:sort",
+          "start": 325.625,
+          "duration": 0.06499999761581421
+        },
+        {
+          "name": "reload:group",
+          "start": 325.69500002264977,
+          "duration": 0.20999997854232788
+        },
+        {
+          "name": "reload:group",
+          "start": 325.9099999964237,
+          "duration": 0.19500002264976501
+        },
+        {
+          "name": "reload:yjs-read-validate",
+          "start": 421.9399999976158,
+          "duration": 1.7600000202655792
+        },
+        {
+          "name": "reload:applyFromDoc",
+          "start": 423.7000000178814,
+          "duration": 1.6099999845027924
+        },
+        {
+          "name": "reload:loadProject",
+          "start": 423.705000013113,
+          "duration": 0.22999998927116394
+        },
+        {
+          "name": "reload:search-index",
+          "start": 432.21000000834465,
+          "duration": 1.1150000095367432
+        },
+        {
+          "name": "reload:search-index",
+          "start": 433.33500000834465,
+          "duration": 0.03999999165534973
+        },
+        {
+          "name": "reload:sort",
+          "start": 433.50500002503395,
+          "duration": 0.06999999284744263
+        },
+        {
+          "name": "reload:sort",
+          "start": 433.580000013113,
+          "duration": 0.05500000715255737
+        },
+        {
+          "name": "reload:group",
+          "start": 433.6350000202656,
+          "duration": 0.1550000011920929
+        },
+        {
+          "name": "reload:group",
+          "start": 433.7900000214577,
+          "duration": 0.1499999761581421
+        },
+        {
+          "name": "reload:preview-request",
+          "start": 479.80000001192093,
+          "duration": 4.66499999165535
+        },
+        {
+          "name": "reload:source-health",
+          "start": 1358.9850000143051,
+          "duration": 606.419999986887
+        }
+      ]
+    }
+  ],
+  "reloadBudgets": {
+    "gridReadyMs": {
+      "p50": 364.36500000953674,
+      "p95": 368.0300000011921
+    },
+    "restorationMs": {
+      "p50": 121.39999997615814,
+      "p95": 121.81499999761581
+    },
+    "backgroundSettleMs": {
+      "p50": 1947.8400000035763,
+      "p95": 1965.405000001192
+    }
+  },
+  "backgroundAfterGrid": true,
+  "domCardsAfterReload": 16,
+  "heapAfterReload": 60584022,
+  "renameToSavedMs": 26.669708000001265,
+  "funnelRows": 0
+}

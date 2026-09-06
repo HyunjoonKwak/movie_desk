@@ -7,6 +7,7 @@ import { useRangeStore } from "@/stores/range-store";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, CheckCircle2, Download, FolderOpen, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { recordExport } from "@/lib/funnel/collector";
 import { toast } from "sonner";
 import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
@@ -109,6 +110,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   const handleExport = async () => {
     const queue = PRESETS.filter((p) => selectedIds.has(p.id));
     if (queue.length === 0) return;
+    recordExport(projectId, "start");
     setFailure(false);
     setRunning(true);
     setMissingNames(null);
@@ -124,12 +126,14 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         const result = await exporter.start({ projectId, preset }, setProgress);
         const destination = await downloadBlob(result.blob, result.suggestedName);
         files.push({ name: result.suggestedName, preset: label, destination });
+        recordExport(projectId, destination.kind === "cancelled" ? "cancelled" : "success");
         if (destination.kind !== "cancelled") {
           toast.success(t("export.success", { name: result.suggestedName }));
         }
         exporterRef.current = null;
       }
     } catch (err) {
+      recordExport(projectId, err instanceof ExportCancelledError ? "cancelled" : "failure");
       if (err instanceof ExportCancelledError) {
         toast.info(t("export.cancelled"));
       } else if (err instanceof MissingMediaError) {

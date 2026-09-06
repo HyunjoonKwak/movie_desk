@@ -1,3 +1,5 @@
+import { recordFunnel } from "@/lib/funnel/collector";
+
 const PENDING_START_KEY_PREFIX = "cut.editor.new-project-start.pending.v1:";
 
 export interface PendingStartStorage {
@@ -48,4 +50,9 @@ export const clearNewProjectStartPending = (
   } catch {
     // See markNewProjectStartPending: local storage cannot block editing.
   }
+};
+
+// Called before loading the fresh project so its creation precedes observation.
+export const recordNewFunnelProject = (projectId: string): void => {
+  recordFunnel(projectId, { event: "start", data: { baseline: false } });
 };

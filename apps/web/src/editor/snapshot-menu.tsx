@@ -1,5 +1,6 @@
 "use client";
 
+import { recordRecovery } from "@/lib/funnel/collector";
 import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { History, RotateCcw, Save, Trash2, X } from "lucide-react";
@@ -60,8 +61,10 @@ export function SnapshotMenu() {
   };
 
   const onRestore = async (id: string) => {
+    recordRecovery("snapshot", "pending", project.id);
     const snap = await loadSnapshot(id);
     if (snap) {
+      recordRecovery("snapshot", "success", project.id);
       loadProject(snap);
       setOpen(false);
       toast.success(t("snap.restored"));

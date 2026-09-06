@@ -1,5 +1,6 @@
 "use client";
 
+import { mountFunnel, recordFunnel } from "@/lib/funnel/collector";
 import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -36,6 +37,7 @@ import { TopBar } from "./top-bar";
 export function EditorShell() {
   useKeyboardShortcuts();
   const persistenceReady = useLocalPersistence();
+  useEffect(() => { if (persistenceReady) return mountFunnel(); }, [persistenceReady]);
   useAudioPlayback();
   useAutoAnalysis();
   const isMobile = useIsBelow(900);
@@ -66,6 +68,7 @@ export function EditorShell() {
   }, []);
   const onChooseStart = useCallback(
     (path: NewProjectPath) => {
+      recordFunnel(projectId, { event: "path", data: { path } });
       clearNewProjectStartPending(projectId);
       setEntry({ projectId, path });
       setCompletedStartIds((current) => new Set(current).add(projectId));
@@ -83,6 +86,7 @@ export function EditorShell() {
   // the expert editor while an unanswered new project survives a reload.
   useEffect(() => {
     if (!persistenceReady || !showFreshStart) return;
+    if (!isNewProjectStartPending(projectId)) recordFunnel(projectId, { event: "start", data: { baseline: false } });
     markNewProjectStartPending(projectId);
   }, [persistenceReady, projectId, showFreshStart]);
 
