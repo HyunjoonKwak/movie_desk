@@ -1,5 +1,6 @@
 "use client";
 
+import { pitchPlaybackKey } from "@/audio/pitch-renderer";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useEffect } from "react";
@@ -13,9 +14,11 @@ import { getAudioEngine } from "./audio-engine";
 export function useAudioPlayback(): void {
   useEffect(() => {
     const engine = getAudioEngine();
+    let scheduledKey = pitchPlaybackKey(useProjectStore.getState().project.timeline.tracks);
     const start = () => {
       const playback = usePlaybackStore.getState();
       const project = useProjectStore.getState().project;
+      scheduledKey = pitchPlaybackKey(project.timeline.tracks);
       void engine.play(project, project.timeline.playhead, playback.rate).catch(() => {
         // Autoplay policy or decode failure: stay silent without leaving a
         // half-scheduled transport behind.
@@ -48,7 +51,37 @@ export function useAudioPlayback(): void {
     );
     const offMedia = useProjectStore.subscribe(
       (state) => state.project.mediaLibrary,
-      (mediaLibrary) => engine.retain(new Set(mediaLibrary.map((asset) => asset.id))),
+      (mediaLibrary, previous) => {
+        const assets = new Map(mediaLibrary.map((asset) => [asset.id, asset]));
+        let changed = false;
+        for (const asset of previous) {
+          // Relink can replace bytes under the same OPFS key and size. Treat
+          // changed records conservatively, including metadata-only edits.
+          if (assets.get(asset.id) !== asset) {
+            engine.forget(asset.id);
+            changed = true;
+          }
+        }
+        engine.retain(new Set(assets.keys()));
+        if (changed && usePlaybackStore.getState().playing) start();
+      },
+    );
+
+    const rescheduleEdit = () => {
+      const state = useProjectStore.getState();
+      if (state.precisionEditing) return;
+      const key = pitchPlaybackKey(state.project.timeline.tracks);
+      if (key === scheduledKey) return;
+      scheduledKey = key;
+      if (usePlaybackStore.getState().playing) start();
+    };
+    const offClips = useProjectStore.subscribe(
+      (state) => state.project.timeline.tracks,
+      rescheduleEdit,
+    );
+    const offPrecision = useProjectStore.subscribe(
+      (state) => state.precisionEditing,
+      rescheduleEdit,
     );
 
     if (usePlaybackStore.getState().playing) start();
@@ -56,6 +89,8 @@ export function useAudioPlayback(): void {
       offPlayback();
       offPlayhead();
       offMedia();
+      offClips();
+      offPrecision();
       engine.stop();
     };
   }, []);

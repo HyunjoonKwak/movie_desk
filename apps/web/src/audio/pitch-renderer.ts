@@ -1,4 +1,4 @@
-import type { MediaClip, StretchRequest } from "@movie-desk/core";
+import { isMediaClip, type Track, type MediaClip, type StretchRequest } from "@movie-desk/core";
 
 export const PITCH_CACHE_BYTES = 128 * 1024 * 1024;
 export const pitchCacheKey = (clip: MediaClip, sampleRate: number, revision = 0): string =>
@@ -13,6 +13,20 @@ export const pitchCacheKey = (clip: MediaClip, sampleRate: number, revision = 0)
     clip.preservePitch === true,
     clip.keyframes.filter((t) => t.target === "speed"),
   ]);
+
+// Ignore visual edits and playhead ticks; restart scheduled audio only when
+// its timeline mapping changes. Precision gestures notify after commit/cancel.
+export const pitchPlaybackKey = (tracks: readonly Track[]): string =>
+  JSON.stringify(
+    tracks.map((track) => [
+      track.id,
+      track.muted,
+      track.solo,
+      track.clips
+        .filter(isMediaClip)
+        .map((clip) => [clip.id, clip.start, clip.disabled, pitchCacheKey(clip, 0)]),
+    ]),
+  );
 
 export class PitchCache<T> {
   private entries = new Map<string, { value: T; bytes: number; assetId: string }>();

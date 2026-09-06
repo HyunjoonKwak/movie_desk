@@ -26,6 +26,31 @@ const frequency = (pcm: Float32Array) => {
     if (pcm[i - 1]! <= 0 && pcm[i]! > 0) count++;
   return count / ((pcm.length - sr / 5) / sr);
 };
+const dominantHz = (pcm: Float32Array) => {
+  const n = Math.min(16384, pcm.length - 9600);
+  const windowed = Float32Array.from(
+    { length: n },
+    (_, i) => pcm[i + 4800]! * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1))),
+  );
+  let bestPower = 0;
+  let bestHz = 0;
+  for (let hz = 200; hz <= 1000; hz += 2) {
+    const coefficient = 2 * Math.cos((2 * Math.PI * hz) / sr);
+    let a = 0;
+    let b = 0;
+    for (const value of windowed) {
+      const next = value + coefficient * a - b;
+      b = a;
+      a = next;
+    }
+    const power = a * a + b * b - coefficient * a * b;
+    if (power > bestPower) {
+      bestPower = power;
+      bestHz = hz;
+    }
+  }
+  return bestHz;
+};
 const render = (
   source: Float32Array,
   c: MediaClip,
@@ -46,6 +71,7 @@ describe("linked-channel WSOLA", () => {
     const c = clip(speed);
     const [left, right] = render(sine(2), c);
     expect(Math.abs(frequency(left!) / 440 - 1)).toBeLessThan(0.02);
+    expect(Math.abs(dominantHz(left!) / 440 - 1)).toBeLessThan(0.02);
     expect(left).toHaveLength(Math.round((c.duration * sr) / 1000));
     for (let i = 0; i < left!.length; i += 41) expect(left![i]! + right![i]!).toBeCloseTo(0, 6);
   });

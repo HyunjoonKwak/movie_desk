@@ -48,3 +48,19 @@ describe("preview pitch cache", () => {
     expect(cache.bytes).toBe(0);
   });
 });
+
+it("changes playback identity for speed/toggle/trim but keeps visual edits out", async () => {
+  const { createEmptyProject } = await import("@movie-desk/core");
+  const { pitchPlaybackKey } = await import("../pitch-renderer");
+  const base = createEmptyProject().timeline.tracks;
+  const tracks = base.map((track, i) => (i === 0 ? { ...track, clips: [clip] } : track));
+  const key = pitchPlaybackKey(tracks);
+  for (const change of [{ speed: 0.5 }, { trimIn: 50 }, { preservePitch: false }]) {
+    expect(
+      pitchPlaybackKey(
+        tracks.map((t, i) => (i === 0 ? { ...t, clips: [{ ...clip, ...change }] } : t)),
+      ),
+    ).not.toBe(key);
+  }
+  expect(pitchPlaybackKey(tracks.map((t) => ({ ...t, height: 120 })))).toBe(key);
+});

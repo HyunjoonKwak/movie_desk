@@ -15,6 +15,7 @@ class AudioEngine {
   private readonly pitchCache = new PitchCache<AudioBuffer>();
   private readonly pitchRevisions = new Map<string, number>();
   private pitchPending = false;
+  private pitchNext: { buffer: AudioBuffer; clip: MediaClip; key: string } | null = null;
   private ctx: AudioContext | null = null;
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly pendingBuffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -43,11 +44,12 @@ class AudioEngine {
     }
     const pending = this.pendingBuffers.get(asset.id);
     if (pending) return pending;
+    const revision = this.pitchRevisions.get(asset.id) ?? 0;
     const promise = this.decode(asset);
     this.pendingBuffers.set(asset.id, promise);
     try {
       const decoded = await promise;
-      if (decoded) {
+      if (decoded && revision === (this.pitchRevisions.get(asset.id) ?? 0)) {
         this.buffers.set(asset.id, decoded);
         while (this.buffers.size > AudioEngine.MAX_CACHED_BUFFERS) {
           const oldest = this.buffers.keys().next().value;
@@ -127,9 +129,11 @@ class AudioEngine {
   }
 
   forget(assetId: string): void {
+    if (this.pitchNext?.clip.assetId === assetId) this.pitchNext = null;
     this.pitchCache.forget(assetId);
     this.pitchRevisions.set(assetId, (this.pitchRevisions.get(assetId) ?? 0) + 1);
     this.buffers.delete(assetId);
+    this.pendingBuffers.delete(assetId);
   }
 
   retain(assetIds: ReadonlySet<string>): void {
@@ -189,12 +193,16 @@ class AudioEngine {
         const key = pitchCacheKey(clip, buffer.sampleRate, this.pitchRevisions.get(asset.id) ?? 0);
         const pitched = clip.preservePitch ? this.pitchCache.get(key) : undefined;
         this.scheduleClip(pitched ?? buffer, clip, rangeStartMs, rangeEndMs, rate, generation, !!pitched);
-        if (clip.preservePitch && !pitched && !this.pitchPending) void this.preparePitch(buffer, clip, key);
+        if (clip.preservePitch && !pitched) void this.preparePitch(buffer, clip, key);
       }
     }
   }
 
   private async preparePitch(buffer: AudioBuffer, clip: MediaClip, key: string): Promise<void> {
+    if (this.pitchPending) {
+      this.pitchNext = { buffer, clip, key };
+      return;
+    }
     const outputSamples = Math.floor(clip.duration * buffer.sampleRate / 1000);
     const bytes = outputSamples * buffer.numberOfChannels * 4;
     // Admission bounds retained output and in-flight source copies separately.
@@ -220,6 +228,9 @@ class AudioEngine {
       // Immediate varispeed remains audible. Never execute expensive DSP inline.
     } finally {
       this.pitchPending = false;
+      const next = this.pitchNext;
+      this.pitchNext = null;
+      if (next && next.key !== key) void this.preparePitch(next.buffer, next.clip, next.key);
     }
   }
 

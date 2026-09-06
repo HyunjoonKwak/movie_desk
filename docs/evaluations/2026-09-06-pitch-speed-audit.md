@@ -104,3 +104,27 @@ probe are in `assets/2026-09-06-pitch-speed/` for review.
 
 AAC follow-up gate: **PASS**, all 9 steps; core 134, web 559, desktop 72,
 scripts 11, E2E 56. Full summary: `2026-09-06-pitch-speed-aac-gate.md`.
+
+Final cache/model hardening: changed media records conservatively invalidate
+both decoded and stretched audio, even when OPFS relink keeps the same key and
+size. Revision guards prevent late old decodes from replacing the new buffer;
+a regression test resolves old/new decodes out of order and verifies only the
+replacement is replayed. Committed speed/ramp/trim/toggle edits restart the
+rolling schedule, while precision gestures wait for commit/cancel. One bounded
+latest preview request follows the active render, so an edit during rendering
+cannot leave the new key unrendered. The 60s E2E verifies a live 2×→0.5× edit
+requests a second worker render. Detached audio carries preservePitch and its
+speed keyframe track. Core tone checks also measure dominant spectral frequency
+using a Hann-windowed Goertzel scan (200–1000Hz, 2Hz grid), with ±2% tolerance.
+
+Final gate: **PASS**, all 9 steps; **778 unit tests** (core 134, web 561,
+desktop 72, scripts 11), **56 E2E tests**, production build and OSV audit pass.
+Summary: `2026-09-06-pitch-speed-final-gate.md`. The feature and AAC correction
+also each passed their own complete gate before their separate commits.
+
+Scope clarification: negative-speed preview retains the existing silent path;
+negative-speed export retains the legacy reverse cursor with linear interpolation.
+Pitch preservation is not applied to reverse. Preview requests exceeding the
+128MiB source/output admission cap retain varispeed, while export renders its
+bounded timeline chunks through the worker. Metadata-only media-record changes
+conservatively invalidate audio caches too, to cover same-key/same-size relinks.

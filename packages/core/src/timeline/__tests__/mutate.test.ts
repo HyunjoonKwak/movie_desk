@@ -155,7 +155,19 @@ describe("timeline mutate", () => {
   it("detaches audio to a new audio track and mutes the source", () => {
     const p0 = createEmptyProject();
     const tid = p0.timeline.tracks[0]!.id;
-    const clip = makeMediaClip(0, 2000);
+    const clip = {
+      ...makeMediaClip(0, 2000),
+      preservePitch: true,
+      keyframes: [
+        {
+          target: "speed",
+          keyframes: [
+            { at: 0, value: 0.5, easing: "linear" as const },
+            { at: 2000, value: 2, easing: "linear" as const },
+          ],
+        },
+      ],
+    };
     const p1 = addClip(p0, tid, clip);
 
     const after = detachAudio(p1, clip.id);
@@ -164,6 +176,8 @@ describe("timeline mutate", () => {
     expect(audioTrack!.clips).toHaveLength(1);
     const detached = audioTrack!.clips[0]!;
     expect(detached.kind).toBe("media");
+    expect((detached as typeof clip).preservePitch).toBe(true);
+    expect(detached.keyframes).toEqual(clip.keyframes);
     expect(detached.start).toBe(0);
     expect(detached.duration).toBe(2000);
     // original video clip's audio is muted

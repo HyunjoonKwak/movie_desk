@@ -161,11 +161,12 @@ export const detachAudio = (project: Project, clipId: ID): Project => {
     start: source.start,
     duration: source.duration,
     speed: source.speed,
+    ...(source.preservePitch === undefined ? {} : { preservePitch: source.preservePitch }),
     trimIn: source.trimIn,
     trimOut: source.trimOut,
     volume: source.volume ?? 1,
     effects: [],
-    keyframes: [],
+    keyframes: source.keyframes.filter((track) => track.target === "speed"),
   };
   p = addClip(p, audioTrack.id, audioClip);
   p = updateClip(p, clipId, (c) => (c.kind === "media" ? { ...c, volume: 0 } : c));

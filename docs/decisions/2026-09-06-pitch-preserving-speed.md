@@ -43,3 +43,8 @@ Mediabunny's own duration-from-media APIs may report the retained raw tail;
 HTMLMediaElement, decodeAudioData and ffprobe are the presentation boundary
 oracles. Unit tests verify every encoded packet byte survives the edit and the
 first packet receives the expected negative demuxed presentation timestamp.
+
+Preview compatibility detail: the historical scheduler skips negative-speed
+clips (silent preview); export retains reverse interpolation. Preview cache
+admission above 128MiB falls back to varispeed. These limits are documented in
+the audit rather than represented as successful pitch-preserving renders.

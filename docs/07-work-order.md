@@ -525,3 +525,12 @@ desktop 72, scripts 11; E2E 56). 후속 기존 결함 수정은 AAC 지연을 �
 | Follow-up | State | Evidence |
 | --- | --- | --- |
 | 기존 결함 수정 — AAC priming/padding presentation | PASS, gate 9/9; core 134 / web 559 / desktop 72 / scripts 11; E2E 56 | `docs/evaluations/2026-09-06-pitch-speed-aac-gate.md`; click +1.542ms, tail RMS 0.250185, ffprobe 1.000000s |
+
+AAC 기존 결함 수정 커밋: `566e271` (독립 gate PASS).
+B′2 후속 점검: 동일 키 재연결·늦은 decode 결과 무효화, 재생 중 속도/트림/토글
+반영(정밀 입력은 commit/cancel 후), 최신 렌더 요청 1개 대기, 오디오 분리 시
+피치·속도 램프 유지 및 Goertzel 지배 주파수 검증을 추가했다.
+
+| B′2 final | State | Gate |
+| --- | --- | --- |
+| Cache/source invalidation, live speed rescheduling, detached-audio mapping | PASS; ready for Claude review | `pnpm gate` 9/9; 778 unit tests (core 134, web 561, desktop 72, scripts 11), E2E 56; `docs/evaluations/2026-09-06-pitch-speed-final-gate.md` |

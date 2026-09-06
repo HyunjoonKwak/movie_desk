@@ -97,12 +97,10 @@ test("pitch toggle is one undo and exported duration matches the timeline", asyn
       ).supported,
   );
   if (!aacSupported) {
-    test
-      .info()
-      .annotations.push({
-        type: "codec",
-        description: "AAC unavailable; video-only export length verified",
-      });
+    test.info().annotations.push({
+      type: "codec",
+      description: "AAC unavailable; video-only export length verified",
+    });
     return;
   }
   const audio = await page.evaluate(
@@ -158,6 +156,7 @@ test("60s stereo preview starts immediately and renders pitch in a worker", asyn
       firstSoundMs: 0,
       workerMs: 0,
       dspMs: 0,
+      workerCount: 0,
       longestTaskMs: 0,
       pitchMainSliceMs: 0,
     };
@@ -175,6 +174,7 @@ test("60s stereo preview starts immediately and renders pitch in a worker", asyn
         const started = performance.now();
         this.addEventListener("message", (event) => {
           if (event.data.channels && event.data.dspMs !== undefined) {
+            stats.workerCount++;
             stats.workerMs = performance.now() - started;
             stats.dspMs = event.data.dspMs;
           }
@@ -237,4 +237,16 @@ test("60s stereo preview starts immediately and renders pitch in a worker", asyn
   expect(stats.firstSoundMs).toBeLessThanOrEqual(500);
   expect(stats.dspMs).toBeLessThanOrEqual(2000);
   expect(stats.pitchMainSliceMs).toBeLessThanOrEqual(16);
+  await page.getByRole("button", { name: "0.5x", exact: true }).click();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () =>
+            (window as unknown as { pitchStats: { workerCount: number } }).pitchStats.workerCount,
+        ),
+      { timeout: 30000 },
+    )
+    .toBeGreaterThanOrEqual(2);
+  await page.getByRole("button", { name: "Pause", exact: true }).click();
 });
