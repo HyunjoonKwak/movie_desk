@@ -15,7 +15,14 @@ export const chapterExportLines = (
 ): string[] => {
   const sorted = [...markers].sort((a, b) => a.at - b.at);
   const lines: string[] = [];
-  if (sorted.length === 0 || sorted[0]!.at > 0) lines.push(`0:00 ${intro}`);
-  for (const marker of sorted) lines.push(`${stamp(marker.at)} ${marker.label || untitled}`);
+  if (sorted.length === 0 || Math.floor(sorted[0]!.at / 1000) > 0) lines.push(`0:00 ${intro}`);
+  // Preserve the first marker in each second; never invent a later chapter time.
+  let previous = "";
+  for (const marker of sorted) {
+    const timestamp = stamp(marker.at);
+    if (timestamp === previous) continue;
+    lines.push(`${timestamp} ${marker.label || untitled}`);
+    previous = timestamp;
+  }
   return lines;
 };

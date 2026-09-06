@@ -32,8 +32,9 @@ export function PrecisionInput({
   fps,
 }: Props) {
   const t = useT();
-  const gesture = usePrecisionGesture(onPreview);
+  const gesture = usePrecisionGesture(onPreview, label, value);
   const id = useId();
+  const scrubRef = useRef<HTMLButtonElement>(null);
   const display = (v: number) => (fps ? formatTimecode(v, fps) : String(Number(v.toFixed(6))));
   const [draft, setDraft] = useState<string | null>(null);
   const [invalid, setInvalid] = useState(false);
@@ -63,6 +64,7 @@ export function PrecisionInput({
   const cancel = () => {
     drag.current = null;
     gesture.finish(true);
+    scrubRef.current?.blur();
     update(null);
   };
   const hint = fps ? t("precision.timeHint", { fps }) : t("precision.numberHint");
@@ -70,6 +72,7 @@ export function PrecisionInput({
     <span className="inline-flex max-w-full flex-col items-end gap-0.5">
       <span className="inline-flex items-center gap-1">
         <button
+          ref={scrubRef}
           type="button"
           tabIndex={-1}
           data-precision-scrub
@@ -77,6 +80,7 @@ export function PrecisionInput({
           title={hint}
           className="touch-none cursor-ew-resize rounded px-1 text-ink-3 hover:bg-white/10"
           onKeyDown={(e) => {
+            if (e.metaKey || e.ctrlKey) return;
             e.stopPropagation();
             if (e.key !== "Tab") e.preventDefault();
             if (e.key === "Escape") {
@@ -117,6 +121,7 @@ export function PrecisionInput({
             const d = drag.current;
             drag.current = null;
             e.currentTarget.releasePointerCapture(e.pointerId);
+            e.currentTarget.blur();
             update(null);
             if (!gesture.finish() && d?.moved && Math.abs(d.next - value) > 1e-9) onChange(d.next);
           }}
@@ -144,6 +149,7 @@ export function PrecisionInput({
           onBlur={() => commit(true)}
           onKeyDown={(e) => {
             e.stopPropagation();
+            if (e.nativeEvent.isComposing) return;
             if (e.key === "Escape") {
               e.preventDefault();
               cancel();

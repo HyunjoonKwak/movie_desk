@@ -46,7 +46,11 @@ const collectSelectedEntries = (): readonly ClipboardEntry[] => {
 export const useKeyboardShortcuts = () => {
   useEffect(() => {
     const handle = (e: KeyboardEvent) => {
-      if (isEditable(e.target)) return;
+      const scrubCommand =
+        (e.metaKey || e.ctrlKey) &&
+        e.target instanceof HTMLElement &&
+        e.target.closest("[data-precision-scrub]");
+      if (isEditable(e.target) && !scrubCommand) return;
       // Radix menus / dialogs / listboxes own their keyboard interaction —
       // arrow-navigating a context menu must not scrub the playhead.
       if (
@@ -63,7 +67,10 @@ export const useKeyboardShortcuts = () => {
         useProjectStore.getState().undo();
         return;
       }
-      if ((cmd && e.shiftKey && e.key.toLowerCase() === "z") || (cmd && e.key.toLowerCase() === "y")) {
+      if (
+        (cmd && e.shiftKey && e.key.toLowerCase() === "z") ||
+        (cmd && e.key.toLowerCase() === "y")
+      ) {
         e.preventDefault();
         useProjectStore.getState().redo();
         return;
@@ -293,9 +300,9 @@ export const useKeyboardShortcuts = () => {
       // Cmd/Ctrl+A — select every clip on every track
       if (cmd && e.key.toLowerCase() === "a") {
         e.preventDefault();
-        const all = useProjectStore.getState().project.timeline.tracks.flatMap((t) =>
-          t.clips.map((c) => c.id),
-        );
+        const all = useProjectStore
+          .getState()
+          .project.timeline.tracks.flatMap((t) => t.clips.map((c) => c.id));
         useSelectionStore.setState({ clipIds: new Set(all) });
       }
 

@@ -23,14 +23,20 @@ export function PrecisionSlider({
   onPreview: (value: number) => void;
 }) {
   const t = useT();
-  const gesture = usePrecisionGesture(onPreview);
+  const gesture = usePrecisionGesture(onPreview, label, value);
   const [draft, setDraft] = useState<number | null>(null);
+  const aborted = useRef(false);
+  const dragging = useRef(false);
   const pending = useRef<number | null>(null);
   const clear = () => {
     pending.current = null;
     setDraft(null);
   };
   const commit = () => {
+    if (aborted.current) {
+      clear();
+      return;
+    }
     const next = pending.current;
     clear();
     if (!gesture.finish() && next !== null && next !== value) onChange(next);
@@ -45,20 +51,46 @@ export function PrecisionSlider({
       value={draft ?? value}
       aria-label={t("precision.slider", { label })}
       aria-valuetext={String(draft ?? value)}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragging.current = true;
+        aborted.current = false;
+      }}
       onChange={(e) => {
+        if (aborted.current) {
+          e.currentTarget.value = String(value);
+          return;
+        }
         pending.current = Number(e.target.value);
         setDraft(pending.current);
         gesture.preview(pending.current);
       }}
-      onPointerUp={commit}
+      onPointerUp={(e) => {
+        if (aborted.current) e.currentTarget.value = String(value);
+        commit();
+        dragging.current = false;
+        aborted.current = false;
+      }}
+      onLostPointerCapture={() => {
+        if (!dragging.current) return;
+        dragging.current = false;
+        aborted.current = false;
+        gesture.finish(true);
+        clear();
+      }}
       onBlur={commit}
       onPointerCancel={() => {
+        dragging.current = false;
+        aborted.current = false;
         gesture.finish(true);
         clear();
       }}
       onKeyDown={(e) => {
         e.stopPropagation();
+        if (e.nativeEvent.isComposing) return;
         if (e.key === "Escape") {
+          aborted.current = dragging.current;
           gesture.finish(true);
           clear();
         }

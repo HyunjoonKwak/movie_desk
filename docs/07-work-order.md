@@ -59,6 +59,8 @@ knip 미사용 export 정리는 파일 소유자가 각자 한다. 자동 편집
 
 ### 인계 메모
 
+- 2026-09-06 Codex: B'1 `1b13e6b` 확인 리뷰 반영. 챕터 동일 초 중복 제거, 스크럽 직후 키보드 undo/redo, 끼어든 명령 전후 제스처 리베이스, Yjs 종료 1회 flush, no-op/IME/슬라이더 Escape 보호를 보강했다. 1,000자산 CPU 프레임 비용 p50 1.462→0.045ms(IndexedDB mock), 측정 범위와 회귀 검증은 [감사 기록](evaluations/2026-09-06-precision-input-audit.md)에 둔다.
+
 - 2026-09-06 Codex: B'1 `c52851b` 리뷰 반영. 챕터 파일 초 포맷 복구와 순수 함수 테스트, 스크럽 키보드 격리, 무이력 live preview → 시작 스냅샷 대비 undo 1회, 입력 단위 리마운트로 AiPanel/섹션 상태 보존, invalid blur 복귀·IME 보호·이미지 소스 입력 제외·플레이헤드 상한을 적용했다. 슬립 standalone 명령도 undo를 기록한다. `applyRamp` N+1 undo, 타임코드 약식 입력, 키프레임 상대 시각 표기는 [감사 후속](evaluations/2026-09-06-precision-input-audit.md)에 추가했다.
 
 - 2026-09-06 Codex: B'1 `codex/b1-precision-input` (`main 07d5d33` 기준). [입력 감사](evaluations/2026-09-06-precision-input-audit.md)를 먼저 작성하고 공용 커밋형 숫자/타임코드 입력을 시작·길이·소스 트림·속도·변형·키프레임 값과 트랜스포트에 적용했다. 직접 입력, 화살표/Shift/Alt, 스크럽, Enter/blur 커밋, Esc 취소, 오류 안내와 접근성 라벨을 제공하고 기존 슬라이더를 유지한다. 변형은 기존 history 우회 경로와 별도인 커밋 명령으로 undo를 기록하며, 소스 트림은 속도 램프 적분의 역변환으로 길이를 재계산한다. 요청 범위의 fps 파서/소스 시간 및 E2E를 위해 `packages/core/`와 store 파일도 수정했으며 의존성은 추가하지 않았다. P1/P2 효과·오디오·타임라인 트림·마커/범위 직접 입력과 키프레임 시각 이동·33ms 키 탐색 통일은 후속이다.
@@ -486,4 +488,4 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | C1 새 프로젝트 출발점 | Codex + Claude 검토 | 구현·교차 리뷰 완료, main 통합 | 가져오기·정리, 수동 편집, 안내형 초안의 세 출발점을 같은 전문 편집 작업 공간에 연결했다. Claude 교차 리뷰에서 찾은 미선택 새로고침·전역 드롭·키보드 포커스·모바일 검증·E2E 결합 문제를 후속 수정. `267eee2` + `8342164`, Chromium E2E 36개·Chrome HEVC·원격 CI 통과. 다음은 C2 |
 | C2 빈·선택·오류 상태 설명 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 4라운드 완료, main 통합(ac112a6) | `codex/c2-state-guidance` · 정상 편집 안내 줄 제거, 누락 오버레이·점선 드롭존 복원, 분석 지연 판정·BPM 창 공유·이름 있는 카드 포커스; 판정/렌더/음악 캐시 21개·E2E 2개, `pnpm gate` 9/9 PASS(단위 662·Chromium E2E 45), 재연결 메타데이터 기반 최근 4개 Promise 캐시·접근성 설명·disabled 드롭존 trusted drop 검증·누락 집합별 닫기 후속 반영 및 최소 폭 화면 갱신. [상태 목록·검증 메모](evaluations/2026-09-06-c2-state-guidance.md), 다음은 C3 |
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |
-| B'1 프레임·수치 정밀 입력 감사 | Codex 구현 · Claude 감독·리뷰 | 리뷰 반영·로컬 검증 완료, 재리뷰·main 통합 대기 | `codex/b1-precision-input` · [감사·적용 범위](evaluations/2026-09-06-precision-input-audit.md), [전체 gate](evaluations/2026-09-06-precision-input-gate.md). 챕터 초 포맷·live preview/undo 세션·상태 보존 리뷰 반영, 공용 NDF 입력·원자적 커밋, 인스펙터/변형/키프레임 값/플레이헤드 적용. `pnpm gate` 9/9 PASS(단위 730·Chromium E2E 51), 한국어 화면 확인. 잔여 P1/P2는 감사 문서에 명시 |
+| B'1 프레임·수치 정밀 입력 감사 | Codex 구현 · Claude 감독·리뷰 | 리뷰 반영·로컬 검증 완료, 재리뷰·main 통합 대기 | `codex/b1-precision-input` · [감사·적용 범위](evaluations/2026-09-06-precision-input-audit.md), [전체 gate](evaluations/2026-09-06-precision-input-gate.md). 챕터 동일 초 중복·키보드 undo·제스처 리베이스·Yjs 종료 flush 확인 리뷰 반영, 공용 NDF 입력·인스펙터/변형/키프레임 값/플레이헤드 적용. `pnpm gate` 9/9 PASS(단위 739·Chromium E2E 52), 한국어 화면 확인. 잔여 P1/P2는 감사 문서에 명시 |

@@ -139,3 +139,25 @@ P0 공용 커밋형 숫자/시간 입력, 인스펙터 시작·길이·소스 �
 리뷰 회귀 검증은 챕터 순수 함수 3건, live preview/undo/취소/세션 무효화/이미지 보호 store 테스트 9건을 추가하고 E2E를 2→4건으로 확장했다. 기존 E2E에는 invalid blur와 IME 조합 중 Enter도 추가했으며, 새로운 E2E는 슬라이더 드래그 중 인접 숫자 값 갱신·스크럽 중 슬라이더 값 갱신·한 번 undo·Backspace/Delete 격리·Tab 이동과 클립 전환 시 섹션 접힘 보존을 확인한다. 중간 전체 gate의 컬렉션 E2E 한 건은 소스 보강과 실행이 겹친 상태에서 실패했으므로 최종 코드를 고정하고 전체 gate를 다시 실행했다.
 
 리뷰 반영 최종 검증: `pnpm gate` **9/9 PASS**, 단위 **730**(core 125/web 538/desktop 56/scripts 11), Chromium E2E **51**건 PASS. 앞서 실패한 컬렉션 E2E도 최종 코드 고정 실행에서 통과했다. `biome format` 대상 8개 파일 검사와 `git diff --check`도 PASS이며, i18n 변경은 한국어/영어 각 1키 append뿐이다.
+
+
+## 1b13e6b 확인 리뷰 반영
+
+- 챕터 첫 마커가 1초 미만이면 자동 인트로를 생략하고, 같은 초의 마커는 첫 항목만 유지한다. 타임스탬프를 임의로 뒤로 밀지 않는 정책을 코드 주석과 400ms/동일 초 회귀 테스트로 고정했다.
+- 스크럽 종료·취소 시 핸들 포커스를 해제하고 Cmd/Ctrl 조합은 전역 명령으로 통과시킨다. E2E는 release 직후 키보드 Cmd+Z/Shift+Cmd+Z를 사용하며, 드래그 중 Backspace/Delete 격리는 유지한다.
+- 열린 제스처에 runWith 명령이 들어오면 직전 live 값을 먼저 undo에 기록하고 명령 후 같은 토큰의 시작 스냅샷을 갱신한다. 이후 프리뷰와 Escape가 유효하며, 드문 경합에서는 제스처가 명령 앞뒤 두 undo로 나뉜다. 중간 명령은 Escape로 취소하지 않는다.
+- Precision 세션 동안 Yjs 쓰기를 미루고 종료·취소·dispose·프로젝트 전환 때 최종 상태를 한 번 flush한다. 입력 unmount의 취소와 기존 토큰 보호를 유지한다.
+- 시작값으로 돌아온 정상 제스처는 history를 추가하지 않는다. 제스처 라벨은 입력 이름을 사용하며, IME 조합 중 Enter/화살표/Escape는 무시한다. 슬라이더 Escape 이후에는 pointerup까지 값 변경을 중단하고 still 이미지의 Spatial fit 컨트롤 가시성도 E2E로 확인한다.
+
+### 1,000자산 프레임 비용 측정
+
+실제 store와 Yjs/project-crdt를 사용하는 Vitest에서 합성 비디오 메타데이터 자산 1,000개·클립 1,000개에 변형 60프레임을 적용했다. IndexedDB provider만 mock이며 렌더러/GPU·디스크 I/O를 포함하지 않는 CPU 측정이다. 실행별 시간 변동이 있어 성능 수치 자체를 테스트 임계치로 삼지 않고 flush 횟수를 검증한다.
+
+| 경로 | 프레임 p50 | 프레임 p95 | Yjs flush | 종료 flush |
+| --- | ---: | ---: | ---: | ---: |
+| 기존 프레임별 flush | 1.462ms | 1.751ms | 60회 | — |
+| 세션 종료에 flush | 0.045ms | 0.047ms | 드래그 중 0회, 종료 1회 | 1.587ms |
+
+확인 리뷰의 집중 검증: 순수 함수/store/persistence 27건 및 Chromium 정밀 입력 E2E 5건 PASS. 전체 gate 결과는 아래 최종 기록과 [gate 보고서](2026-09-06-precision-input-gate.md)에 남긴다.
+
+최종 전체 gate: **9/9 PASS**, 단위 **739**(core 125/web 547/desktop 56/scripts 11), Chromium E2E **52**건 PASS. 전체 gate 안의 별도 측정은 기존 p50 1.994ms/p95 8.920ms → 세션 p50 0.049ms/p95 0.072ms, 종료 flush 1.984ms로 같은 flush 횟수 감소를 확인했다. `git diff --check`도 PASS이며 이번 확인 리뷰에는 i18n 변경이 없다.

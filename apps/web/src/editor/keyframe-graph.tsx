@@ -122,11 +122,14 @@ export function KeyframeGraph({ clipId, clip }: Props) {
     cleanupDrag.current?.();
     const svg = e.currentTarget.ownerSVGElement!;
     const store = useProjectStore.getState();
-    const token = store.beginPrecisionEdit();
+    const token = store.beginPrecisionEdit("Adjust keyframe");
+    const origin = track?.keyframes.find((k) => k.at === atMs)?.value;
+    let latest = origin;
     const move = (ev: PointerEvent) => {
       const rect = svg.getBoundingClientRect();
       const y = Math.max(0, Math.min(GRAPH_H, ev.clientY - rect.top));
       const value = range.min + (1 - y / GRAPH_H) * (range.max - range.min);
+      latest = value;
       if (track)
         store.previewPrecisionEdit(token, () =>
           store.previewKeyframe(clipId, track.target, atMs, value),
@@ -134,7 +137,7 @@ export function KeyframeGraph({ clipId, clip }: Props) {
       setDragValue(value);
     };
     const cleanup = (abandon = true) => {
-      store.endPrecisionEdit(token, abandon);
+      store.endPrecisionEdit(token, abandon, origin === latest);
       cleanupDrag.current = null;
       setDragValue(null);
       window.removeEventListener("pointercancel", cancel);

@@ -2,6 +2,7 @@
 // the same `SetFn`/`GetFn` pair so it can compose against the single source
 // of truth without circular imports.
 
+import { checkpointPrecision, resumePrecision } from "./precision-session";
 import type { Project } from "@movie-desk/core";
 import { runCommand } from "@movie-desk/core";
 import type { CommandHistory } from "@movie-desk/core";
@@ -23,7 +24,11 @@ export const runWith = <S extends ProjectMutating>(
   fn: (p: Project) => Project,
 ): void => {
   set((s) => {
-    const r = runCommand(s.project, s.history, { label, apply: fn });
+    const after = fn(s.project);
+    if (after === s.project) return s;
+    const history = checkpointPrecision(s.project, s.history);
+    const r = runCommand(s.project, history, { label, apply: () => after });
+    resumePrecision(r.project, r.history);
     // A no-op edit (the action found nothing to change) must not consume an
     // undo slot or discard the redo stack.
     if (r.project === s.project) return s;

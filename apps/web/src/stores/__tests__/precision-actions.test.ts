@@ -139,17 +139,45 @@ describe("live precision transactions", () => {
     expect(current(clip.id)).toEqual(clip);
     expect(useProjectStore.getState().history.past).toHaveLength(0);
   });
-  it("does not overwrite an intervening history action on cancellation", () => {
+  it.each([false, true])(
+    "rebases across a background command and remains undoable (cancel=%s)",
+    (cancel) => {
+      const clip = setup();
+      const store = useProjectStore.getState();
+      const token = store.beginPrecisionEdit("Adjust speed");
+      store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 2));
+      store.applyGenerated("Background command", (p) => ({ ...p, name: "Keep this edit" }));
+      expect(current(clip.id).speed).toBe(2);
+      expect(useProjectStore.getState().history.past.map((c) => c.label)).toEqual([
+        "Adjust speed",
+        "Background command",
+      ]);
+      store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 3));
+      expect(current(clip.id).speed).toBe(3);
+      store.endPrecisionEdit(token, cancel);
+      expect(current(clip.id).speed).toBe(cancel ? 2 : 3);
+      expect(useProjectStore.getState().project.name).toBe("Keep this edit");
+      if (!cancel) {
+        store.undo();
+        expect(current(clip.id).speed).toBe(2);
+      }
+      store.undo();
+      expect(current(clip.id).speed).toBe(2);
+      expect(useProjectStore.getState().project.name).not.toBe("Keep this edit");
+      store.undo();
+      expect(current(clip.id)).toEqual(clip);
+    },
+  );
+  it("discards a return-to-origin gesture and releases the persistence gate", () => {
     const clip = setup();
     const store = useProjectStore.getState();
-    const token = store.beginPrecisionEdit();
-    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 2));
-    store.renameProject("Keep this edit");
-    const beforeCancel = useProjectStore.getState();
-    store.previewPrecisionEdit(token, () => store.previewClipSpeed(clip.id, 3));
-    store.endPrecisionEdit(token, true);
-    expect(useProjectStore.getState().project).toBe(beforeCancel.project);
-    expect(useProjectStore.getState().history).toBe(beforeCancel.history);
+    const token = store.beginPrecisionEdit("Adjust scale");
+    store.previewPrecisionEdit(token, () => store.setTransform(clip.id, { scale: 2 }));
+    store.previewPrecisionEdit(token, () => store.setTransform(clip.id, { scale: 1 }));
+    store.endPrecisionEdit(token, false, true);
+    expect(current(clip.id)).toEqual(clip);
+    expect(useProjectStore.getState().history.past).toHaveLength(0);
+    expect(useProjectStore.getState().precisionEditing).toBe(false);
   });
   it("makes a standalone slip action undoable", () => {
     const clip = setup();

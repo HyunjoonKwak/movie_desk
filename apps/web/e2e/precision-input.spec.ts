@@ -40,7 +40,10 @@ test("invalid input and Escape do not edit; arrow session commits on blur", asyn
   await duration.fill("00:00:02:00");
   const clip = page.locator("[data-clip]").first();
   const width = await clip.evaluate((el) => el.getBoundingClientRect().width);
-  await duration.dispatchEvent("keydown", { key: "Enter", isComposing: true });
+  for (const key of ["Enter", "ArrowUp", "ArrowDown", "Escape"]) {
+    await duration.dispatchEvent("keydown", { key, isComposing: true });
+    await expect(duration).toHaveValue("00:00:02:00");
+  }
   expect(await clip.evaluate((el) => el.getBoundingClientRect().width)).toBe(width);
   await duration.press("Escape");
   await expect(duration).toHaveValue(before);
@@ -84,14 +87,17 @@ test("slider and scrub show live values, undo once and keep deletion shortcuts i
     steps: 5,
   });
   await expect(slider).toHaveValue("1.2");
-  await page.mouse.up();
   await page.keyboard.press("Backspace");
   await page.keyboard.press("Delete");
   await expect(clips).toHaveCount(count);
   await expect(input).toHaveValue("1.2");
-  await page.keyboard.press("Tab");
-  await expect(input).toBeFocused();
-  await page.getByRole("button", { name: "Undo (Cmd+Z)" }).click();
+  await page.mouse.up();
+  await expect(scrub).not.toBeFocused();
+  await page.keyboard.press("Meta+z");
+  await expect(input).toHaveValue(before);
+  await page.keyboard.press("Meta+Shift+z");
+  await expect(input).toHaveValue("1.2");
+  await page.keyboard.press("Meta+z");
   await expect(input).toHaveValue(before);
 });
 
@@ -109,4 +115,47 @@ test("clip selection preserves inspector sections and still images have no sourc
   await expect(page.getByRole("spinbutton", { name: "Source in", exact: true })).toBeHidden();
   await expect(page.getByRole("spinbutton", { name: "Source out", exact: true })).toBeHidden();
   await expect(page.getByRole("slider", { name: /Slip/ })).toBeHidden();
+  await expect(page.getByText("Spatial fit", { exact: true })).toBeVisible();
+  await expect(
+    page
+      .locator("select")
+      .filter({ has: page.getByRole("option", { name: "Stretch", exact: true }) }),
+  ).toBeVisible();
+});
+
+test("Escape aborts a slider until release and a return-to-origin scrub adds no undo", async ({
+  page,
+}) => {
+  await seedTimeline(page, 1);
+  const clips = page.locator("[data-clip]");
+  await clips.first().click();
+  const input = page.getByRole("spinbutton", { name: "Scale", exact: true });
+  const slider = page.getByRole("slider", { name: "Scale slider", exact: true });
+  await slider.scrollIntoViewIfNeeded();
+  const box = (await slider.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
+  await expect(input).not.toHaveValue("1");
+  await page.keyboard.press("Escape");
+  await expect(input).toHaveValue("1");
+  await page.mouse.move(box.x + box.width * 0.9, box.y + box.height / 2);
+  await page.mouse.up();
+  await expect(input).toHaveValue("1");
+  await expect(slider).toHaveValue("1");
+  const scrub = page.getByRole("button", { name: "Scrub Scale", exact: true });
+  const handle = (await scrub.boundingBox())!;
+  const x = handle.x + handle.width / 2;
+  const y = handle.y + handle.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  await page.mouse.move(x + 20, y);
+  await expect(slider).toHaveValue("1.2");
+  await page.mouse.move(x, y);
+  await page.mouse.up();
+  await expect(input).toHaveValue("1");
+  // Both gestures were cancelled/no-op: the next undo removes the prior append.
+  const count = await clips.count();
+  await page.keyboard.press("Meta+z");
+  await expect(clips).toHaveCount(count - 1);
 });

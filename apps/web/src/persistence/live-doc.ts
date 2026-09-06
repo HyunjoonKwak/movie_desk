@@ -108,10 +108,11 @@ export const getLiveDoc = (): LiveDoc => {
     return project;
   };
 
-  // Content mutations flush synchronously; native Yjs operations are cheap.
+  // Live precision frames update the renderer, but flush once when the session ends.
   const unsubscribe = useProjectStore.subscribe(
-    (state) => state.project,
-    (project, previous) => {
+    (state) => ({ project: state.project, editing: state.precisionEditing }),
+    ({ project, editing }, old) => {
+      const previous = old.project;
       if (applyingFromDoc || project.id !== projectId) return;
       if (
         project.timeline.tracks === previous.timeline.tracks &&
@@ -120,13 +121,15 @@ export const getLiveDoc = (): LiveDoc => {
         project.name === previous.name &&
         project.framerate === previous.framerate &&
         project.resolution === previous.resolution &&
-        project.timeline.markers === previous.timeline.markers
+        project.timeline.markers === previous.timeline.markers &&
+        !(old.editing && !editing)
       ) {
         return;
       }
       useSaveStateStore.getState().setState("saving");
-      flush();
+      if (!editing) flush();
     },
+    { equalityFn: (a, b) => a.project === b.project && a.editing === b.editing },
   );
 
   // Startup may replay several updates; whenSynced applies their final state once.
@@ -175,6 +178,12 @@ export const getLiveDoc = (): LiveDoc => {
     projectId,
     dispose: () => {
       if (disposed) return;
+      if (
+        useProjectStore.getState().project.id === projectId &&
+        useProjectStore.getState().precisionEditing
+      ) {
+        useProjectStore.getState().endPrecisionEdit();
+      }
       unsubscribe();
       disposed = true;
       doc.off("afterTransaction", afterTransaction);

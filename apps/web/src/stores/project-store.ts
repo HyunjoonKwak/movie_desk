@@ -1,4 +1,5 @@
 "use client";
+import { precisionSession, resumePrecision } from "./precision-session";
 import { reloadSpan } from "@/lib/reload-metrics";
 
 import {
@@ -175,9 +176,10 @@ interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
   trimEnd: (clipId: ID, newEnd: Ms) => void;
   trimStart: (clipId: ID, newStart: Ms) => void;
   setSourceTrim: (clipId: ID, edge: "in" | "out", ms: Ms) => void;
-  beginPrecisionEdit: () => symbol;
+  precisionEditing: boolean;
+  beginPrecisionEdit: (label?: string) => symbol;
   previewPrecisionEdit: (token: symbol, apply: () => void) => void;
-  endPrecisionEdit: (token: symbol, cancel?: boolean) => void;
+  endPrecisionEdit: (token?: symbol, cancel?: boolean, unchanged?: boolean) => void;
   previewClipSpeed: (clipId: ID, speed: number) => void;
   previewSlipClipTo: (clipId: ID, sourceIn: Ms) => void;
   previewKeyframe: (clipId: ID, target: string, atMs: Ms, value: number) => void;
@@ -241,7 +243,6 @@ let clipDragBefore: Project | null = null;
 // session pins the exact history entry it may extend — identity, not label,
 // so an undo (or any other edit) in between can never be merged over.
 let nudgeSession: { key: string; at: number; entry: AppliedCommand } | null = null;
-let precisionSession: { token: symbol; before: Project; history: CommandHistory } | null = null;
 
 const applySlip = (project: Project, clipId: ID, deltaMs: Ms): Project => {
   const clip = findClip(project.timeline, clipId);
@@ -287,11 +288,12 @@ export const useProjectStore = create<ProjectStoreState>()(
   subscribeWithSelector((set, get) => ({
     project: createEmptyProject(),
     history: emptyHistory,
+    precisionEditing: false,
 
     loadProject: (p) => {
       const end = reloadSpan("loadProject");
       nudgeSession = null;
-      precisionSession = null;
+      get().endPrecisionEdit(undefined, true);
       set({ project: p, history: emptyHistory });
       end();
     },
@@ -320,31 +322,42 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     // Precision gestures publish live values without history, then record the
     // pre-gesture snapshot once. Tokens fence unmounted or replaced editors.
-    beginPrecisionEdit: () => {
-      if (precisionSession) get().endPrecisionEdit(precisionSession.token);
+    beginPrecisionEdit: (label = "Adjust value") => {
+      if (precisionSession.current) get().endPrecisionEdit();
       const token = Symbol("precision edit");
-      precisionSession = { token, before: get().project, history: get().history };
+      precisionSession.current = {
+        token,
+        before: get().project,
+        history: get().history,
+        label,
+        rebased: false,
+      };
+      set({ precisionEditing: true });
       return token;
     },
     previewPrecisionEdit: (token, apply) => {
-      const session = precisionSession;
-      if (
-        session?.token !== token ||
-        session.history !== get().history ||
-        session.before.id !== get().project.id
-      )
-        return;
+      const session = precisionSession.current;
+      if (session?.token !== token || session.before.id !== get().project.id) return;
+      // Non-runWith operations (e.g. undo) can also replace history.
+      if (session.history !== get().history) resumePrecision(get().project, get().history);
       apply();
     },
-    endPrecisionEdit: (token, cancel = false) => {
-      const session = precisionSession;
-      if (session?.token !== token) return;
-      precisionSession = null;
+    endPrecisionEdit: (token, cancel = false, unchanged = false) => {
+      const session = precisionSession.current;
+      if (!session || (token !== undefined && session.token !== token)) return;
+      precisionSession.current = null;
       const { project: after, history } = get();
-      if (session.history !== history || session.before.id !== after.id || after === session.before)
+      if (
+        session.history !== history ||
+        session.before.id !== after.id ||
+        after === session.before
+      ) {
+        set({ precisionEditing: false });
         return;
-      if (cancel) {
+      }
+      if (cancel || (unchanged && !session.rebased)) {
         set({
+          precisionEditing: false,
           project: {
             ...session.before,
             timeline: {
@@ -355,9 +368,13 @@ export const useProjectStore = create<ProjectStoreState>()(
           },
         });
       } else {
-        set({ history: recordApplied(session.before, after, history, "Adjust value") });
+        set({
+          precisionEditing: false,
+          history: recordApplied(session.before, after, history, session.label),
+        });
       }
     },
+
     previewClipSpeed: (clipId, speed) =>
       set((s) => ({
         project: updateClip(s.project, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) })),
