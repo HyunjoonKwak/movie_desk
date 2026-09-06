@@ -112,14 +112,11 @@ export function marqueeHitTest(
   if (layout.width <= 0 || layout.cardHeight <= 0) return hits;
   for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
     const group = groups[groupIndex]!;
-    const groupLayout = layout.groups[groupIndex];
-    if (!groupLayout) continue;
     for (let index = 0; index < group.assets.length; index += 1) {
-      const row = Math.floor(index / layout.columns);
       const column = index % layout.columns;
       const x = column * (layout.cardWidth + MEDIA_GRID_GAP);
-      const y =
-        groupLayout.top + groupLayout.headerHeight + row * (layout.cardHeight + MEDIA_GRID_GAP);
+      const y = cardTop(layout, groupIndex, index);
+      if (y === null) continue;
       if (
         x < rect.x + rect.w &&
         x + layout.cardWidth > rect.x &&
@@ -130,4 +127,15 @@ export function marqueeHitTest(
     }
   }
   return hits;
+}
+
+// Card reveal and hit-testing consumers share the same group/header/row coordinates.
+export function cardTop(layout: MediaLayout, groupIndex: number, index: number): number | null {
+  const group = layout.groups[groupIndex];
+  if (!group || index < 0) return null;
+  return (
+    group.top +
+    group.headerHeight +
+    Math.floor(index / layout.columns) * (layout.cardHeight + MEDIA_GRID_GAP)
+  );
 }

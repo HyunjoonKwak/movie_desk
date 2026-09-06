@@ -18,7 +18,7 @@ import { SnapGuide } from "./snap-guide";
 import { SkimLine } from "./skim-line";
 import { TRACK_HEADER_W, clampZoom } from "../constants";
 
-import { timelineGuidance } from "@/timeline/state-guidance";
+import { TIMELINE_HINT_KEYS, timelineGuidance } from "@/timeline/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 export function TimelinePanel() {
@@ -342,7 +342,9 @@ export function TimelinePanel() {
         <TimelineZoom />
       </div>
 
-      {guidance.state === "empty" && <StateHint testId="timeline-state-hint" text={t("state.timeline.empty")} />}
+      {guidance.state === "empty" && (
+        <StateHint testId="timeline-state-hint" text={t(TIMELINE_HINT_KEYS.empty)} />
+      )}
       <div
         ref={containerRef}
         data-tl-scroll

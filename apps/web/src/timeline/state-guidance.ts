@@ -1,6 +1,12 @@
 // Ignore stale selection IDs and avoid allocating a clip array on timeline updates.
 import type { Track } from "@movie-desk/core";
 
+export const TIMELINE_HINT_KEYS = {
+  empty: "state.timeline.empty",
+  unselected: "state.timeline.unselected",
+  selected: "state.timeline.selected",
+} as const;
+
 export function timelineGuidance(tracks: readonly Track[], selected: ReadonlySet<string>) {
   let total = 0;
   let count = 0;

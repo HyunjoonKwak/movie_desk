@@ -817,4 +817,5 @@ export const en = {
     "state.clearSearchFilters": "Clear filters",
     "state.inspector.multipleFirstSelected": "Selected clips: {n}. These controls edit the clip you selected first; select a single clip to edit another one.",
     "state.export.recovery": "Export could not finish. Return to the editor to check sources and the export range, then retry.",
+    "preview.missingMoreNames": "{name} (+{n} more)",
 } as const;

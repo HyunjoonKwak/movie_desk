@@ -100,21 +100,32 @@ export function AutoEditPanel() {
 
   const analysisSettled = stats.total > 0 && stats.doneCount + stats.failedCount === stats.total;
   const musicAsset = media.find((asset) => asset.id === wiz.musicAssetId);
-  const [tempo, setTempo] = useState<{ asset: typeof musicAsset; bpm: number } | null>(null);
+  const musicAssetId = wiz.musicAssetId;
+  const musicPath = musicAsset?.opfsPath;
+  const musicDuration = musicAsset?.durationMs;
+  const [tempo, setTempo] = useState<{ assetId: ID; path: string; bpm: number } | null>(null);
   useEffect(() => {
-    if (analysisRunning || !analysisSettled || stats.doneCount === 0 || !musicAsset) return;
+    if (
+      analysisRunning ||
+      !analysisSettled ||
+      stats.doneCount === 0 ||
+      !musicAssetId ||
+      !musicPath ||
+      musicDuration === undefined
+    )
+      return;
     let cancelled = false;
-    void analyzeMusic(musicAsset.id, musicAsset.opfsPath, musicAsset.durationMs)
+    void analyzeMusic(musicAssetId, musicPath, musicDuration)
       .then((music) => {
-        if (!cancelled) setTempo({ asset: musicAsset, bpm: music?.bpm ?? 0 });
+        if (!cancelled) setTempo({ assetId: musicAssetId, path: musicPath, bpm: music?.bpm ?? 0 });
       })
       .catch(() => {
-        if (!cancelled) setTempo({ asset: musicAsset, bpm: 0 });
+        if (!cancelled) setTempo({ assetId: musicAssetId, path: musicPath, bpm: 0 });
       });
     return () => {
       cancelled = true;
     };
-  }, [analysisRunning, analysisSettled, stats.doneCount, musicAsset]);
+  }, [analysisRunning, analysisSettled, stats.doneCount, musicAssetId, musicPath, musicDuration]);
   const guidance = useMemo(
     () =>
       stats.total === 0
@@ -128,12 +139,13 @@ export function AutoEditPanel() {
             },
             () => {
               // A newly selected music file must finish tempo analysis before a candidate verdict.
-              if (musicAsset && tempo?.asset !== musicAsset) return null;
+              if (musicPath && (tempo?.assetId !== musicAssetId || tempo.path !== musicPath))
+                return null;
               return buildCandidates(
                 media,
                 doneAnalyses(entries),
                 { pinned: wiz.pinned, excluded: wiz.excluded },
-                candidateWindowMs(wiz.mode, musicAsset ? tempo?.bpm : 0),
+                candidateWindowMs(wiz.mode, musicPath ? tempo?.bpm : 0),
               ).candidates.length;
             },
           ),
@@ -142,7 +154,8 @@ export function AutoEditPanel() {
       stats.doneCount,
       stats.failedCount,
       analysisRunning,
-      musicAsset,
+      musicAssetId,
+      musicPath,
       tempo,
       media,
       entries,
@@ -310,7 +323,7 @@ export function AutoEditPanel() {
                   </button>
                 </div>
               )}
-              {stats.failedCount > 0 && (
+              {stats.doneCount > 0 && stats.failedCount > 0 && (
                 <p className="mt-2 break-keep text-2xs leading-relaxed text-amber-200">
                   {t("auto.reportPartial", { failed: stats.failedCount })}
                 </p>

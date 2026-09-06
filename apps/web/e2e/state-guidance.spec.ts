@@ -15,7 +15,7 @@ test("empty project explains the next step and imports through its hint", async 
   ).toBe(true);
   await expect(page.getByTestId("inspector-empty-hint")).toBeVisible();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByTestId("media-empty-hint").getByRole("button").click();
+  await page.getByTestId("media-empty-hint").click({ position: { x: 5, y: 5 } });
   await (await chooser).setFiles({ name: "hint.png", mimeType: "image/png", buffer: PNG });
   await expect(mediaCard(page, "hint.png")).toBeVisible();
   await expect(page.getByTestId("media-empty-hint")).toBeHidden();
@@ -52,7 +52,7 @@ test("Korean hints wrap at the media minimum width and reset an empty search", a
   await page.screenshot({ path: testInfo.outputPath("ko-auto-empty-min-width.png") });
   await page.getByRole("button", { name: "속성", exact: true }).click();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByTestId("media-empty-hint").getByRole("button").click();
+  await page.getByTestId("media-empty-hint").click({ position: { x: 5, y: 5 } });
   await (await chooser).setFiles({ name: "hint.png", mimeType: "image/png", buffer: PNG });
   await expect(mediaCard(page, "hint.png")).toBeVisible();
   await page.locator('[data-testid="media-controls"] input').first().fill("no-such-file");
@@ -98,4 +98,32 @@ test("Korean hints wrap at the media minimum width and reset an empty search", a
   expect(choosers).toBe(0);
   await missingHint.getByRole("button", { name: "이 안내 닫기" }).click();
   await expect(missingHint).toBeHidden();
+  // A repaired set becoming missing again starts a new warning episode.
+  // Focus probes are throttled for 10 seconds; allow a complete real probe cycle.
+  await page.evaluate(
+    async ({ name, bytes }) => {
+      const root = await navigator.storage.getDirectory();
+      const handle = await root.getFileHandle(name, { create: true });
+      const writer = await handle.createWritable();
+      await writer.write(new Uint8Array(bytes));
+      await writer.close();
+    },
+    { name: key, bytes: [...PNG] },
+  );
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      return page.locator("[data-preview-missing]").count();
+    }, { timeout: 15000 })
+    .toBe(0);
+  await page.evaluate(async (name) => {
+    const root = await navigator.storage.getDirectory();
+    await root.removeEntry(name);
+  }, key);
+  await expect
+    .poll(async () => {
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+      return missingHint.count();
+    }, { timeout: 15000 })
+    .toBe(1);
 });

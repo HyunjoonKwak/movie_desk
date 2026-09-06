@@ -71,13 +71,14 @@ import { TrashDialog } from "./trash-dialog";
 import {
   MEDIA_GRID_GAP,
   buildMediaLayout,
+  cardTop,
   marqueeHitTest,
   mediaColumns,
   type MediaSegmentLayout,
   type VirtualMediaGroup,
 } from "@/media/virtual-layout";
 
-import { mediaGuidance } from "@/media/state-guidance";
+import { MEDIA_HINT_KEYS, mediaGuidance } from "@/media/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -296,7 +297,7 @@ export function MediaBin() {
       // capture would otherwise retarget the click to this container).
       if (
         (e.target as HTMLElement).closest(
-          "[data-asset-card], [data-group-header], [data-state-hint]",
+          '[data-asset-card], [data-group-header], [data-state-hint], [data-testid="media-empty-hint"]',
         )
       )
         return;
@@ -620,27 +621,34 @@ export function MediaBin() {
   const missing = useMemo(
     () => ({
       count: Object.keys(sourceHealth).length,
+      signature: Object.keys(sourceHealth).sort().join("|"),
       first: media.find((asset) => sourceHealth[asset.id]),
     }),
     [media, sourceHealth],
   );
-  const [dismissedProjects, setDismissedProjects] = useState<ReadonlySet<ID>>(new Set());
+  const [dismissedMissing, setDismissedMissing] = useState<string | null>(null);
+  const missingSignature = JSON.stringify([projectId, missing.signature]);
+  useEffect(() => {
+    setDismissedMissing((previous) => previous === missingSignature ? previous : null);
+  }, [missingSignature]);
   const [pendingReveal, setPendingReveal] = useState<ID | null>(null);
   useLayoutEffect(() => {
     if (!pendingReveal) return;
     const location = locateAsset(pendingReveal);
     const scroll = listRef.current;
     const cards = cardsRef.current;
-    if (!location || !scroll || !cards) return;
+    if (!location || !scroll || !cards) {
+      setPendingReveal(null);
+      return;
+    }
     // Reuse the virtual layout and forced focus location so offscreen cards mount before focus.
     setFocusedAssetId(pendingReveal);
-    const group = layout.groups[location.groupIndex];
-    if (!group) return;
-    scroll.scrollTop =
-      cards.offsetTop +
-      group.top +
-      group.headerHeight +
-      Math.floor(location.assetIndex / columns) * (layout.cardHeight + MEDIA_GRID_GAP);
+    const top = cardTop(layout, location.groupIndex, location.assetIndex);
+    if (top === null) {
+      setPendingReveal(null);
+      return;
+    }
+    scroll.scrollTop = cards.offsetTop + top;
     const frame = requestAnimationFrame(() => {
       const card = [...cards.querySelectorAll<HTMLElement>("[data-asset-card]")].find(
         (element) => element.dataset.assetCard === pendingReveal,
@@ -650,7 +658,7 @@ export function MediaBin() {
       setPendingReveal(null);
     });
     return () => cancelAnimationFrame(frame);
-  }, [pendingReveal, locateAsset, layout, columns]);
+  }, [pendingReveal, locateAsset, layout]);
 
   return (
     <div className="flex h-full flex-col">
@@ -784,7 +792,7 @@ export function MediaBin() {
         </div>
       )}
 
-      {missing.count > 0 && !dismissedProjects.has(projectId) && (
+      {missing.count > 0 && dismissedMissing !== missingSignature && (
         <StateHint
           testId="media-missing-hint"
           tone="warning"
@@ -802,7 +810,7 @@ export function MediaBin() {
           }
           dismiss={{
             label: t("state.dismiss"),
-            onClick: () => setDismissedProjects((previous) => new Set([...previous, projectId])),
+            onClick: () => setDismissedMissing(missingSignature),
           }}
         />
       )}
@@ -852,20 +860,24 @@ export function MediaBin() {
           />
         )}
         {guidance === "empty" && (
-          <div className="mt-4 rounded-lg border border-dashed border-line-strong bg-panel-2/40 p-2 transition-colors hover:border-accent/55 hover:bg-panel-2">
-            <p className="px-2 text-xs text-ink-2">{t("media.dropHere")}</p>
-            <p className="px-2 text-2xs text-ink-3">{t("media.browseHere")}</p>
-            <StateHint
-              testId="media-empty-hint"
-              text={t("state.media.empty")}
-              action={{ label: t("media.import"), onClick: onChooseFiles, disabled: importing }}
-            />
-          </div>
+          <button
+            type="button"
+            onClick={onChooseFiles}
+            disabled={importing}
+            data-testid="media-empty-hint"
+            aria-label={t("media.import")}
+            className="mt-4 flex w-full flex-col gap-1 rounded-lg border border-dashed border-line-strong bg-panel-2/40 p-4 text-left transition-colors hover:border-accent/55 hover:bg-panel-2 disabled:opacity-50"
+          >
+            <span className="text-xs text-ink-2">{t("media.dropHere")}</span>
+            <span className="text-2xs text-ink-3">{t("media.browseHere")}</span>
+            <span className="mt-1 text-xs leading-5 text-ink-3">{t(MEDIA_HINT_KEYS.empty)}</span>
+            <span className="mt-1 text-xs text-accent">{t("media.import")}</span>
+          </button>
         )}
         {guidance === "filtered" && (
           <StateHint
             testId="media-filtered-hint"
-            text={`${t("media.noMatches")} ${t("state.media.filtered")}`}
+            text={`${t("media.noMatches")} ${t(MEDIA_HINT_KEYS.filtered)}`}
             action={{ label: t("state.clearSearchFilters"), onClick: resetSearch }}
           />
         )}

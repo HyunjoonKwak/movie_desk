@@ -65,7 +65,7 @@ export const phraseBefore = (sections: readonly Ms[], atMs: Ms): Ms => {
 
 // --- browser analysis --------------------------------------------------------
 
-export const analyzeMusic = async (
+const analyzeMusicUncached = async (
   assetId: ID,
   opfsPath: string,
   durationMs: Ms,
@@ -101,4 +101,25 @@ export const analyzeMusic = async (
   } catch {
     return null;
   }
+};
+
+// Share in-flight and completed analysis across the panel, generation and beat snap.
+// Retain only derived analysis; failed reads/decodes must be retryable after reconnect.
+const musicAnalyses = new Map<string, Promise<MusicAnalysis | null>>();
+export const analyzeMusic = (
+  assetId: ID,
+  opfsPath: string,
+  durationMs: Ms,
+): Promise<MusicAnalysis | null> => {
+  const key = JSON.stringify([assetId, opfsPath]);
+  const cached = musicAnalyses.get(key);
+  if (cached) return cached;
+  const pending = analyzeMusicUncached(assetId, opfsPath, durationMs)
+    .catch(() => null)
+    .then((result) => {
+      if (!result && musicAnalyses.get(key) === pending) musicAnalyses.delete(key);
+      return result;
+    });
+  musicAnalyses.set(key, pending);
+  return pending;
 };

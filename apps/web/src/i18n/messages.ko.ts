@@ -815,4 +815,5 @@ export const ko = {
     "state.clearSearchFilters": "검색·필터 초기화",
     "state.inspector.multipleFirstSelected": "{n}개를 선택했습니다. 여기서는 먼저 선택한 클립을 편집하므로 다른 클립을 바꾸려면 하나만 선택하세요.",
     "state.export.recovery": "내보내기를 완료하지 못했습니다. 편집으로 돌아가 원본과 내보내기 범위를 확인한 뒤 다시 시도하세요.",
+    "preview.missingMoreNames": "{name} 외 {n}개",
 } as const;
