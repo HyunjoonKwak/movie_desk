@@ -165,3 +165,42 @@ test("bus mute exports silence and mixer strips scroll at 390 pixels", async ({ 
   await expect(page.getByRole("spinbutton", { name: "Master Gain", exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath("audio-mixer-mobile.png") });
 });
+
+test("opens a project with invalid mixer settings and explains the recovery once", async ({
+  page,
+}) => {
+  await prepare(page);
+  const clips = await page.locator("[data-clip]").count();
+  const json = await run<string>(
+    page,
+    `async () => {
+    const p = await readMixerProject();
+    return JSON.stringify({ schema: "cut_editor-project", version: 1, exportedAt: Date.now(),
+      project: { ...p, name: "Recovered mixer", audio: { buses: [], master: { gainDb: 100 } },
+        timeline: { ...p.timeline, tracks: p.timeline.tracks.map(t => t.name === "A1" ? { ...t, audio: { pan: 2 } } : t) } } });
+  }`,
+  );
+  await page.getByRole("button", { name: "Projects", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .locator('input[type="file"][accept="application/json,.json"]')
+    .setInputFiles({
+      name: "recover-mixer.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(json),
+    });
+  const notice = page.getByText(
+    "The audio mixer settings could not be read; the project opened with defaults.",
+    { exact: true },
+  );
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveCount(1);
+  await expect(page.getByRole("textbox", { name: "Rename project" })).toHaveValue(
+    "Recovered mixer",
+  );
+  await expect(page.locator("[data-clip]")).toHaveCount(clips);
+  await expect
+    .poll(() => run<boolean>(page, "async () => (await readMixerProject()).audio === undefined"))
+    .toBe(true);
+  expect(await run<number>(page, "() => exportMixerRms()")).toBeGreaterThan(0.01);
+});

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
@@ -7,15 +6,26 @@ const { chromium } = require("@playwright/test");
 const { build } = createRequire(createRequire(require.resolve("vitest")).resolve("vite"))(
   "esbuild",
 );
-// Extract the actual reviewed estimator to keep the paired baseline reproducible.
-const baselineSource = execFileSync("git", ["show", "13e7506:apps/web/src/mixer/mixer-meter.tsx"], {
-  encoding: "utf8",
-});
-const baselineBody = baselineSource
-  .split("const estimate = useMemo(() => {")[1]
-  .split("}, [playing,")[0]
-  .replace("if (playing) return 0;", "")
-  .replace("const project = useProjectStore.getState().project;", "");
+// Frozen pre-sharing baseline: deliberately rebuilds the asset map per consumer.
+// Kept inline so paired measurements also work without Git history.
+const baselineBody = `
+  const tracks = id === "master" ? project.timeline.tracks : project.timeline.tracks.filter(
+    track => id === "track:" + track.id || id === "bus:" + track.audio?.busId);
+  const assets = new Map(project.mediaLibrary.map(asset => [asset.id, asset]));
+  let peak = 0;
+  for (const track of tracks) {
+    const route = resolveTrackRoute(project, track);
+    const [ll, lr, rl, rr] = stereoPanMatrix(route.pan);
+    const scale = route.trackGain * Math.max(ll + lr, rl + rr)
+      * (id.startsWith("track:") ? 1 : route.busGain)
+      * (id === "master" ? route.masterGain : 1);
+    peak = Math.max(peak, scale * playheadLevel(
+      { ...project, timeline: { ...project.timeline, tracks: [track] } },
+      assetId => assets.get(assetId),
+      assetId => assets.get(assetId)?.waveformPeaks ?? waveforms[assetId]));
+  }
+  return peak;
+`;
 const result = await build({
   stdin: {
     contents: `export * from "./packages/core/src/audio-routing/index.ts";

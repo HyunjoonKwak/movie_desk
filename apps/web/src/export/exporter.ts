@@ -258,6 +258,8 @@ export class WebCodecsExporter implements Exporter {
                 if (this.cancelled) throw new ExportCancelledError();
                 const numberOfFrames = Math.min(encoderChunkSize, totalSamples - i);
                 const planar = packStereoPlanar(chunk.channels, i, numberOfFrames);
+                // At unity the mixer worker has already limited PCM to ±1;
+                // only normalization can introduce additional clipped samples.
                 if (masterGain !== 1) {
                   for (let sample = 0; sample < planar.length; sample++) {
                     const normalized = planar[sample]! * masterGain;
@@ -288,7 +290,8 @@ export class WebCodecsExporter implements Exporter {
               }
             }
             if (prerollSamples) encodePadding(prerollSamples + Math.round(exportDurationMs * 48));
-            audioPeaks = { ...peakMeter.finish(), clippedSamples, limitedSamples };
+            const { samplePeak, truePeak } = peakMeter.finish();
+            audioPeaks = { samplePeak, truePeak, clippedSamples, limitedSamples };
             await audioEncoder.flush();
           } finally {
             if (audioEncoder.state !== "closed") audioEncoder.close();

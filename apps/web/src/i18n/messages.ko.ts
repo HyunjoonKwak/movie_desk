@@ -931,6 +931,6 @@ export const ko = {
     "mixer.rms": "RMS",
     "mixer.shortLufs": "단기 LUFS",
     "mixer.exportPeaks": "근사 트루피크: {peak} dBTP · 클리핑 샘플: {count}",
-    "mixer.unavailable": "실측 미터를 사용할 수 없음",
     "mixer.limited": "리미터 이전 과부하 샘플: {count}",
+    "project.audioRecovered": "오디오 믹서 설정을 읽을 수 없어 기본값으로 프로젝트를 열었습니다.",
 } as const;

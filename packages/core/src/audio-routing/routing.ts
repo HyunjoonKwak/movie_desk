@@ -40,23 +40,30 @@ export const resolveTrackRoute = (project: Project, track: Track): TrackRoute =>
 
 // Clip volume automation is evaluated before this stage and replaces base
 // clip volume. Routing multiplies that resulting PCM, never base volume again.
+// Optional scratch is caller-owned and must not alias inputs or the other output.
+// Returned views borrow it until the next write; omitting it returns owned PCM.
 export const routeStereo = (
   channels: readonly Float32Array[],
   route: TrackRoute,
+  scratch?: readonly [Float32Array, Float32Array],
 ): readonly [Float32Array, Float32Array] => {
   const left = channels[0] ?? new Float32Array(0);
   const right = channels[1] ?? left;
-  const output: [Float32Array, Float32Array] = [
-    new Float32Array(left.length),
-    new Float32Array(left.length),
-  ];
+  const output = scratch ?? [new Float32Array(left.length), new Float32Array(left.length)];
+  if (
+    scratch &&
+    (scratch.some((channel) => channel.length < left.length) ||
+      scratch[0].buffer === scratch[1].buffer ||
+      scratch.some((output) => channels.some((input) => input.buffer === output.buffer)))
+  )
+    throw new Error("Routing scratch must have sufficient capacity and independent buffers");
   const [ll, lr, rl, rr] = stereoPanMatrix(route.pan);
   const totalGain = route.trackGain * route.busGain * route.masterGain;
   for (let i = 0; i < left.length; i++) {
     const l = left[i]!;
     const r = right[i] ?? 0;
-    output[0][i] = (l * ll + r * lr) * totalGain;
-    output[1][i] = (l * rl + r * rr) * totalGain;
+    output[0]![i] = (l * ll + r * lr) * totalGain;
+    output[1]![i] = (l * rl + r * rr) * totalGain;
   }
-  return output;
+  return [output[0]!.subarray(0, left.length), output[1]!.subarray(0, left.length)];
 };

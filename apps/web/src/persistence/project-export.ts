@@ -122,10 +122,12 @@ const trackSchema = z
         busId: z.string().min(1).optional(),
       })
       .passthrough()
-      .optional(),
+      .optional()
+      .catch(undefined),
     clips: z.array(clipSchema),
   })
-  .passthrough();
+  .passthrough()
+  .transform(({ audio, ...rest }) => (audio === undefined ? rest : { ...rest, audio }));
 
 const rootSnapshotSchema = z
   .object({
@@ -247,9 +249,12 @@ const projectSchema = z
       .transform(({ magnetic: _legacy, ...rest }) => rest),
     mediaLibrary: z.array(mediaAssetSchema),
     collections: z.array(collectionSchema).optional(),
-    audio: projectAudioSchema.optional(),
+    audio: projectAudioSchema.optional().catch(undefined),
   })
-  .passthrough() as unknown as z.ZodType<Project>;
+  .passthrough()
+  .transform(({ audio, ...rest }) =>
+    audio === undefined ? rest : { ...rest, audio },
+  ) as unknown as z.ZodType<Project>;
 
 const exportSchema = z.object({
   schema: z.literal("cut_editor-project"),
@@ -258,7 +263,23 @@ const exportSchema = z.object({
   project: projectSchema,
 });
 
-export const parseStoredProject = (raw: unknown): Project => projectSchema.parse(raw);
+// Recovery metadata is session-only: it never enters JSON, Yjs or the project model.
+const recoveredAudio = new WeakSet<Project>();
+const rememberAudioRecovery = (raw: unknown, project: Project): Project => {
+  // Called only after the load-bearing project shape has passed validation.
+  const input = raw as Project;
+  if (
+    (input.audio !== undefined && project.audio === undefined) ||
+    input.timeline.tracks.some(
+      (track, i) => track.audio !== undefined && project.timeline.tracks[i]?.audio === undefined,
+    )
+  )
+    recoveredAudio.add(project);
+  return project;
+};
+export const takeAudioRecovery = (project: Project): boolean => recoveredAudio.delete(project);
+export const parseStoredProject = (raw: unknown): Project =>
+  rememberAudioRecovery(raw, projectSchema.parse(raw));
 
 export const toProjectExport = (project: Project): ProjectExport => ({
   schema: "cut_editor-project",
@@ -298,6 +319,7 @@ export const parseProjectExport = (raw: unknown): ProjectExport => {
       PROJECT_VERSION,
     );
   }
+  rememberAudioRecovery((raw as ProjectExport).project, env.project);
   return env;
 };
 

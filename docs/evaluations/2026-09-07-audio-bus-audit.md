@@ -132,3 +132,19 @@ Real OfflineAudioContext versus export mixer: maximum PCM error **1.490116119384
 [Verified round-2 desktop/header screenshot](audio-bus/round2-desktop.png).
 
 Round-2 full `pnpm gate`: **9/9 PASS**, unit tests **854** (core 143, web 628, desktop 72, scripts 11), Chromium E2E **59/59 PASS**; see [gate report](2026-09-07-audio-bus-round2-gate.md). Port 32119 was checked before each browser/gate launch. Only M1 is deferred; all mandatory review items and the other suggested items are implemented.
+
+## Round 3 final review — 2026-09-07
+
+Base `224e25e`, same worktree. All three required changes and all four optional changes were implemented:
+
+- The paired benchmark now includes a frozen inline baseline estimator; it uses no Git command, commit reference or source-text splitting. The earlier round-2 report describes how that original measurement was taken, while the current script remains runnable after history cleanup.
+- Removed only the unused `mixer.unavailable` line in each locale catalog. The coordinator additionally authorized one new `project.audioRecovered` line at each file's end, preserving four-space indentation and all other lines without an i18n formatter. The decision's worklet fallback paragraph now matches the estimated value/label behavior; locale parity passes.
+- Invalid project/track audio blocks use optional catch-to-undefined recovery and omit the discarded property entirely. Valid neighboring blocks, clips and assets survive; malformed required timeline data still fails. Stored JSON and export-envelope tests cover bad gain, pan and duplicate buses. Actual load consumes non-persisted recovery metadata and emits a Korean/English warning once; the new browser import test checks the visible notice, project name, clip count, saved default audio state and audible exported PCM.
+- Clarified the worker limiter's unity-gain guarantee and explicitly extracted sample/true peak fields instead of overwriting the meter's clipped count via spread.
+- Added project ID to the shared estimate cache guard, with a cross-project regression assertion.
+- Added per-mixer reusable routing scratch, independent output/input buffer validation and disposal. Core tests verify buffer reuse, result lengths, default result independence and alias/capacity rejection. No scratch is shared across mixer instances or exposed as an export chunk.
+- Added metering-enabled fake AudioWorkletNode coverage for the full track panner → track meter → bus gain/meter → master gain/meter → destination path, zero gain-only rewiring and port cleanup.
+
+Current standalone browser benchmark: PCM maximum error **1.49e-8**, 8-track meter message/store-publication maximum **0.10 ms**, and 1,000-asset/8-track/100-move estimator time **55.6→1.4 ms**, p95 **0.70→0.10 ms**, asset maps **1700→1**, estimate checksum **637.5** unchanged. See [round-3 measurements](2026-09-07-audio-bus-round3-measurements.json); these JavaScript timings exclude React layout/paint.
+
+The coordinator confirmed B′2's gate and dispatch had finished before the first B′3 full gate, and port 32119 was checked before each gate launch. Final full gate **9/9 PASS**, unit tests **858** (core 144, web 631, desktop 72, scripts 11), locale parity **5/5** within web tests and Chromium E2E **60/60 PASS**; see [round-3 gate](2026-09-07-audio-bus-round3-gate.md). No round-3 item is deferred; the previously documented M1 true-peak worker migration remains a separate follow-up.

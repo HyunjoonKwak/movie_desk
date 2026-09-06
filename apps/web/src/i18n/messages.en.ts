@@ -933,6 +933,6 @@ export const en = {
     "mixer.rms": "RMS",
     "mixer.shortLufs": "Short-term LUFS",
     "mixer.exportPeaks": "Approx. true peak: {peak} dBTP · Clipped samples: {count}",
-    "mixer.unavailable": "Live meter unavailable",
     "mixer.limited": "Pre-limiter overload samples: {count}",
+    "project.audioRecovered": "The audio mixer settings could not be read; the project opened with defaults.",
 } as const;

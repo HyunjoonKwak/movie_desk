@@ -64,3 +64,18 @@ describe("shared audio routing", () => {
     ).toBe(0);
   });
 });
+
+it("reuses caller-owned scratch without changing independent default results", () => {
+  const route = resolveTrackRoute(p, base);
+  const input = [Float32Array.of(0.2, 0.4)];
+  const owned = routeStereo(input, route);
+  const scratch: [Float32Array, Float32Array] = [new Float32Array(8), new Float32Array(8)];
+  const borrowed = routeStereo(input, route, scratch);
+  expect(borrowed[0].buffer).toBe(scratch[0].buffer);
+  expect(borrowed).toEqual(owned);
+  routeStereo([Float32Array.of(0.8)], route, scratch);
+  expect(owned[0]).toEqual(input[0]);
+  expect(input[0]![0]).toBeCloseTo(0.2);
+  expect(() => routeStereo(input, route, [input[0]!, scratch[1]])).toThrow(/independent/);
+  expect(() => routeStereo(input, route, [new Float32Array(1), scratch[1]])).toThrow(/capacity/);
+});

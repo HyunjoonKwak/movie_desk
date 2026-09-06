@@ -14,7 +14,7 @@ One-level buses only: no sends, feedback, nested buses, bus pan or effects. Miss
 
 ## Meters
 
-Local AudioWorklets pass stereo PCM unchanged and measure every sample; results cross to main every 2,048 frames and publish at most once per animation frame. Track, bus and master meters show peak/RMS in dBFS with a 1.5 second peak/clip hold. Master short-term LUFS uses a contiguous 3-second K-weighted stereo window (no integrated gating), with a warm-up placeholder. Stopped/scrub meters remain explicitly labelled waveform estimates. AudioWorklet failure preserves audio with an explicit unavailable meter label.
+Local AudioWorklets pass stereo PCM unchanged and measure every sample; results cross to main every 2,048 frames and publish at most once per animation frame. Track, bus and master meters show peak/RMS in dBFS with a 1.5 second peak/clip hold. Master short-term LUFS uses a contiguous 3-second K-weighted stereo window (no integrated gating), with a warm-up placeholder. Stopped/scrub meters remain explicitly labelled waveform estimates. AudioWorklet failure preserves audio and falls back to waveform estimates with an explicit estimated label, including during playback.
 
 Export true peak is an explicitly approximate 4× 16-tap windowed-sinc interpolator, preserving history across chunks and flushing latency at the end. It is not a certified BS.1770 measurement. True/sample peaks measure the final normalized, clamped Float32 PCM before encoding, not decoded lossy AAC. Clipped-sample counts still represent normalized channel samples exceeding full scale before that clamp; limiter overload is a separate count. No external dependencies or network service.
 
@@ -23,3 +23,9 @@ Export true peak is an explicitly approximate 4× 16-tap windowed-sinc interpola
 Initial graph parameters are initialized at their target before playback to preserve legacy PCM; subsequent gain/pan edits use a 10 ms exponential time constant. Unchanged targets do not add automation and unchanged output destinations do not reconnect. Late inputs connect directly to master and are removed by the next project update if still absent.
 
 When worklets are unavailable, playing/stopped/scrub views use explicitly labelled waveform estimates. Asset lookup maps are memoized by immutable mediaLibrary identity, and all track/header/bus/master estimates share one calculation per playhead/routing/waveform snapshot. This remains a maximum-envelope estimate, not phase-aware PCM summation.
+
+## Round 3 recovery and buffer ownership
+
+Invalid optional project/track audio blocks are dropped independently when loading JSON, library snapshots or CRDT data; valid routing blocks and the timeline/assets remain intact. The absent block uses the existing default route/gain policy. Load-bearing project corruption still fails validation. Recovery metadata stays in a WeakSet outside persistence, is consumed on actual project load, and triggers a localized warning; a stable toast ID coalesces duplicate library/CRDT hydration notices for the same project.
+
+Export routing borrows scratch owned by each ProjectAudioMixer instance, grows it only when capacity is insufficient and releases it on disposal. Each clip's routed PCM is accumulated synchronously before reuse. The core helper rejects input/output buffer aliasing and undersized scratch; callers omitting scratch retain independently owned output arrays.

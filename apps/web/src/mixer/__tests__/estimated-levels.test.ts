@@ -49,6 +49,7 @@ it("shares asset maps across playhead changes and all strip estimates per frame"
   const waveforms = {};
   const first = estimatedLevels(p, waveforms);
   expect(estimatedLevels({ ...p }, waveforms)).toBe(first);
+  expect(estimatedLevels({ ...p, id: "other" as ID }, waveforms)).not.toBe(first);
   expect(first[`track:${p.timeline.tracks[0]!.id}`]).toBeCloseTo(0.5 * 10 ** (-6 / 20));
   expect(first["bus:b"]).toBeCloseTo(0.5 * 10 ** (-12 / 20));
   expect(first.master).toBeCloseTo(0.5 * 10 ** (-18 / 20));

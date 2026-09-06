@@ -108,3 +108,43 @@ it("supports unavailable/rejected worklets and missing animation-frame globals",
     graph.dispose();
   }).not.toThrow();
 });
+
+it("routes through worklet outputs and disposes their ports", () => {
+  const { ctx } = fakeContext();
+  const meters: FakeMeter[] = [];
+  class FakeMeter {
+    connect = vi.fn();
+    disconnect = vi.fn();
+    port = { onmessage: null, postMessage: vi.fn(), close: vi.fn() };
+    constructor() {
+      meters.push(this);
+    }
+  }
+  vi.stubGlobal("AudioWorkletNode", FakeMeter);
+  const base = createEmptyProject();
+  const track = { ...base.timeline.tracks[0]!, audio: { busId: "b" } };
+  const project: Project = {
+    ...base,
+    audio: { buses: [{ id: "b", name: "Bus", gainDb: 0 }], master: { gainDb: 0 } },
+    timeline: { ...base.timeline, tracks: [track] },
+  };
+  const graph = new MixerAudioGraph(ctx, true);
+  graph.update(project);
+  const gain = graph.input(track.id);
+  const panner = vi.mocked(gain.connect).mock.calls[0]![0] as unknown as AudioNode;
+  expect(panner.connect).toHaveBeenCalledWith(meters[2]);
+  const masterGain = meters[1]!.connect.mock.calls[0]![0];
+  const busGain = meters[2]!.connect.mock.calls[0]![0];
+  expect(masterGain.connect).toHaveBeenCalledWith(meters[0]);
+  expect(busGain.connect).toHaveBeenCalledWith(meters[1]);
+  expect(meters[0]!.connect).toHaveBeenCalledWith(ctx.destination);
+  for (const meter of meters) meter.connect.mockClear();
+  graph.update({ ...project, audio: { ...project.audio!, master: { gainDb: -6 } } });
+  expect(meters.flatMap((meter) => meter.connect.mock.calls)).toHaveLength(0);
+  graph.dispose();
+  for (const meter of meters) {
+    expect(meter.disconnect).toHaveBeenCalled();
+    expect(meter.port.close).toHaveBeenCalledOnce();
+    expect(meter.port.postMessage).toHaveBeenCalledWith({ stop: true });
+  }
+});

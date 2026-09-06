@@ -1,5 +1,9 @@
 "use client";
 
+import { toast } from "sonner";
+import { t } from "@/i18n/use-t";
+import { takeAudioRecovery } from "@/persistence/project-export";
+
 import { editMixer, type MixerEdit } from "@movie-desk/core";
 import { precisionSession, resumePrecision } from "./precision-session";
 import { reloadSpan } from "@/lib/reload-metrics";
@@ -300,6 +304,8 @@ export const useProjectStore = create<ProjectStoreState>()(
       nudgeSession = null;
       get().endPrecisionEdit(undefined, true);
       set({ project: p, history: emptyHistory });
+      if (takeAudioRecovery(p))
+        toast.warning(t("project.audioRecovered"), { id: `audio-recovery:${p.id}` });
       end();
     },
 

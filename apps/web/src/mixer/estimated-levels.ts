@@ -18,6 +18,7 @@ export const meterAssets = (media: Project["mediaLibrary"]): ReadonlyMap<string,
 };
 let cached:
   | {
+      projectId: Project["id"];
       tracks: Project["timeline"]["tracks"];
       media: Project["mediaLibrary"];
       audio: Project["audio"];
@@ -35,6 +36,7 @@ export const estimatedLevels = (
   const { tracks, playhead } = project.timeline;
   if (
     cached &&
+    cached.projectId === project.id &&
     cached.tracks === tracks &&
     cached.media === project.mediaLibrary &&
     cached.audio === project.audio &&
@@ -62,6 +64,7 @@ export const estimatedLevels = (
     levels.master = Math.max(levels.master!, busPeak * route.masterGain);
   }
   cached = {
+    projectId: project.id,
     tracks,
     playhead,
     media: project.mediaLibrary,

@@ -263,6 +263,7 @@ export class ProjectAudioMixer {
   private static readonly EFFECT_PADDING_MS = 500;
   private static readonly MAX_DECODED_ASSETS = 2;
   private readonly clips: PreparedClip[];
+  private routingScratch: StereoChannels = [new Float32Array(0), new Float32Array(0)];
   private readonly buffers = new Map<string, AudioBuffer | null>();
   private decodeContext: OfflineAudioContext | null = null;
 
@@ -387,11 +388,14 @@ export class ProjectAudioMixer {
         const targetOffset = overlapStart - chunkStartSample;
         const processedOffset = overlapStart - processStart;
         const mixedSamples = overlapEnd - overlapStart;
+        if (this.routingScratch[0].length < mixedSamples)
+          this.routingScratch = [new Float32Array(mixedSamples), new Float32Array(mixedSamples)];
         const routed = routeStereo(
           processed.map((channel) =>
             channel.subarray(processedOffset, processedOffset + mixedSamples),
           ),
           route,
+          this.routingScratch,
         );
         for (let channel = 0; channel < 2; channel++) {
           const input = routed[channel]!;
@@ -423,6 +427,7 @@ export class ProjectAudioMixer {
 
   dispose(): void {
     this.buffers.clear();
+    this.routingScratch = [new Float32Array(0), new Float32Array(0)];
     this.decodeContext = null;
   }
 
