@@ -48,6 +48,16 @@ export const createRecoveryEpisode = (
   };
 };
 export type RecoveryEpisode = ReturnType<typeof createRecoveryEpisode>;
+/** Close an unfinished recovery before opening the next one in the same UI slot. */
+export const replaceRecoveryEpisode = (
+  slot: { current: RecoveryEpisode | null },
+  start: () => RecoveryEpisode,
+): RecoveryEpisode => {
+  slot.current?.abandon();
+  const episode = start();
+  slot.current = episode;
+  return episode;
+};
 export const createExportEpisode = (
   projectId: string,
   assets: number,

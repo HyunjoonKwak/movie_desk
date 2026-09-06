@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { createExportEpisode, createRecoveryEpisode, recoveryHintVisible } from "../episodes";
+import {
+  createExportEpisode,
+  createRecoveryEpisode,
+  recoveryHintVisible,
+  replaceRecoveryEpisode,
+  type RecoveryEpisode,
+} from "../episodes";
 import { computeFunnel } from "../compute";
 import type { FunnelEvent, FunnelRow } from "@/persistence/funnel-log";
 afterEach(() => vi.unstubAllGlobals());
@@ -67,3 +73,32 @@ it("only the recovery-specific C2 hint counts, never unrelated or report hints",
   querySelector.mockReturnValue({ getClientRects: () => [{}] });
   expect(recoveryHintVisible("media-missing-hint")).toBe(true);
 });
+
+it.each([1, 20])(
+  "replacing a %i-asset recovery abandons the old pending episode before opening the next",
+  (assets) => {
+    const emit = vi.fn();
+    const slot: { current: RecoveryEpisode | null } = { current: null };
+    const start = (episode: number) => () =>
+      createRecoveryEpisode("a", "relink", assets, episode, null, emit);
+    const old = replaceRecoveryEpisode(slot, start(1));
+    if (assets > 1) old.resolve(assets - 1);
+    const next = replaceRecoveryEpisode(slot, start(2));
+    expect(emit.mock.calls.map((call) => [call[1].data.episode, call[1].data.result])).toEqual([
+      [1, "pending"],
+      [1, "abandoned"],
+      [2, "pending"],
+    ]);
+    expect(emit.mock.calls[1]?.[1].data.resolved).toBe(assets - 1);
+    old.resolve();
+    next.resolve(assets);
+    replaceRecoveryEpisode(slot, start(3));
+    expect(emit.mock.calls.map((call) => call[1].data.result)).toEqual([
+      "pending",
+      "abandoned",
+      "pending",
+      "success",
+      "pending",
+    ]);
+  },
+);

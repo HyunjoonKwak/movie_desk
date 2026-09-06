@@ -53,6 +53,15 @@ node apps/web/scripts/bench-library.mjs --assets 1000 --url http://127.0.0.1:321
 - 미처리 LOW: 세션 간 같은 at의 전역 삽입 순서 키. 현재 로컬 sequence+UUID는 세션 내에서만 순서를 보장한다. 날짜+숫자 episode가 최종 복구 결과를 연결하므로 다른 세션의 at 동률을 결과 중복으로 해석하지 않는다. 전역 순서는 다중 탭 원자적 counter/DB 스키마 변경이 필요해 이번 소규모 정확성 수정에서 보류한다.
 - 이전 임시 sync 하니스 수치는 1라운드 계측일 뿐이며 하니스 파일을 삭제했다.
 
+## 3라운드 마지막 정리
+
+- MEDIUM 성능: flush 직후 전체 count와 이번 batch 프로젝트별 인덱스 count로 상한 초과를 확인한 때만 정리한다. DB 스키마 v2의 `[projectId+at+event+id]` 복합 인덱스 키만 읽어 payload를 로드하지 않고 보호 판별·오래된 활동 정리를 수행한다. DB 이름은 유지하며 v1 행은 Dexie 인덱스 업그레이드로 보존한다.
+- LOW 고아 pending: 단일 파일·폴더 복구 모두 새 에피소드 생성 전에 이전 미완료 에피소드를 abandoned로 닫는다. 이전 결과 콜백과 이미 끝난 에피소드의 중복 종료는 무시한다.
+- LOW 순수 테스트 복원: fake-indexeddb 없는 9개 테스트로 프로젝트별/전체 상한, 보호 이벤트 전체 생존, 최신 activity 유지, legacy command/undo 정리, 0/음수 상한을 검증한다. DB 스파이 테스트는 상한 이하에서 toArray/orderBy/bulkDelete가 호출되지 않고 초과 시 메타데이터 keys 경로가 1회 실행되는지 확인한다. 에피소드 교체 테스트 2개는 1개/20개 자산의 pending → abandoned → 새 pending 순서를 확인한다.
+- 선택 항목: 관련 C2 힌트가 없는 복구 종류의 리포트 힌트 열을 “—”로 표시하고 결정 문서에 의미를 명시했다.
+
+- 3라운드 전체 gate: 9/9 PASS, core 125·web 583·desktop 72·scripts 11 = 단위 791개(C3 32개), Chromium E2E 55개, OSV 167개 패키지 취약점 0건. [3라운드 gate 원문](2026-09-06-c3-round3-gate.md).
+
 ## 남은 검증
 
 Claude 교차 리뷰 및 B7 실제 사용자 완주가 남는다. 브라우저 로컬 관찰 통계는 첫 사용자 여부·도움 여부·기록 중지 중의 동작을 알 수 없고, 상한/삭제/저장 실패 때문에 장기 누적 통계를 대체하지 않는다.

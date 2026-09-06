@@ -53,11 +53,12 @@ export const parseFunnelRow = (input: unknown): FunnelRow | null => {
 };
 export const PROJECT_LIMIT = 1000;
 export const TOTAL_LIMIT = 5000;
-export const trimFunnelRows = (
-  rows: readonly FunnelRow[],
+type FunnelRetentionRow = Pick<FunnelRow, "id" | "projectId" | "at" | "event">;
+export const trimFunnelRows = <T extends FunnelRetentionRow>(
+  rows: readonly T[],
   perProject = PROJECT_LIMIT,
   total = TOTAL_LIMIT,
-): FunnelRow[] => {
+): T[] => {
   const protectedEvents = new Set([
     "start",
     "path",
@@ -87,6 +88,10 @@ class FunnelDB extends Dexie {
   constructor() {
     super("movie-desk.funnel.v1");
     this.version(1).stores({ rows: "id, projectId, at, [projectId+at]" });
+    // Retention reads index keys only, without loading event payloads.
+    this.version(2).stores({
+      rows: "id, projectId, at, [projectId+at], [projectId+at+event+id]",
+    });
   }
 }
 let db: FunnelDB | undefined;
@@ -114,7 +119,29 @@ export const flushFunnelLog = (): Promise<void> => {
         const database = getDb();
         await database.transaction("rw", database.rows, async () => {
           await database.rows.bulkAdd(batch);
-          const rows = await database.rows.toArray();
+          const totalCount = await database.rows.count();
+          let needsTrim = totalCount > TOTAL_LIMIT;
+          if (!needsTrim) {
+            for (const projectId of new Set(batch.map((row) => row.projectId))) {
+              if (
+                (await database.rows.where("projectId").equals(projectId).count()) > PROJECT_LIMIT
+              ) {
+                needsTrim = true;
+                break;
+              }
+            }
+          }
+          if (!needsTrim) return;
+          const keys = await database.rows.orderBy("[projectId+at+event+id]").keys();
+          const rows = keys.map((key) => {
+            const [projectId, at, event, id] = key as unknown as [
+              string,
+              number,
+              FunnelRow["event"],
+              string,
+            ];
+            return { projectId, at, event, id };
+          });
           const keep = new Set(trimFunnelRows(rows).map((row) => row.id));
           await database.rows.bulkDelete(
             rows.filter((row) => !keep.has(row.id)).map((row) => row.id),

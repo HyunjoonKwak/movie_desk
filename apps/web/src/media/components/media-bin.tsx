@@ -1,6 +1,6 @@
 "use client";
 
-import type { RecoveryEpisode } from "@/lib/funnel/episodes";
+import { type RecoveryEpisode, replaceRecoveryEpisode } from "@/lib/funnel/episodes";
 import { recordRecovery } from "@/lib/funnel/collector";
 
 import { readDesktopMediaBridge } from "../source/desktop-media-bridge";
@@ -491,8 +491,9 @@ export function MediaBin() {
 
   const startRelink = useCallback(
     (asset: MediaAsset) => {
-      const measurement = recordRecovery("relink", 1, "media-missing-hint", projectId);
-      singleRecovery.current = measurement;
+      const measurement = replaceRecoveryEpisode(singleRecovery, () =>
+        recordRecovery("relink", 1, "media-missing-hint", projectId),
+      );
       if (asset.sourceRef?.kind === "disk") {
         void chooseDesktopRelink([asset.id])
           .then(([row]) => {
@@ -773,8 +774,9 @@ export function MediaBin() {
             );
             const bridge = readDesktopMediaBridge();
             let canceled = false;
-            const measurement = recordRecovery("relink", assets.length, "media-missing-hint", projectId);
-            folderRecovery.current = measurement;
+            const measurement = replaceRecoveryEpisode(folderRecovery, () =>
+              recordRecovery("relink", assets.length, "media-missing-hint", projectId),
+            );
             cancelFolderRecovery.current = () => { if (!canceled) { canceled = true; measurement.abandon(); } };
             setRelinkProgress({ completed: 0, total: assets.length });
             const unsubscribe = bridge?.onRelinkProgress?.((value) => {

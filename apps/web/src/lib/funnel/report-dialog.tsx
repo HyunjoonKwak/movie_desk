@@ -135,7 +135,11 @@ export function FunnelControls() {
                   {report.recoveries.map((row) => (
                     <tr key={`${row.kind}-${row.hintVisible}`}>
                       <td>{t(`funnel.kind.${row.kind}`)}</td>
-                      <td>{t(row.hintVisible ? "funnel.yes" : "funnel.no")}</td>
+                      <td>
+                        {row.kind === "relink"
+                          ? t(row.hintVisible ? "funnel.yes" : "funnel.no")
+                          : "—"}
+                      </td>
                       <td>{row.success}</td>
                       <td>{row.abandoned}</td>
                       <td>{row.pending}</td>

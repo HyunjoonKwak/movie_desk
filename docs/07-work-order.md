@@ -502,3 +502,5 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 활동은 메모리에서 합산하여 activity 증분으로 기록하고 단계·복구 행은 보관 정리에서 보호한다. 언마운트/숨김 시 flush, 관련 복구 힌트만 측정, 에피소드당 단일 결과와 assets/resolved, 저장 취소·다중 프리셋 결과 집계를 수정했다. 전체 gate와 1,000자산 머리 행 생존 재측정 수치는 [평가 문서](evaluations/2026-09-06-c3-completion-funnel.md)에 기록한다. 전역 삽입 순서 LOW만 보류하며, 메뉴 폭 제한은 390px 측정 진입을 위해 유지한다.
 
 C3 2라운드 검증 완료: gate 9/9 PASS(core 125·web 571·desktop 72·scripts 11, E2E 55), C3 단위 20개. 새 벤치는 activity 1행을 포함한 전체 15행이며 최초 관찰 start/import 각 1행 생존, 복원 p95 133ms로 150ms 예산 이내다.
+
+C3 3라운드 마지막 정리 완료: 상한 count 초과 시에만 메타데이터 인덱스로 정리, 새 복구 전 이전 pending을 abandoned로 종료, 순수 보관 테스트 9개 복원 및 힌트 없음 “—” 표시; gate 9/9 PASS(core 125·web 583·desktop 72·scripts 11 = 단위 791, C3 32·E2E 55), [검증](evaluations/2026-09-06-c3-round3-gate.md).
