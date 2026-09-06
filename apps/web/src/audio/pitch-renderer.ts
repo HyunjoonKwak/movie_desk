@@ -1,9 +1,10 @@
 import {
-  sourceOffsetForRamp,
-  isMediaClip,
-  type Track,
   type MediaClip,
+  type StretchContinuation,
   type StretchRequest,
+  type Track,
+  isMediaClip,
+  sourceOffsetForRamp,
 } from "@movie-desk/core";
 
 export const PITCH_CACHE_BYTES = 128 * 1024 * 1024;
@@ -69,10 +70,13 @@ export class PitchCache<T> {
   }
 }
 
-// One worker per job makes cancellation/error isolation explicit. Termination
-// stops synchronous worker-side DSP immediately; stale jobs cannot block new jobs.
+// At most two job slots share reusable workers. Aborts discard busy workers.
+const idleWorkers: Worker[] = [];
+// Weak source ownership avoids retaining decoded PCM; bound per-source variants.
+const continuations = new WeakMap<Float32Array, Map<string, StretchContinuation>>();
 
 export const pitchMainSlice = <T>(run: () => T): T => {
+  if (process.env.NODE_ENV === "production") return run();
   const start = performance.now();
   try {
     return run();
@@ -150,6 +154,14 @@ export const renderPitchInWorker = (
   const run = async () => {
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     if (typeof Worker === "undefined") throw new Error("Pitch worker unavailable");
+    const source = req.channels[0];
+    const key = `${req.clip.id}:${req.sourceSampleRate}:${pitchCacheKey(req.clip, req.outputSampleRate)}`;
+    let states = source ? continuations.get(source) : undefined;
+    if (source && !states) {
+      states = new Map();
+      continuations.set(source, states);
+    }
+    const continuation = { ...(req.continuation ?? states?.get(key)) };
     const { lower, upper } = pitchSourceWindow(req);
     const channels: Float32Array[] = [];
     // Copy in bounded blocks and transfer ownership, never detach decoded PCM.
@@ -165,37 +177,54 @@ export const renderPitchInWorker = (
     }
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     return new Promise<Float32Array[]>((resolve, reject) => {
-      const worker = new Worker(new URL("./pitch-worker.ts", import.meta.url));
-      const cleanup = () => {
+      const worker = idleWorkers.pop() ?? new Worker(new URL("./pitch-worker.ts", import.meta.url));
+      const cleanup = (discard = false) => {
         clearTimeout(timer);
-        worker.terminate();
+        worker.onmessage = null;
+        worker.onerror = null;
+        if (discard) worker.terminate();
+        else idleWorkers.push(worker);
         signal?.removeEventListener("abort", abort);
       };
       const abort = () => {
-        cleanup();
+        cleanup(true);
         reject(new DOMException("Cancelled", "AbortError"));
       };
       const timer = setTimeout(() => {
-        cleanup();
+        cleanup(true);
         reject(new Error("Pitch render timed out"));
       }, 30000);
       signal?.addEventListener("abort", abort, { once: true });
-      worker.onmessage = (event: MessageEvent<{ channels: Float32Array[]; error?: string }>) => {
+      worker.onmessage = (
+        event: MessageEvent<{
+          channels: Float32Array[];
+          error?: string;
+          continuation?: StretchContinuation;
+        }>,
+      ) => {
         cleanup();
         if (event.data.error) reject(new Error(event.data.error));
-        else resolve(event.data.channels);
+        else {
+          if (event.data.continuation) {
+            if (req.continuation) Object.assign(req.continuation, event.data.continuation);
+            states?.delete(key);
+            states?.set(key, event.data.continuation);
+            if (states && states.size > 32) states.delete(states.keys().next().value!);
+          }
+          resolve(event.data.channels);
+        }
       };
       worker.onerror = () => {
-        cleanup();
+        cleanup(true);
         reject(new Error("Pitch worker failed"));
       };
       try {
         worker.postMessage(
-          { ...req, channels, sourceStartSample: lower, id: 1 },
+          { ...req, continuation, channels, sourceStartSample: lower, id: 1 },
           channels.map((c) => c.buffer),
         );
       } catch (error) {
-        cleanup();
+        cleanup(true);
         reject(error);
       }
     });

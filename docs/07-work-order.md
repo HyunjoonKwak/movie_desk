@@ -579,3 +579,24 @@ M7/M10 지연 입력 master 연결·정리와 rAF 가드, M4 DOM 구조, M3 audi
 [2라운드 측정](evaluations/2026-09-07-audio-bus-round2-measurements.json): 실제 미리보기/export PCM 최대 오차 1.49e-8, 8트랙 미터 main 메시지 처리·store 발행 최대 0.10ms 유지(React 제외). [항목별 감사](evaluations/2026-09-07-audio-bus-audit.md)와 [결정](decisions/2026-09-07-audio-bus-model.md)에 근거·범위·미처리를 기록했다. [2라운드 full gate](evaluations/2026-09-07-audio-bus-round2-gate.md) **9/9 PASS**, 단위 **854**(core 143·web 628·desktop 72·scripts 11), Chromium E2E **59/59 PASS**. 헤더 레이아웃 회귀를 수정한 뒤 믹서·타임라인 반복 E2E도 **14/14 PASS**했다.
 
 - 2026-09-07 B′3 3라운드: 벤치 SHA 의존 제거, 미참조 i18n/문서 정리, 잘못된 audio 블록만 복구하고 한·영 안내 1회 표시, scratch 재사용·project ID 캐시·Worklet 출력 테스트까지 반영; B′2 종료 후 포트 확인하여 [gate](evaluations/2026-09-07-audio-bus-round3-gate.md) 9/9·단위 858·E2E 60 PASS, 이번 라운드 미처리 없음(M1 워커 이전은 기존 후속).
+### B′2 후속 정리 및 worktree 복구 (2026-09-07)
+
+기준 `origin/main 1c3c0e4b74a9d36a9c05cb8e81da74818e000f1b`에서
+`codex/b2-followups`를 재생성했다. 기존 통합된 미커밋 작업은
+`b2-pre-followups-integrated-backup` stash로 보관했다.
+
+M5 dense 상관·고주파 fixture, M6 청크 정렬 체크포인트, M7 최대 2개 Worker
+재사용, M8 production 계측 제외, detachAudio volume 자동화 승계와 원본 무음,
+trim 범위 에너지·NaN/Infinity PCM 가드·audio barrel을 반영했다.
+6kHz/10kHz 오차 최대 0.1%, 443Hz의 30초 경계 점프 0.0208–0.0289(<0.05).
+Node DSP CPU +9.4–19.1%, Chromium 10분 오디오 단계 3.523→5.296초(+50.3%),
+Worker 생성 20→1개이며 fallback은 없다. 성능 비용을 감사 문서에 함께 기록했다.
+
+[전체 gate](evaluations/2026-09-07-pitch-speed-followups-gate.md) **9/9 PASS**,
+E2E **57/57**; 추가 회귀 후 lint/typecheck/test 재검증 PASS,
+최종 단위 **839**(core143·web613·desktop72·scripts11).
+32119 점유 종료를 기다린 뒤 실행했고 종료 후 포트 해제를 코디네이터에게 알렸다.
+[감사 문서](evaluations/2026-09-06-pitch-speed-audit.md)의 2026-09-07 절과
+[측정 원본](evaluations/2026-09-07-pitch-speed-followups-dsp.jsonl) 참조.
+`pitchRevisions` 정리는 B′3 소유 `preview/audio-engine.ts`여서 코디네이터에게
+이관 요청했으며, 해당 파일 및 다른 B′3 소유 파일은 수정하지 않았다.

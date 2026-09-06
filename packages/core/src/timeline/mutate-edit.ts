@@ -151,7 +151,14 @@ export const detachAudio = (project: Project, clipId: ID): Project => {
   let p = project;
   let audioTrack = p.timeline.tracks.find((t) => t.kind === "audio");
   if (!audioTrack) {
-    p = addTrack(p, { kind: "audio", name: "A1", height: 48, muted: false, solo: false, locked: false });
+    p = addTrack(p, {
+      kind: "audio",
+      name: "A1",
+      height: 48,
+      muted: false,
+      solo: false,
+      locked: false,
+    });
     audioTrack = p.timeline.tracks.at(-1)!;
   }
   const audioClip: Clip = {
@@ -166,10 +173,16 @@ export const detachAudio = (project: Project, clipId: ID): Project => {
     trimOut: source.trimOut,
     volume: source.volume ?? 1,
     effects: [],
-    keyframes: source.keyframes.filter((track) => track.target === "speed"),
+    keyframes: source.keyframes.filter(
+      (track) => track.target === "speed" || track.target === "volume",
+    ),
   };
   p = addClip(p, audioTrack.id, audioClip);
-  p = updateClip(p, clipId, (c) => (c.kind === "media" ? { ...c, volume: 0 } : c));
+  p = updateClip(p, clipId, (c) =>
+    c.kind === "media"
+      ? { ...c, volume: 0, keyframes: c.keyframes.filter((track) => track.target !== "volume") }
+      : c,
+  );
   return p;
 };
 

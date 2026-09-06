@@ -158,7 +158,15 @@ describe("timeline mutate", () => {
     const clip = {
       ...makeMediaClip(0, 2000),
       preservePitch: true,
+      volume: 0.7,
       keyframes: [
+        {
+          target: "volume",
+          keyframes: [
+            { at: 0, value: 0.2, easing: "linear" as const },
+            { at: 1000, value: 0.9, easing: "linear" as const },
+          ],
+        },
         {
           target: "speed",
           keyframes: [
@@ -183,6 +191,9 @@ describe("timeline mutate", () => {
     // original video clip's audio is muted
     const orig = findClip(after.timeline, clip.id)! as typeof clip;
     expect(orig.volume).toBe(0);
+    expect(orig.keyframes.some((t) => t.target === "volume")).toBe(false);
+    expect((detached as typeof clip).volume).toBe(0.7);
+    expect(clip.keyframes).toHaveLength(2);
   });
 
   it("moves grouped clips together", () => {

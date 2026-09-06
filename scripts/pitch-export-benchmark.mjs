@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 // Audio export stage benchmark: decoded 10-minute stereo, 20 × 30s chunks.
-// Run from the repository root; optional baseline Git ref (default 27128d1; --varispeed for legacy audio probes).
+// Run from the repository root; optional baseline Git ref (default 27128d1).
+// --varispeed: legacy probes; --dsp [ref]: offline dense-correlation/chunk comparison.
 import { createRequire } from "node:module";
 import { relative, resolve } from "node:path";
 const require = createRequire(resolve("apps/web/package.json"));
@@ -11,7 +12,8 @@ const viteRequire = createRequire(vitestRequire.resolve("vite"));
 const { build } = viteRequire("esbuild");
 const root = process.cwd();
 const legacy = process.argv[2] === "--varispeed";
-const baseline = process.argv[2] ?? "27128d1";
+const dsp = process.argv[2] === "--dsp";
+const baseline = (dsp ? process.argv[3] : process.argv[2]) ?? (dsp ? "1c3c0e4" : "27128d1");
 if (!legacy) {
   try {
     execFileSync("git", ["rev-parse", "--verify", `${baseline}^{commit}`], { stdio: "ignore" });
@@ -20,6 +22,126 @@ if (!legacy) {
       `Unknown baseline Git ref: ${baseline}. Pass an available ancestor commit (default 27128d1).`,
     );
   }
+}
+// Offline DSP comparison including tones above the former 3kHz correlation Nyquist limit.
+if (dsp) {
+  const sr = 48000;
+  const dominantHz = (pcm, expected) => {
+    const n = 16384;
+    let bestPower = -1;
+    let bestHz = 0;
+    for (let hz = expected - 800; hz <= expected + 800; hz += 2) {
+      const coefficient = 2 * Math.cos((2 * Math.PI * hz) / sr);
+      let a = 0;
+      let b = 0;
+      for (let i = 0; i < n; i++) {
+        const value = pcm[i + 4800] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)));
+        const next = value + coefficient * a - b;
+        b = a;
+        a = next;
+      }
+      const power = a * a + b * b - coefficient * a * b;
+      if (power > bestPower) {
+        bestPower = power;
+        bestHz = hz;
+      }
+    }
+    return bestHz;
+  };
+  for (const ref of [baseline, "working-tree"]) {
+    const bundle = await build({
+      entryPoints: ["packages/core/src/audio/time-stretch.ts"],
+      bundle: true,
+      write: false,
+      format: "esm",
+      platform: "node",
+      plugins: [
+        {
+          name: "baseline",
+          setup(builder) {
+            builder.onLoad({ filter: /\.ts$/ }, ({ path }) => ({
+              contents:
+                ref === "working-tree"
+                  ? readFileSync(path, "utf8")
+                  : execFileSync("git", ["show", `${ref}:${relative(root, path)}`], {
+                      encoding: "utf8",
+                    }),
+              loader: "ts",
+            }));
+          },
+        },
+      ],
+    });
+    const { renderClipAudio } = await import(
+      `data:text/javascript;base64,${Buffer.from(bundle.outputFiles[0].text).toString("base64")}`
+    );
+    const clip = {
+      id: "c",
+      assetId: "a",
+      kind: "media",
+      start: 0,
+      duration: 2000,
+      trimIn: 0,
+      trimOut: 2000,
+      speed: 1,
+      preservePitch: true,
+      effects: [],
+      keyframes: [],
+    };
+    const rows = [];
+    for (const hz of [440, 6000, 10000]) {
+      const channel = Float32Array.from(
+        { length: sr * 2 },
+        (_, i) => 0.5 * Math.sin((2 * Math.PI * hz * i) / sr),
+      );
+      for (const speed of [0.5, 1.37, 2]) {
+        const req = {
+          channels: [channel, channel],
+          clip: { ...clip, speed, duration: 2000 / speed },
+          sourceSampleRate: sr,
+          outputSampleRate: sr,
+          offsetMs: 0,
+          outputSamples: Math.round((sr * 2) / speed),
+        };
+        renderClipAudio(req);
+        const timings = [];
+        let output;
+        for (let i = 0; i < 5; i++) {
+          const start = performance.now();
+          output = renderClipAudio(req);
+          timings.push(performance.now() - start);
+        }
+        rows.push({
+          hz,
+          speed,
+          dominantHz: dominantHz(output[0], hz),
+          medianMs: timings.sort((a, b) => a - b)[2],
+        });
+      }
+    }
+    const boundaries = [];
+    const channel = Float32Array.from(
+      { length: sr * 62 },
+      (_, i) => 0.5 * Math.sin((2 * Math.PI * 443 * i) / sr),
+    );
+    for (const speed of [0.5, 1.37, 2]) {
+      const continuation = {};
+      const req = {
+        channels: [channel],
+        clip: { ...clip, speed, duration: 31000, trimOut: 62000 },
+        sourceSampleRate: sr,
+        outputSampleRate: sr,
+        offsetMs: 0,
+        outputSamples: sr * 30,
+        continuation,
+      };
+      const [a] = renderClipAudio(req);
+      const [b] = renderClipAudio({ ...req, offsetMs: 30000, outputSamples: sr / 10 });
+      boundaries.push({ speed, sampleJump: Math.abs(b[0] - a.at(-1)) });
+    }
+    process.stdout.write(`${JSON.stringify({ ref, rows, boundaries })}\n`);
+  }
+  process.exit(0);
 }
 const browser = await chromium.launch({ headless: true });
 try {
@@ -190,10 +312,13 @@ try {
             }
           };
           let transferredBytes = 0;
+          const pitchWorkers = new Set();
           const nativePost = Worker.prototype.postMessage;
           Worker.prototype.postMessage = function (message, transfer) {
-            if (message.clip)
+            if (message.clip) {
+              pitchWorkers.add(this);
               transferredBytes += message.channels.reduce((n, c) => n + c.byteLength, 0);
+            }
             return nativePost.call(this, message, transfer);
           };
           const clip = {
@@ -222,6 +347,7 @@ try {
             elapsedMs,
             chunks,
             transferredBytes,
+            pitchWorkerCount: pitchWorkers.size,
             assetBytes: channels[0].byteLength * 2,
             pitchFallback: mixer.pitchFallback ?? false,
           };

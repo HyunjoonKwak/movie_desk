@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { ID } from "../../utils/id";
 import type { MediaClip } from "../../model/clip";
 import { sourceOffsetForRamp } from "../../timeline/speed";
-import { renderClipAudio } from "../time-stretch";
+import type { ID } from "../../utils/id";
+import { type StretchContinuation, renderClipAudio } from "../time-stretch";
 
 const sr = 48000;
 const sine = (seconds: number) =>
@@ -26,7 +26,7 @@ const frequency = (pcm: Float32Array) => {
     if (pcm[i - 1]! <= 0 && pcm[i]! > 0) count++;
   return count / ((pcm.length - sr / 5) / sr);
 };
-const dominantHz = (pcm: Float32Array) => {
+const dominantHz = (pcm: Float32Array, expected = 440) => {
   const n = Math.min(16384, pcm.length - 9600);
   const windowed = Float32Array.from(
     { length: n },
@@ -34,7 +34,7 @@ const dominantHz = (pcm: Float32Array) => {
   );
   let bestPower = 0;
   let bestHz = 0;
-  for (let hz = 200; hz <= 1000; hz += 2) {
+  for (let hz = Math.max(20, expected - 800); hz <= expected + 800; hz += 2) {
     const coefficient = 2 * Math.cos((2 * Math.PI * hz) / sr);
     let a = 0;
     let b = 0;
@@ -56,8 +56,10 @@ const render = (
   c: MediaClip,
   offsetMs = 0,
   outputSamples = Math.round((c.duration * sr) / 1000),
+  continuation?: StretchContinuation,
 ) =>
   renderClipAudio({
+    ...(continuation ? { continuation } : {}),
     channels: [source, source.map((x) => -x)],
     sourceSampleRate: sr,
     outputSampleRate: sr,
@@ -138,4 +140,66 @@ it("supported ramps override an unsupported constant speed hint", async () => {
   expect(pitchHasUnsupportedRange(c)).toBe(false);
   c.keyframes[0]!.keyframes[1]!.value = 5;
   expect(pitchHasUnsupportedRange(c)).toBe(true);
+});
+
+// Noninteger periods exercise alignment beyond the exact 48kHz/440Hz fixtures.
+it.each([6000, 10000])("preserves high-frequency %sHz tones", (hz) => {
+  const source = Float32Array.from({ length: sr * 2 }, (_, i) =>
+    Math.sin((2 * Math.PI * hz * i) / sr),
+  );
+  for (const speed of [0.5, 1.37, 2]) {
+    const [out] = render(source, clip(speed));
+    expect(Math.abs(dominantHz(out!, hz) / hz - 1)).toBeLessThan(0.02);
+  }
+});
+it.each([0.5, 1.37, 2])(
+  "keeps 30s chunk boundary continuous at %sx",
+  (speed) => {
+    const source = Float32Array.from(
+      { length: sr * 62 },
+      (_, i) => 0.5 * Math.sin((2 * Math.PI * 443 * i) / sr),
+    );
+    const c = { ...clip(speed), duration: 31000, trimOut: 62000 };
+    const continuation = {};
+    const [a] = render(source, c, 0, sr * 30, continuation);
+    const [b] = render(source, c, 30000, sr / 10, continuation);
+    expect(Math.abs(b![0]! - a!.at(-1)!)).toBeLessThan(0.05);
+  },
+  20000,
+);
+it("sanitizes nonfinite PCM before correlation and interpolation", () => {
+  const source = sine(2);
+  source[123] = Number.NaN;
+  source[4800] = Number.POSITIVE_INFINITY;
+  const [out] = render(source, clip(0.5));
+  expect(out!.every(Number.isFinite)).toBe(true);
+});
+
+it("resumes arbitrary sample boundaries exactly and ignores checkpoints after seeking", () => {
+  const source = sine(4);
+  const c = { ...clip(1.37), trimOut: 4000, duration: 2000 };
+  const continuation = {};
+  const split = 48137;
+  const [whole] = render(source, c, 0, split + 24000);
+  const [a] = render(source, c, 0, split, continuation);
+  const [b] = render(source, c, (split * 1000) / sr, 24000, continuation);
+  expect(a).toEqual(whole!.subarray(0, split));
+  expect(b).toEqual(whole!.subarray(split));
+  const [seek] = render(source, c, 500, 10000, continuation);
+  expect(seek).toEqual(render(source, c, 500, 10000)[0]);
+});
+
+it("selects the energetic channel inside the trim, ignoring loud discarded audio", () => {
+  const left = new Float32Array(sr * 2).fill(10);
+  left.fill(0, sr / 2, sr * 1.5);
+  const right = sine(2);
+  const req = {
+    channels: [left, right],
+    sourceSampleRate: sr,
+    outputSampleRate: sr,
+    clip: { ...clip(1.37), trimIn: 500, trimOut: 1500, duration: 700 },
+    offsetMs: 0,
+    outputSamples: sr * 0.7,
+  };
+  expect(renderClipAudio(req)[1]).toEqual(renderClipAudio({ ...req, channels: [right] })[0]);
 });

@@ -247,3 +247,104 @@ Round-2 deferred list is superseded only for baseline-script consolidation;
 M5–M8, revision cleanup, trim energy reference, malformed-number hardening and
 the core audio barrel remain deferred. Validation: see
 [round-3 gate](2026-09-06-pitch-speed-round3-gate.md).
+
+
+## B′2 follow-ups — 2026-09-07
+
+Baseline: `1c3c0e4b74a9d36a9c05cb8e81da74818e000f1b` (`origin/main`).
+Recovered this worktree onto `codex/b2-followups`; the integrated uncommitted work
+was preserved in stash `b2-pre-followups-integrated-backup`. No push or main merge.
+
+### M5: dense correlation and offline CPU comparison
+
+Correlation now scores every overlap sample (`j++`), retaining the coarse delta
+search followed by ±3-sample refinement. Dense tail/candidate samples are cached
+once per hop so interpolation is not repeated for every candidate.
+
+Reproduce offline: `node scripts/pitch-export-benchmark.mjs --dsp 1c3c0e4`.
+48kHz, two-second stereo sine input; one warm-up then median of five renders per
+fixture in the same Node process, baseline before working tree. Goertzel scans
+expected frequency ±800Hz in 2Hz steps over a Hann-windowed 16384-sample segment.
+Elapsed wall time is a local single-thread DSP CPU proxy, not a cross-device guarantee.
+
+| Input Hz | Speed | Baseline ms | Dense ms | Change | Dense dominant Hz | Error |
+| --- | --- | --- | --- | --- | --- | --- |
+| 440 | 0.5× | 34.140 | 40.654 | +19.1% | 440 | 0.00% |
+| 440 | 1.37× | 11.200 | 12.585 | +12.4% | 440 | 0.00% |
+| 440 | 2× | 7.722 | 8.684 | +12.5% | 440 | 0.00% |
+| 6000 | 0.5× | 30.778 | 34.761 | +12.9% | 6000 | 0.00% |
+| 6000 | 1.37× | 11.578 | 12.668 | +9.4% | 5994 | 0.10% |
+| 6000 | 2× | 7.507 | 8.555 | +14.0% | 6000 | 0.00% |
+| 10000 | 0.5× | 31.015 | 35.107 | +13.2% | 10000 | 0.00% |
+| 10000 | 1.37× | 11.118 | 12.543 | +12.8% | 10000 | 0.00% |
+| 10000 | 2× | 7.320 | 8.554 | +16.9% | 10000 | 0.00% |
+
+All fixtures retain dominant frequency within ±2%; max observed error is 0.10%.
+The baseline also passes this frequency-only metric: pure tones alone do not prove
+correct overlap alignment. The change removes correlation downsampling itself;
+this audit does not claim broad perceptual improvement from these fixtures.
+
+### M6: adjacent chunk phase continuity
+
+Increasing a finite preroll does not reconstruct the accumulated WSOLA phase.
+Instead, `StretchContinuation` preserves the cursor, previous anchor, overlap-hop
+position and linked reference channel before the next range's first overlap hop.
+The worker returns that checkpoint; `pitch-renderer` scopes it by source identity,
+clip ID and pitch configuration in a WeakMap with at most 32 variants per source.
+Only exactly adjacent output sample positions resume it; seeks use the existing
+40ms preroll. Source copies retain the existing 250ms margins; no enlargement needed.
+
+48kHz, 443Hz sine at amplitude 0.5, first range 30s and next range 100ms:
+
+| Speed | Baseline absolute boundary jump | Checkpoint jump | Threshold |
+| --- | --- | --- | --- |
+| 0.5× | 0.590724 | 0.026845 | <0.05 |
+| 1.37× | 0.160836 | 0.020804 | <0.05 |
+| 2× | 0.517846 | 0.028894 | <0.05 |
+
+The 0.05 threshold exceeds the ordinary adjacent-sample change of this fixture
+(~0.029). Additional regressions compare concatenated output sample-for-sample
+with a single render across a non-hop-aligned split, verify seek rejection of an
+old checkpoint, and exercise cropped source copies through pooled workers.
+Checkpoint eviction/interleaving can cause a cold start; independent seek renders
+are not promised to reproduce the phase of a full render from the clip beginning.
+
+### M7–M8, detach and LOW items
+
+- M7: two admitted jobs reuse up to two workers; successful replies clear handlers
+  and timers and return the worker to the pool. Cancellation immediately terminates
+  active DSP; fatal worker errors, timeout and failed transfer also discard the worker
+  because a failed/busy worker cannot safely be reused. Queued aborts allocate no worker.
+  Lifecycle tests cover reuse, maximum size, queued cancellation, active replacement,
+  missing/CSP/error/timeout paths and real-DSP checkpoint transfer.
+- M8: production `pitchMainSlice` directly invokes its callback without reading the
+  clock or calling `performance.measure`/`clearMeasures`. Worker DSP timing is also
+  development-only. Development/e2e measurement remains available; production bypass
+  has a unit test and the production build is in the gate.
+- detachAudio: the detached clip inherits static volume plus volume and speed
+  keyframes; the original retains speed mapping with volume 0 and no volume track,
+  so automation cannot unmute it. Unit coverage also checks the source input is intact.
+- LOW: channel energy scans use only the available trimmed source range; nonfinite
+  PCM values become zero before interpolation/scoring. Added `audio/index.ts` and
+  routed the core root barrel through it. Trim-reference and NaN/Infinity tests added.
+- `pitchRevisions` cleanup remains owned by B′3 in `preview/audio-engine.ts` and was
+  explicitly escalated to the coordinator. That file and all other B′3-owned files
+  were not edited in this worktree.
+
+Validation: see [follow-up gate](2026-09-07-pitch-speed-followups-gate.md).
+
+Actual Chromium export-stage check (`node scripts/pitch-export-benchmark.mjs 1c3c0e4`):
+10-minute 48kHz stereo, 20 × 30s chunks, decoded PCM fixture and audio mix only:
+
+| Metric | Baseline | Follow-up |
+| --- | --- | --- |
+| Elapsed | 3523.1ms | 5295.9ms (+50.3%) |
+| Pitch workers constructed | 20 | 1 |
+| Transferred PCM | 237,696,000 bytes | 237,696,000 bytes |
+| Pitch fallback | false | false |
+
+This full audio-stage measurement has higher overhead than the Node DSP microbenchmark;
+worker reuse reduces construction count but does not offset dense correlation CPU cost.
+Both results are reported without claiming an overall export speedup.
+E2E preview probe: first sound 75.20ms, DSP 248.05ms, one worker, longest main task 0ms,
+maximum measured pitch main slice 1.04ms (development build).

@@ -13,7 +13,19 @@ export const pitchHasUnsupportedRange = (clip: MediaClip): boolean => {
     : !pitchRateSupported(clip.speed);
 };
 
+// A bounded checkpoint resumes overlap alignment across adjacent output ranges.
+// Callers must scope it to one source and unchanged clip/rate configuration.
+export interface StretchContinuation {
+  nextStartSample?: number;
+  firstHop?: number;
+  cursor?: number;
+  previous?: number;
+  previousPreserved?: boolean;
+  reference?: number;
+}
+
 export interface StretchRequest {
+  continuation?: StretchContinuation;
   channels: Float32Array[];
   sourceSampleRate: number;
   sourceStartSample?: number;
@@ -44,30 +56,51 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
   const sample = (channel: Float32Array, position: number): number => {
     if (position < lower || position >= upper) return 0;
     const i = Math.floor(position) - sourceStart;
-    const a = channel[i] ?? 0;
-    return (
-      a +
-      ((i + 1 + sourceStart < upper ? (channel[i + 1] ?? 0) : a) - a) * (position - sourceStart - i)
-    );
+    const raw = channel[i] ?? 0;
+    const a = Number.isFinite(raw) ? raw : 0;
+    const next = channel[i + 1] ?? 0;
+    const b = Number.isFinite(next) ? next : 0;
+    return a + ((i + 1 + sourceStart < upper ? b : a) - a) * (position - sourceStart - i);
   };
   // Align ranges to the same hop grid; bounded pre-roll settles overlap search.
   const startSample = Math.round((req.offsetMs * sr) / 1000);
-  const firstHop = Math.max(0, Math.floor(startSample / hop) - 4) * hop;
-  let cursor = lower + (sourceOffsetForRamp(clip, (firstHop * 1000) / sr) * srcRate) / 1000;
-  let previous = cursor;
-  let previousPreserved = false;
+  const resume = req.continuation?.nextStartSample === startSample ? req.continuation : undefined;
+  const firstHop = resume?.firstHop ?? Math.max(0, Math.floor(startSample / hop) - 4) * hop;
+  let cursor =
+    resume?.cursor ?? lower + (sourceOffsetForRamp(clip, (firstHop * 1000) / sr) * srcRate) / 1000;
+  let previous = resume?.previous ?? cursor;
+  let previousPreserved = resume?.previousPreserved ?? false;
   const weights = new Float32Array(length);
   let reference = 0;
   let maxEnergy = -1;
   for (let c = 0; c < channels.length; c++) {
     let energy = 0;
-    for (let i = 0; i < channels[c]!.length; i += 256) energy += channels[c]![i]! ** 2;
+    for (
+      let i = Math.max(0, Math.ceil(lower - sourceStart));
+      i < Math.min(channels[c]!.length, upper - sourceStart);
+      i += 256
+    ) {
+      const value = channels[c]![i]!;
+      if (Number.isFinite(value)) energy += value * value;
+    }
     if (energy > maxEnergy) {
       maxEnergy = energy;
       reference = c;
     }
   }
+  reference = resume?.reference ?? reference;
+  const checkpointHop = Math.max(0, Math.floor((startSample + length) / hop) - 1) * hop;
   for (let at = firstHop; at < startSample + length; at += hop) {
+    if (at === checkpointHop && req.continuation) {
+      Object.assign(req.continuation, {
+        nextStartSample: startSample + length,
+        firstHop: at,
+        cursor,
+        previous,
+        previousPreserved,
+        reference,
+      });
+    }
     const time = (at * 1000) / sr;
     const rate = rateAt(time);
     const preserve = clip.preservePitch === true && clip.speed > 0 && pitchRateSupported(rate);
@@ -76,15 +109,24 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
       const ref = channels[reference]!;
       let best = Number.NEGATIVE_INFINITY;
       let bestDelta = 0;
+      // Cache dense overlap samples once: striding correlation aliases high tones.
+      const tail = new Float32Array(hop);
+      const candidates = new Float32Array(hop + 2 * search + 8);
+      let aa = 0;
+      for (let j = 0; j < hop; j++) {
+        const a = sample(ref, previous + (hop + j) * ratio);
+        tail[j] = a;
+        aa += a * a;
+      }
+      for (let j = 0; j < candidates.length; j++)
+        candidates[j] = sample(ref, cursor + (j - search - 4) * ratio);
       const score = (delta: number) => {
         let dot = 0;
-        let aa = 0;
         let bb = 0;
-        for (let j = 0; j < hop; j += 8) {
-          const a = sample(ref, previous + (hop + j) * ratio);
-          const b = sample(ref, cursor + (delta + j) * ratio);
+        for (let j = 0; j < hop; j++) {
+          const a = tail[j]!;
+          const b = candidates[delta + j + search + 4]!;
           dot += a * b;
-          aa += a * a;
           bb += b * b;
         }
         // Prefer the expected anchor in silence and on ties.
