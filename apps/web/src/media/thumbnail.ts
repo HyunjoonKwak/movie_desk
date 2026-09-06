@@ -1,3 +1,4 @@
+import type { RandomAccessMediaSource } from "./source/media-source";
 import { sampleFramesAt } from "@/renderer/frame-sampler";
 import type { SourceRotation } from "@movie-desk/core";
 
@@ -24,21 +25,33 @@ const drawToDataUrl = (
   return canvas.toDataURL("image/webp", 0.7);
 };
 
-export const makeImageThumb = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      const data = drawToDataUrl(img, img.naturalWidth, img.naturalHeight);
-      URL.revokeObjectURL(url);
-      resolve(data);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("thumb-image"));
-    };
-    img.src = url;
-  });
+export const makeImageThumb = async (file: Blob | RandomAccessMediaSource): Promise<string> => {
+  const lease =
+    file instanceof Blob
+      ? {
+          url: URL.createObjectURL(file),
+          release() {
+            URL.revokeObjectURL(this.url);
+          },
+        }
+      : await file.acquirePlaybackUrl();
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      const url = lease.url;
+      const img = new Image();
+      img.onload = () => {
+        const data = drawToDataUrl(img, img.naturalWidth, img.naturalHeight);
+        resolve(data);
+      };
+      img.onerror = () => {
+        reject(new Error("thumb-image"));
+      };
+      img.src = url;
+    });
+  } finally {
+    lease.release();
+  }
+};
 
 // Frame height for filmstrip tiles; width derives from the video aspect ratio.
 const STRIP_H = 48;
@@ -49,7 +62,7 @@ const toWebp = (canvas: HTMLCanvasElement, quality: number): string =>
 // Builds a wide filmstrip image sampling `frames` evenly-spaced frames across
 // the whole source. Returns the data URL and the actual frame count drawn.
 export const makeVideoFilmstrip = async (
-  file: File,
+  file: Blob | RandomAccessMediaSource,
   frames = 10,
   rotation?: SourceRotation,
 ): Promise<{ dataUrl: string; frames: number } | null> => {
@@ -89,7 +102,7 @@ export const makeVideoFilmstrip = async (
 };
 
 export const makeVideoThumb = async (
-  file: File,
+  file: Blob | RandomAccessMediaSource,
   atSec = 0.1,
   rotation?: SourceRotation,
 ): Promise<string> => {

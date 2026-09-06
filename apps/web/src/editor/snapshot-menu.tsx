@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { History, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -23,7 +23,28 @@ export function SnapshotMenu() {
   const project = useProjectStore((s) => s.project);
   const loadProject = useProjectStore((s) => s.loadProject);
   const t = useT();
-  const candidates = snapshotCleanupCandidates(rows);
+  const candidates = useMemo(() => snapshotCleanupCandidates(rows), [rows]);
+  const [proposal, setProposal] = useState<{
+    projectId: string;
+    rows: readonly ProjectSnapshot[];
+  } | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const confirmCleanup = async () => {
+    if (!proposal || cleaning) return;
+    setCleaning(true);
+    try {
+      await cleanupSnapshots(
+        proposal.projectId,
+        proposal.rows.map((row) => row.id),
+      );
+      await refresh();
+      setProposal(null);
+    } catch {
+      toast.error(t("snap.cleanupFailed"));
+    } finally {
+      setCleaning(false);
+    }
+  };
 
   useEffect(() => {
     if (open) void refresh();
@@ -69,7 +90,10 @@ export function SnapshotMenu() {
               {t("snap.menu")}
             </Dialog.Title>
             <Dialog.Close asChild>
-              <button type="button" className="rounded p-1 text-ink-3 hover:bg-white/10 hover:text-ink-1">
+              <button
+                type="button"
+                className="rounded p-1 text-ink-3 hover:bg-white/10 hover:text-ink-1"
+              >
                 <X className="size-4" />
               </button>
             </Dialog.Close>
@@ -97,19 +121,53 @@ export function SnapshotMenu() {
               <button
                 type="button"
                 className="btn-ghost"
-                onClick={async () => {
-                  if (!window.confirm(t("snap.cleanupConfirm", { n: candidates.length }))) return;
-                  await cleanupSnapshots(
-                    project.id,
-                    candidates.map((row) => row.id),
-                  );
-                  await refresh();
-                }}
+                onClick={() => setProposal({ projectId: project.id, rows: candidates })}
               >
-                {t("snap.cleanup")}
+                {t("snap.reviewCleanup")}
               </button>
             </div>
           )}
+          <Dialog.Root
+            open={proposal !== null}
+            onOpenChange={(value) => {
+              if (!value && !cleaning) setProposal(null);
+            }}
+          >
+            <Dialog.Portal>
+              <Dialog.Overlay className="fixed inset-0 z-[60] bg-black/70" />
+              <Dialog.Content className="fixed left-1/2 top-1/2 z-[61] w-[420px] max-w-[95vw] -translate-x-1/2 -translate-y-1/2 rounded-lg bg-panel-1 p-5 text-ink-1">
+                <Dialog.Title>{t("snap.reviewCleanup")}</Dialog.Title>
+                <Dialog.Description className="mt-2 text-sm text-ink-2">
+                  {t("snap.cleanupConsequences")}
+                </Dialog.Description>
+                <ul className="my-3 max-h-56 overflow-auto text-sm">
+                  {proposal?.rows.map((row) => (
+                    <li key={row.id}>
+                      {row.label} — {new Date(row.createdAt).toLocaleString()}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    disabled={cleaning}
+                    onClick={() => setProposal(null)}
+                  >
+                    {t("snap.cleanupCancel")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={cleaning}
+                    onClick={() => void confirmCleanup()}
+                  >
+                    {t("snap.deleteReviewed")}
+                  </button>
+                </div>
+              </Dialog.Content>
+            </Dialog.Portal>
+          </Dialog.Root>
           <ul className="mt-4 max-h-72 space-y-1 overflow-y-auto">
             {rows.length === 0 && (
               <li className="px-2 py-6 text-center text-xs text-ink-3">{t("snap.empty")}</li>

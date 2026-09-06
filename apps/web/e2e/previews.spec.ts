@@ -128,7 +128,11 @@ test("snapshot cleanup requires confirmation and keeps the latest twenty", async
   await page.goto("/editor");
   await importMediaFiles(page, { name: "snap.png", mimeType: "image/png", buffer: PNG });
   await expect.poll(() => libraryJson(page)).toContain("snap.png");
-  const project = JSON.parse(await libraryJson(page)) as { id: string };
+  const project = (await libraryJson(page))
+    .split("\n")
+    .map((row) => JSON.parse(row) as { id: string; mediaLibrary?: { name: string }[] })
+    .find((row) => row.mediaLibrary?.some((asset) => asset.name === "snap.png"));
+  if (!project) throw new Error("Imported project was not persisted");
   // Open the menu once to initialize the snapshot database.
   await page.getByRole("button", { name: "Snapshots", exact: true }).click();
   await page.keyboard.press("Escape");
@@ -159,11 +163,11 @@ test("snapshot cleanup requires confirmation and keeps the latest twenty", async
   );
   await page.getByRole("button", { name: "Snapshots", exact: true }).click();
   await expect(page.getByText("2 snapshots available to clean up (keep latest 20)")).toBeVisible();
-  page.once("dialog", (dialog) => dialog.dismiss());
-  await page.getByRole("button", { name: "Review cleanup" }).click();
+  await page.getByRole("button", { name: "Review snapshots to delete" }).click();
+  await page.getByRole("button", { name: "Cancel cleanup" }).click();
   await expect(page.getByRole("dialog").locator("li")).toHaveCount(22);
-  page.once("dialog", (dialog) => dialog.accept());
-  await page.getByRole("button", { name: "Review cleanup" }).click();
+  await page.getByRole("button", { name: "Review snapshots to delete" }).click();
+  await page.getByRole("button", { name: "Delete listed snapshots" }).click();
   await expect(page.getByRole("dialog").locator("li")).toHaveCount(20);
   await expect(page.getByText("save 0", { exact: true })).toHaveCount(0);
   await expect(page.getByText("save 21", { exact: true })).toBeVisible();

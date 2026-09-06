@@ -1,5 +1,4 @@
 "use client";
-import { measureReload } from "@/lib/reload-metrics";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -40,6 +39,7 @@ import { useLocaleStore } from "@/i18n/store";
 import { useViewStore } from "@/stores/view-store";
 import { MediaGroupHeader } from "./media-group-header";
 import type { ID } from "@movie-desk/core";
+import { measureReload, markReloadGridReady } from "@/lib/reload-metrics";
 import { cn } from "@/lib/cn";
 import { useT } from "@/i18n/use-t";
 import type {
@@ -585,6 +585,9 @@ export function MediaBin() {
       }),
     [virtualGroups, listWidth, columns, groups],
   );
+  useLayoutEffect(() => {
+    if (media.length > 0 && listWidth > 0) markReloadGridReady();
+  }, [media, listWidth]);
   useLayoutEffect(() => {
     layoutRef.current = { layout, groups: virtualGroups };
   }, [layout, virtualGroups]);

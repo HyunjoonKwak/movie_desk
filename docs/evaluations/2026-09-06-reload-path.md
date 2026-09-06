@@ -1,124 +1,118 @@
-# Reload path / preview backlog — 2026-09-06
+# Reload path and preview recovery — 2026-09-06 review revision
 
-Branch `codex/a5-reload-path`, base `71fabdb`. Isolated worktree; Chrome ephemeral profile,
-1,000 assets (200 AAC videos + 800 PNG), viewport 1440×900, 16 mounted cards in dev (24 in the production build).
+Branch `codex/a5-reload-path`, review base `e451255` (ancestor `main 71fabdb`).
 
-## Measurement method
+## Current performance contract
 
-`node apps/web/scripts/bench-library.mjs --url http://127.0.0.1:3105 --out <result.json>`.
-Opt-in `sessionStorage["bench.reload"]` enables `performance.measure("reload:…")` spans.
-The existing reload metric is retained unchanged: Playwright reload followed by count polling
-at 250 ms intervals. This includes navigation, module loading/hydration and polling latency;
-it is not just persistence CPU time. Async spans overlap and must not be summed.
-`zod` includes the nested JSON parse; subtract the `json` span for validation alone.
+The coordinator **retired the reload-to-ready 400 ms target**. The old Playwright DOM polling
+metric is no longer an acceptance metric. Three separately reported values replace it:
 
-## Decisions
+1. **First usable grid:** `reload:grid-ready`, emitted by the media panel in a layout effect after
+   media and a measured grid width have committed. Its timestamp is relative to navigationStart.
+   This means the library row is usable; it does not pretend that all Yjs/background work is done.
+2. **Restoration cost, target <150 ms:** sum of `library-read`, `json`, `zod`, `yjs-load`,
+   `yjs-read-validate`, and `applyFromDoc`, through the first completed document application.
+   JSON and zod are now separate, non-nested spans. `loadProject` is already inside application,
+   so it is not added again. Later GC row reads are excluded. Dev StrictMode duplicate startup
+   reads remain included. This is the requested elapsed-span sum, not pure CPU time: Yjs load
+   includes async waiting and can overlap the grid's rendering.
+3. **Background settle:** the later completion of the first source-health pass and first preview
+   batch (including its store application). Both must start **after** the grid mark, avoiding
+   contention with that first usable commit. Their elapsed duration is not charged to restoration.
 
-Baseline: 675.2 ms reload-to-ready, first library read starts 399.0 ms after navigation.
-Library JSON is 244,659 bytes on this base (the previous waveform separation is already present).
-Search/geocoding, sorting and grouping are sub-2 ms per call; no lazy search or schema weakening.
+`bench-library.mjs` imports 1,000 assets (200 AAC video, 800 PNG) once into an ephemeral Chrome
+profile, then reloads five times. It reads User Timing entries instead of polling DOM readiness.
+p50/p95 use nearest-rank over the five samples (p95 is the maximum); no warm-up sample is discarded.
+Both environments use 1440×900. Dev mounted 16 cards; production mounted 24 cards. Runs were
+sequential after the gate, with no concurrent build or test browser workload.
 
-1. Yjs startup measured 152.1 ms and applied the document four times. Restore once after
-   `whenSynced`; ignore empty transactions and reentrant/local transactions. Keep full schema
-   validation, migration and subsequent remote updates. A real Y.Doc regression test covers
-   multi-update startup, empty transactions and later remote edits.
-2. The first source-health pass started at 449.0 ms and ran 1,068.8 ms, overlapping restore.
-   Delay library-wide checks by one second, cancelling obsolete scheduled passes as the library
-   changes. Focus/visibility rechecks and preview/export preflight remain immediate.
+Commands:
 
-An intermediate run was 608.8 ms before empty-transaction suppression. A run concurrent with
-production build was 1,139.9 ms (first library read 659.6 ms); retain this as a contention warning,
-not an isolated performance comparison. Final isolated runs follow below.
+```sh
+NEXT_DIST_DIR=.next-bench pnpm --filter @movie-desk/web exec next dev --turbopack -p 3105
+node apps/web/scripts/bench-library.mjs --url http://127.0.0.1:3105 --out /tmp/a5-r2-dev.json
+NEXT_DIST_DIR=.next-gate pnpm --filter @movie-desk/web exec next start -p 3106
+node apps/web/scripts/bench-library.mjs --url http://127.0.0.1:3106 --out /tmp/a5-r2-prod.json
+```
 
-## Preview and snapshots
+## Five-run results
 
-The card hover action regenerates thumbnail, filmstrip and waveform using the existing import
-preview generators and the current original source adapter, then writes `putAssetPreviews` with
-its default missing-field replacement. Store listeners refresh visible cards; successful writes
-clear legacy inline previews outside undo history. Missing originals hide the action; progress,
-success and failure toasts are translated. Leases are released on success and failure.
-The operation materializes the original as a File because the existing generators accept File;
-very large originals therefore have a temporary memory cost.
+| Metric (ms from navigationStart except restoration sum) | Dev p50 | Dev p95 | Production p50 | Production p95 |
+| --- | ---: | ---: | ---: | ---: |
+| First usable grid | 386.32 | 578.65 | 336.76 | 341.47 |
+| Restoration cost | 144.23 | 166.86 | 71.84 | 78.40 |
+| Background settle | 2208.89 | 2427.85 | 1868.51 | 1982.34 |
 
-Snapshot policy proposes the oldest overflow beyond the latest 20 per project. Saving never
-automatically deletes. The UI shows the proposed count and requires confirmation; cleanup deletes
-only the reviewed ids in the reviewed project in one transaction. GC already enumerates the
-snapshot table on each scan, so removed rows naturally leave the keep set; a regression verifies
-that enumeration includes only remaining rows. No GC implementation change is needed.
+**Budget decision:** production p50/p95 both satisfy <150 ms. Dev p50 satisfies it; dev p95
+**does not** (166.86 ms). The slowest dev sample has a 145.84 ms Yjs-load span; keep this tail
+visible rather than claiming an across-environment pass from the median. No additional speculative
+loading/schema changes were made as part of this review correction.
 
-E2E deletes stored preview rows, reloads to an empty card, regenerates, and reloads again to prove
-persistence. Unit tests cover source/rotation use, missing derived-field replacement, storage
-failure lease release, retention boundaries, project isolation, and remaining-row enumeration.
+Both background starts follow the grid mark in **5/5 dev and 5/5 production samples**.
 
-## Final measurements
+| Environment / run | Grid | Restoration | Background settle | Both background starts after grid |
+| --- | ---: | ---: | ---: | --- |
+| dev / 1 | 516.87 | 166.86 | 2294.75 | True |
+| dev / 2 | 365.47 | 97.24 | 2136.79 | True |
+| dev / 3 | 578.65 | 144.31 | 2427.85 | True |
+| dev / 4 | 386.32 | 144.23 | 2208.89 | True |
+| dev / 5 | 365.39 | 141.16 | 2138.35 | True |
+| prod / 1 | 339.91 | 78.40 | 1772.53 | True |
+| prod / 2 | 341.47 | 61.42 | 1982.34 | True |
+| prod / 3 | 334.98 | 66.41 | 1907.31 | True |
+| prod / 4 | 336.76 | 71.84 | 1868.51 | True |
+| prod / 5 | 335.28 | 72.43 | 1810.44 | True |
 
-| Metric | Baseline dev | Final dev | Production |
-| --- | ---: | ---: | ---: |
-| Reload → library ready (ms) | 675.2 | 616.4 | 528.1 |
-| Import (ms) | 11554.2 | 10682.2 | 16308.6 |
-| Search (ms) | 52.7 | 53.6 | 67.6 |
-| DOM cards after reload | 16.0 | 16.0 | 24.0 |
+| Restore stage, per-run sum (ms) | Dev p50 | Dev p95 | Production p50 | Production p95 |
+| --- | ---: | ---: | ---: | ---: |
+| library-read | 4.31 | 7.12 | 0.49 | 0.74 |
+| json | 0.43 | 0.59 | 0.29 | 0.53 |
+| zod | 4.38 | 5.79 | 3.74 | 5.25 |
+| yjs-load | 127.94 | 145.78 | 61.58 | 64.78 |
+| yjs-read-validate | 2.43 | 3.68 | 2.59 | 3.22 |
+| applyFromDoc | 2.04 | 8.94 | 1.91 | 6.95 |
 
-Startup spans below show individual durations in ms (first startup only; later GC library reads excluded).
+## Review corrections
 
-| Span | Baseline dev | Final dev |
-| --- | ---: | ---: |
-| library-read | 0.48, 4.12 | 0.29, 9.18 |
-| json | 0.20, 0.22 | 0.22, 0.20 |
-| zod | 3.45, 1.97 | 3.52, 1.97 |
-| yjs-load | 152.12 | 91.64 |
-| yjs-read-validate | not instrumented | 1.74 |
-| applyFromDoc | 2.57, 1.41, 1.08, 1.22 | 7.28 |
-| loadProject | 2.68, 0.34, 0.25, 0.22, 0.21 | 2.66, 0.24 |
-| search-index | 1.58, 0.31, 1.58, 0.09, 1.01, 0.04 | 1.44, 0.17, 1.26, 0.09 |
-| sort | 0.13, 0.08, 0.10, 0.06, 0.08, 0.06 | 0.09, 0.06, 0.09, 0.06 |
-| group | 0.25, 0.16, 0.20, 0.18, 0.12, 0.10 | 0.21, 0.16, 0.16, 0.13 |
-| preview-request | 8.19 | 1.88 |
-| source-health | 1068.75 | 1119.59 |
+- OPFS reconstruction references `readMediaFile`'s Blob through a File without materializing
+  bytes. Desktop video is passed to the shared ranged frame sampler directly; image decoding
+  uses a leased playback URL. There is no whole-original `source.read(0, sizeBytes)`.
+- Waveforms use `ensureAudioVariant` and decode only the audio variant. An unavailable variant
+  is a failed waveform kind, with no whole-video fallback. Unsupported/silent video may therefore
+  report a waveform warning while retaining its existing preview.
+- Full replacement is allowed only for all expected kinds: image thumb; audio waveform; video
+  thumb, filmstrip and waveform. Partial output uses `replaceMissing: false`, preserves stored
+  previews, and reports the failed translated kind names in a warning, never a success toast.
+  Total decode failure and storage failure remain errors. Source errors suggest relinking.
+- Module-owned jobs deduplicate by asset id and cap active regeneration at two. A subscribed
+  pending set keeps remounted cards disabled. A release stack covers later lease acquisition
+  failure as well as decode/storage failure.
+- Metrics read sessionStorage once inside try/catch and share a no-op when storage is denied.
+- The first source-health timer is armed once and reads the latest asset ref when it fires;
+  later changes check immediately. It uses `FIRST_PASS_DELAY_MS` beside `FORCE_THROTTLE_MS`.
+  Immediate preview/export checks and focus/visibility behavior remain intact.
+- Snapshot candidates are memoized. The app confirmation dialog lists the frozen proposal's
+  labels/dates and explicitly warns that originals referenced only by those snapshots may be
+  removed in the next GC. Cleanup uses one bulkGet, project filtering, and one bulkDelete inside
+  a transaction; its error handler reports a toast. Saving never automatically removes snapshots.
+- E2E locates the imported project among library rows instead of assuming one row. Type-only
+  Yjs import and requested import/line-width cleanup are included. Translation changes append
+  keys with the existing four-space indentation.
 
-Final dev navigation response end 146.5 ms, DOMContentLoaded 159.4 ms, load event 235.7 ms,
-first library read 382.2 ms. Yjs settles at 487.9 ms; visible preview query starts 586.8 ms.
-The source-health pass now starts at 1,519.9 ms, after the measured ready boundary, rather than
-449.0 ms before it. Yjs load decreases 152.1 → 91.6 ms; application count decreases 4 → 1.
-The dev 400 ms target remains **unmet** (616.4 ms final); these single-run measurements are not
-statistical proof. Startup module/hydration cost alone nearly exhausts the budget. Further work
-should profile that navigation/hydration interval separately before changing loading boundaries;
-no speculative schema/cache/search changes were included.
+## Validation
 
-Production (`NEXT_DIST_DIR=.next-gate next start -p 3106`): response end 14.3 ms,
-DOMContentLoaded 71.5 ms, load event 90.5 ms; first library read 311.8 ms, Yjs sync 400.9 ms,
-preview query 454.0–474.7 ms, ready 528.1 ms. Production also misses 400 ms under the unchanged
-benchmark definition. Production mounted 24 cards, so do not attribute the whole dev/prod delta
-to bundling alone. Both builds were measured sequentially with no gate/build running.
+`pnpm gate` **PASS**, including install, version policy, lint, typecheck, unit tests,
+OSV audit, production build, Playwright install, and **45/45 Chromium E2E**.
+Unit counts: core 107, web 477, desktop 56, scripts 11 (**651 total**).
+New/updated regression coverage includes throwing storage access, zero eager disk reads,
+OPFS Blob handling, audio-variant decoding, partial filmstrip preservation, no video fallback,
+lease acquisition failure, storage errors, shared deduplication/concurrency, snapshot bulk cleanup,
+and app-dialog cancel/confirm flows with preview regeneration surviving reload.
 
-| Production startup span | Durations (ms) |
-| --- | ---: |
-| library-read | 0.47 |
-| json | 0.28 |
-| zod | 6.41 |
-| yjs-load | 77.46 |
-| yjs-read-validate | 6.44 |
-| applyFromDoc | 11.16 |
-| loadProject | 4.58, 0.41 |
-| search-index | 4.02, 3.00 |
-| sort | 0.16, 0.32 |
-| group | 0.42, 0.23 |
-| preview-request | 20.65 |
-| source-health | 632.46 |
+The earlier `e451255` single-run values (dev 675→616 ms, production 528 ms) measured a different,
+now-retired DOM polling boundary. They are historical evidence, not comparable budget results.
+The previous Yjs 4→1 application reduction and source-health overlap finding remain the reason
+for the original two-path change; full stored schema validation remains enabled.
 
-## Validation and handoff
-
-Final `pnpm gate` **PASS**: frozen install, version policy, lint, typecheck, unit tests
-(core 107, web 471, desktop 56, scripts 11), OSV audit (167 production packages, no known
-vulnerabilities), production build, Playwright install, and Chromium E2E **45/45**.
-The added preview/snapshot browser tests also passed 4/4 in an isolated focused run.
-One earlier full run lost the test server connection; the final passing gate ran after shutting
-down both measurement servers. An earlier new test used a thumbnail-dependent accessible name;
-it now identifies the card by its stable container and visible filename even when the image is absent.
-
-Decision: deliver the measured two-path change and both backlog features for review, but do not
-claim the requested sub-400 ms performance outcome. Next investigation is navigation/module
-hydration before the first library read. No push, main merge, other worktree edits, schema
-weakening, i18n formatting, or unrelated formatting was performed.
-
-Raw results: [baseline and final JSON](2026-09-06-reload-path-results.json).
+Raw current samples: [five-run review results](2026-09-06-reload-path-review-results.json).
+Historical raw samples: [initial reload investigation](2026-09-06-reload-path-results.json).

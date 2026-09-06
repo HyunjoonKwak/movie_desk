@@ -2,7 +2,7 @@
 
 import { Heart, Layers, Link2, Loader2, Pin, Scissors, Star, Trash2, X } from "lucide-react";
 import { Music, Image as ImageIcon, Film } from "lucide-react";
-import { memo, useRef, useState } from "react";
+import { memo, useRef } from "react";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { fmtSec } from "@/media/format";
@@ -13,7 +13,12 @@ import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import type { MediaAsset } from "@movie-desk/core";
 import { toast } from "sonner";
-import { regenerateAssetPreviews } from "@/media/import";
+import {
+  regenerateAssetPreviews,
+  usePreviewRegenerationStore,
+  PreviewRegenerationError,
+} from "@/media/import";
+import { MediaSourceError } from "@/media/source/media-source";
 import { isSourceMissing } from "@/media/source/probe-source";
 import { useProjectStore } from "@/stores/project-store";
 import { RefreshCw } from "lucide-react";
@@ -73,18 +78,33 @@ export const MediaCard = memo(function MediaCard({
   onDelete,
 }: MediaCardProps) {
   const t = useT();
-  const [regenerating, setRegenerating] = useState(false);
+  const regenerating = usePreviewRegenerationStore((s) => s.pending.has(asset.id));
   const regenerate = async () => {
-    setRegenerating(true);
     const id = toast.loading(t("media.previewBuilding"));
     try {
-      await regenerateAssetPreviews(asset);
-      useProjectStore.getState().dropInlinePreviews([asset.id]);
-      toast.success(t("media.previewDone"), { id });
-    } catch {
-      toast.error(t("media.previewFailed"), { id });
-    } finally {
-      setRegenerating(false);
+      const result = await regenerateAssetPreviews(asset);
+      if (result.failed.length) {
+        toast.warning(
+          t("media.previewPartial", {
+            kinds: result.failed.map((kind) => t(`media.previewKind.${kind}`)).join(", "),
+          }),
+          { id },
+        );
+      } else {
+        useProjectStore.getState().dropInlinePreviews([asset.id]);
+        toast.success(t("media.previewDone"), { id });
+      }
+    } catch (error) {
+      toast.error(
+        t(
+          error instanceof MediaSourceError
+            ? "media.previewSourceFailed"
+            : error instanceof PreviewRegenerationError && error.kind === "storage"
+              ? "media.previewStorageFailed"
+              : "media.previewDecodeFailed",
+        ),
+        { id },
+      );
     }
   };
   const Icon = KIND_ICON[asset.kind];

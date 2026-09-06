@@ -1,5 +1,4 @@
 "use client";
-import { reloadSpan } from "@/lib/reload-metrics";
 
 import type { MediaAsset } from "@movie-desk/core";
 import { create } from "zustand";
@@ -9,6 +8,8 @@ import { type SourceHealth, isSourceMissing, probeAssetSource } from "./source/p
 // looked, so the media bin can flag a missing original before the user
 // discovers it in the preview or at export. Results are tied to the asset
 // record that was probed: a relinked or rebuilt asset is probed again.
+
+import { reloadSpan } from "@/lib/reload-metrics";
 
 interface HealthEntry {
   readonly health: SourceHealth;
@@ -38,6 +39,7 @@ const DEFAULT_MAX_AGE_MS = 60_000;
 // A forced pass (window focus) costs a read per asset — on the desktop a
 // lease plus a ranged request — so bursts of focus events share one pass.
 export const FORCE_THROTTLE_MS = 10_000;
+export const FIRST_PASS_DELAY_MS = 1_000;
 const FLUSH_EVERY = 32;
 
 let prober: (asset: MediaAsset) => Promise<SourceHealth> = probeAssetSource;

@@ -97,18 +97,19 @@ const libraryRowMetrics = () =>
               json: row.json,
               bytes: encoder.encode(row.json).byteLength,
             }));
-            const largest = rows.reduce(
-              (best, row) => (row.bytes > best.bytes ? row : best),
-              { json: "", bytes: 0 },
-            );
+            const largest = rows.reduce((best, row) => (row.bytes > best.bytes ? row : best), {
+              json: "",
+              bytes: 0,
+            });
             const fields = {};
             let assetFieldBytes = 0;
             try {
               const project = JSON.parse(largest.json);
               for (const asset of project.mediaLibrary ?? []) {
                 for (const [key, value] of Object.entries(asset)) {
-                  const bytes = encoder.encode(`${JSON.stringify(key)}:${JSON.stringify(value)},`)
-                    .byteLength;
+                  const bytes = encoder.encode(
+                    `${JSON.stringify(key)}:${JSON.stringify(value)},`,
+                  ).byteLength;
                   assetFieldBytes += bytes;
                   const prior = fields[key] ?? { bytes: 0, assets: 0 };
                   fields[key] = { bytes: prior.bytes + bytes, assets: prior.assets + 1 };
@@ -201,16 +202,60 @@ try {
   result.healthPassMs = probe.elapsed;
   result.healthPassOpens = probe.value - opensBefore;
 
-  // 5. Reload → library restored (row parse + Yjs sync) → all cards back.
-  t0 = performance.now();
-  await page.reload();
-  await untilAtLeast(shownCount, TOTAL, 120_000);
-  result.reloadToReadyMs = performance.now() - t0;
-  result.navigation = await page.evaluate(() => performance.getEntriesByType("navigation")[0]?.toJSON());
+  // 5. Five reloads: the media panel marks its first usable committed grid.
+  result.reloadRuns = [];
+  for (let run = 0; run < 5; run++) {
+    await page.reload();
+    await page.waitForFunction(
+      () =>
+        performance.getEntriesByName("reload:grid-ready").length > 0 &&
+        performance.getEntriesByName("reload:applyFromDoc").length > 0 &&
+        performance.getEntriesByName("reload:source-health").length > 0 &&
+        performance.getEntriesByName("reload:preview-request").length > 0,
+    );
+    result.reloadRuns.push(
+      await page.evaluate(() => {
+        const spans = performance
+          .getEntriesByType("measure")
+          .filter((e) => e.name.startsWith("reload:"))
+          .map((e) => ({ name: e.name, start: e.startTime, duration: e.duration }));
+        const gridReadyMs = performance.getEntriesByName("reload:grid-ready")[0].startTime;
+        const applied = spans.find((e) => e.name === "reload:applyFromDoc");
+        const restoreEnd = applied.start + applied.duration;
+        const restoreNames = new Set(
+          ["library-read", "json", "zod", "yjs-load", "yjs-read-validate", "applyFromDoc"].map(
+            (name) => `reload:${name}`,
+          ),
+        );
+        const restorationMs = spans
+          .filter((e) => restoreNames.has(e.name) && e.start < restoreEnd)
+          .reduce((total, e) => total + e.duration, 0);
+        const background = ["reload:source-health", "reload:preview-request"].map((name) =>
+          spans.find((e) => e.name === name),
+        );
+        return {
+          gridReadyMs,
+          restorationMs,
+          backgroundSettleMs: Math.max(...background.map((e) => e.start + e.duration)),
+          backgroundAfterGrid: background.every((e) => e.start >= gridReadyMs),
+          spans,
+        };
+      }),
+    );
+  }
+  const percentile = (key, p) => {
+    const values = result.reloadRuns.map((run) => run[key]).sort((a, b) => a - b);
+    return values[Math.ceil(values.length * p) - 1];
+  };
+  result.reloadBudgets = Object.fromEntries(
+    ["gridReadyMs", "restorationMs", "backgroundSettleMs"].map((key) => [
+      key,
+      { p50: percentile(key, 0.5), p95: percentile(key, 0.95) },
+    ]),
+  );
+  result.backgroundAfterGrid = result.reloadRuns.every((run) => run.backgroundAfterGrid);
   result.domCardsAfterReload = await page.locator("[data-asset-card]").count();
   result.heapAfterReload = await heap();
-  await page.waitForTimeout(3000);
-  result.reloadSpans = await page.evaluate(() => performance.getEntriesByType("measure").filter(e => e.name.startsWith("reload:")).map(e => ({name:e.name, start:e.startTime, duration:e.duration})));
 
   // 6. Single edit cost with a large library: rename the project and wait for the save badge.
   // Let visible previews finish their lazy IndexedDB read and image decode so
@@ -245,24 +290,33 @@ const rows = [
     "source-health pass (focus)",
     `${ms(result.healthPassMs)} (${result.healthPassOpens} file opens)`,
   ],
-  ["reload → library ready", ms(result.reloadToReadyMs)],
+  ...Object.entries(result.reloadBudgets).map(([name, values]) => [
+    name,
+    `p50 ${ms(values.p50)} / p95 ${ms(values.p95)} (5 runs)`,
+  ]),
+  ["background starts after grid", String(result.backgroundAfterGrid)],
   ["DOM cards after reload", String(result.domCardsAfterReload)],
   ["JS heap after reload", result.heapAfterReload ? mb(result.heapAfterReload) : "n/a"],
   ["rename → Saved badge", ms(result.renameToSavedMs)],
 ];
 console.log("| metric | value |\n| --- | --- |");
 for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
-console.log("\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |");
+console.log(
+  "\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |",
+);
 const share = (bytes) =>
   result.libraryRowBytes > 0 ? `${((bytes / result.libraryRowBytes) * 100).toFixed(1)}%` : "n/a";
 for (const [field, value] of Object.entries(result.libraryJsonComposition).sort(
   (a, b) => b[1].bytes - a[1].bytes,
 )) {
   console.log(
-    `| ${field} | ${value.bytes.toLocaleString("en-US")} | ${share(value.bytes)} | ${value.assets} |`,
+    ["", field, value.bytes.toLocaleString("en-US"),
+      share(value.bytes), value.assets, ""].join(" | "),
   );
 }
 console.log(
-  `| other project data/structure | ${result.libraryOtherProjectBytes.toLocaleString("en-US")} | ${share(result.libraryOtherProjectBytes)} | — |`,
+  ["", "other project data/structure",
+    result.libraryOtherProjectBytes.toLocaleString("en-US"),
+    share(result.libraryOtherProjectBytes), "—", ""].join(" | "),
 );
 if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);

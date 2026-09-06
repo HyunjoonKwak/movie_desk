@@ -1,9 +1,11 @@
+import { create } from "zustand";
+import { MediaSourceError } from "./source/media-source";
 import { resolveMediaSource } from "./source/resolve-media-source";
 import { extractCaptureMeta } from "@/autoedit/metadata";
 import { leaseMediaKey } from "@/persistence/media-gc";
-import { writeMediaFile } from "@/persistence/opfs";
+import { readMediaFile, writeMediaFile } from "@/persistence/opfs";
 import { leasePreview, putAssetPreviews } from "@/persistence/previews";
-import { type MediaAsset, newId } from "@movie-desk/core";
+import { type MediaAsset, newId, sourceRefOf } from "@movie-desk/core";
 import { audioVariantKey, ensureAudioVariant } from "./audio/audio-variant";
 import { readMp4ContainerInfo } from "./container-info";
 import { probeMedia } from "./probe";
@@ -133,31 +135,112 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   }
 };
 
-// Rebuild from the current original, never a proxy or cached audio variant.
-export const regenerateAssetPreviews = async (asset: MediaAsset): Promise<void> => {
-  const release = leasePreview(asset.id);
-  const releaseOriginal = leaseMediaKey(asset.opfsPath);
+export type PreviewKind = "thumb" | "filmstrip" | "waveform";
+export interface RegenerationResult {
+  readonly failed: readonly PreviewKind[];
+}
+export class PreviewRegenerationError extends Error {
+  constructor(
+    readonly kind: "decode" | "storage",
+    options?: ErrorOptions,
+  ) {
+    super(`Preview ${kind} failed`, options);
+  }
+}
+export const usePreviewRegenerationStore = create<{ readonly pending: ReadonlySet<string> }>(
+  () => ({ pending: new Set() }),
+);
+const regenerationJobs = new Map<string, Promise<RegenerationResult>>();
+const slots: (() => void)[] = [];
+let activeRegenerations = 0;
+const acquireSlot = async () => {
+  if (activeRegenerations >= 2) await new Promise<void>((resolve) => slots.push(resolve));
+  else activeRegenerations++;
+};
+const releaseSlot = () => {
+  const next = slots.shift();
+  if (next) next();
+  else activeRegenerations--;
+};
+
+const rebuildPreviews = async (asset: MediaAsset): Promise<RegenerationResult> => {
+  const releases: (() => void)[] = [];
   try {
-    const source = await resolveMediaSource(asset);
-    const bytes = await source.read(0, source.sizeBytes);
-    const file = new File([bytes], asset.name, { type: source.mime });
+    const ref = sourceRefOf(asset);
+    releases.push(leasePreview(asset.id));
+    releases.push(leaseMediaKey(ref.kind === "opfs" ? ref.key : asset.opfsPath));
+    releases.push(leaseMediaKey(audioVariantKey(asset)));
+    const blob = ref.kind === "opfs" ? await readMediaFile(ref.key) : null;
+    if (ref.kind === "opfs" && !blob) throw new MediaSourceError("offline", "Original unavailable");
+    // OPFS File references its backing Blob; disk sources stay ranged through the sampler.
+    const source = blob
+      ? new File([blob], asset.name, { type: asset.mime })
+      : await resolveMediaSource(asset);
+    const attempt = async <T>(run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (error) {
+        if (error instanceof MediaSourceError) throw error;
+        return null;
+      }
+    };
     const thumb =
       asset.kind === "image"
-        ? await makeImageThumb(file)
+        ? await attempt(() => makeImageThumb(source))
         : asset.kind === "video"
-          ? await makeVideoThumb(file, 0.1, asset.rotation)
-          : undefined;
+          ? await attempt(() => makeVideoThumb(source, 0.1, asset.rotation))
+          : null;
     const filmstrip =
-      asset.kind === "video" ? await makeVideoFilmstrip(file, 10, asset.rotation) : undefined;
-    const waveform = asset.kind !== "image" ? await extractWaveformPeaks(file) : undefined;
-    if (!thumb && !filmstrip && !waveform) throw new Error("No previews could be generated");
-    await putAssetPreviews(asset.id, {
-      ...(thumb ? { thumb } : {}),
-      ...(filmstrip ? { filmstrip } : {}),
-      ...(waveform ? { waveform } : {}),
-    });
+      asset.kind === "video"
+        ? await attempt(() => makeVideoFilmstrip(source, 10, asset.rotation))
+        : null;
+    // Do not decode a whole video container when the audio-only variant is unavailable.
+    const waveform =
+      asset.kind !== "image"
+        ? await attempt(async () => {
+            const audio = await ensureAudioVariant(asset);
+            return audio ? extractWaveformPeaks(audio) : null;
+          })
+        : null;
+    const failed: PreviewKind[] = [];
+    if (asset.kind !== "audio" && !thumb) failed.push("thumb");
+    if (asset.kind === "video" && !filmstrip) failed.push("filmstrip");
+    if (asset.kind !== "image" && !waveform) failed.push("waveform");
+    if (!thumb && !filmstrip && !waveform) throw new PreviewRegenerationError("decode");
+    try {
+      await putAssetPreviews(
+        asset.id,
+        {
+          ...(thumb ? { thumb } : {}),
+          ...(filmstrip ? { filmstrip } : {}),
+          ...(waveform ? { waveform } : {}),
+        },
+        { replaceMissing: failed.length === 0 },
+      );
+    } catch (cause) {
+      throw new PreviewRegenerationError("storage", { cause });
+    }
+    return { failed };
   } finally {
-    release();
-    releaseOriginal();
+    for (const release of releases.reverse()) release();
   }
+};
+
+export const regenerateAssetPreviews = (asset: MediaAsset): Promise<RegenerationResult> => {
+  const existing = regenerationJobs.get(asset.id);
+  if (existing) return existing;
+  const job = (async () => {
+    await acquireSlot();
+    try {
+      return await rebuildPreviews(asset);
+    } finally {
+      releaseSlot();
+    }
+  })().finally(() => {
+    regenerationJobs.delete(asset.id);
+    usePreviewRegenerationStore.setState({ pending: new Set(regenerationJobs.keys()) });
+  });
+  regenerationJobs.set(asset.id, job);
+  usePreviewRegenerationStore.setState({ pending: new Set(regenerationJobs.keys()) });
+  return job;
 };

@@ -23,6 +23,10 @@ vi.mock("dexie", () => {
     each = async (visit: (row: Row) => void) => {
       for (const row of rows.values()) visit(row);
     };
+    bulkGet = async (ids: string[]) => ids.map((id) => rows.get(id));
+    bulkDelete = async (ids: string[]) => {
+      for (const id of ids) rows.delete(id);
+    };
     get = async (id: string) => rows.get(id);
     delete = async (id: string) => {
       rows.delete(id);

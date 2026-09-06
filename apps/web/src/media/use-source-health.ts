@@ -3,7 +3,7 @@
 import type { MediaAsset } from "@movie-desk/core";
 import { useEffect, useMemo, useRef } from "react";
 import { type SourceHealth, isSourceMissing } from "./source/probe-source";
-import { useSourceHealthStore } from "./source-health-store";
+import { FIRST_PASS_DELAY_MS, useSourceHealthStore } from "./source-health-store";
 
 // Keeps the library's source health current: probes new or changed assets
 // when the list changes, and re-probes everything when the window comes
@@ -16,11 +16,22 @@ export const useSourceHealth = (
   const entries = useSourceHealthStore((s) => s.entries);
   const check = useSourceHealthStore((s) => s.check);
 
+  const latest = useRef(assets);
+  latest.current = assets;
+  const started = useRef(false);
+
   useEffect(() => {
     // Let restoration and visible previews finish before opening every original.
     // Preview/export preflight still checks a requested source immediately.
-    const timer = setTimeout(() => void check(assets, { prune: true }), 1_000);
+    const timer = setTimeout(() => {
+      started.current = true;
+      void check(latest.current, { prune: true });
+    }, FIRST_PASS_DELAY_MS);
     return () => clearTimeout(timer);
+  }, [check]);
+
+  useEffect(() => {
+    if (started.current) void check(assets, { prune: true });
   }, [assets, check]);
 
   useEffect(() => {

@@ -1,10 +1,10 @@
-import { reloadSpan, measureReload } from "@/lib/reload-metrics";
 // Multi-project library backed by IndexedDB. Each project is keyed by its
 // stable id; the active project id is stored alongside so the editor can
 // re-open the last project automatically. Yjs continues to hold the live
 // canonical state for the *active* project; this store is for the "open
 // previous projects" experience.
 
+import { reloadSpan, measureReload } from "@/lib/reload-metrics";
 import Dexie, { type Table } from "dexie";
 import type { Project } from "@movie-desk/core";
 import { parseStoredProject } from "./project-export";
@@ -63,12 +63,8 @@ export const loadStoredProject = async (id: string): Promise<StoredProjectLoadRe
   end();
   if (!row) return { status: "missing" };
   try {
-    return {
-      status: "ok",
-      project: measureReload("zod", () =>
-        parseStoredProject(measureReload("json", () => JSON.parse(row.json))),
-      ),
-    };
+    const json = measureReload("json", () => JSON.parse(row.json));
+    return { status: "ok", project: measureReload("zod", () => parseStoredProject(json)) };
   } catch {
     // Keep the raw JSON so callers (e.g. media GC) can salvage OPFS references
     // and users can still export/recover or delete it from the project menu.

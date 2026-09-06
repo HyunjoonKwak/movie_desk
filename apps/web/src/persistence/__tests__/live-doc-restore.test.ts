@@ -1,6 +1,6 @@
 import { createEmptyProject } from "@movie-desk/core";
 import { afterEach, expect, it, vi } from "vitest";
-import * as Y from "yjs";
+import type * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";
 import { useProjectStore } from "@/stores/project-store";
 
