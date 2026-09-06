@@ -159,6 +159,12 @@ describe("timeline mutate", () => {
       ...makeMediaClip(0, 2000),
       preservePitch: true,
       volume: 0.7,
+      effects: [
+        { id: newId(), type: "audio-gain", enabled: true, params: { db: -6 } },
+        { id: newId(), type: "audio-fade", enabled: true, params: { inMs: 100 } },
+        { id: newId(), type: "audio-eq", enabled: false, params: { low: 2 } },
+        { id: newId(), type: "brightness", enabled: true, params: { value: 0.2 } },
+      ],
       keyframes: [
         {
           target: "volume",
@@ -194,6 +200,9 @@ describe("timeline mutate", () => {
     expect(orig.keyframes.some((t) => t.target === "volume")).toBe(false);
     expect((detached as typeof clip).volume).toBe(0.7);
     expect(clip.keyframes).toHaveLength(2);
+    expect(detached.effects).toEqual(clip.effects.slice(0, 3));
+    expect(orig.effects).toEqual(clip.effects.slice(3));
+    expect(clip.effects).toHaveLength(4);
   });
 
   it("moves grouped clips together", () => {

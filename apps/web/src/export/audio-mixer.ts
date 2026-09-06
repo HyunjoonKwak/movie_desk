@@ -1,7 +1,7 @@
 import { resolveTrackRoute, routeStereo, type TrackRoute } from "@movie-desk/core";
-import { renderPitchInWorker } from "@/audio/pitch-renderer";
+import { renderPitchRangeInWorker } from "@/audio/pitch-renderer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
-import type { ID, MediaAsset, Project } from "@movie-desk/core";
+import type { ID, MediaAsset, Project, StretchContinuation } from "@movie-desk/core";
 import {
   type EffectInstance,
   type MediaClip,
@@ -298,6 +298,7 @@ export class ProjectAudioMixer {
       ),
     );
     let duckGain = 1;
+    const pitchContinuations = new Map<MediaClip, StretchContinuation>();
 
     for (
       let chunkStartSample = absoluteStartSample;
@@ -346,7 +347,7 @@ export class ProjectAudioMixer {
           );
         if (clip.preservePitch === true && clip.speed > 0 && !this.pitchFallback) {
           try {
-            rendered = await renderPitchInWorker(
+            const result = await renderPitchRangeInWorker(
               {
                 channels: sources,
                 sourceSampleRate: decoded.sampleRate,
@@ -354,9 +355,16 @@ export class ProjectAudioMixer {
                 clip,
                 offsetMs: clipOffsetMs,
                 outputSamples,
+                ...(pitchContinuations.has(clip)
+                  ? { continuation: pitchContinuations.get(clip)! }
+                  : {}),
+                checkpointSample: Math.max(0, overlapEnd - effectPaddingSamples - clipStartSample),
               },
               options.signal,
             );
+            rendered = result.channels;
+            if (result.continuation) pitchContinuations.set(clip, result.continuation);
+            else pitchContinuations.delete(clip);
           } catch {
             throwIfAborted(options.signal);
             this.pitchFallback = true;

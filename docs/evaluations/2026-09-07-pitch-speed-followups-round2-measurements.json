@@ -1,0 +1,224 @@
+{
+  "ab": [
+    {
+      "ref": "1c3c0e4",
+      "elapsedMs": 3087.5999999940395,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 20,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    },
+    {
+      "ref": "working-tree",
+      "elapsedMs": 4180.299999982119,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 1,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    }
+  ],
+  "abc": [
+    {
+      "ref": "1c3c0e4",
+      "elapsedMs": 3130.0999999940395,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 20,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    },
+    {
+      "ref": "working-tree",
+      "elapsedMs": 2394,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 1,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    }
+  ],
+  "finalExport": [
+    {
+      "ref": "1c3c0e4",
+      "elapsedMs": 3118.4000000059605,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 20,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    },
+    {
+      "ref": "working-tree",
+      "elapsedMs": 2379,
+      "chunks": 20,
+      "transferredBytes": 237696000,
+      "pitchWorkerCount": 1,
+      "assetBytes": 230400000,
+      "pitchFallback": false
+    }
+  ],
+  "finalDsp": [
+    {
+      "ref": "1c3c0e4",
+      "rows": [
+        {
+          "hz": 440,
+          "speed": 0.5,
+          "dominantHz": 440,
+          "medianMs": 34.64154199999996
+        },
+        {
+          "hz": 440,
+          "speed": 1.37,
+          "dominantHz": 440,
+          "medianMs": 11.345250000000021
+        },
+        {
+          "hz": 440,
+          "speed": 2,
+          "dominantHz": 440,
+          "medianMs": 7.371792000000028
+        },
+        {
+          "hz": 6000,
+          "speed": 0.5,
+          "dominantHz": 6000,
+          "medianMs": 29.403291999999965
+        },
+        {
+          "hz": 6000,
+          "speed": 1.37,
+          "dominantHz": 6000,
+          "medianMs": 11.00308300000006
+        },
+        {
+          "hz": 6000,
+          "speed": 2,
+          "dominantHz": 6000,
+          "medianMs": 7.32483400000001
+        },
+        {
+          "hz": 10000,
+          "speed": 0.5,
+          "dominantHz": 10000,
+          "medianMs": 29.633125000000064
+        },
+        {
+          "hz": 10000,
+          "speed": 1.37,
+          "dominantHz": 10000,
+          "medianMs": 10.923583000000008
+        },
+        {
+          "hz": 10000,
+          "speed": 2,
+          "dominantHz": 10000,
+          "medianMs": 7.293249999999944
+        }
+      ],
+      "boundaries": [
+        {
+          "speed": 0.5,
+          "sampleJump": 0.5907239615917206
+        },
+        {
+          "speed": 1.37,
+          "sampleJump": 0.16083627939224243
+        },
+        {
+          "speed": 2,
+          "sampleJump": 0.5178463067859411
+        }
+      ]
+    },
+    {
+      "ref": "working-tree",
+      "rows": [
+        {
+          "hz": 440,
+          "speed": 0.5,
+          "dominantHz": 440,
+          "medianMs": 27.503833000000213
+        },
+        {
+          "hz": 440,
+          "speed": 1.37,
+          "dominantHz": 440,
+          "medianMs": 5.908249999999953
+        },
+        {
+          "hz": 440,
+          "speed": 2,
+          "dominantHz": 440,
+          "medianMs": 4.068499999999858
+        },
+        {
+          "hz": 6000,
+          "speed": 0.5,
+          "dominantHz": 6000,
+          "medianMs": 15.23908399999982
+        },
+        {
+          "hz": 6000,
+          "speed": 1.37,
+          "dominantHz": 5994,
+          "medianMs": 5.514208000000053
+        },
+        {
+          "hz": 6000,
+          "speed": 2,
+          "dominantHz": 6000,
+          "medianMs": 3.814542000000074
+        },
+        {
+          "hz": 10000,
+          "speed": 0.5,
+          "dominantHz": 10000,
+          "medianMs": 15.786957999999686
+        },
+        {
+          "hz": 10000,
+          "speed": 1.37,
+          "dominantHz": 10000,
+          "medianMs": 5.730167000000165
+        },
+        {
+          "hz": 10000,
+          "speed": 2,
+          "dominantHz": 10000,
+          "medianMs": 3.833874999999807
+        }
+      ],
+      "boundaries": [
+        {
+          "speed": 0.5,
+          "sampleJump": 0.026844769716262817
+        },
+        {
+          "speed": 1.37,
+          "sampleJump": 0.0208035409450531
+        },
+        {
+          "speed": 2,
+          "sampleJump": 0.028894005343317986
+        }
+      ]
+    }
+  ],
+  "audioGainBoundaries": [
+    {
+      "speed": 0.5,
+      "jump": 0.019004642963409424
+    },
+    {
+      "speed": 1.37,
+      "jump": 0.014727786183357239
+    },
+    {
+      "speed": 2,
+      "jump": 0.020455388352274895
+    }
+  ]
+}

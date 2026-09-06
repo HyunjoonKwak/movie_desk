@@ -1,6 +1,6 @@
 import {
   type MediaClip,
-  type StretchContinuation,
+  type StretchResult,
   type StretchRequest,
   type Track,
   isMediaClip,
@@ -72,8 +72,11 @@ export class PitchCache<T> {
 
 // At most two job slots share reusable workers. Aborts discard busy workers.
 const idleWorkers: Worker[] = [];
-// Weak source ownership avoids retaining decoded PCM; bound per-source variants.
-const continuations = new WeakMap<Float32Array, Map<string, StretchContinuation>>();
+let workerGeneration = 0;
+export const disposePitchWorkers = (): void => {
+  workerGeneration++;
+  for (const worker of idleWorkers.splice(0)) worker.terminate();
+};
 
 export const pitchMainSlice = <T>(run: () => T): T => {
   if (process.env.NODE_ENV === "production") return run();
@@ -147,21 +150,13 @@ export const pitchSourceWindow = (
 };
 
 const yieldMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
-export const renderPitchInWorker = (
+export const renderPitchRangeInWorker = (
   req: StretchRequest,
   signal?: AbortSignal,
-): Promise<Float32Array[]> => {
+): Promise<StretchResult> => {
   const run = async () => {
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
     if (typeof Worker === "undefined") throw new Error("Pitch worker unavailable");
-    const source = req.channels[0];
-    const key = `${req.clip.id}:${req.sourceSampleRate}:${pitchCacheKey(req.clip, req.outputSampleRate)}`;
-    let states = source ? continuations.get(source) : undefined;
-    if (source && !states) {
-      states = new Map();
-      continuations.set(source, states);
-    }
-    const continuation = { ...(req.continuation ?? states?.get(key)) };
     const { lower, upper } = pitchSourceWindow(req);
     const channels: Float32Array[] = [];
     // Copy in bounded blocks and transfer ownership, never detach decoded PCM.
@@ -176,13 +171,14 @@ export const renderPitchInWorker = (
       channels.push(copy);
     }
     if (signal?.aborted) throw new DOMException("Cancelled", "AbortError");
-    return new Promise<Float32Array[]>((resolve, reject) => {
+    return new Promise<StretchResult>((resolve, reject) => {
       const worker = idleWorkers.pop() ?? new Worker(new URL("./pitch-worker.ts", import.meta.url));
+      const generation = workerGeneration;
       const cleanup = (discard = false) => {
         clearTimeout(timer);
         worker.onmessage = null;
         worker.onerror = null;
-        if (discard) worker.terminate();
+        if (discard || generation !== workerGeneration) worker.terminate();
         else idleWorkers.push(worker);
         signal?.removeEventListener("abort", abort);
       };
@@ -195,24 +191,10 @@ export const renderPitchInWorker = (
         reject(new Error("Pitch render timed out"));
       }, 30000);
       signal?.addEventListener("abort", abort, { once: true });
-      worker.onmessage = (
-        event: MessageEvent<{
-          channels: Float32Array[];
-          error?: string;
-          continuation?: StretchContinuation;
-        }>,
-      ) => {
-        cleanup();
+      worker.onmessage = (event: MessageEvent<StretchResult & { error?: string }>) => {
+        cleanup(Boolean(event.data.error));
         if (event.data.error) reject(new Error(event.data.error));
-        else {
-          if (event.data.continuation) {
-            if (req.continuation) Object.assign(req.continuation, event.data.continuation);
-            states?.delete(key);
-            states?.set(key, event.data.continuation);
-            if (states && states.size > 32) states.delete(states.keys().next().value!);
-          }
-          resolve(event.data.channels);
-        }
+        else resolve(event.data);
       };
       worker.onerror = () => {
         cleanup(true);
@@ -220,7 +202,7 @@ export const renderPitchInWorker = (
       };
       try {
         worker.postMessage(
-          { ...req, continuation, channels, sourceStartSample: lower, id: 1 },
+          { ...req, channels, sourceStartSample: lower },
           channels.map((c) => c.buffer),
         );
       } catch (error) {
@@ -238,3 +220,9 @@ export const renderPitchInWorker = (
     }
   })();
 };
+
+// Preview is stateless; export callers explicitly own their continuation.
+export const renderPitchInWorker = async (
+  req: StretchRequest,
+  signal?: AbortSignal,
+): Promise<Float32Array[]> => (await renderPitchRangeInWorker(req, signal)).channels;

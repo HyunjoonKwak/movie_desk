@@ -348,3 +348,99 @@ worker reuse reduces construction count but does not offset dense correlation CP
 Both results are reported without claiming an overall export speedup.
 E2E preview probe: first sound 75.20ms, DSP 248.05ms, one worker, longest main task 0ms,
 maximum measured pitch main slice 1.04ms (development build).
+
+
+## B′2 follow-ups round 2 — 2026-09-07
+
+This section supersedes the preceding round's dense-only search and implicit
+WeakMap continuation design. Starting commit: `bbd6f1f89c6698b2c3dfa6a8d26f20da1c163fb0`;
+performance comparison remains the fixed historical `1c3c0e4` baseline.
+
+### Export regression removed
+
+All measurements below run `node scripts/pitch-export-benchmark.mjs 1c3c0e4`
+with local Chromium, decoded 10-minute 48kHz stereo, 20 × 30s chunks; no decoding
+or video encoding is included. Each row pairs baseline and working-tree runs in
+one invocation; wall-clock differences between invocations are not speedup claims.
+
+| Implementation | Paired baseline ms | Working tree ms | Change |
+| --- | --- | --- | --- |
+| (a) reusable tail/candidate buffers + score closure; (b) candidate energy prefix sum | 3087.6 | 4180.3 | +35.4% |
+| (a)+(b)+(c) box-filtered decimated coarse search, full-rate ±8 refine | 3130.1 | 2394.0 | −23.5% |
+| Final, including explicit immutable continuation and padded mixer integration | 3118.4 | 2379.0 | **−23.7%** |
+
+(a)+(b) exceeded the +15% ceiling, so (c) was required. All correlation scratch
+buffers and score closures now live outside the hop loop. Candidate squared-energy
+prefix sums make fine-candidate normalization O(1). Eight-sample box averaging
+precedes the coarse correlation's stride-eight sampling; ±8-sample full-rate
+refinement selects the final alignment. Box filtering is a cheap low-pass with
+limited stopband rejection, not a brick-wall filter; the measured tone criteria
+below are the scope of the accuracy claim.
+Final transferred PCM remains 237,696,000 bytes, worker construction 20→1,
+20 output chunks, and pitch fallback false for both implementations.
+The benchmark comment now explicitly states that a clean working tree is still
+compared to the requested historical ref; default/explicit refs are not resolved
+to the current branch's main automatically.
+
+### High-frequency and boundary measurements
+
+`node scripts/pitch-export-benchmark.mjs --dsp 1c3c0e4`, same 48kHz, two-second
+stereo, Hann/Goertzel methodology as above (one warm-up, median of five DSP calls):
+
+| Input Hz | Speed | Dominant Hz | Error | Baseline ms | Final ms |
+| --- | --- | --- | --- | --- | --- |
+| 440 | 0.5× | 440 | 0.00% | 34.642 | 27.504 |
+| 440 | 1.37× | 440 | 0.00% | 11.345 | 5.908 |
+| 440 | 2× | 440 | 0.00% | 7.372 | 4.068 |
+| 6000 | 0.5× | 6000 | 0.00% | 29.403 | 15.239 |
+| 6000 | 1.37× | 5994 | 0.10% | 11.003 | 5.514 |
+| 6000 | 2× | 6000 | 0.00% | 7.325 | 3.815 |
+| 10000 | 0.5× | 10000 | 0.00% | 29.633 | 15.787 |
+| 10000 | 1.37× | 10000 | 0.00% | 10.924 | 5.730 |
+| 10000 | 2× | 10000 | 0.00% | 7.293 | 3.834 |
+
+6kHz/10kHz maximum dominant-frequency error is 0.10%, within ±2%.
+The changes to dot products and energy normalization also change alignment below
+3kHz: outputs are **not bit-identical to the old algorithm**, even at lower
+frequencies. Previously saved pitch-rendered outputs must be re-rendered.
+
+| Speed | Plain 443Hz boundary jump | With audio-gain −3dB and effect padding |
+| --- | --- | --- |
+| 0.5× | 0.026845 | 0.019005 |
+| 1.37× | 0.020804 | 0.014728 |
+| 2× | 0.028894 | 0.020455 |
+
+All are below 0.05 at the 30s boundary (source amplitude 0.5, sample rate 48kHz).
+The effect regression runs the real ProjectAudioMixer and audio-gain processing
+with pure DSP substituted only for worker transport; its second run on the same
+mixer is sample-identical. The old padding mismatch would resume at neither
+boundary and fail this regression.
+
+### Explicit state, immutable API and detach effects
+
+- `renderClipAudio` now returns `{ channels, continuation }`; it never mutates
+  request or input continuation. A requested `checkpointSample` selects the next
+  padded range start. The returned snapshot precedes that range's overlap hop,
+  letting the next render repeat the necessary hops with the same phase.
+- Each `ProjectAudioMixer.chunks()` invocation owns a local continuation map and
+  explicitly passes/receives snapshots through `renderPitchRangeInWorker`.
+  Checkpoints target `overlapEnd - effectPadding - clipStart` rather than the end
+  of the padded output. No global/source WeakMap remains. Stateless preview uses
+  the compatible array-returning `renderPitchInWorker` wrapper, so preview calls
+  cannot modify export state. B′3-owned preview code was not changed.
+- Frozen shared snapshots and sub-hop ranges have regression coverage; each
+  result contains its own fresh snapshot, and empty output has none. Caller
+  history is not consulted. Non-adjacent independent ranges still cold-start;
+  each explicit export generator is deterministic for its selected range.
+- detachAudio now moves all `audio-` namespaced effects (gain, fade, EQ, gate,
+  denoise, including disabled settings) onto the detached audio in original order.
+  Non-audio effects stay on the source, which remains muted without volume
+  automation. Tests check gain/fade/EQ transfer, visual retention and unchanged
+  original input arrays; the core uses the existing audio effect type namespace.
+- Removed unused constant worker request IDs. DSP error replies now discard the
+  worker just like transport errors/timeouts. `disposePitchWorkers()` terminates
+  idle workers and marks active ones for termination on completion, so owners
+  can explicitly tear down the pool; normal renders still reuse at most two.
+
+Validation: [round-2 gate](2026-09-07-pitch-speed-followups-round2-gate.md).
+Raw paired benchmark results: [round-2 measurements](2026-09-07-pitch-speed-followups-round2-measurements.json).

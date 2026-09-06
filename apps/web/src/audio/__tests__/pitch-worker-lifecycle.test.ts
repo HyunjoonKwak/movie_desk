@@ -119,7 +119,7 @@ it.each([false, true])(
         onmessage = (_event: unknown) => {};
         terminate() {}
         postMessage(req: StretchRequest) {
-          cropped = renderClipAudio(req);
+          cropped = renderClipAudio(req).channels;
           this.onmessage({ data: { channels: cropped } });
         }
       },
@@ -151,7 +151,7 @@ it.each([false, true])(
         ),
       ],
     };
-    const full = renderClipAudio(req);
+    const full = renderClipAudio(req).channels;
     await renderPitchInWorker(req);
     expect(cropped).toEqual(full);
   },
@@ -203,8 +203,7 @@ it("carries DSP checkpoints through pooled workers and cropped consecutive chunk
       onmessage = (_event: unknown) => {};
       terminate() {}
       postMessage(req: StretchRequest) {
-        const channels = renderClipAudio(req);
-        this.onmessage({ data: { channels, continuation: req.continuation } });
+        this.onmessage({ data: renderClipAudio(req) });
       }
     },
   );
@@ -220,9 +219,15 @@ it("carries DSP checkpoints through pooled workers and cropped consecutive chunk
     clip: { ...clip, speed: 1.37, duration: 2000, trimOut: 4000 },
     outputSamples: 48000,
   };
-  const whole = renderClipAudio({ ...req, outputSamples: 96000 });
-  const a = await renderPitchInWorker(req);
-  const b = await renderPitchInWorker({ ...req, offsetMs: 1000 });
+  const whole = renderClipAudio({ ...req, outputSamples: 96000 }).channels;
+  const { renderPitchRangeInWorker } = await import("../pitch-renderer");
+  const first = await renderPitchRangeInWorker(req);
+  const a = first.channels;
+  // An unrelated preview render cannot replace export state.
+  await renderPitchInWorker({ ...req, offsetMs: 500 });
+  const b = (
+    await renderPitchRangeInWorker({ ...req, offsetMs: 1000, continuation: first.continuation! })
+  ).channels;
   expect(a[0]).toEqual(whole[0]!.subarray(0, 48000));
   expect(b[0]).toEqual(whole[0]!.subarray(48000));
   expect(Math.abs(b[0]![0]! - a[0]!.at(-1)!)).toBeLessThan(0.05);
@@ -252,4 +257,33 @@ it("removes aborted queued jobs without creating another worker", async () => {
   for (const worker of workers) worker.onmessage({ data: { channels: [] } });
   await Promise.all([a, b]);
   expect(workers).toHaveLength(2);
+});
+
+it("disposes pooled workers and retires in-flight workers after disposal", async () => {
+  const workers: { onmessage: (event: unknown) => void; terminate: ReturnType<typeof vi.fn> }[] =
+    [];
+  vi.stubGlobal(
+    "Worker",
+    class {
+      onmessage = (_event: unknown) => {};
+      terminate = vi.fn();
+      postMessage() {}
+      constructor() {
+        workers.push(this);
+      }
+    },
+  );
+  const { disposePitchWorkers } = await import("../pitch-renderer");
+  const a = renderPitchInWorker(request());
+  await vi.waitFor(() => expect(workers).toHaveLength(1));
+  disposePitchWorkers();
+  workers[0]!.onmessage({ data: { channels: [] } });
+  await a;
+  expect(workers[0]!.terminate).toHaveBeenCalledOnce();
+  const b = renderPitchInWorker(request());
+  await vi.waitFor(() => expect(workers).toHaveLength(2));
+  workers[1]!.onmessage({ data: { channels: [] } });
+  await b;
+  disposePitchWorkers();
+  expect(workers[1]!.terminate).toHaveBeenCalledOnce();
 });

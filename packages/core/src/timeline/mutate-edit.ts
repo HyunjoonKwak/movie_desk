@@ -172,7 +172,7 @@ export const detachAudio = (project: Project, clipId: ID): Project => {
     trimIn: source.trimIn,
     trimOut: source.trimOut,
     volume: source.volume ?? 1,
-    effects: [],
+    effects: source.effects.filter((effect) => effect.type.startsWith("audio-")),
     keyframes: source.keyframes.filter(
       (track) => track.target === "speed" || track.target === "volume",
     ),
@@ -180,7 +180,12 @@ export const detachAudio = (project: Project, clipId: ID): Project => {
   p = addClip(p, audioTrack.id, audioClip);
   p = updateClip(p, clipId, (c) =>
     c.kind === "media"
-      ? { ...c, volume: 0, keyframes: c.keyframes.filter((track) => track.target !== "volume") }
+      ? {
+          ...c,
+          volume: 0,
+          effects: c.effects.filter((effect) => !effect.type.startsWith("audio-")),
+          keyframes: c.keyframes.filter((track) => track.target !== "volume"),
+        }
       : c,
   );
   return p;

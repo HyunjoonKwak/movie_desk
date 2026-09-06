@@ -25,7 +25,9 @@ export interface StretchContinuation {
 }
 
 export interface StretchRequest {
-  continuation?: StretchContinuation;
+  continuation?: Readonly<StretchContinuation>;
+  // Next padded range start in clip-relative output samples.
+  checkpointSample?: number;
   channels: Float32Array[];
   sourceSampleRate: number;
   sourceStartSample?: number;
@@ -35,14 +37,19 @@ export interface StretchRequest {
   outputSamples: number;
 }
 
+export interface StretchResult {
+  channels: Float32Array[];
+  continuation?: StretchContinuation;
+}
+
 // Pure worker-side DSP. All channels share the alignment selected on channel 0
 // (or the highest-energy channel), preserving stereo phase relationships.
 // 20ms windows / 10ms hops, bounded ±5ms search: O(output samples).
-export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
+export const renderClipAudio = (req: StretchRequest): StretchResult => {
   const { channels, sourceSampleRate: srcRate, outputSampleRate: sr, clip } = req;
   const length = Math.max(0, Math.floor(req.outputSamples));
   const output = channels.map(() => new Float32Array(length));
-  if (!length || !channels.length) return output;
+  if (!length || !channels.length) return { channels: output };
   const ratio = srcRate / sr;
   const hop = Math.max(1, Math.round(sr * 0.01));
   const window = hop * 2;
@@ -89,17 +96,43 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
     }
   }
   reference = resume?.reference ?? reference;
-  const checkpointHop = Math.max(0, Math.floor((startSample + length) / hop) - 1) * hop;
+  const nextStartSample = req.checkpointSample ?? startSample + length;
+  const checkpointHop = Math.max(0, Math.floor(nextStartSample / hop) - 1) * hop;
+  let continuation: StretchContinuation | undefined;
+  const tail = new Float32Array(hop);
+  const candidates = new Float32Array(hop + 2 * search + 16);
+  const energyPrefix = new Float64Array(candidates.length + 1);
+  const tailD = new Float64Array(Math.floor(hop / 8));
+  const candD = new Float64Array(candidates.length);
+  let aaD = 0;
+  const coarseScore = (delta: number) => {
+    let dot = 0;
+    let bb = 0;
+    for (let j = 0; j < tailD.length; j++) {
+      const b = candD[delta + search + 8 + j * 8]!;
+      dot += tailD[j]! * b;
+      bb += b * b;
+    }
+    return dot / Math.sqrt(aaD * bb + 1e-20) - Math.abs(delta) * 1e-7;
+  };
+  let aa = 0;
+  const score = (delta: number) => {
+    const start = delta + search + 8;
+    let dot = 0;
+    for (let j = 0; j < hop; j++) dot += tail[j]! * candidates[start + j]!;
+    const bb = Math.max(0, energyPrefix[start + hop]! - energyPrefix[start]!);
+    return dot / Math.sqrt(aa * bb + 1e-20) - Math.abs(delta) * 1e-7;
+  };
   for (let at = firstHop; at < startSample + length; at += hop) {
-    if (at === checkpointHop && req.continuation) {
-      Object.assign(req.continuation, {
-        nextStartSample: startSample + length,
+    if (at === checkpointHop) {
+      continuation = {
+        nextStartSample,
         firstHop: at,
         cursor,
         previous,
         previousPreserved,
         reference,
-      });
+      };
     }
     const time = (at * 1000) / sr;
     const rate = rateAt(time);
@@ -110,37 +143,40 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
       let best = Number.NEGATIVE_INFINITY;
       let bestDelta = 0;
       // Cache dense overlap samples once: striding correlation aliases high tones.
-      const tail = new Float32Array(hop);
-      const candidates = new Float32Array(hop + 2 * search + 8);
-      let aa = 0;
+      aa = 0;
       for (let j = 0; j < hop; j++) {
         const a = sample(ref, previous + (hop + j) * ratio);
         tail[j] = a;
         aa += a * a;
       }
-      for (let j = 0; j < candidates.length; j++)
-        candidates[j] = sample(ref, cursor + (j - search - 4) * ratio);
-      const score = (delta: number) => {
-        let dot = 0;
-        let bb = 0;
-        for (let j = 0; j < hop; j++) {
-          const a = tail[j]!;
-          const b = candidates[delta + j + search + 4]!;
-          dot += a * b;
-          bb += b * b;
-        }
-        // Prefer the expected anchor in silence and on ties.
-        return dot / Math.sqrt(aa * bb + 1e-20) - Math.abs(delta) * 1e-7;
-      };
+      for (let j = 0; j < candidates.length; j++) {
+        const value = sample(ref, cursor + (j - search - 8) * ratio);
+        candidates[j] = value;
+        energyPrefix[j + 1] = energyPrefix[j]! + value * value;
+      }
+      // Low-pass before decimation; full-rate refinement retains high-band alignment.
+      aaD = 0;
+      for (let j = 0; j < tailD.length; j++) {
+        let sum = 0;
+        for (let k = 0; k < 8; k++) sum += tail[j * 8 + k]!;
+        tailD[j] = sum / 8;
+        aaD += tailD[j]! * tailD[j]!;
+      }
+      let sum = 0;
+      for (let j = candidates.length - 1; j >= 0; j--) {
+        sum += candidates[j]! - (candidates[j + 8] ?? 0);
+        candD[j] = sum / 8;
+      }
       for (let delta = -search; delta <= search; delta += 4) {
-        const value = score(delta);
+        const value = coarseScore(delta);
         if (value > best) {
           best = value;
           bestDelta = delta;
         }
       }
       const coarse = bestDelta;
-      for (let delta = coarse - 3; delta <= coarse + 3; delta++) {
+      best = Number.NEGATIVE_INFINITY;
+      for (let delta = coarse - 8; delta <= coarse + 8; delta++) {
         const value = score(delta);
         if (value > best) {
           best = value;
@@ -168,5 +204,5 @@ export const renderClipAudio = (req: StretchRequest): Float32Array[] => {
       const weight = weights[i] ?? 0;
       if (weight > 0) channel[i]! /= weight;
     }
-  return output;
+  return { channels: output, ...(continuation ? { continuation } : {}) };
 };

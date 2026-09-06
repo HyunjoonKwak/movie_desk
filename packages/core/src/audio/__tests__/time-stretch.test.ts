@@ -51,7 +51,7 @@ const dominantHz = (pcm: Float32Array, expected = 440) => {
   }
   return bestHz;
 };
-const render = (
+const renderResult = (
   source: Float32Array,
   c: MediaClip,
   offsetMs = 0,
@@ -67,6 +67,8 @@ const render = (
     offsetMs,
     outputSamples,
   });
+
+const render = (...args: Parameters<typeof renderResult>) => renderResult(...args).channels;
 
 describe("linked-channel WSOLA", () => {
   it.each([0.5, 2])("keeps 440Hz within 2%% at %s× and exact output length", (speed) => {
@@ -160,8 +162,10 @@ it.each([0.5, 1.37, 2])(
       (_, i) => 0.5 * Math.sin((2 * Math.PI * 443 * i) / sr),
     );
     const c = { ...clip(speed), duration: 31000, trimOut: 62000 };
-    const continuation = {};
-    const [a] = render(source, c, 0, sr * 30, continuation);
+    const {
+      channels: [a],
+      continuation,
+    } = renderResult(source, c, 0, sr * 30);
     const [b] = render(source, c, 30000, sr / 10, continuation);
     expect(Math.abs(b![0]! - a!.at(-1)!)).toBeLessThan(0.05);
   },
@@ -178,10 +182,12 @@ it("sanitizes nonfinite PCM before correlation and interpolation", () => {
 it("resumes arbitrary sample boundaries exactly and ignores checkpoints after seeking", () => {
   const source = sine(4);
   const c = { ...clip(1.37), trimOut: 4000, duration: 2000 };
-  const continuation = {};
   const split = 48137;
   const [whole] = render(source, c, 0, split + 24000);
-  const [a] = render(source, c, 0, split, continuation);
+  const {
+    channels: [a],
+    continuation,
+  } = renderResult(source, c, 0, split);
   const [b] = render(source, c, (split * 1000) / sr, 24000, continuation);
   expect(a).toEqual(whole!.subarray(0, split));
   expect(b).toEqual(whole!.subarray(split));
@@ -201,5 +207,20 @@ it("selects the energetic channel inside the trim, ignoring loud discarded audio
     offsetMs: 0,
     outputSamples: sr * 0.7,
   };
-  expect(renderClipAudio(req)[1]).toEqual(renderClipAudio({ ...req, channels: [right] })[0]);
+  expect(renderClipAudio(req).channels[1]).toEqual(
+    renderClipAudio({ ...req, channels: [right] }).channels[0],
+  );
+});
+
+it("does not mutate shared checkpoints and returns a fresh checkpoint for sub-hop ranges", () => {
+  const source = sine(4);
+  const c = { ...clip(1.37), trimOut: 4000 };
+  const first = renderResult(source, c, 0, 48137);
+  const continuation = Object.freeze(first.continuation!);
+  const a = renderResult(source, c, (48137 * 1000) / sr, 10, continuation);
+  const b = renderResult(source, c, (48137 * 1000) / sr, 10, continuation);
+  expect(a).toEqual(b);
+  expect(a.continuation).not.toBe(continuation);
+  expect(a.continuation!.nextStartSample).toBe(48147);
+  expect(continuation.nextStartSample).toBe(48137);
 });

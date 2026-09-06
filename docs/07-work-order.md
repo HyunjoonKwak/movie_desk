@@ -600,3 +600,28 @@ E2E **57/57**; 추가 회귀 후 lint/typecheck/test 재검증 PASS,
 [측정 원본](evaluations/2026-09-07-pitch-speed-followups-dsp.jsonl) 참조.
 `pitchRevisions` 정리는 B′3 소유 `preview/audio-engine.ts`여서 코디네이터에게
 이관 요청했으며, 해당 파일 및 다른 B′3 소유 파일은 수정하지 않았다.
+
+
+### B′2 후속 2라운드 리뷰 반영 (2026-09-07)
+
+`codex/b2-followups bbd6f1f`에서 이어서 수정했다. 상관 버퍼·클로저를 홉 밖으로
+옮기고 에너지 prefix sum을 적용해도 +35.4%여서 8샘플 평균 후 coarse 탐색과
+전체 레이트 ±8 정밀 탐색까지 적용했다. 최종 10분 오디오 내보내기 단계는
+고정 기준 `1c3c0e4`의 **3118.4ms→2379.0ms(−23.7%)**, Worker 20→1개,
+fallback 없음으로 +15% 이내 목표를 충족했다.
+
+효과 패딩의 다음 실제 렌더 시작 지점에 체크포인트를 저장하고 믹서 generator가
+명시적으로 전달한다. 전역 WeakMap을 제거하고 core DSP는 인자를 변형하지 않는
+`{ channels, continuation }` 반환값으로 변경했다. audio-gain −3dB의 30초
+경계 점프 **0.0147–0.0205(<0.05)**, 같은 믹서 재실행 출력 동일,
+6/10kHz 지배 주파수 오차 최대 **0.1%**를 검증했다.
+오디오 분리는 gain/fade/EQ 등 `audio-` 효과를 이동하고 영상 효과만 원본에 남긴다.
+상수 Worker ID 제거, 오류 폐기 일관화, dispose 함수, 짧은 범위·공유 불변
+체크포인트 테스트도 포함했다. 3kHz 미만도 비트 동일하지 않아 기존 피치 산출물은
+재렌더가 필요함을 감사 문서에 명시했다.
+
+[전체 gate](evaluations/2026-09-07-pitch-speed-followups-round2-gate.md) **9/9 PASS**,
+단위 **844**(core144·web617·desktop72·scripts11), Chromium E2E **57/57**.
+[감사 문서](evaluations/2026-09-06-pitch-speed-audit.md)의 round 2 절과
+[측정 원본](evaluations/2026-09-07-pitch-speed-followups-round2-measurements.json) 참조.
+공유 파일은 허용된 `export/audio-mixer.ts` 청크 상태 전달 부분만 수정했다.

@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 // Audio export stage benchmark: decoded 10-minute stereo, 20 × 30s chunks.
 // Run from the repository root; optional baseline Git ref (default 27128d1).
+// Comparison always uses the requested historical ref versus current files, including a clean tree.
 // --varispeed: legacy probes; --dsp [ref]: offline dense-correlation/chunk comparison.
 import { createRequire } from "node:module";
 import { relative, resolve } from "node:path";
@@ -109,6 +110,7 @@ if (dsp) {
         for (let i = 0; i < 5; i++) {
           const start = performance.now();
           output = renderClipAudio(req);
+          output = output.channels ?? output;
           timings.push(performance.now() - start);
         }
         rows.push({
@@ -135,8 +137,15 @@ if (dsp) {
         outputSamples: sr * 30,
         continuation,
       };
-      const [a] = renderClipAudio(req);
-      const [b] = renderClipAudio({ ...req, offsetMs: 30000, outputSamples: sr / 10 });
+      const first = renderClipAudio(req);
+      const [a] = first.channels ?? first;
+      const next = renderClipAudio({
+        ...req,
+        continuation: first.continuation ?? continuation,
+        offsetMs: 30000,
+        outputSamples: sr / 10,
+      });
+      const [b] = next.channels ?? next;
       boundaries.push({ speed, sampleJump: Math.abs(b[0] - a.at(-1)) });
     }
     process.stdout.write(`${JSON.stringify({ ref, rows, boundaries })}\n`);
