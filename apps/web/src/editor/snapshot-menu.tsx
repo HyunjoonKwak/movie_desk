@@ -8,6 +8,8 @@ import { useProjectStore } from "@/stores/project-store";
 import { useT } from "@/i18n/use-t";
 import {
   deleteSnapshot,
+  cleanupSnapshots,
+  snapshotCleanupCandidates,
   listSnapshots,
   loadSnapshot,
   saveSnapshot,
@@ -21,6 +23,7 @@ export function SnapshotMenu() {
   const project = useProjectStore((s) => s.project);
   const loadProject = useProjectStore((s) => s.loadProject);
   const t = useT();
+  const candidates = snapshotCleanupCandidates(rows);
 
   useEffect(() => {
     if (open) void refresh();
@@ -88,6 +91,25 @@ export function SnapshotMenu() {
             </button>
           </div>
 
+          {candidates.length > 0 && (
+            <div className="mt-3 flex items-center justify-between text-xs text-ink-2">
+              <span>{t("snap.cleanupAvailable", { n: candidates.length })}</span>
+              <button
+                type="button"
+                className="btn-ghost"
+                onClick={async () => {
+                  if (!window.confirm(t("snap.cleanupConfirm", { n: candidates.length }))) return;
+                  await cleanupSnapshots(
+                    project.id,
+                    candidates.map((row) => row.id),
+                  );
+                  await refresh();
+                }}
+              >
+                {t("snap.cleanup")}
+              </button>
+            </div>
+          )}
           <ul className="mt-4 max-h-72 space-y-1 overflow-y-auto">
             {rows.length === 0 && (
               <li className="px-2 py-6 text-center text-xs text-ink-3">{t("snap.empty")}</li>

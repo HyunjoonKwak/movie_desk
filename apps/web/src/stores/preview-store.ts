@@ -1,3 +1,4 @@
+import { reloadSpan } from "@/lib/reload-metrics";
 import {
   type AssetPreviews,
   type Filmstrip,
@@ -212,7 +213,9 @@ const makeBatch = <T>(
     const ids = queued.filter((item) => item.generation === generation).map((item) => item.id);
     if (ids.length === 0) return;
     try {
+      const end = reloadSpan("preview-request");
       const found = await load(ids);
+      end();
       if (generation === previewGeneration && found.size > 0) await apply(found, generation);
     } catch {
       for (const id of ids) asked.delete(id);

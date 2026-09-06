@@ -1,0 +1,760 @@
+{
+  "baselineDev": {
+    "assets": 1000,
+    "videos": 200,
+    "importMs": 11554.196709,
+    "importPerAssetMs": 11.554196709,
+    "domCardsAfterImport": 16,
+    "heapAfterImport": 81677091,
+    "fileOpensDuringImport": 3386,
+    "libraryRowBytes": 244659,
+    "libraryJsonComposition": {
+      "id": {
+        "bytes": 20000,
+        "assets": 1000
+      },
+      "name": {
+        "bytes": 23800,
+        "assets": 1000
+      },
+      "kind": {
+        "bytes": 15000,
+        "assets": 1000
+      },
+      "mime": {
+        "bytes": 19000,
+        "assets": 1000
+      },
+      "durationMs": {
+        "bytes": 18000,
+        "assets": 1000
+      },
+      "opfsPath": {
+        "bytes": 41800,
+        "assets": 1000
+      },
+      "importedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      },
+      "hasAudio": {
+        "bytes": 3200,
+        "assets": 200
+      },
+      "width": {
+        "bytes": 10400,
+        "assets": 1000
+      },
+      "height": {
+        "bytes": 11200,
+        "assets": 1000
+      },
+      "sizeBytes": {
+        "bytes": 15400,
+        "assets": 1000
+      },
+      "capturedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      },
+      "videoCodec": {
+        "bytes": 5400,
+        "assets": 200
+      },
+      "audioCodec": {
+        "bytes": 5000,
+        "assets": 200
+      }
+    },
+    "libraryOtherProjectBytes": 2459,
+    "searchMs": 52.668250000002445,
+    "filterMs": 59.340000000000146,
+    "healthPassMs": 511.6821659999987,
+    "healthPassOpens": 1000,
+    "reloadToReadyMs": 675.2205420000028,
+    "domCardsAfterReload": 16,
+    "heapAfterReload": 76592178,
+    "reloadSpans": [
+      {
+        "name": "reload:library-read",
+        "start": 398.9850000143051,
+        "duration": 0.48499998450279236
+      },
+      {
+        "name": "reload:library-read",
+        "start": 399.03999999165535,
+        "duration": 4.120000004768372
+      },
+      {
+        "name": "reload:json",
+        "start": 399.4850000143051,
+        "duration": 0.19999998807907104
+      },
+      {
+        "name": "reload:zod",
+        "start": 399.4850000143051,
+        "duration": 3.449999988079071
+      },
+      {
+        "name": "reload:json",
+        "start": 403.1700000166893,
+        "duration": 0.2199999988079071
+      },
+      {
+        "name": "reload:zod",
+        "start": 403.1700000166893,
+        "duration": 1.969999998807907
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 405.1700000166893,
+        "duration": 2.6849999725818634
+      },
+      {
+        "name": "reload:yjs-load",
+        "start": 407.8700000047684,
+        "duration": 152.11500000953674
+      },
+      {
+        "name": "reload:search-index",
+        "start": 418.955000013113,
+        "duration": 1.5799999833106995
+      },
+      {
+        "name": "reload:search-index",
+        "start": 420.5649999976158,
+        "duration": 0.3050000071525574
+      },
+      {
+        "name": "reload:sort",
+        "start": 421.3149999976158,
+        "duration": 0.12999999523162842
+      },
+      {
+        "name": "reload:sort",
+        "start": 421.4500000178814,
+        "duration": 0.08499997854232788
+      },
+      {
+        "name": "reload:group",
+        "start": 421.53999999165535,
+        "duration": 0.25
+      },
+      {
+        "name": "reload:group",
+        "start": 421.7950000166893,
+        "duration": 0.16499999165534973
+      },
+      {
+        "name": "reload:source-health",
+        "start": 448.955000013113,
+        "duration": 1068.75
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 519.4799999892712,
+        "duration": 0.3400000035762787
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 519.4799999892712,
+        "duration": 2.5650000274181366
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 529.2750000059605,
+        "duration": 0.2549999952316284
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 529.2750000059605,
+        "duration": 1.4099999964237213
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 532.1299999952316,
+        "duration": 0.2150000035762787
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 532.1299999952316,
+        "duration": 1.0800000131130219
+      },
+      {
+        "name": "reload:search-index",
+        "start": 539.0150000154972,
+        "duration": 1.5849999785423279
+      },
+      {
+        "name": "reload:search-index",
+        "start": 540.6200000047684,
+        "duration": 0.08500000834465027
+      },
+      {
+        "name": "reload:sort",
+        "start": 540.9300000071526,
+        "duration": 0.09999999403953552
+      },
+      {
+        "name": "reload:sort",
+        "start": 541.0300000011921,
+        "duration": 0.06499999761581421
+      },
+      {
+        "name": "reload:group",
+        "start": 541.0949999988079,
+        "duration": 0.20000001788139343
+      },
+      {
+        "name": "reload:group",
+        "start": 541.2950000166893,
+        "duration": 0.17999997735023499
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 561.4500000178814,
+        "duration": 0.2149999737739563
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 561.4500000178814,
+        "duration": 1.2249999940395355
+      },
+      {
+        "name": "reload:search-index",
+        "start": 563.6450000107288,
+        "duration": 1.0149999856948853
+      },
+      {
+        "name": "reload:search-index",
+        "start": 564.6649999916553,
+        "duration": 0.04000002145767212
+      },
+      {
+        "name": "reload:sort",
+        "start": 564.830000013113,
+        "duration": 0.07999998331069946
+      },
+      {
+        "name": "reload:sort",
+        "start": 564.9099999964237,
+        "duration": 0.06000000238418579
+      },
+      {
+        "name": "reload:group",
+        "start": 564.9699999988079,
+        "duration": 0.11500000953674316
+      },
+      {
+        "name": "reload:group",
+        "start": 565.0850000083447,
+        "duration": 0.10499998927116394
+      },
+      {
+        "name": "reload:preview-request",
+        "start": 640.3400000035763,
+        "duration": 8.185000002384186
+      }
+    ],
+    "renameToSavedMs": 53.68895799999882
+  },
+  "finalDev": {
+    "assets": 1000,
+    "videos": 200,
+    "importMs": 10682.165291000001,
+    "importPerAssetMs": 10.682165291,
+    "domCardsAfterImport": 16,
+    "heapAfterImport": 91557469,
+    "fileOpensDuringImport": 1451,
+    "libraryRowBytes": 244659,
+    "libraryJsonComposition": {
+      "id": {
+        "bytes": 20000,
+        "assets": 1000
+      },
+      "name": {
+        "bytes": 23800,
+        "assets": 1000
+      },
+      "kind": {
+        "bytes": 15000,
+        "assets": 1000
+      },
+      "mime": {
+        "bytes": 19000,
+        "assets": 1000
+      },
+      "durationMs": {
+        "bytes": 18000,
+        "assets": 1000
+      },
+      "width": {
+        "bytes": 10400,
+        "assets": 1000
+      },
+      "height": {
+        "bytes": 11200,
+        "assets": 1000
+      },
+      "opfsPath": {
+        "bytes": 41800,
+        "assets": 1000
+      },
+      "sizeBytes": {
+        "bytes": 15400,
+        "assets": 1000
+      },
+      "capturedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      },
+      "hasAudio": {
+        "bytes": 3200,
+        "assets": 200
+      },
+      "videoCodec": {
+        "bytes": 5400,
+        "assets": 200
+      },
+      "audioCodec": {
+        "bytes": 5000,
+        "assets": 200
+      },
+      "importedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      }
+    },
+    "libraryOtherProjectBytes": 2459,
+    "searchMs": 53.61945799999921,
+    "filterMs": 60.84124999999949,
+    "healthPassMs": 508.6749999999993,
+    "healthPassOpens": 1000,
+    "reloadToReadyMs": 616.3850419999981,
+    "navigation": {
+      "name": "http://127.0.0.1:3105/editor",
+      "entryType": "navigation",
+      "startTime": 0,
+      "duration": 235.71500000357628,
+      "navigationId": 6018,
+      "initiatorType": "navigation",
+      "deliveryType": "",
+      "nextHopProtocol": "http/1.1",
+      "renderBlockingStatus": "non-blocking",
+      "contentType": "text/html",
+      "contentEncoding": "gzip",
+      "workerStart": 0,
+      "workerRouterEvaluationStart": 0,
+      "workerCacheLookupStart": 0,
+      "workerMatchedSourceType": "",
+      "workerFinalSourceType": "",
+      "redirectStart": 0,
+      "redirectEnd": 0,
+      "fetchStart": 0.6349999904632568,
+      "domainLookupStart": 0.6349999904632568,
+      "domainLookupEnd": 0.6349999904632568,
+      "connectStart": 0.6349999904632568,
+      "secureConnectionStart": 0,
+      "connectEnd": 0.6349999904632568,
+      "requestStart": 1.6449999809265137,
+      "responseStart": 138.2999999821186,
+      "firstInterimResponseStart": 0,
+      "finalResponseHeadersStart": 138.2999999821186,
+      "responseEnd": 146.53499999642372,
+      "transferSize": 9685,
+      "encodedBodySize": 9385,
+      "decodedBodySize": 48505,
+      "responseStatus": 200,
+      "serverTiming": [],
+      "unloadEventStart": 140.31999999284744,
+      "unloadEventEnd": 140.31999999284744,
+      "domInteractive": 159.35499998927116,
+      "domContentLoadedEventStart": 159.36499997973442,
+      "domContentLoadedEventEnd": 159.375,
+      "domComplete": 234.5199999809265,
+      "loadEventStart": 235.69999998807907,
+      "loadEventEnd": 235.71500000357628,
+      "type": "reload",
+      "redirectCount": 0,
+      "activationStart": 0,
+      "criticalCHRestart": 0,
+      "notRestoredReasons": null,
+      "confidence": {
+        "randomizedTriggerRate": 0.4994798,
+        "value": "high"
+      }
+    },
+    "domCardsAfterReload": 16,
+    "heapAfterReload": 42767150,
+    "reloadSpans": [
+      {
+        "name": "reload:library-read",
+        "start": 382.25,
+        "duration": 0.28999999165534973
+      },
+      {
+        "name": "reload:library-read",
+        "start": 382.3349999785423,
+        "duration": 9.180000007152557
+      },
+      {
+        "name": "reload:zod",
+        "start": 382.55500000715256,
+        "duration": 3.5199999809265137
+      },
+      {
+        "name": "reload:json",
+        "start": 382.5600000023842,
+        "duration": 0.22499999403953552
+      },
+      {
+        "name": "reload:json",
+        "start": 391.5300000011921,
+        "duration": 0.19999998807907104
+      },
+      {
+        "name": "reload:zod",
+        "start": 391.5300000011921,
+        "duration": 1.9749999940395355
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 393.5349999964237,
+        "duration": 2.655000001192093
+      },
+      {
+        "name": "reload:yjs-load",
+        "start": 396.2049999833107,
+        "duration": 91.64000001549721
+      },
+      {
+        "name": "reload:search-index",
+        "start": 407.8700000047684,
+        "duration": 1.4399999976158142
+      },
+      {
+        "name": "reload:search-index",
+        "start": 409.32499998807907,
+        "duration": 0.17000001668930054
+      },
+      {
+        "name": "reload:sort",
+        "start": 409.8349999785423,
+        "duration": 0.09000000357627869
+      },
+      {
+        "name": "reload:sort",
+        "start": 409.93000000715256,
+        "duration": 0.06499999761581421
+      },
+      {
+        "name": "reload:group",
+        "start": 410,
+        "duration": 0.20999997854232788
+      },
+      {
+        "name": "reload:group",
+        "start": 410.2099999785423,
+        "duration": 0.1600000262260437
+      },
+      {
+        "name": "reload:yjs-read-validate",
+        "start": 487.8700000047684,
+        "duration": 1.7449999749660492
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 489.625,
+        "duration": 0.23999997973442078
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 489.625,
+        "duration": 7.2750000059604645
+      },
+      {
+        "name": "reload:search-index",
+        "start": 502.1850000023842,
+        "duration": 1.2599999904632568
+      },
+      {
+        "name": "reload:search-index",
+        "start": 503.4549999833107,
+        "duration": 0.09000000357627869
+      },
+      {
+        "name": "reload:sort",
+        "start": 503.6850000023842,
+        "duration": 0.0949999988079071
+      },
+      {
+        "name": "reload:sort",
+        "start": 503.7800000011921,
+        "duration": 0.06000000238418579
+      },
+      {
+        "name": "reload:group",
+        "start": 503.8400000035763,
+        "duration": 0.1599999964237213
+      },
+      {
+        "name": "reload:group",
+        "start": 504.0049999952316,
+        "duration": 0.13499999046325684
+      },
+      {
+        "name": "reload:preview-request",
+        "start": 586.75,
+        "duration": 1.875
+      },
+      {
+        "name": "reload:source-health",
+        "start": 1519.905000001192,
+        "duration": 1119.594999998808
+      },
+      {
+        "name": "reload:library-read",
+        "start": 3455.5049999952316,
+        "duration": 1.199999988079071
+      },
+      {
+        "name": "reload:json",
+        "start": 3456.7249999940395,
+        "duration": 0.2150000035762787
+      },
+      {
+        "name": "reload:zod",
+        "start": 3456.7249999940395,
+        "duration": 2.064999997615814
+      }
+    ],
+    "renameToSavedMs": 57.670500000000175
+  },
+  "finalProduction": {
+    "assets": 1000,
+    "videos": 200,
+    "importMs": 16308.622458,
+    "importPerAssetMs": 16.308622458,
+    "domCardsAfterImport": 24,
+    "heapAfterImport": 96554392,
+    "fileOpensDuringImport": 1423,
+    "libraryRowBytes": 244659,
+    "libraryJsonComposition": {
+      "id": {
+        "bytes": 20000,
+        "assets": 1000
+      },
+      "name": {
+        "bytes": 23800,
+        "assets": 1000
+      },
+      "kind": {
+        "bytes": 15000,
+        "assets": 1000
+      },
+      "mime": {
+        "bytes": 19000,
+        "assets": 1000
+      },
+      "durationMs": {
+        "bytes": 18000,
+        "assets": 1000
+      },
+      "width": {
+        "bytes": 10400,
+        "assets": 1000
+      },
+      "height": {
+        "bytes": 11200,
+        "assets": 1000
+      },
+      "opfsPath": {
+        "bytes": 41800,
+        "assets": 1000
+      },
+      "sizeBytes": {
+        "bytes": 15400,
+        "assets": 1000
+      },
+      "capturedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      },
+      "hasAudio": {
+        "bytes": 3200,
+        "assets": 200
+      },
+      "videoCodec": {
+        "bytes": 5400,
+        "assets": 200
+      },
+      "audioCodec": {
+        "bytes": 5000,
+        "assets": 200
+      },
+      "importedAt": {
+        "bytes": 27000,
+        "assets": 1000
+      }
+    },
+    "libraryOtherProjectBytes": 2459,
+    "searchMs": 67.5615420000031,
+    "filterMs": 34.05149999999776,
+    "healthPassMs": 508.54291699999885,
+    "healthPassOpens": 1000,
+    "reloadToReadyMs": 528.0795839999992,
+    "navigation": {
+      "name": "http://127.0.0.1:3106/editor",
+      "entryType": "navigation",
+      "startTime": 0,
+      "duration": 90.45500001311302,
+      "navigationId": 7888,
+      "initiatorType": "navigation",
+      "deliveryType": "cache",
+      "nextHopProtocol": "",
+      "renderBlockingStatus": "non-blocking",
+      "contentType": "text/html",
+      "contentEncoding": "gzip",
+      "workerStart": 0,
+      "workerRouterEvaluationStart": 0,
+      "workerCacheLookupStart": 0,
+      "workerMatchedSourceType": "",
+      "workerFinalSourceType": "",
+      "redirectStart": 0,
+      "redirectEnd": 0,
+      "fetchStart": 4.125,
+      "domainLookupStart": 4.125,
+      "domainLookupEnd": 4.125,
+      "connectStart": 4.125,
+      "secureConnectionStart": 0,
+      "connectEnd": 4.125,
+      "requestStart": 6.340000003576279,
+      "responseStart": 13.185000002384186,
+      "firstInterimResponseStart": 0,
+      "finalResponseHeadersStart": 13.185000002384186,
+      "responseEnd": 14.280000001192093,
+      "transferSize": 300,
+      "encodedBodySize": 2523,
+      "decodedBodySize": 7599,
+      "responseStatus": 200,
+      "serverTiming": [],
+      "unloadEventStart": 21.669999986886978,
+      "unloadEventEnd": 21.669999986886978,
+      "domInteractive": 71.40000000596046,
+      "domContentLoadedEventStart": 71.5300000011921,
+      "domContentLoadedEventEnd": 71.54499998688698,
+      "domComplete": 90.43000000715256,
+      "loadEventStart": 90.45500001311302,
+      "loadEventEnd": 90.45500001311302,
+      "type": "reload",
+      "redirectCount": 0,
+      "activationStart": 0,
+      "criticalCHRestart": 0,
+      "notRestoredReasons": null,
+      "confidence": {
+        "randomizedTriggerRate": 0.4994798,
+        "value": "low"
+      }
+    },
+    "domCardsAfterReload": 24,
+    "heapAfterReload": 36028213,
+    "reloadSpans": [
+      {
+        "name": "reload:library-read",
+        "start": 311.84999999403954,
+        "duration": 0.4650000035762787
+      },
+      {
+        "name": "reload:json",
+        "start": 312.35499998927116,
+        "duration": 0.2849999964237213
+      },
+      {
+        "name": "reload:zod",
+        "start": 312.35499998927116,
+        "duration": 6.409999996423721
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 318.794999986887,
+        "duration": 4.580000013113022
+      },
+      {
+        "name": "reload:yjs-load",
+        "start": 323.3899999856949,
+        "duration": 77.45500001311302
+      },
+      {
+        "name": "reload:search-index",
+        "start": 327.080000013113,
+        "duration": 4.019999980926514
+      },
+      {
+        "name": "reload:sort",
+        "start": 331.669999986887,
+        "duration": 0.1550000011920929
+      },
+      {
+        "name": "reload:group",
+        "start": 331.8700000047684,
+        "duration": 0.42499998211860657
+      },
+      {
+        "name": "reload:yjs-read-validate",
+        "start": 400.8799999952316,
+        "duration": 6.444999992847443
+      },
+      {
+        "name": "reload:loadProject",
+        "start": 407.3449999988079,
+        "duration": 0.4099999964237213
+      },
+      {
+        "name": "reload:applyFromDoc",
+        "start": 407.3449999988079,
+        "duration": 11.155000001192093
+      },
+      {
+        "name": "reload:search-index",
+        "start": 419.4350000023842,
+        "duration": 3
+      },
+      {
+        "name": "reload:sort",
+        "start": 422.89500001072884,
+        "duration": 0.32499998807907104
+      },
+      {
+        "name": "reload:group",
+        "start": 423.25999999046326,
+        "duration": 0.23000001907348633
+      },
+      {
+        "name": "reload:preview-request",
+        "start": 454.03999999165535,
+        "duration": 20.650000005960464
+      },
+      {
+        "name": "reload:source-health",
+        "start": 1431.0200000107288,
+        "duration": 632.4599999785423
+      },
+      {
+        "name": "reload:library-read",
+        "start": 3367.199999988079,
+        "duration": 0.29500001668930054
+      },
+      {
+        "name": "reload:json",
+        "start": 3367.5,
+        "duration": 0.19999998807907104
+      },
+      {
+        "name": "reload:zod",
+        "start": 3367.5,
+        "duration": 1.9300000071525574
+      }
+    ],
+    "renameToSavedMs": 28.984500000005937
+  }
+}

@@ -1,4 +1,5 @@
 "use client";
+import { reloadSpan } from "@/lib/reload-metrics";
 
 import type { MediaAsset } from "@movie-desk/core";
 import { create } from "zustand";
@@ -89,6 +90,7 @@ export const useSourceHealthStore = create<SourceHealthState>((set, get) => ({
       (asset) => !inFlight.has(asset.id) && isDue(pruned[asset.id], asset, force, maxAgeMs, now),
     );
     if (due.length === 0) return;
+    const end = reloadSpan("source-health");
     // Assets already flagged missing go first so a reconnected drive clears
     // its badges before the healthy majority is re-checked.
     const queue = [
@@ -129,6 +131,7 @@ export const useSourceHealthStore = create<SourceHealthState>((set, get) => ({
       await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, worker));
     } finally {
       flush();
+      end();
     }
   },
 }));

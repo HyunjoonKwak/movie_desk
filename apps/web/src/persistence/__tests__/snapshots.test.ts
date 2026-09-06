@@ -20,6 +20,9 @@ vi.mock("dexie", () => {
     put = async (row: Row) => {
       rows.set(row.id, row);
     };
+    each = async (visit: (row: Row) => void) => {
+      for (const row of rows.values()) visit(row);
+    };
     get = async (id: string) => rows.get(id);
     delete = async (id: string) => {
       rows.delete(id);
@@ -48,6 +51,7 @@ vi.mock("dexie", () => {
   // own field initialisers, which would otherwise reset it to undefined.
   class FakeDexie {
     snapshots: FakeTable | undefined;
+    transaction = async (_mode: string, _table: unknown, run: () => Promise<void>) => run();
     version() {
       return {
         stores: () => {
@@ -59,7 +63,15 @@ vi.mock("dexie", () => {
   return { default: FakeDexie };
 });
 
-import { deleteSnapshot, listSnapshots, loadSnapshot, saveSnapshot } from "../snapshots";
+import {
+  cleanupSnapshots,
+  forEachSnapshotJson,
+  snapshotCleanupCandidates,
+  deleteSnapshot,
+  listSnapshots,
+  loadSnapshot,
+  saveSnapshot,
+} from "../snapshots";
 
 beforeEach(() => {
   rows.clear();
@@ -107,4 +119,29 @@ describe("snapshots", () => {
     await deleteSnapshot(only?.id as string);
     expect(await listSnapshots(project.id)).toEqual([]);
   });
+});
+
+it("proposes oldest overflow without deleting and cleans only confirmed project ids", async () => {
+  const project = createEmptyProject();
+  for (let i = 0; i < 23; i++) {
+    rows.set(String(i), {
+      id: String(i),
+      projectId: project.id,
+      createdAt: i,
+      label: String(i),
+      json: JSON.stringify(project),
+    });
+  }
+  rows.set("other", { id: "other", projectId: "other", createdAt: 0, label: "other", json: "{}" });
+  const candidates = snapshotCleanupCandidates(await listSnapshots(project.id));
+  expect(candidates.map((row) => row.id)).toEqual(["0", "1", "2"]);
+  expect(rows.size).toBe(24);
+  await cleanupSnapshots(project.id, [...candidates.map((row) => row.id), "other"]);
+  expect(await listSnapshots(project.id)).toHaveLength(20);
+  expect(rows.has("other")).toBe(true);
+  const retained: string[] = [];
+  await forEachSnapshotJson((json) => retained.push(json));
+  expect(retained).toHaveLength(21);
+  expect(snapshotCleanupCandidates(await listSnapshots(project.id))).toEqual([]);
+  expect(() => snapshotCleanupCandidates([], 0)).toThrow(RangeError);
 });

@@ -816,4 +816,11 @@ export const ko = {
     "state.inspector.multipleFirstSelected": "{n}개를 선택했습니다. 여기서는 먼저 선택한 클립을 편집하므로 다른 클립을 바꾸려면 하나만 선택하세요.",
     "state.export.recovery": "내보내기를 완료하지 못했습니다. 편집으로 돌아가 원본과 내보내기 범위를 확인한 뒤 다시 시도하세요.",
     "preview.missingMoreNames": "{name} 외 {n}개",
+    "media.previewRebuild": "썸네일 다시 만들기",
+    "media.previewBuilding": "프리뷰 재생성 중…",
+    "media.previewDone": "프리뷰를 다시 만들었습니다",
+    "media.previewFailed": "프리뷰를 다시 만들지 못했습니다",
+    "snap.cleanupAvailable": "정리 가능 {n}개 (최근 20개 보존)",
+    "snap.cleanupConfirm": "오래된 스냅샷 {n}개를 삭제할까요? 되돌릴 수 없습니다.",
+    "snap.cleanup": "정리 확인",
 } as const;

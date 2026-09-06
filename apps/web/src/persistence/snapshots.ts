@@ -70,3 +70,30 @@ export const deleteSnapshot = async (id: string): Promise<void> => {
 export const forEachSnapshotJson = async (visit: (json: string) => void): Promise<void> => {
   await getDb().snapshots.each((row) => visit(row.json));
 };
+
+export const DEFAULT_SNAPSHOT_LIMIT = 20;
+
+// A proposal only: saving never silently removes a user's save point.
+export const snapshotCleanupCandidates = (
+  rows: readonly ProjectSnapshot[],
+  limit = DEFAULT_SNAPSHOT_LIMIT,
+): readonly ProjectSnapshot[] => {
+  if (!Number.isSafeInteger(limit) || limit < 1) throw new RangeError("Invalid snapshot limit");
+  return [...rows]
+    .sort((a, b) => b.createdAt - a.createdAt || b.id.localeCompare(a.id))
+    .slice(limit)
+    .reverse();
+};
+
+// Only the exact ids the user reviewed, scoped to the project they reviewed.
+export const cleanupSnapshots = async (
+  projectId: string,
+  confirmedIds: readonly string[],
+): Promise<void> => {
+  await getDb().transaction("rw", getDb().snapshots, async () => {
+    for (const id of confirmedIds) {
+      const row = await getDb().snapshots.get(id);
+      if (row?.projectId === projectId) await getDb().snapshots.delete(id);
+    }
+  });
+};

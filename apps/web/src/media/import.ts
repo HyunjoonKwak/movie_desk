@@ -1,3 +1,4 @@
+import { resolveMediaSource } from "./source/resolve-media-source";
 import { extractCaptureMeta } from "@/autoedit/metadata";
 import { leaseMediaKey } from "@/persistence/media-gc";
 import { writeMediaFile } from "@/persistence/opfs";
@@ -129,5 +130,34 @@ export const importMediaFile = async (file: File): Promise<ImportResult> => {
   } catch (error) {
     releaseLease();
     throw error;
+  }
+};
+
+// Rebuild from the current original, never a proxy or cached audio variant.
+export const regenerateAssetPreviews = async (asset: MediaAsset): Promise<void> => {
+  const release = leasePreview(asset.id);
+  const releaseOriginal = leaseMediaKey(asset.opfsPath);
+  try {
+    const source = await resolveMediaSource(asset);
+    const bytes = await source.read(0, source.sizeBytes);
+    const file = new File([bytes], asset.name, { type: source.mime });
+    const thumb =
+      asset.kind === "image"
+        ? await makeImageThumb(file)
+        : asset.kind === "video"
+          ? await makeVideoThumb(file, 0.1, asset.rotation)
+          : undefined;
+    const filmstrip =
+      asset.kind === "video" ? await makeVideoFilmstrip(file, 10, asset.rotation) : undefined;
+    const waveform = asset.kind !== "image" ? await extractWaveformPeaks(file) : undefined;
+    if (!thumb && !filmstrip && !waveform) throw new Error("No previews could be generated");
+    await putAssetPreviews(asset.id, {
+      ...(thumb ? { thumb } : {}),
+      ...(filmstrip ? { filmstrip } : {}),
+      ...(waveform ? { waveform } : {}),
+    });
+  } finally {
+    release();
+    releaseOriginal();
   }
 };

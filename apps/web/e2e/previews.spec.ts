@@ -88,3 +88,83 @@ test("keeps waveforms outside project persistence and restores them on the timel
   await expect(page.getByTestId("clip-waveform").first()).toBeVisible();
   await expect.poll(() => libraryJson(page)).not.toContain("waveformPeaks");
 });
+
+test("regenerates a deleted thumbnail from the original", async ({ page }) => {
+  await configurePage(page);
+  await page.goto("/editor");
+  await importMediaFiles(page, { name: "rebuild.png", mimeType: "image/png", buffer: PNG });
+  await expect(mediaCard(page, "rebuild.png").locator("img")).toBeVisible();
+  await expect.poll(() => libraryJson(page)).toContain("rebuild.png");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("movie-desk.previews.v1");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction("previews", "readwrite");
+          tx.objectStore("previews").clear();
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+  );
+  await page.reload();
+  const card = page.locator("[data-asset-card]").filter({ hasText: "rebuild.png" });
+  await expect(card).toBeVisible();
+  await expect(card.locator("img")).toHaveCount(0);
+  await card.hover();
+  await card.getByRole("button", { name: "Regenerate previews" }).click();
+  await expect(card.locator("img")).toHaveAttribute("src", /^data:image/);
+  await page.reload();
+  await expect(mediaCard(page, "rebuild.png").locator("img")).toHaveAttribute("src", /^data:image/);
+});
+
+test("snapshot cleanup requires confirmation and keeps the latest twenty", async ({ page }) => {
+  await configurePage(page);
+  await page.goto("/editor");
+  await importMediaFiles(page, { name: "snap.png", mimeType: "image/png", buffer: PNG });
+  await expect.poll(() => libraryJson(page)).toContain("snap.png");
+  const project = JSON.parse(await libraryJson(page)) as { id: string };
+  // Open the menu once to initialize the snapshot database.
+  await page.getByRole("button", { name: "Snapshots", exact: true }).click();
+  await page.keyboard.press("Escape");
+  await page.evaluate(
+    (project) =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("cut_editor.snapshots.v1");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction("snapshots", "readwrite");
+          for (let i = 0; i < 22; i++)
+            tx.objectStore("snapshots").put({
+              id: `snapshot-${i}`,
+              projectId: project.id,
+              label: `save ${i}`,
+              createdAt: i,
+              json: JSON.stringify(project),
+            });
+          tx.oncomplete = () => {
+            db.close();
+            resolve();
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+    project,
+  );
+  await page.getByRole("button", { name: "Snapshots", exact: true }).click();
+  await expect(page.getByText("2 snapshots available to clean up (keep latest 20)")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await page.getByRole("button", { name: "Review cleanup" }).click();
+  await expect(page.getByRole("dialog").locator("li")).toHaveCount(22);
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Review cleanup" }).click();
+  await expect(page.getByRole("dialog").locator("li")).toHaveCount(20);
+  await expect(page.getByText("save 0", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("save 21", { exact: true })).toBeVisible();
+});

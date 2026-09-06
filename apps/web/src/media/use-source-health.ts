@@ -17,7 +17,10 @@ export const useSourceHealth = (
   const check = useSourceHealthStore((s) => s.check);
 
   useEffect(() => {
-    void check(assets, { prune: true });
+    // Let restoration and visible previews finish before opening every original.
+    // Preview/export preflight still checks a requested source immediately.
+    const timer = setTimeout(() => void check(assets, { prune: true }), 1_000);
+    return () => clearTimeout(timer);
   }, [assets, check]);
 
   useEffect(() => {

@@ -818,4 +818,11 @@ export const en = {
     "state.inspector.multipleFirstSelected": "Selected clips: {n}. These controls edit the clip you selected first; select a single clip to edit another one.",
     "state.export.recovery": "Export could not finish. Return to the editor to check sources and the export range, then retry.",
     "preview.missingMoreNames": "{name} (+{n} more)",
+    "media.previewRebuild": "Regenerate previews",
+    "media.previewBuilding": "Regenerating previews…",
+    "media.previewDone": "Previews regenerated",
+    "media.previewFailed": "Could not regenerate previews",
+    "snap.cleanupAvailable": "{n} snapshots available to clean up (keep latest 20)",
+    "snap.cleanupConfirm": "Delete these {n} oldest snapshots? This cannot be undone.",
+    "snap.cleanup": "Review cleanup",
 } as const;

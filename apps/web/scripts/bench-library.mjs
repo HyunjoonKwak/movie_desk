@@ -66,6 +66,7 @@ const page = await context.newPage();
 await page.addInitScript(() => {
   localStorage.setItem("cut.locale.v1", JSON.stringify({ state: { locale: "en" }, version: 0 }));
   localStorage.setItem("cut.persistence.welcomed", "1");
+  sessionStorage.setItem("bench.reload", "1");
   // Count OPFS file opens: one per source-health probe, thumbnail read, etc.
   const stats = { fileOpens: 0 };
   window.__bench = stats;
@@ -205,8 +206,11 @@ try {
   await page.reload();
   await untilAtLeast(shownCount, TOTAL, 120_000);
   result.reloadToReadyMs = performance.now() - t0;
+  result.navigation = await page.evaluate(() => performance.getEntriesByType("navigation")[0]?.toJSON());
   result.domCardsAfterReload = await page.locator("[data-asset-card]").count();
   result.heapAfterReload = await heap();
+  await page.waitForTimeout(3000);
+  result.reloadSpans = await page.evaluate(() => performance.getEntriesByType("measure").filter(e => e.name.startsWith("reload:")).map(e => ({name:e.name, start:e.startTime, duration:e.duration})));
 
   // 6. Single edit cost with a large library: rename the project and wait for the save badge.
   // Let visible previews finish their lazy IndexedDB read and image decode so

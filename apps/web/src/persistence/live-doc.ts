@@ -1,3 +1,4 @@
+import { reloadSpan } from "@/lib/reload-metrics";
 import { useProjectStore } from "@/stores/project-store";
 import type { Clip, Project, Track } from "@movie-desk/core";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -67,6 +68,7 @@ export const getLiveDoc = (): LiveDoc => {
   if (live?.projectId === projectId) return live;
   live?.dispose();
 
+  const loaded = reloadSpan("yjs-load");
   const doc = new Y.Doc();
   const persistence = new IndexeddbPersistence(projectPersistenceName(projectId), doc);
   const projectCrdt = createProjectCrdt(doc);
@@ -74,6 +76,7 @@ export const getLiveDoc = (): LiveDoc => {
 
   let applyingFromDoc = false;
   let disposed = false;
+  let restored = false;
 
   const flush = (): void => {
     const project = useProjectStore.getState().project;
@@ -89,14 +92,18 @@ export const getLiveDoc = (): LiveDoc => {
     if (disposed) return null;
     const localProject = useProjectStore.getState().project;
     if (localProject.id !== projectId) return null;
+    const readEnd = reloadSpan("yjs-read-validate");
     const project = projectCrdt.read(projectId, localProject.timeline);
+    readEnd();
     if (!project) return null;
+    const end = reloadSpan("applyFromDoc");
     applyingFromDoc = true;
     try {
       useProjectStore.getState().loadProject(project);
       doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
     } finally {
       applyingFromDoc = false;
+      end();
     }
     return project;
   };
@@ -122,15 +129,26 @@ export const getLiveDoc = (): LiveDoc => {
     },
   );
 
+  // Startup may replay several updates; whenSynced applies their final state once.
+  // Read-only Yjs transactions must not reset history or rebuild the media list.
   const afterTransaction = (transaction: Y.Transaction) => {
-    if (transaction.origin === LOCAL_ORIGIN || disposed) return;
+    if (
+      transaction.origin === LOCAL_ORIGIN ||
+      disposed ||
+      !restored ||
+      applyingFromDoc ||
+      transaction.changed.size === 0
+    )
+      return;
     applyFromDoc();
   };
   doc.on("afterTransaction", afterTransaction);
   persistence.on("synced", () => useSaveStateStore.getState().markSaved());
 
   void persistence.whenSynced.then(() => {
+    loaded();
     if (disposed) return;
+    restored = true;
     if (projectCrdt.isInitialized()) {
       applyFromDoc();
       return;

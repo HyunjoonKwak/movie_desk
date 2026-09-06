@@ -1,4 +1,5 @@
 "use client";
+import { measureReload } from "@/lib/reload-metrics";
 
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
@@ -490,7 +491,7 @@ export function MediaBin() {
   // The index is rebuilt only when the library changes; each keystroke or
   // filter change is a pass over precomputed text.
   const searchIndex = useMemo(
-    () => buildSearchIndex(media, reverseGeocode, locale),
+    () => measureReload("search-index", () => buildSearchIndex(media, reverseGeocode, locale)),
     [media, locale],
   );
   const places = useMemo(() => collectPlaces(searchIndex), [searchIndex]);
@@ -561,9 +562,12 @@ export function MediaBin() {
   // "던져 놓으면 정리된다": capture order and day groups are the default view.
   const mediaOrder = useViewStore((s) => s.mediaOrder);
   const groupDays = useViewStore((s) => s.mediaGroupByDay);
-  const ordered = useMemo(() => sortAssets(filtered, mediaOrder), [filtered, mediaOrder]);
+  const ordered = useMemo(
+    () => measureReload("sort", () => sortAssets(filtered, mediaOrder)),
+    [filtered, mediaOrder],
+  );
   const groups = useMemo(
-    () => (groupDays ? groupByDay(ordered, reverseGeocode) : null),
+    () => (groupDays ? measureReload("group", () => groupByDay(ordered, reverseGeocode)) : null),
     [ordered, groupDays],
   );
   const virtualGroups = useMemo(

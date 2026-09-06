@@ -2,7 +2,7 @@
 
 import { Heart, Layers, Link2, Loader2, Pin, Scissors, Star, Trash2, X } from "lucide-react";
 import { Music, Image as ImageIcon, Film } from "lucide-react";
-import { memo, useRef } from "react";
+import { memo, useRef, useState } from "react";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { fmtSec } from "@/media/format";
@@ -12,6 +12,11 @@ import { useMediaUiStore } from "@/stores/media-ui-store";
 import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import type { MediaAsset } from "@movie-desk/core";
+import { toast } from "sonner";
+import { regenerateAssetPreviews } from "@/media/import";
+import { isSourceMissing } from "@/media/source/probe-source";
+import { useProjectStore } from "@/stores/project-store";
+import { RefreshCw } from "lucide-react";
 import { MissingBadge } from "./missing-badge";
 import { MEDIA_CARD_PADDING } from "@/media/virtual-layout";
 
@@ -68,6 +73,20 @@ export const MediaCard = memo(function MediaCard({
   onDelete,
 }: MediaCardProps) {
   const t = useT();
+  const [regenerating, setRegenerating] = useState(false);
+  const regenerate = async () => {
+    setRegenerating(true);
+    const id = toast.loading(t("media.previewBuilding"));
+    try {
+      await regenerateAssetPreviews(asset);
+      useProjectStore.getState().dropInlinePreviews([asset.id]);
+      toast.success(t("media.previewDone"), { id });
+    } catch {
+      toast.error(t("media.previewFailed"), { id });
+    } finally {
+      setRegenerating(false);
+    }
+  };
   const Icon = KIND_ICON[asset.kind];
   const cardRef = useRef<HTMLLIElement>(null);
   const previewVisible = usePreviewVisibility(cardRef);
@@ -209,6 +228,17 @@ export const MediaCard = memo(function MediaCard({
         </div>
       </button>
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+        {!isSourceMissing(health) && (
+          <button
+            type="button"
+            onClick={() => void regenerate()}
+            disabled={regenerating}
+            className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40 disabled:opacity-50"
+            title={t("media.previewRebuild")}
+          >
+            <RefreshCw className={cn("size-3", regenerating && "animate-spin")} />
+          </button>
+        )}
         {asset.kind !== "image" && (
           <button
             type="button"

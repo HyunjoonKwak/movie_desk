@@ -1,4 +1,5 @@
 "use client";
+import { reloadSpan } from "@/lib/reload-metrics";
 
 import {
   type AppliedCommand,
@@ -268,8 +269,10 @@ export const useProjectStore = create<ProjectStoreState>()(
     history: emptyHistory,
 
     loadProject: (p) => {
+      const end = reloadSpan("loadProject");
       nudgeSession = null;
       set({ project: p, history: emptyHistory });
+      end();
     },
 
     applyGenerated: (label, build) => runWith(set, label, build),

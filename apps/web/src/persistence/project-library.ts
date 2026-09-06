@@ -1,3 +1,4 @@
+import { reloadSpan, measureReload } from "@/lib/reload-metrics";
 // Multi-project library backed by IndexedDB. Each project is keyed by its
 // stable id; the active project id is stored alongside so the editor can
 // re-open the last project automatically. Yjs continues to hold the live
@@ -57,10 +58,17 @@ type StoredProjectLoadResult =
   | { readonly status: "corrupt"; readonly raw: string };
 
 export const loadStoredProject = async (id: string): Promise<StoredProjectLoadResult> => {
+  const end = reloadSpan("library-read");
   const row = await getDb().projects.get(id);
+  end();
   if (!row) return { status: "missing" };
   try {
-    return { status: "ok", project: parseStoredProject(JSON.parse(row.json)) };
+    return {
+      status: "ok",
+      project: measureReload("zod", () =>
+        parseStoredProject(measureReload("json", () => JSON.parse(row.json))),
+      ),
+    };
   } catch {
     // Keep the raw JSON so callers (e.g. media GC) can salvage OPFS references
     // and users can still export/recover or delete it from the project menu.
