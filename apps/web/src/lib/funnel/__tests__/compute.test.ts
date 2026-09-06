@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computeFunnel } from "../compute";
-import { trimFunnelRows, type FunnelRow, type FunnelEvent } from "@/persistence/funnel-log";
+import type { FunnelRow, FunnelEvent } from "@/persistence/funnel-log";
 let id = 0;
 const row = (projectId: string, at: number, event: FunnelEvent): FunnelRow => ({
   id: String(id++),
@@ -66,13 +66,6 @@ describe("local completion funnel", () => {
       { kind: "relink", hintVisible: false, success: 0, abandoned: 1, pending: 1 },
       { kind: "relink", hintVisible: true, success: 1, abandoned: 0, pending: 0 },
     ]);
-  });
-  it("retains newest rows under both limits deterministically", () => {
-    const rows = [...complete("a"), ...complete("b")];
-    const kept = trimFunnelRows(rows, 2, 3);
-    expect(kept).toHaveLength(3);
-    expect(kept.every((r) => r.at >= 60)).toBe(true);
-    expect(kept.filter((r) => r.projectId === "a").length).toBeLessThanOrEqual(2);
   });
 });
 

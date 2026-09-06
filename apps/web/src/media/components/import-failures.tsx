@@ -32,7 +32,7 @@ export function ImportFailures(props: {
   const retry = (selected: typeof failures) => {
     if (useImportProgressStore.getState().active) return;
     remove(selected.map((failure) => failure.id));
-    void trackImportRetry(() => props.onRetry(selected.map((failure) => failure.candidate)));
+    void trackImportRetry(() => props.onRetry(selected.map((failure) => failure.candidate)), selected.length);
   };
 
   return (

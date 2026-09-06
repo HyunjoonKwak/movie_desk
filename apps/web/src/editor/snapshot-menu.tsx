@@ -1,7 +1,7 @@
 "use client";
 
 import { recordRecovery } from "@/lib/funnel/collector";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { History, RotateCcw, Save, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import {
 
 export function SnapshotMenu() {
   const [open, setOpen] = useState(false);
+  const recovery = useRef<ReturnType<typeof recordRecovery> | null>(null);
   const [rows, setRows] = useState<ProjectSnapshot[]>([]);
   const [label, setLabel] = useState("");
   const project = useProjectStore((s) => s.project);
@@ -61,10 +62,11 @@ export function SnapshotMenu() {
   };
 
   const onRestore = async (id: string) => {
-    recordRecovery("snapshot", "pending", project.id);
+    const measurement = recovery.current && !recovery.current.finished ? recovery.current : recordRecovery("snapshot", 1, null, project.id);
+    recovery.current = measurement;
     const snap = await loadSnapshot(id);
     if (snap) {
-      recordRecovery("snapshot", "success", project.id);
+      measurement.resolve();
       loadProject(snap);
       setOpen(false);
       toast.success(t("snap.restored"));
@@ -79,7 +81,7 @@ export function SnapshotMenu() {
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
+    <Dialog.Root open={open} onOpenChange={(value) => { if (!value) recovery.current?.abandon(); setOpen(value); }}>
       <Dialog.Trigger asChild>
         <button type="button" className="btn-ghost px-2 py-1 text-xs" title={t("snap.menu")}>
           <History className="size-3.5" />

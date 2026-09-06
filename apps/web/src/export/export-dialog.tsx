@@ -110,7 +110,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
   const handleExport = async () => {
     const queue = PRESETS.filter((p) => selectedIds.has(p.id));
     if (queue.length === 0) return;
-    recordExport(projectId, "start");
+    const measurement = recordExport(projectId);
     setFailure(false);
     setRunning(true);
     setMissingNames(null);
@@ -126,14 +126,14 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         const result = await exporter.start({ projectId, preset }, setProgress);
         const destination = await downloadBlob(result.blob, result.suggestedName);
         files.push({ name: result.suggestedName, preset: label, destination });
-        recordExport(projectId, destination.kind === "cancelled" ? "cancelled" : "success");
+        measurement.record(destination.kind === "cancelled" ? "cancelled" : "success");
         if (destination.kind !== "cancelled") {
           toast.success(t("export.success", { name: result.suggestedName }));
         }
         exporterRef.current = null;
       }
     } catch (err) {
-      recordExport(projectId, err instanceof ExportCancelledError ? "cancelled" : "failure");
+      measurement.record(err instanceof ExportCancelledError ? "cancelled" : "failure");
       if (err instanceof ExportCancelledError) {
         toast.info(t("export.cancelled"));
       } else if (err instanceof MissingMediaError) {
@@ -146,6 +146,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         toast.error(t("export.failed", { msg }));
       }
     } finally {
+      measurement.finish();
       // Files written before a later preset failed are still shown.
       if (files.length > 0) setCompleted(files);
       setRunning(false);

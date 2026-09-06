@@ -906,4 +906,5 @@ export const ko = {
     "funnel.kind.snapshot": "스냅샷 복원",
     "funnel.kind.save-conflict": "저장 충돌 해결",
     "funnel.kind.import-retry": "가져오기 재시도",
+    "funnel.retention": "프로젝트 1,000행 / 전체 5,000행 초과 시 활동 행만 정리하며 퍼널·복구 행은 보존합니다. 시간은 휴식 포함이며 도움 유무를 판별하지 않습니다.",
 } as const;

@@ -908,4 +908,5 @@ export const en = {
     "funnel.kind.snapshot": "Snapshot",
     "funnel.kind.save-conflict": "Save conflict",
     "funnel.kind.import-retry": "Import retry",
+    "funnel.retention": "Activity is pruned above 1,000 rows per project / 5,000 total; funnel and recovery events are retained. Times include breaks and do not measure help received.",
 } as const;

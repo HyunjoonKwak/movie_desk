@@ -1,28 +1,36 @@
 import { useProjectStore } from "@/stores/project-store";
-import { useImportFailureStore } from "@/media/import-failure-store";
 import { recordRecovery, funnelEnabled } from "./collector";
 
-export const trackImportRetry = async (retry: () => Promise<void>): Promise<void> => {
+const episodes = new Map<string, ReturnType<typeof recordRecovery>>();
+export const trackImportRetry = async (
+  retry: () => Promise<void>,
+  assets: number,
+): Promise<void> => {
   if (!funnelEnabled()) {
     await retry();
     return;
   }
   const project = useProjectStore.getState().project;
-  const failures = useImportFailureStore.getState().failures.length;
-  recordRecovery("import-retry", "pending", project.id);
+  const measurement =
+    episodes.get(project.id) ?? recordRecovery("import-retry", assets, null, project.id);
+  episodes.set(project.id, measurement);
   try {
     await retry();
-    if (
-      useProjectStore.getState().project.id === project.id &&
-      useProjectStore.getState().project.mediaLibrary.length > project.mediaLibrary.length &&
-      useImportFailureStore.getState().failures.length === failures
-    ) {
-      recordRecovery("import-retry", "success", project.id);
+    if (useProjectStore.getState().project.id === project.id) {
+      measurement.resolve(
+        Math.max(
+          0,
+          useProjectStore.getState().project.mediaLibrary.length - project.mediaLibrary.length,
+        ),
+      );
+      if (measurement.finished) episodes.delete(project.id);
     }
   } catch {
     /* Existing import UI owns its errors; unresolved attempts stay pending. */
   }
 };
 export const abandonImportFailures = (count: number): void => {
-  if (count > 0) recordRecovery("import-retry", "abandoned");
+  const id = useProjectStore.getState().project.id;
+  if (count > 0) (episodes.get(id) ?? recordRecovery("import-retry", count, null, id)).abandon();
+  episodes.delete(id);
 };

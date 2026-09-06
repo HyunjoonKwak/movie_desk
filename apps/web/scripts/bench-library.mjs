@@ -164,6 +164,14 @@ try {
   result.heapAfterImport = await heap();
   result.fileOpensDuringImport = await page.evaluate(() => window.__bench.fileOpens);
 
+  if (FUNNEL) {
+    await page.getByRole("button", { name: "Projects", exact: true }).click();
+    await page.getByRole("button", { name: "Measurement report", exact: true }).click();
+    await page.getByTestId("funnel-timeline").locator("li").first().waitFor();
+    await page.getByRole("button", { name: "Close report" }).click();
+    await page.keyboard.press("Escape");
+  }
+
   // 2. Persisted project size (the debounced library row holds the whole project).
   await page.waitForTimeout(1_000);
   const library = await libraryRowMetrics();
@@ -283,20 +291,21 @@ try {
   await nameInput.press("Enter");
   await page.getByText(/^Saved/).waitFor();
   result.renameToSavedMs = performance.now() - t0;
-  result.funnelRows = await page.evaluate(async () => {
+  result.funnelLog = await page.evaluate(async () => {
     const databases = await indexedDB.databases();
-    if (!databases.some((db) => db.name === "movie-desk.funnel.v1")) return 0;
+    if (!databases.some((db) => db.name === "movie-desk.funnel.v1")) return { rows: 0, events: {} };
     return new Promise((resolveRows, reject) => {
       const open = indexedDB.open("movie-desk.funnel.v1");
       open.onerror = () => reject(open.error);
       open.onsuccess = () => {
         const db = open.result;
-        const request = db.transaction("rows").objectStore("rows").count();
-        request.onsuccess = () => { db.close(); resolveRows(request.result); };
+        const request = db.transaction("rows").objectStore("rows").getAll();
+        request.onsuccess = () => { db.close(); resolveRows({ rows: request.result.length, observedStarts: request.result.filter((r) => r.event === "start" && r.data.baseline === false).length, observedImports: request.result.filter((r) => r.event === "import" && r.data.baseline === false).length, events: request.result.reduce((counts, row) => ({ ...counts, [row.event]: (counts[row.event] ?? 0) + 1 }), {}) }); };
         request.onerror = () => { db.close(); reject(request.error); };
       };
     });
   });
+  result.funnelRows = result.funnelLog.rows;
 } finally {
   await browser.close();
 }

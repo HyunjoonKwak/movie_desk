@@ -1,5 +1,4 @@
 "use client";
-import { recordRecovery } from "@/lib/funnel/collector";
 import { useT } from "@/i18n/use-t";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useState } from "react";
@@ -22,7 +21,6 @@ export function DesktopRelinkDialog({
   );
   const pending = selectedDesktopRelinkRows(rows, selected, done);
   const close = () => {
-    if (done.size < rows.length) recordRecovery("relink", "abandoned");
     onClose();
   };
   return (

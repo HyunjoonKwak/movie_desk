@@ -3,10 +3,11 @@ import type { FunnelRow } from "@/persistence/funnel-log";
 export const STAGES = ["start", "import", "clip", "export-start", "export-success"] as const;
 export const RECOVERIES = ["relink", "snapshot", "save-conflict", "import-retry"] as const;
 const median = (values: number[]): number | null => {
-  values.sort((a, b) => a - b);
-  const mid = Math.floor(values.length / 2);
-  return values.length ? (values[mid]! + values[Math.floor((values.length - 1) / 2)]!) / 2 : null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length ? (sorted[mid]! + sorted[Math.floor((sorted.length - 1) / 2)]!) / 2 : null;
 };
+
 export const computeFunnel = (input: readonly FunnelRow[]) => {
   const rows = [...input].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
   const grouped = new Map<string, FunnelRow[]>();
@@ -39,8 +40,15 @@ export const computeFunnel = (input: readonly FunnelRow[]) => {
       baseline,
       incomplete: !start,
       times,
-      undo: timeline.filter((row) => row.event === "undo").length,
-      commands: timeline.filter((row) => row.event === "command").length,
+      undo: timeline.reduce(
+        (n, row) => n + (row.event === "activity" ? row.data.undos : row.event === "undo" ? 1 : 0),
+        0,
+      ),
+      commands: timeline.reduce(
+        (n, row) =>
+          n + (row.event === "activity" ? row.data.commands : row.event === "command" ? 1 : 0),
+        0,
+      ),
     };
   });
   const eligible = projects.filter((p) => !p.baseline && !p.incomplete);
@@ -72,21 +80,19 @@ export const computeFunnel = (input: readonly FunnelRow[]) => {
       let abandoned = 0;
       let pending = 0;
       for (const project of projects) {
-        // Repeated attempts share one pending episode per project/kind, regardless of whether
-        // the hint changed visibility before the eventual outcome.
-        let unresolved: boolean | undefined;
+        const episodes = new Map<number | string, Extract<FunnelRow, { event: "recovery" }>>();
         for (const row of project.timeline) {
           if (row.event !== "recovery" || row.data.kind !== kind) continue;
-          if (row.data.result === "pending") unresolved ??= row.data.hintVisible;
-          else {
-            unresolved = undefined;
-            if (row.data.hintVisible === hintVisible) {
-              if (row.data.result === "success") success++;
-              else abandoned++;
-            }
-          }
+          const key = row.data.episode ?? `legacy-${kind}`;
+          const previous = episodes.get(key);
+          if (!previous || previous.data.result === "pending") episodes.set(key, row);
         }
-        if (unresolved === hintVisible) pending++;
+        for (const row of episodes.values()) {
+          if (row.data.hintVisible !== hintVisible) continue;
+          if (row.data.result === "success") success++;
+          else if (row.data.result === "abandoned") abandoned++;
+          else pending++;
+        }
       }
       return { kind, hintVisible, success, abandoned, pending };
     }),

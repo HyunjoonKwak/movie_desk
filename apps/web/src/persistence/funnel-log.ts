@@ -19,6 +19,10 @@ export const funnelEventSchema = z.discriminatedUnion("event", [
     event: z.literal("export-failure"),
     data: z.object({ cancelled: z.boolean() }).strict(),
   }),
+  z.object({
+    event: z.literal("activity"),
+    data: z.object({ commands: count, undos: count }).strict(),
+  }),
   z.object({ event: z.literal("undo"), data: z.object({}).strict() }),
   z.object({ event: z.literal("command"), data: z.object({}).strict() }),
   z.object({
@@ -28,6 +32,9 @@ export const funnelEventSchema = z.discriminatedUnion("event", [
         kind: z.enum(["relink", "snapshot", "save-conflict", "import-retry"]),
         result: z.enum(["pending", "success", "abandoned"]),
         hintVisible: z.boolean(),
+        episode: count.optional(),
+        assets: count.optional(),
+        resolved: count.optional(),
       })
       .strict(),
   }),
@@ -51,16 +58,29 @@ export const trimFunnelRows = (
   perProject = PROJECT_LIMIT,
   total = TOTAL_LIMIT,
 ): FunnelRow[] => {
+  const protectedEvents = new Set([
+    "start",
+    "path",
+    "import",
+    "clip",
+    "export-start",
+    "export-success",
+    "export-failure",
+    "recovery",
+  ]);
+  const protectedRows = rows.filter((row) => protectedEvents.has(row.event));
   const counts = new Map<string, number>();
-  return [...rows]
+  for (const row of protectedRows) counts.set(row.projectId, (counts.get(row.projectId) ?? 0) + 1);
+  const activity = [...rows]
+    .filter((row) => !protectedEvents.has(row.event))
     .sort((a, b) => b.at - a.at || b.id.localeCompare(a.id))
     .filter((row) => {
       const n = (counts.get(row.projectId) ?? 0) + 1;
       counts.set(row.projectId, n);
       return n <= perProject;
     })
-    .slice(0, total)
-    .reverse();
+    .slice(0, Math.max(0, total - protectedRows.length));
+  return [...protectedRows, ...activity].sort((a, b) => a.at - b.at || a.id.localeCompare(b.id));
 };
 class FunnelDB extends Dexie {
   rows!: Table<FunnelRow, string>;
@@ -94,23 +114,11 @@ export const flushFunnelLog = (): Promise<void> => {
         const database = getDb();
         await database.transaction("rw", database.rows, async () => {
           await database.rows.bulkAdd(batch);
-          for (const projectId of new Set(batch.map((row) => row.projectId))) {
-            const excess =
-              (await database.rows.where("projectId").equals(projectId).count()) - PROJECT_LIMIT;
-            if (excess > 0) {
-              const oldest = await database.rows
-                .where("[projectId+at]")
-                .between([projectId, Dexie.minKey], [projectId, Dexie.maxKey])
-                .limit(excess)
-                .primaryKeys();
-              await database.rows.bulkDelete(oldest);
-            }
-          }
-          const excess = (await database.rows.count()) - TOTAL_LIMIT;
-          if (excess > 0)
-            await database.rows.bulkDelete(
-              await database.rows.orderBy("at").limit(excess).primaryKeys(),
-            );
+          const rows = await database.rows.toArray();
+          const keep = new Set(trimFunnelRows(rows).map((row) => row.id));
+          await database.rows.bulkDelete(
+            rows.filter((row) => !keep.has(row.id)).map((row) => row.id),
+          );
         });
       } catch {
         /* Measurement never blocks the editor. */

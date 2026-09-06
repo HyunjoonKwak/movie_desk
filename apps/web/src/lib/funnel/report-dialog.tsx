@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { StateHint } from "@/components/state-hint";
 import { useT } from "@/i18n/use-t";
 import { clearFunnelLog, readFunnelRows, type FunnelRow } from "@/persistence/funnel-log";
@@ -22,7 +22,7 @@ export function FunnelControls() {
   const [error, setError] = useState(false);
   const [rows, setRows] = useState<FunnelRow[]>([]);
   const [currentId, setCurrentId] = useState("");
-  const report = computeFunnel(rows);
+  const report = useMemo(() => computeFunnel(rows), [rows]);
   const current = report.projects.find((project) => project.projectId === currentId);
   const refresh = async () => {
     await settleFunnelCollection();
@@ -73,6 +73,7 @@ export function FunnelControls() {
           setOpen(value);
           setConfirm(false);
           if (value) void refresh();
+          else setRows([]);
         }}
       >
         <Dialog.Trigger asChild>
@@ -95,7 +96,7 @@ export function FunnelControls() {
               {t("funnel.projects")}: {report.total} · {t("funnel.baseline")}: {report.baseline} ·{" "}
               {t("funnel.incomplete")}: {report.incomplete}
             </p>
-            <StateHint text={t("funnel.limit")} />
+            <StateHint text={t("funnel.retention")} />
             <div className="overflow-x-auto">
               <table className="w-full text-left [&_th]:p-2 [&_td]:p-2">
                 <thead>
@@ -150,7 +151,10 @@ export function FunnelControls() {
             </p>
             <ol className="max-h-40 space-y-1 overflow-y-auto" data-testid="funnel-timeline">
               {current?.timeline
-                .filter((row) => row.event !== "command" && row.event !== "undo")
+                .filter(
+                  (row) =>
+                    row.event !== "command" && row.event !== "undo" && row.event !== "activity",
+                )
                 .slice(-100)
                 .map((row) => (
                   <li key={row.id}>

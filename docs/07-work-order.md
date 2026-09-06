@@ -489,10 +489,16 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | C2 빈·선택·오류 상태 설명 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 4라운드 완료, main 통합(ac112a6) | `codex/c2-state-guidance` · 정상 편집 안내 줄 제거, 누락 오버레이·점선 드롭존 복원, 분석 지연 판정·BPM 창 공유·이름 있는 카드 포커스; 판정/렌더/음악 캐시 21개·E2E 2개, `pnpm gate` 9/9 PASS(단위 662·Chromium E2E 45), 재연결 메타데이터 기반 최근 4개 Promise 캐시·접근성 설명·disabled 드롭존 trusted drop 검증·누락 집합별 닫기 후속 반영 및 최소 폭 화면 갱신. [상태 목록·검증 메모](evaluations/2026-09-06-c2-state-guidance.md), 다음은 C3 |
 | A2-a 오디오 트랙 variant | Claude + Codex | 구현·통합 검증 완료, main 통합 | AAC 트랙을 mp4box demux → mp4-muxer 재먹싱(재인코딩 없음)한 audio-only MP4를 OPFS 캐시에 저장. 재생·파형·내보내기 믹서가 variant를 읽고 없으면 원본. Codex가 동시 build 병합과 캐시 쓰기 실패 폴백을 보강. 남은 일: AAC 외 코덱(Opus·PCM), 디코드된 PCM 청크 스트리밍(B15) |
 | B'1 프레임·수치 정밀 입력 감사 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 3라운드 완료, main 통합(dcfd9ca) | `codex/b1-precision-input` · [감사·적용 범위](evaluations/2026-09-06-precision-input-audit.md), [전체 gate](evaluations/2026-09-06-precision-input-gate.md). 챕터 동일 초 중복·키보드 undo·제스처 리베이스·Yjs 종료 flush 확인 리뷰 반영, 공용 NDF 입력·인스펙터/변형/키프레임 값/플레이헤드 적용. `pnpm gate` 9/9 PASS(단위 739·Chromium E2E 52), 한국어 화면 확인. 잔여 P1/P2는 감사 문서에 명시 |
-| C3 첫 완성률 측정 | Codex 구현 · Claude 감독·리뷰 | 구현·gate 완료, Claude 리뷰 대기 | `codex/c3-completion-funnel` · 로컬 옵트인 Dexie 로그, baseline 제외 퍼널·복구 결과·JSON 다운로드·삭제. [결정](decisions/2026-09-06-first-completion-metric.md). gate 9/9 PASS(단위 772·E2E 55), 1,000자산 필터 11.42→11.01ms·복원 p50 121.40→120.70ms. B7에서 측정 켜고 새 프로젝트 완주 후 리포트 확인 |
+| C3 첫 완성률 측정 | Codex 구현 · Claude 감독·리뷰 | 구현·gate 완료, Claude 리뷰 대기 | `codex/c3-completion-funnel` · 로컬 옵트인 Dexie 로그, baseline 제외 퍼널·복구 결과·JSON 다운로드·삭제. [결정](decisions/2026-09-06-first-completion-metric.md). 2라운드 gate 9/9 PASS(단위 779·E2E 55), 1,000자산 로그 15행·최초 start/import 생존. B7에서 측정 켜고 새 프로젝트 완주 후 리포트 확인 |
 
 ### C3 구현 메모 (2026-09-06)
 
 기록이 켜진 뒤 생성되고 가져오기에 도달한 프로젝트만 첫 완성률 분모로 센다. baseline과 보관 상한 때문에 시작이 사라진 기록은 별도로 표시한다. 자산·클립 각 1개 이상인 실제 다운로드 성공이 완성이며 최초 사용자나 도움 여부를 추론하지 않는다. 재연결·스냅샷·재시도는 명시적 결과와 C2 안내 표시 여부를 기록하고, 기준 브랜치에 없는 저장 충돌 해결 UI는 0으로 표시한다. 원래 프로젝트 ID도 SHA-256으로 치환한다. 네트워크 전송·SDK는 없고 i18n은 끝에만 추가했다. B'2 오디오/속도 파일은 변경하지 않았다.
 
 검증 수치·벤치 상세는 `evaluations/2026-09-06-c3-completion-funnel.md`에 기록한다.
+
+### C3 2라운드 리뷰 반영 (2026-09-06)
+
+활동은 메모리에서 합산하여 activity 증분으로 기록하고 단계·복구 행은 보관 정리에서 보호한다. 언마운트/숨김 시 flush, 관련 복구 힌트만 측정, 에피소드당 단일 결과와 assets/resolved, 저장 취소·다중 프리셋 결과 집계를 수정했다. 전체 gate와 1,000자산 머리 행 생존 재측정 수치는 [평가 문서](evaluations/2026-09-06-c3-completion-funnel.md)에 기록한다. 전역 삽입 순서 LOW만 보류하며, 메뉴 폭 제한은 390px 측정 진입을 위해 유지한다.
+
+C3 2라운드 검증 완료: gate 9/9 PASS(core 125·web 571·desktop 72·scripts 11, E2E 55), C3 단위 20개. 새 벤치는 activity 1행을 포함한 전체 15행이며 최초 관찰 start/import 각 1행 생존, 복원 p95 133ms로 150ms 예산 이내다.

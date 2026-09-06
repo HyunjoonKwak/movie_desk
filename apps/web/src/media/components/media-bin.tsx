@@ -1,5 +1,6 @@
 "use client";
 
+import type { RecoveryEpisode } from "@/lib/funnel/episodes";
 import { recordRecovery } from "@/lib/funnel/collector";
 
 import { readDesktopMediaBridge } from "../source/desktop-media-bridge";
@@ -104,6 +105,9 @@ export function MediaBin() {
   const relinkMediaAsset = useProjectStore((s) => s.relinkMediaAsset);
   const relinkInputRef = useRef<HTMLInputElement>(null);
   const [relinkProgress, setRelinkProgress] = useState<{ completed: number; total: number } | null>(null);
+  const singleRecovery = useRef<RecoveryEpisode | null>(null);
+  const folderRecovery = useRef<RecoveryEpisode | null>(null);
+  const cancelFolderRecovery = useRef<(() => void) | null>(null);
   const [relinkRows, setRelinkRows] = useState<DesktopRelinkCandidate[] | null>(null);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
@@ -427,6 +431,7 @@ export function MediaBin() {
 
   const applyRelink = useCallback(
     async (asset: MediaAsset, file: File, identical: boolean) => {
+      const measurement = singleRecovery.current;
       try {
         const patch = await relinkAssetFromFile(asset, file, { identical });
         // If persistence failed, remove old stored rows so migration can fill
@@ -436,13 +441,13 @@ export function MediaBin() {
         );
         usePreviewStore.getState().forget([asset.id]);
         relinkMediaAsset(asset.id, patch);
-        recordRecovery("relink", "success", projectId);
+        measurement?.resolve();
         toast.success(t("media.relinked", { name: asset.name }));
       } catch (err) {
         toast.error(`${t("media.relinkFailed")}: ${err instanceof Error ? err.message : err}`);
       }
     },
-    [projectId, relinkMediaAsset, t],
+    [relinkMediaAsset, t],
   );
 
   const toggleRangeEditing = useCallback((assetId: ID) => {
@@ -462,7 +467,6 @@ export function MediaBin() {
   );
   const applyDesktopRelink = useCallback(
     async (row: DesktopRelinkCandidate, confirmed: boolean) => {
-      recordRecovery("relink", "pending", projectId);
       try {
         const asset = useProjectStore
           .getState()
@@ -473,7 +477,6 @@ export function MediaBin() {
         );
         usePreviewStore.getState().forget([row.assetId]);
         relinkMediaAsset(row.assetId as ID, patch);
-        recordRecovery("relink", "success", projectId);
         toast.success(t("media.relinked", { name: row.name ?? row.relativePath }));
         return true;
       } catch (error) {
@@ -483,18 +486,19 @@ export function MediaBin() {
         return false;
       }
     },
-    [projectId, relinkMediaAsset, t],
+    [relinkMediaAsset, t],
   );
 
   const startRelink = useCallback(
     (asset: MediaAsset) => {
-      recordRecovery("relink", "pending");
+      const measurement = recordRecovery("relink", 1, "media-missing-hint", projectId);
+      singleRecovery.current = measurement;
       if (asset.sourceRef?.kind === "disk") {
         void chooseDesktopRelink([asset.id])
           .then(([row]) => {
-            if (!row) { recordRecovery("relink", "abandoned"); return; }
+            if (!row) { measurement.abandon(); return; }
             if (row.verdict === "identical") {
-              void applyDesktopRelink(row, false);
+              void applyDesktopRelink(row, false).then((ok) => { if (ok) measurement.resolve(); });
               return;
             }
             toast.warning(row.verdict === "size" ? t("media.relinkMismatchSize", { expected: row.expectedSizeBytes ?? asset.sizeBytes ?? 0, actual: row.sizeBytes ?? 0 }) : t("media.relinkDifferentFingerprint"), {
@@ -502,7 +506,7 @@ export function MediaBin() {
               action: {
                 label: t("media.relinkAnyway"),
                 onClick: () => {
-                  void applyDesktopRelink(row, true);
+                  void applyDesktopRelink(row, true).then((ok) => { if (ok) measurement.resolve(); });
                 },
               },
             });
@@ -515,17 +519,17 @@ export function MediaBin() {
       if (!input) return;
       // Set imperatively: the chooser opens before the state above has rendered.
       input.accept = `${asset.kind}/*`;
-      input.oncancel = () => recordRecovery("relink", "abandoned");
+      input.oncancel = () => measurement.abandon();
       input.click();
     },
-    [applyDesktopRelink, t],
+    [applyDesktopRelink, projectId, t],
   );
 
   const onRelinkFileChosen = useCallback(
     (file: File | undefined) => {
       const asset = relinking;
       setRelinking(null);
-      if (asset && !file) recordRecovery("relink", "abandoned");
+      if (asset && !file) singleRecovery.current?.abandon();
       if (!asset || !file) return;
       const verdict = compareRelinkCandidate(asset, file);
       if (verdict.ok) {
@@ -769,7 +773,9 @@ export function MediaBin() {
             );
             const bridge = readDesktopMediaBridge();
             let canceled = false;
-            recordRecovery("relink", "pending", projectId);
+            const measurement = recordRecovery("relink", assets.length, "media-missing-hint", projectId);
+            folderRecovery.current = measurement;
+            cancelFolderRecovery.current = () => { if (!canceled) { canceled = true; measurement.abandon(); } };
             setRelinkProgress({ completed: 0, total: assets.length });
             const unsubscribe = bridge?.onRelinkProgress?.((value) => {
               const progress = value as { completed: number; total: number };
@@ -781,6 +787,7 @@ export function MediaBin() {
             )
               .then((rows) => {
                 if (!canceled && rows.length) setRelinkRows(matchDesktopRelinkRows(assets, rows));
+                else if (!canceled) measurement.abandon();
               })
               .catch((error) => toast.error(t(error instanceof Error && error.message === "tooMany" ? "media.relinkTooMany" : error instanceof Error && error.message === "capacity" ? "media.relinkCapacity" : error instanceof Error && error.message === "timeout" ? "media.relinkTimeout" : "media.relinkFailed")))
               .finally(() => { canceled = true; unsubscribe?.(); setRelinkProgress(null); });
@@ -793,7 +800,7 @@ export function MediaBin() {
       {relinkProgress && (
         <dialog open aria-label={t("media.relinkFolder")} className="fixed left-1/2 top-1/2 z-50 m-0 w-[min(90vw,400px)] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-white/10 bg-panel-1 p-5 shadow-xl">
           <p>{t("media.relinkPreparing")} {relinkProgress.completed} / {relinkProgress.total}</p>
-          <button type="button" className="btn-ghost mt-3" onClick={() => { recordRecovery("relink", "abandoned", projectId); void readDesktopMediaBridge()?.cancelRelink?.(); }}>
+          <button type="button" className="btn-ghost mt-3" onClick={() => { cancelFolderRecovery.current?.(); void readDesktopMediaBridge()?.cancelRelink?.(); }}>
             {t("media.relinkCancel")}
           </button>
         </dialog>
@@ -801,8 +808,8 @@ export function MediaBin() {
       {relinkRows && (
         <DesktopRelinkDialog
           rows={relinkRows}
-          onClose={() => { setRelinkRows(null); void readDesktopMediaBridge()?.cancelRelink?.(); }}
-          onCommit={applyDesktopRelink}
+          onClose={() => { folderRecovery.current?.abandon(); setRelinkRows(null); void readDesktopMediaBridge()?.cancelRelink?.(); }}
+          onCommit={async (row, confirmed) => { const ok = await applyDesktopRelink(row, confirmed); if (ok) folderRecovery.current?.resolve(); return ok; }}
         />
       )}
 
