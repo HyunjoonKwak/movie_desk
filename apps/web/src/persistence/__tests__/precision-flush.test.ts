@@ -122,3 +122,22 @@ it("measures 60 preview frames with 1000 assets and clips, including actual Yjs 
   }
   process.stdout.write(`PRECISION_1000_ASSET_BENCH ${JSON.stringify(results)}\n`);
 });
+
+it("flushes master-only precision changes once and persists bus-only edits", async () => {
+  const fixture = await setup();
+  const store = useProjectStore.getState();
+  const token = store.beginPrecisionEdit("Master gain");
+  for (const gainDb of [-1, -3, -6])
+    store.previewPrecisionEdit(token, () => store.previewMixer({ kind: "master", gainDb }));
+  expect(fixture.flushes()).toBe(0);
+  store.endPrecisionEdit(token);
+  expect(fixture.flushes()).toBe(1);
+  expect(provider.doc!.getMap("project-meta").get("audio")).toMatchObject({
+    master: { gainDb: -6 },
+  });
+  store.updateMixer({ kind: "bus-add", id: "bus", name: "Bus" });
+  expect(fixture.flushes()).toBe(2);
+  expect(provider.doc!.getMap("project-meta").get("audio")).toMatchObject({
+    buses: [{ id: "bus" }],
+  });
+});

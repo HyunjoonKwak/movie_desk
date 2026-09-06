@@ -84,6 +84,23 @@ const clipSchema = z.discriminatedUnion("kind", [
   z.object({ ...clipBase, kind: z.literal("adjustment") }).passthrough(),
 ]);
 
+const gainDbSchema = finite.min(-60).max(12);
+const projectAudioSchema = z.object({
+  buses: z
+    .array(
+      z.object({
+        id: z.string().min(1),
+        name: z.string().min(1).max(100),
+        gainDb: gainDbSchema,
+        muted: z.boolean().optional(),
+      }),
+    )
+    .refine((buses) => new Set(buses.map((bus) => bus.id)).size === buses.length, {
+      message: "Duplicate audio bus ID",
+    }),
+  master: z.object({ gainDb: gainDbSchema }),
+});
+
 const trackSchema = z
   .object({
     id: z.string(),
@@ -94,6 +111,13 @@ const trackSchema = z
     solo: z.boolean(),
     locked: z.boolean(),
     connected: z.boolean().optional(),
+    audio: z
+      .object({
+        gainDb: gainDbSchema.optional(),
+        pan: finite.min(-1).max(1).optional(),
+        busId: z.string().min(1).optional(),
+      })
+      .optional(),
     clips: z.array(clipSchema),
   })
   .passthrough();
@@ -218,6 +242,7 @@ const projectSchema = z
       .transform(({ magnetic: _legacy, ...rest }) => rest),
     mediaLibrary: z.array(mediaAssetSchema),
     collections: z.array(collectionSchema).optional(),
+    audio: projectAudioSchema.optional(),
   })
   .passthrough() as unknown as z.ZodType<Project>;
 

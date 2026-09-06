@@ -65,6 +65,7 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
           project.framerate !== previous.framerate ||
           project.resolution !== previous.resolution ||
           project.mediaLibrary !== previous.mediaLibrary ||
+          project.audio !== previous.audio ||
           project.timeline.tracks !== previous.timeline.tracks ||
           project.timeline.markers !== previous.timeline.markers;
         if (contentChanged) schedule(project);

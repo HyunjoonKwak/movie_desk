@@ -18,7 +18,20 @@ export interface Timeline {
   readonly markers?: readonly Marker[]; // optional; backwards compatible
 }
 
+export interface AudioBus {
+  readonly id: string;
+  readonly name: string;
+  readonly gainDb: number;
+  readonly muted?: boolean;
+}
+
+export interface ProjectAudio {
+  readonly buses: readonly AudioBus[];
+  readonly master: { readonly gainDb: number };
+}
+
 export interface Project {
+  readonly audio?: ProjectAudio;
   readonly id: ID;
   readonly name: string;
   readonly createdAt: number;

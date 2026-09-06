@@ -30,6 +30,9 @@ export interface ExportProgress {
 }
 
 export interface ExportResult {
+  readonly audioPeaks?: import("@movie-desk/core").AudioPeakResult & {
+    readonly limitedSamples: number;
+  };
   readonly pitchFallback?: boolean;
   readonly aacCorrectionFallback?: boolean;
   readonly blob: Blob;

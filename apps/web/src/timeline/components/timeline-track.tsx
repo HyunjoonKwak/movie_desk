@@ -1,5 +1,6 @@
 "use client";
 
+import { MixerMeter } from "@/mixer/mixer-meter";
 import { useCallback, useState } from "react";
 import { Headphones, Lock, Trash2, Unlock, Volume2, VolumeX } from "lucide-react";
 import type { Track } from "@movie-desk/core";
@@ -97,7 +98,12 @@ export function TimelineTrack({ track, width }: Props) {
         )}
         style={{ height: track.height, width: TRACK_HEADER_W }}
       >
-        <span className="font-medium text-ink-1">{track.name}</span>
+        <span className="font-medium text-ink-1">
+          {track.name}
+          {(track.kind === "audio" || track.kind === "video") && (
+            <MixerMeter id={`track:${track.id}`} compact />
+          )}
+        </span>
         <span className="flex items-center gap-0.5">
           <button
             type="button"

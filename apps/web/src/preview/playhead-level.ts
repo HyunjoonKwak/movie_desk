@@ -7,8 +7,8 @@ import {
 } from "@movie-desk/core";
 
 // Estimates the instantaneous audio level (0..1) at the current playhead by
-// sampling each audio-bearing clip's precomputed peak envelope. There is no
-// live audio graph during preview, so this drives the level meter instead.
+// sampling precomputed peak envelopes while stopped or scrubbing. Playback
+// uses measured audio worklet levels; this remains a phase-blind estimate.
 export const playheadLevel = (
   project: Project,
   getAsset: (id: ID) => MediaAsset | undefined,

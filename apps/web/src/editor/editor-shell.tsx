@@ -1,5 +1,6 @@
 "use client";
 
+import { MixerPanel } from "@/mixer/mixer-panel";
 import { mountFunnel, recordFunnel } from "@/lib/funnel/collector";
 import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
@@ -37,7 +38,9 @@ import { TopBar } from "./top-bar";
 export function EditorShell() {
   useKeyboardShortcuts();
   const persistenceReady = useLocalPersistence();
-  useEffect(() => { if (persistenceReady) return mountFunnel(); }, [persistenceReady]);
+  useEffect(() => {
+    if (persistenceReady) return mountFunnel();
+  }, [persistenceReady]);
   useAudioPlayback();
   useAutoAnalysis();
   const isMobile = useIsBelow(900);
@@ -86,7 +89,8 @@ export function EditorShell() {
   // the expert editor while an unanswered new project survives a reload.
   useEffect(() => {
     if (!persistenceReady || !showFreshStart) return;
-    if (!isNewProjectStartPending(projectId)) recordFunnel(projectId, { event: "start", data: { baseline: false } });
+    if (!isNewProjectStartPending(projectId))
+      recordFunnel(projectId, { event: "start", data: { baseline: false } });
     markNewProjectStartPending(projectId);
   }, [persistenceReady, projectId, showFreshStart]);
 
@@ -219,7 +223,7 @@ function ResizeHandle({ orientation }: { orientation: "vertical" | "horizontal" 
   );
 }
 
-type MobileDrawer = "media" | "auto" | "inspector";
+type MobileDrawer = "media" | "auto" | "inspector" | "mixer";
 
 function MobileShell({
   onNewProject,
@@ -276,6 +280,15 @@ function MobileShell({
         >
           <Sliders className="size-5" />
         </button>
+        <button
+          type="button"
+          onClick={() => setDrawer("mixer")}
+          className="btn-ghost flex-1 justify-center"
+          aria-label={t("mixer.title")}
+          title={t("mixer.title")}
+        >
+          <Sliders className="size-5" />
+        </button>
       </nav>
 
       {drawer && (
@@ -286,7 +299,9 @@ function MobileShell({
                 ? t("media.title")
                 : drawer === "auto"
                   ? t("auto.tab")
-                  : t("inspector.title")}
+                  : drawer === "mixer"
+                    ? t("mixer.title")
+                    : t("inspector.title")}
             </span>
             <button
               type="button"
@@ -301,6 +316,8 @@ function MobileShell({
               <MediaBin />
             ) : drawer === "auto" ? (
               <AutoEditPanel />
+            ) : drawer === "mixer" ? (
+              <MixerPanel />
             ) : (
               <InspectorPanel />
             )}

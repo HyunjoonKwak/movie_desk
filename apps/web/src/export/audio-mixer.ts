@@ -1,3 +1,4 @@
+import { resolveTrackRoute, routeStereo, type TrackRoute } from "@movie-desk/core";
 import { renderPitchInWorker } from "@/audio/pitch-renderer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
@@ -231,6 +232,7 @@ export interface AudioMixChunk {
   readonly channels: StereoChannels;
   readonly sampleRate: number;
   readonly startSample: number;
+  readonly limitedSamples?: number;
 }
 
 export interface AudioMixOptions {
@@ -241,6 +243,7 @@ export interface AudioMixOptions {
 }
 
 interface PreparedClip {
+  readonly route: TrackRoute;
   readonly clip: MediaClip;
   readonly bus: "voice" | "music";
 }
@@ -274,7 +277,7 @@ export class ProjectAudioMixer {
       const bus = track.kind === "audio" ? "music" : "voice";
       return track.clips
         .filter((clip): clip is MediaClip => isMediaClip(clip) && !clip.disabled)
-        .map((clip) => ({ clip, bus }));
+        .map((clip) => ({ clip, bus, route: resolveTrackRoute(project, track) }));
     });
   }
 
@@ -305,7 +308,7 @@ export class ProjectAudioMixer {
       const voiceChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
       const musicChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
 
-      for (const { clip, bus } of this.clips) {
+      for (const { clip, bus, route } of this.clips) {
         const clipStartSample = Math.floor((clip.start / 1000) * this.sampleRate);
         const clipEndSample = Math.ceil(((clip.start + clip.duration) / 1000) * this.sampleRate);
         const overlapStart = Math.max(chunkStartSample, clipStartSample);
@@ -379,15 +382,13 @@ export class ProjectAudioMixer {
           }
         }
 
+        const routed = routeStereo(processed, route);
         const target = bus === "music" ? musicChannels : voiceChannels;
         const targetOffset = overlapStart - chunkStartSample;
         const processedOffset = overlapStart - processStart;
         const mixedSamples = overlapEnd - overlapStart;
         for (let channel = 0; channel < 2; channel++) {
-          const input = processed[Math.min(channel, processed.length - 1)]!.subarray(
-            processedOffset,
-            processedOffset + mixedSamples,
-          );
+          const input = routed[channel]!.subarray(processedOffset, processedOffset + mixedSamples);
           const output = target[channel]!;
           for (let i = 0; i < input.length; i++) output[targetOffset + i]! += input[i] ?? 0;
         }
@@ -407,6 +408,7 @@ export class ProjectAudioMixer {
       throwIfAborted(options.signal);
       yield {
         channels: combined.channels,
+        limitedSamples: combined.limitedSamples,
         sampleRate: this.sampleRate,
         startSample: chunkStartSample - absoluteStartSample,
       };
@@ -488,7 +490,7 @@ interface CombineRequest {
 const runCombineWorker = async (
   req: CombineRequest,
   signal?: AbortSignal,
-): Promise<{ channels: StereoChannels; finalDuckGain: number }> => {
+): Promise<{ channels: StereoChannels; finalDuckGain: number; limitedSamples: number }> => {
   const w = getWorker();
   if (!w) {
     // Tests / SSR / browsers without Worker / a worker given up on — run inline.
@@ -501,48 +503,55 @@ const runCombineWorker = async (
     voiceChannels: [req.voiceChannels[0].slice(), req.voiceChannels[1].slice()],
     musicChannels: [req.musicChannels[0].slice(), req.musicChannels[1].slice()],
   };
-  return new Promise<{ channels: StereoChannels; finalDuckGain: number }>((resolve, reject) => {
-    const requestId = ++mixerRequestId;
-    const cleanup = () => {
-      clearTimeout(timer);
-      w.removeEventListener("message", onMessage);
-      w.removeEventListener("error", onError);
-      signal?.removeEventListener("abort", onAbort);
-    };
-    const onMessage = (
-      e: MessageEvent<{
-        requestId?: number;
-        channels: StereoChannels;
-        finalDuckGain: number;
-      }>,
-    ) => {
-      if (e.data.requestId !== requestId) return;
-      cleanup();
-      resolve({ channels: e.data.channels, finalDuckGain: e.data.finalDuckGain });
-    };
-    const onError = (err: ErrorEvent) => {
-      cleanup();
-      abandonWorker();
-      resolve(combineInlineStateful(retained));
-      void err;
-    };
-    const onAbort = () => {
-      cleanup();
-      reject(new DOMException("Audio mixing cancelled", "AbortError"));
-    };
-    const timer = setTimeout(() => {
-      cleanup();
-      abandonWorker();
-      resolve(combineInlineStateful(retained));
-    }, WORKER_REPLY_TIMEOUT_MS);
-    signal?.addEventListener("abort", onAbort, { once: true });
-    w.addEventListener("message", onMessage);
-    w.addEventListener("error", onError);
-    w.postMessage({ ...req, requestId }, [
-      req.voiceChannels[0].buffer,
-      req.voiceChannels[1].buffer,
-      req.musicChannels[0].buffer,
-      req.musicChannels[1].buffer,
-    ]);
-  });
+  return new Promise<{ channels: StereoChannels; finalDuckGain: number; limitedSamples: number }>(
+    (resolve, reject) => {
+      const requestId = ++mixerRequestId;
+      const cleanup = () => {
+        clearTimeout(timer);
+        w.removeEventListener("message", onMessage);
+        w.removeEventListener("error", onError);
+        signal?.removeEventListener("abort", onAbort);
+      };
+      const onMessage = (
+        e: MessageEvent<{
+          requestId?: number;
+          channels: StereoChannels;
+          finalDuckGain: number;
+          limitedSamples: number;
+        }>,
+      ) => {
+        if (e.data.requestId !== requestId) return;
+        cleanup();
+        resolve({
+          channels: e.data.channels,
+          finalDuckGain: e.data.finalDuckGain,
+          limitedSamples: e.data.limitedSamples,
+        });
+      };
+      const onError = (err: ErrorEvent) => {
+        cleanup();
+        abandonWorker();
+        resolve(combineInlineStateful(retained));
+        void err;
+      };
+      const onAbort = () => {
+        cleanup();
+        reject(new DOMException("Audio mixing cancelled", "AbortError"));
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        abandonWorker();
+        resolve(combineInlineStateful(retained));
+      }, WORKER_REPLY_TIMEOUT_MS);
+      signal?.addEventListener("abort", onAbort, { once: true });
+      w.addEventListener("message", onMessage);
+      w.addEventListener("error", onError);
+      w.postMessage({ ...req, requestId }, [
+        req.voiceChannels[0].buffer,
+        req.voiceChannels[1].buffer,
+        req.musicChannels[0].buffer,
+        req.musicChannels[1].buffer,
+      ]);
+    },
+  );
 };

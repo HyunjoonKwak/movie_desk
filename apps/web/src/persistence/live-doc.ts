@@ -118,6 +118,7 @@ export const getLiveDoc = (): LiveDoc => {
         project.timeline.tracks === previous.timeline.tracks &&
         project.mediaLibrary === previous.mediaLibrary &&
         project.collections === previous.collections &&
+        project.audio === previous.audio &&
         project.name === previous.name &&
         project.framerate === previous.framerate &&
         project.resolution === previous.resolution &&

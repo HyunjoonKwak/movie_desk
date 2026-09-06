@@ -1,5 +1,6 @@
 "use client";
 
+import { MixerPanel } from "@/mixer/mixer-panel";
 import { useState } from "react";
 import {
   Activity,
@@ -23,6 +24,7 @@ import { ProjectInspectorPanel } from "./project-inspector-panel";
 import { useT } from "@/i18n/use-t";
 
 export type RightPanelTab =
+  | "mixer"
   | "inspector"
   | "auto"
   | "subs"
@@ -64,6 +66,12 @@ export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPan
           label={t("music.tab")}
         />
         <TabButton
+          active={tab === "mixer"}
+          onClick={() => setTab("mixer")}
+          icon={<Sliders className="size-3.5" />}
+          label={t("mixer.title")}
+        />
+        <TabButton
           active={tab === "scopes"}
           onClick={() => setTab("scopes")}
           icon={<Activity className="size-3.5" />}
@@ -93,6 +101,7 @@ export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPan
         {tab === "auto" && <AutoEditPanel />}
         {tab === "subs" && <SubtitlePanel />}
         {tab === "music" && <MusicPanel />}
+        {tab === "mixer" && <MixerPanel />}
         {tab === "scopes" && <ScopesPanel />}
         {tab === "multicam" && <MulticamPanel />}
         {tab === "markers" && <MarkerPanel />}

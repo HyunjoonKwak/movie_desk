@@ -1,3 +1,4 @@
+import { TruePeakMeter, type AudioPeakResult } from "@movie-desk/core";
 import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
@@ -83,6 +84,7 @@ export class WebCodecsExporter implements Exporter {
     canvas.height = preset.height;
     const compositor = new Compositor(canvas);
     let encoder: VideoEncoder | null = null;
+    let audioPeaks: (AudioPeakResult & { limitedSamples: number }) | undefined;
     let pitchFallback = false;
     let aacCorrectionFallback = false;
     try {
@@ -246,7 +248,11 @@ export class WebCodecsExporter implements Exporter {
             };
             if (prerollSamples) encodePadding(0);
             const encoderChunkSize = 1024;
+            const peakMeter = new TruePeakMeter(2);
+            let limitedSamples = 0;
             for await (const chunk of mixer.chunks(mixOptions)) {
+              peakMeter.push(chunk.channels, masterGain);
+              limitedSamples += chunk.limitedSamples ?? 0;
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
               for (let i = 0; i < totalSamples; i += encoderChunkSize) {
                 if (this.cancelled) throw new ExportCancelledError();
@@ -275,6 +281,7 @@ export class WebCodecsExporter implements Exporter {
               }
             }
             if (prerollSamples) encodePadding(prerollSamples + Math.round(exportDurationMs * 48));
+            audioPeaks = { ...peakMeter.finish(), limitedSamples };
             await audioEncoder.flush();
           } finally {
             if (audioEncoder.state !== "closed") audioEncoder.close();
@@ -302,6 +309,7 @@ export class WebCodecsExporter implements Exporter {
       return {
         pitchFallback,
         aacCorrectionFallback,
+        ...(audioPeaks ? { audioPeaks } : {}),
         blob: new Blob([buffer], { type: "video/mp4" }),
         mime: "video/mp4",
         suggestedName: `${name}.mp4`,

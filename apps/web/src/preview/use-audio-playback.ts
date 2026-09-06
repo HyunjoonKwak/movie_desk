@@ -75,6 +75,11 @@ export function useAudioPlayback(): void {
       scheduledKey = key;
       if (usePlaybackStore.getState().playing) start();
     };
+    const offRouting = useProjectStore.subscribe(
+      (state) => [state.project.timeline.tracks, state.project.audio] as const,
+      () => engine.updateRouting(useProjectStore.getState().project),
+      { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] },
+    );
     const offClips = useProjectStore.subscribe(
       (state) => state.project.timeline.tracks,
       rescheduleEdit,
@@ -90,6 +95,7 @@ export function useAudioPlayback(): void {
       offPlayhead();
       offMedia();
       offClips();
+      offRouting();
       offPrecision();
       engine.stop();
     };

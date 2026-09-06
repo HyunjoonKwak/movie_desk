@@ -1,0 +1,62 @@
+{
+  "cases": [
+    {
+      "mono": false,
+      "pan": -1,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": -0.5,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 0,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 0.5,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": false,
+      "pan": 1,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": true,
+      "pan": -1,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": -0.5,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": 0,
+      "maxError": 7.450580596923828e-9
+    },
+    {
+      "mono": true,
+      "pan": 0.5,
+      "maxError": 1.4901161193847656e-8
+    },
+    {
+      "mono": true,
+      "pan": 1,
+      "maxError": 1.4901161193847656e-8
+    }
+  ],
+  "meterFrame": {
+    "tracks": 8,
+    "samples": 1000,
+    "medianMs": 0,
+    "p95Ms": 0,
+    "maxMs": 0.10000002384185791,
+    "scope": "all worklet message handlers + one actual store publication; excludes React layout/paint"
+  }
+}

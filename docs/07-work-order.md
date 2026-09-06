@@ -492,6 +492,8 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | C3 첫 완성률 측정 | Codex 구현 · Claude 감독·리뷰 |  구현·리뷰 4라운드 완료, main 통합(59a2ef7); B7 도그푸딩에서 리포트 확인 대기 | `codex/c3-completion-funnel` · 로컬 옵트인 Dexie 로그, baseline 제외 퍼널·복구 결과·JSON 다운로드·삭제. [결정](decisions/2026-09-06-first-completion-metric.md). 2라운드 gate 9/9 PASS(단위 779·E2E 55), 1,000자산 로그 15행·최초 start/import 생존. B7에서 측정 켜고 새 프로젝트 완주 후 리포트 확인 |
 | B'2 피치 보존 속도 | Codex 구현 · Claude 감독·리뷰(3라운드 마무리는 Claude) | 구현·리뷰 3라운드 완료, main 통합(29987f7) | `claude/b2-pitch-speed` · 자체 WSOLA(외부 의존 없음, `packages/core/src/audio/time-stretch.ts`), 옵트인 `preservePitch`(기존 프로젝트 동작 불변), 워커 렌더·창 단위 전송·128MiB LRU, 속도 섹션 토글·상태 힌트, 내보내기 믹서 적용·varispeed 폴백, AAC priming/preroll edit list 보정(기존 결함) + 보정 실패 강등 안내. [감사](evaluations/2026-09-06-pitch-speed-audit.md), [결정](decisions/2026-09-06-pitch-preserving-speed.md). 10분 내보내기 14.75→3.11초. 남은 후순위: 상관 서브샘플링·30초 경계 위상 지표·worker 재사용·측정 분리·detachAudio volume 키프레임(B'3) |
 
+| B'3 오디오 미터·버스 | Codex 구현 · Claude 감독·리뷰 | 구현·전체 gate 완료, 코디네이터 리뷰 대기 | `codex/b3-audio-bus` · [감사](evaluations/2026-09-07-audio-bus-audit.md), [모델 결정](decisions/2026-09-07-audio-bus-model.md). 선택 모델·CRDT/JSON 저장, 공용 라우팅·스테레오 팬, 실측 peak/RMS/3초 LUFS, 버스·마스터 UI·정밀 undo, export 근사 true peak·과부하 안내. PCM 최대 오차 1.49e-8, 8트랙 미터 처리 최대 0.10ms, 전체 E2E 59 PASS. 승인된 피치 테스트 mock 2개 보완 후 full gate 9/9 PASS, 단위 847·E2E 59 PASS |
+
 ### C3 구현 메모 (2026-09-06)
 
 기록이 켜진 뒤 생성되고 가져오기에 도달한 프로젝트만 첫 완성률 분모로 센다. baseline과 보관 상한 때문에 시작이 사라진 기록은 별도로 표시한다. 자산·클립 각 1개 이상인 실제 다운로드 성공이 완성이며 최초 사용자나 도움 여부를 추론하지 않는다. 재연결·스냅샷·재시도는 명시적 결과와 C2 안내 표시 여부를 기록하고, 기준 브랜치에 없는 저장 충돌 해결 UI는 0으로 표시한다. 원래 프로젝트 ID도 SHA-256으로 치환한다. 네트워크 전송·SDK는 없고 i18n은 끝에만 추가했다. B'2 오디오/속도 파일은 변경하지 않았다.
@@ -558,3 +560,12 @@ edit list·오디오 길이/onset/tail 회귀 검증이 있었으며, 오디오 
 [최종 gate](evaluations/2026-09-06-pitch-speed-round2-gate.md) **9/9 PASS**,
 단위 **823**(core 135·web 605·desktop 72·scripts 11), Chromium E2E **57**.
 AAC 길이 1.00133s·onset 0.25154s, 미리보기 첫 소리 69.89ms·DSP 121.92ms.
+
+
+### 2026-09-07 B′3 — audio meters and routing
+
+기준 `origin/main 1c3c0e4` 확인 후 현재 checkout만 `codex/b3-audio-bus`로 변경했다. 기본값은 기존 중앙 stereo/mono 음량을 보존하며, mono를 stereo로 복제한 후 Web Audio stereo 등전력 crossfeed 팬을 적용한다. gain −60…+12 dB, 한 단계 버스·mute·마스터, 삭제된 버스는 마스터로 폴백한다. 기존 export limiter와 정규화는 유지하고 limiter 전 과부하와 정규화 뒤 clipping/근사 true peak를 분리 표시한다.
+
+코디네이터가 팬 법칙과 피치 테스트 2개 수정 예외를 승인했다. `createStereoPanner`·`disconnect`와 Node 테스트의 rAF stub만 보완하여 실제 믹서 그래프를 유지했고 기존 relink/job 취소 검증은 그대로다. 대체 graph mock patch는 사용·커밋하지 않았다. 포트 32119와 동시 gate 부재를 확인한 뒤 [full `pnpm gate`](evaluations/2026-09-07-audio-bus-gate.md) **9/9 PASS**, 단위 **847**(core 143·web 621·desktop 72·scripts 11), Chromium E2E **59/59 PASS**를 확인했다. 모델·저장·미리보기·export·UI·검증 자료는 통합 오디오 버스 기능 커밋으로 묶으며, main 통합·push는 수행하지 않는다.
+
+1,000자산 기준 비교: 가져오기 7451→7392ms, grid-ready p95 373→375ms, reload heap 111.2→107.3MB, DOM 16개·JSON 244659 bytes 유지. 원본 비교는 임시 git archive와 별도 서버를 사용했으며 다른 worktree/사용자 드라이브는 변경하지 않았다. 측정 범위·남은 미리보기/export 효과 차이·단일 LWW 프로젝트 audio 설정의 동시 편집 한계는 감사/결정 문서에 기록했다.

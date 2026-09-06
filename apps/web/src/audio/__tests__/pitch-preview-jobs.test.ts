@@ -24,6 +24,9 @@ it("speed edits abort stale jobs, immediately render the new key and only cache 
     numberOfChannels: 2,
     getChannelData: () => new Float32Array(48000),
   };
+  // Meter publication is unrelated to decode/job invalidation in this Node test.
+  vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
+  vi.stubGlobal("cancelAnimationFrame", vi.fn());
   vi.stubGlobal(
     "AudioContext",
     class {
@@ -42,6 +45,9 @@ it("speed edits abort stale jobs, immediately render the new key and only cache 
           connect() {},
           disconnect() {},
         };
+      }
+      createStereoPanner() {
+        return { pan: { value: 0 }, connect() {}, disconnect() {} };
       }
       createBufferSource() {
         return {

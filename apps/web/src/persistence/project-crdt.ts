@@ -58,6 +58,8 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
 
   const write = (project: Project): void => {
     setJsonValue(metaMap, META_SCHEMA, PROJECT_CRDT_SCHEMA_VERSION);
+    if (project.audio) setJsonValue(metaMap, "audio", project.audio);
+    else metaMap.delete("audio");
     setJsonValue(metaMap, "name", project.name);
     setJsonValue(metaMap, "createdAt", project.createdAt);
     setJsonValue(metaMap, "framerate", project.framerate);
@@ -152,6 +154,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       framerate,
       resolution: resolution as Project["resolution"],
       mediaLibrary,
+      ...(metaMap.has("audio") ? { audio: metaMap.get("audio") } : {}),
       ...(collections.length > 0 ? { collections } : {}),
       timeline: {
         tracks,

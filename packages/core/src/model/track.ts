@@ -3,7 +3,14 @@ import type { Clip } from "./clip";
 
 export type TrackKind = "video" | "audio" | "text" | "overlay";
 
+export interface TrackAudio {
+  readonly gainDb?: number;
+  readonly pan?: number;
+  readonly busId?: string;
+}
+
 export interface Track {
+  readonly audio?: TrackAudio;
   readonly id: ID;
   readonly kind: TrackKind;
   readonly name: string;

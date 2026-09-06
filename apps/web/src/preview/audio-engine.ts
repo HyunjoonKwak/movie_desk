@@ -1,3 +1,4 @@
+import { MixerAudioGraph, loadMeterWorklet } from "@/mixer/audio-graph";
 import {
   PitchCache,
   pitchCacheKey,
@@ -34,6 +35,8 @@ class AudioEngine {
   private readonly pitchFailed = new Set<string>();
   private readonly fades = new Map<AudioBufferSourceNode, GainNode>();
   private ctx: AudioContext | null = null;
+  private graph: MixerAudioGraph | null = null;
+  private readonly clipTracks = new Map<string, string>();
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly pendingBuffers = new Map<string, Promise<AudioBuffer | null>>();
   private active: AudioBufferSourceNode[] = [];
@@ -101,7 +104,11 @@ class AudioEngine {
     const ctx = this.getCtx();
     this.retain(new Set(project.mediaLibrary.map((asset) => asset.id)));
     await ctx.resume();
+    const metering = await loadMeterWorklet(ctx);
     if (generation !== this.generation) return;
+    this.graph = new MixerAudioGraph(ctx, metering);
+    const current = useProjectStore.getState().project;
+    this.graph.update(current.id === project.id ? current : project);
 
     const elapsedMs = performance.now() - requestedAt;
     const effectiveFromMs = Math.max(0, fromMs + elapsedMs * rate);
@@ -122,7 +129,14 @@ class AudioEngine {
     this.queueRefill(project, rate, generation);
   }
 
+  updateRouting(project: Project): void {
+    this.graph?.update(project);
+  }
+
   stop(): void {
+    this.graph?.dispose();
+    this.graph = null;
+    this.clipTracks.clear();
     for (const [id, job] of this.pitchJobs) {
       job.controller.abort();
       setPitchState(id, job.stateKey);
@@ -223,6 +237,7 @@ class AudioEngine {
         const asset = project.mediaLibrary.find((candidate) => candidate.id === clip.assetId);
         if (!asset || (asset.kind !== "audio" && asset.kind !== "video")) continue;
         const entry = clipsByAsset.get(asset.id) ?? { asset, clips: [] };
+        this.clipTracks.set(clip.id, track.id);
         entry.clips.push(clip);
         clipsByAsset.set(asset.id, entry);
       }
@@ -414,7 +429,8 @@ class AudioEngine {
       fade.gain.linearRampToValueAtTime(1, when + 0.02);
     }
     source.connect(gain).connect(fade);
-    fade.connect(ctx.destination);
+    const trackId = this.clipTracks.get(clip.id);
+    fade.connect(this.graph && trackId ? this.graph.input(trackId) : ctx.destination);
     this.fades.set(source, fade);
     try {
       source.start(

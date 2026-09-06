@@ -20,6 +20,7 @@ export interface MixerWorkerResponse {
   readonly requestId?: number;
   readonly channels: StereoChannels;
   readonly finalDuckGain: number;
+  readonly limitedSamples: number;
 }
 
 const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
@@ -52,7 +53,9 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
   // Limit each stereo sample with one shared gain. Unlike normalizing against
   // the peak of an entire chunk, this produces identical output regardless of
   // where streaming chunk boundaries happen to fall.
+  let limitedSamples = 0;
   for (let i = 0; i < totalSamples; i++) {
+    limitedSamples += Number(Math.abs(accum[0][i]!) > 1) + Number(Math.abs(accum[1][i]!) > 1);
     const peak = Math.max(Math.abs(accum[0][i]!), Math.abs(accum[1][i]!));
     if (peak > 1) {
       const gain = 1 / peak;
@@ -60,7 +63,7 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
       accum[1][i]! *= gain;
     }
   }
-  return { channels: accum, finalDuckGain };
+  return { channels: accum, finalDuckGain, limitedSamples };
 };
 
 // Worker entry. Guarded to a REAL worker scope: `"onmessage" in self` is also

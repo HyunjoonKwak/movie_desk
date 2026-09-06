@@ -1,4 +1,6 @@
 "use client";
+
+import { editMixer, type MixerEdit } from "@movie-desk/core";
 import { precisionSession, resumePrecision } from "./precision-session";
 import { reloadSpan } from "@/lib/reload-metrics";
 
@@ -101,6 +103,8 @@ interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
   // 사용 구간 지정 — undefined 전달 시 구간 해제(전체 사용).
   setAssetUseRange: (assetId: ID, range: { inMs: Ms; outMs: Ms } | undefined) => void;
   dropInlinePreviews: (assetIds: readonly ID[]) => void;
+  updateMixer: (edit: MixerEdit) => void;
+  previewMixer: (edit: MixerEdit) => void;
   addNewTrack: (kind: TrackKind) => void;
   addTextClipAtPlayhead: (text?: string) => void;
   addShapeClipAtPlayhead: (shape: ShapeKind) => void;
@@ -316,6 +320,8 @@ export const useProjectStore = create<ProjectStoreState>()(
     ...createMusicActions(set),
     ...createPlaceAssetActions(set),
     ...createTrackActions(set),
+    updateMixer: (edit) => runWith(set, "Adjust audio mixer", (p) => editMixer(p, edit)),
+    previewMixer: (edit) => set((s) => ({ project: editMixer(s.project, edit) })),
     ...createMarkerActions(set),
     ...createKeyframeActions(set),
     ...createEffectActions(set),
@@ -613,9 +619,9 @@ export const useProjectStore = create<ProjectStoreState>()(
       }),
 
     setPreservePitch: (clipId, enabled) =>
-      runWith(set, "Preserve pitch", (p) => updateClip(p, clipId, (c) =>
-        c.kind === "media" ? { ...c, preservePitch: enabled } : c,
-      )),
+      runWith(set, "Preserve pitch", (p) =>
+        updateClip(p, clipId, (c) => (c.kind === "media" ? { ...c, preservePitch: enabled } : c)),
+      ),
     setClipSpeed: (clipId, speed) =>
       runWith(set, "Set speed", (p) =>
         updateClip(p, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) })),

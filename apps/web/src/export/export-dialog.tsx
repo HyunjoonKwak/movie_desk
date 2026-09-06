@@ -52,6 +52,9 @@ const formatSize = (megabytes: number): string => {
 };
 
 interface ExportedFile {
+  readonly audioPeaks?: import("@movie-desk/core").AudioPeakResult & {
+    readonly limitedSamples: number;
+  };
   readonly pitchFallback?: boolean;
   readonly aacCorrectionFallback?: boolean;
   readonly name: string;
@@ -131,6 +134,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
           name: result.suggestedName,
           preset: label,
           destination,
+          ...(result.audioPeaks ? { audioPeaks: result.audioPeaks } : {}),
           pitchFallback: result.pitchFallback === true,
           aacCorrectionFallback: result.aacCorrectionFallback === true,
         });
@@ -257,6 +261,28 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                   >
                     <div className="font-medium text-ink-1">{file.name}</div>
                     <div className="text-ink-3">{file.preset}</div>
+                    {file.audioPeaks && (
+                      <StateHint
+                        tone={
+                          file.audioPeaks.truePeak > 1 || file.audioPeaks.limitedSamples > 0
+                            ? "warning"
+                            : "info"
+                        }
+                        text={t("mixer.exportPeaks", {
+                          peak:
+                            file.audioPeaks.truePeak > 0
+                              ? (20 * Math.log10(file.audioPeaks.truePeak)).toFixed(1)
+                              : "−∞",
+                          count: file.audioPeaks.clippedSamples,
+                        })}
+                      />
+                    )}
+                    {file.audioPeaks && file.audioPeaks.limitedSamples > 0 && (
+                      <StateHint
+                        tone="warning"
+                        text={t("mixer.limited", { count: file.audioPeaks.limitedSamples })}
+                      />
+                    )}
                     {file.pitchFallback && (
                       <StateHint tone="info" text={t("export.pitchFallback")} />
                     )}
