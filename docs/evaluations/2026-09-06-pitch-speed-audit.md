@@ -444,3 +444,19 @@ boundary and fail this regression.
 
 Validation: [round-2 gate](2026-09-07-pitch-speed-followups-round2-gate.md).
 Raw paired benchmark results: [round-2 measurements](2026-09-07-pitch-speed-followups-round2-measurements.json).
+
+
+### Round 3 integration note (2026-09-07)
+
+Rebased onto B′3-integrated `origin/main 5bb97f5737fa9daf72e95810f0be691a43381df4`.
+Resolved conflicts in `docs/07-work-order.md`, `packages/core/src/index.ts`, and
+`apps/web/src/export/audio-mixer.ts`, retaining both work-order histories, audio
+and audio-routing exports, and routing/scratch logic alongside explicit pitch
+checkpoints. Removed the padded-boundary debug log and documented the ±8
+refinement buffer guard invariant.
+
+`disposePitchWorkers()` remains an explicit teardown hook: preview and export
+share this application-lifetime pool, so unmounting an editor or export dialog
+must not tear down another owner’s workers. Browser document shutdown releases
+workers; wiring a component-level disposer requires shared ownership tracking.
+No production component teardown hook was added in this integration cleanup.

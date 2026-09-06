@@ -44,7 +44,8 @@ export interface StretchResult {
 
 // Pure worker-side DSP. All channels share the alignment selected on channel 0
 // (or the highest-energy channel), preserving stereo phase relationships.
-// 20ms windows / 10ms hops, bounded ±5ms search: O(output samples).
+// 20ms windows / 10ms hops; alignment is bounded to ±(search + 8) output
+// samples (5ms coarse radius plus 8 refinement samples): O(output samples).
 export const renderClipAudio = (req: StretchRequest): StretchResult => {
   const { channels, sourceSampleRate: srcRate, outputSampleRate: sr, clip } = req;
   const length = Math.max(0, Math.floor(req.outputSamples));
@@ -100,6 +101,8 @@ export const renderClipAudio = (req: StretchRequest): StretchResult => {
   const checkpointHop = Math.max(0, Math.floor(nextStartSample / hop) - 1) * hop;
   let continuation: StretchContinuation | undefined;
   const tail = new Float32Array(hop);
+  // Eight guard samples on each side cover coarse ±search plus ±8 refinement.
+  // With index offset search + 8, the last hop read is at most length - 1.
   const candidates = new Float32Array(hop + 2 * search + 16);
   const energyPrefix = new Float64Array(candidates.length + 1);
   const tailD = new Float64Array(Math.floor(hop / 8));

@@ -203,7 +203,6 @@ it.each([0.5, 1.37, 2])(
     const repeat = [];
     for await (const chunk of mixer.chunks()) repeat.push(chunk);
     expect(repeat[1]!.channels[0]).toEqual(chunks[1]!.channels[0]);
-    console.info("B2 padded boundary", { speed, jump });
     mixer.dispose();
   },
   20000,

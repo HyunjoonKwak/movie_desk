@@ -625,3 +625,20 @@ fallback 없음으로 +15% 이내 목표를 충족했다.
 [감사 문서](evaluations/2026-09-06-pitch-speed-audit.md)의 round 2 절과
 [측정 원본](evaluations/2026-09-07-pitch-speed-followups-round2-measurements.json) 참조.
 공유 파일은 허용된 `export/audio-mixer.ts` 청크 상태 전달 부분만 수정했다.
+
+
+### B′2 후속 3라운드 — B′3 통합 기준 rebase (2026-09-07)
+
+`origin/main 5bb97f5737fa9daf72e95810f0be691a43381df4` 위로 rebase했다.
+`bbd6f1f`→`3d4b60f`, `87999ed`→`28e898a`로 재작성됐으며 충돌 파일은
+`docs/07-work-order.md`, `packages/core/src/index.ts`, `apps/web/src/export/audio-mixer.ts`
+세 개다. B′3 메모 전체, audio-routing과 audio barrel export, 라우팅·scratch와
+명시적 피치 체크포인트를 모두 보존했다. i18n 변경·충돌은 없었다.
+
+`pitch-mixer.test.ts` 디버그 console.info를 제거했다. DSP 후보 버퍼의 양쪽
+8샘플 guard와 실제 ±(search+8) 탐색 범위를 주석으로 정정했고, 공유 Worker 풀의
+dispose를 component unmount에 연결하지 않는 이유를 감사 문서에 기록했다.
+관련 pitch-mixer/audio-routing 테스트 **10/10 PASS**.
+[rebase 후 전체 gate](evaluations/2026-09-07-pitch-speed-followups-round3-gate.md)
+**9/9 PASS**, 단위 **875**(core153·web639·desktop72·scripts11), Chromium E2E
+**60/60 PASS**. gate 전후 `lsof -ti :32119`로 비점유를 확인했다.
