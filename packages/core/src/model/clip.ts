@@ -121,6 +121,7 @@ export type SpatialFit = "stretch" | "fill" | "fit";
 
 export interface MediaClip extends ClipBase {
   readonly kind: "media";
+  readonly preservePitch?: boolean; // opt-in; missing retains legacy varispeed
   readonly assetId: ID;
   readonly trimIn: Ms;         // offset within source asset
   readonly trimOut: Ms;        // end offset within source asset (exclusive)

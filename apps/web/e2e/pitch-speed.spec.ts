@@ -1,0 +1,168 @@
+import { ALL_FORMATS, BufferSource, Input } from "mediabunny";
+import { expect, test } from "@playwright/test";
+import { configurePage, importMediaFiles, mediaCard } from "./support";
+
+const wav = (seconds: number): Buffer => {
+  const frames = seconds * 48000;
+  const out = Buffer.alloc(44 + frames * 4);
+  out.write("RIFF");
+  out.writeUInt32LE(out.length - 8, 4);
+  out.write("WAVEfmt ", 8);
+  out.writeUInt32LE(16, 16);
+  out.writeUInt16LE(1, 20);
+  out.writeUInt16LE(2, 22);
+  out.writeUInt32LE(48000, 24);
+  out.writeUInt32LE(192000, 28);
+  out.writeUInt16LE(4, 32);
+  out.writeUInt16LE(16, 34);
+  out.write("data", 36);
+  out.writeUInt32LE(frames * 4, 40);
+  for (let i = 0; i < frames; i++) {
+    const sample = Math.round(Math.sin((2 * Math.PI * 440 * i) / 48000) * 12000);
+    out.writeInt16LE(sample, 44 + i * 4);
+    out.writeInt16LE(-sample, 46 + i * 4);
+  }
+  return out;
+};
+
+const seedAudio = async (page: import("@playwright/test").Page, seconds: number) => {
+  await configurePage(page);
+  await page.goto("/editor");
+  await importMediaFiles(page, { name: "tone.wav", mimeType: "audio/wav", buffer: wav(seconds) });
+  await expect(mediaCard(page, "tone.wav")).toBeVisible();
+  await page.waitForTimeout(500);
+  if ((await page.locator("[data-clip]").count()) === 0) {
+    await mediaCard(page, "tone.wav").click();
+    await page.keyboard.press("e");
+  }
+  await page.waitForTimeout(500);
+  while ((await page.locator("[data-clip]").count()) > 1) {
+    await page.locator("[data-clip]").last().click();
+    await page.keyboard.press("Delete");
+  }
+  await page.locator("[data-clip]").first().click();
+  const toggle = page.getByRole("checkbox", { name: "Preserve pitch" });
+  if (!(await toggle.isVisible()))
+    await page.getByRole("button", { name: "Speed", exact: true }).click();
+  return toggle;
+};
+
+test("pitch toggle is one undo and exported duration matches the timeline", async ({ page }) => {
+  test.setTimeout(180000);
+  const toggle = await seedAudio(page, 2);
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await expect(toggle).toBeChecked();
+  await page.getByRole("button", { name: "Undo (Cmd+Z)" }).click();
+  await expect(toggle).not.toBeChecked();
+  await toggle.check();
+  await page.getByRole("button", { name: "2x", exact: true }).click();
+  const duration = page.getByRole("spinbutton", { name: "Duration", exact: true });
+  await duration.fill("00:00:01:00");
+  await duration.press("Enter");
+  await page.getByRole("button", { name: "Export", exact: true }).first().click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Family message 720p").uncheck();
+  await dialog.getByLabel("Web (VP9 · MP4)").check();
+  const download = page.waitForEvent("download", { timeout: 150000 });
+  await dialog.getByRole("button", { name: "Export", exact: true }).click();
+  const file = await download;
+  const filePath = (await file.path())!;
+  const bytes = await import("node:fs/promises").then((fs) => fs.readFile(filePath));
+  const input = new Input({ source: new BufferSource(bytes), formats: ALL_FORMATS });
+  const video = (await input.getPrimaryVideoTrack())!;
+  const durationSec = await video.computeDuration();
+  input.dispose();
+  expect(Math.abs(durationSec - 1)).toBeLessThanOrEqual(1 / 30);
+});
+
+test("60s stereo preview starts immediately and renders pitch in a worker", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => {
+    const stats = {
+      requestedAt: 0,
+      firstSoundMs: 0,
+      workerMs: 0,
+      dspMs: 0,
+      longestTaskMs: 0,
+      pitchMainSliceMs: 0,
+    };
+    Object.assign(window, { pitchStats: stats });
+    const start = AudioBufferSourceNode.prototype.start;
+    AudioBufferSourceNode.prototype.start = function (...args: Parameters<typeof start>) {
+      if (stats.requestedAt && !stats.firstSoundMs)
+        stats.firstSoundMs = performance.now() - stats.requestedAt;
+      return start.apply(this, args);
+    };
+    const NativeWorker = window.Worker;
+    window.Worker = class extends NativeWorker {
+      constructor(url: string | URL, options?: WorkerOptions) {
+        super(url, options);
+        const started = performance.now();
+        this.addEventListener("message", (event) => {
+          if (event.data.channels && event.data.dspMs !== undefined) {
+            stats.workerMs = performance.now() - started;
+            stats.dspMs = event.data.dspMs;
+          }
+        });
+      }
+    };
+    new PerformanceObserver((list) => {
+      if (stats.requestedAt)
+        for (const entry of list.getEntries())
+          if (entry.startTime >= stats.requestedAt)
+            stats.longestTaskMs = Math.max(stats.longestTaskMs, entry.duration);
+    }).observe({ type: "longtask", buffered: false });
+    new PerformanceObserver((list) => {
+      for (const entry of list.getEntries())
+        if (entry.name === "pitch-main-slice")
+          stats.pitchMainSliceMs = Math.max(stats.pitchMainSliceMs, entry.duration);
+    }).observe({ type: "measure", buffered: false });
+  });
+  const toggle = await seedAudio(page, 60);
+  await page.getByRole("button", { name: "2x", exact: true }).click();
+  const duration = page.getByRole("spinbutton", { name: "Duration", exact: true });
+  await duration.fill("00:00:30:00");
+  await duration.press("Enter");
+  await toggle.check();
+  await page.evaluate(() => {
+    (window as unknown as { pitchStats: { requestedAt: number } }).pitchStats.requestedAt =
+      performance.now();
+  });
+  await page.getByRole("button", { name: "Play", exact: true }).click();
+  await expect
+    .poll(
+      () =>
+        page.evaluate(
+          () => (window as unknown as { pitchStats: { workerMs: number } }).pitchStats.workerMs,
+        ),
+      { timeout: 30000 },
+    )
+    .toBeGreaterThan(0);
+  const stats = await page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          pitchStats: {
+            firstSoundMs: number;
+            workerMs: number;
+            dspMs: number;
+            longestTaskMs: number;
+            pitchMainSliceMs: number;
+          };
+        }
+      ).pitchStats,
+  );
+  // biome-ignore lint/suspicious/noConsole: reproducible performance evidence for the B2 audit.
+  console.log("B2 pitch benchmark", stats);
+  await testInfo.attach("pitch-benchmark", {
+    body: JSON.stringify(stats),
+    contentType: "application/json",
+  });
+  expect(stats.firstSoundMs).toBeGreaterThan(0);
+  expect(stats.firstSoundMs).toBeLessThanOrEqual(500);
+  expect(stats.dspMs).toBeLessThanOrEqual(2000);
+  expect(stats.pitchMainSliceMs).toBeLessThanOrEqual(16);
+});

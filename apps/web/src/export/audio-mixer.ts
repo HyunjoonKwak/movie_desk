@@ -1,3 +1,4 @@
+import { renderPitchInWorker } from "@/audio/pitch-renderer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import {
@@ -31,7 +32,7 @@ export const resampleClipAudio = (
   );
 };
 
-const resampleClipAudioRange = (
+export const resampleClipAudioRange = (
   source: Float32Array,
   sourceSampleRate: number,
   outputSampleRate: number,
@@ -46,7 +47,10 @@ const resampleClipAudioRange = (
 
   for (let i = 0; i < output.length; i++) {
     const sourceIndex = Math.floor(sourceCursor);
-    if (sourceIndex >= 0 && sourceIndex < source.length) output[i] = source[sourceIndex] ?? 0;
+    if (sourceIndex >= 0 && sourceIndex < source.length) {
+      const a = source[sourceIndex] ?? 0;
+      output[i] = a + ((source[sourceIndex + 1] ?? a) - a) * (sourceCursor - sourceIndex);
+    }
 
     const relMs = clipOffsetMs + (i / outputSampleRate) * 1000;
     const instantaneousRate = speedTrack
@@ -321,17 +325,18 @@ export class ProjectAudioMixer {
         const outputSamples = processEnd - processStart;
         const clipOffsetMs = ((processStart - clipStartSample) / this.sampleRate) * 1000;
         const [leftSource, rightSource] = decodedStereoChannels(decoded);
+        const rendered = clip.preservePitch === true && clip.speed > 0
+          ? await renderPitchInWorker({
+              channels: [leftSource, rightSource], sourceSampleRate: decoded.sampleRate,
+              outputSampleRate: this.sampleRate, clip, offsetMs: clipOffsetMs, outputSamples,
+            }, options.signal)
+          : [leftSource, rightSource].map((source) => resampleClipAudioRange(
+              source, decoded.sampleRate, this.sampleRate, clip, clipOffsetMs, outputSamples,
+            ));
         const processed = await Promise.all(
-          [leftSource, rightSource].map((source) =>
+          rendered.map((source) =>
             applyAudioEffects(
-              resampleClipAudioRange(
-                source,
-                decoded.sampleRate,
-                this.sampleRate,
-                clip,
-                clipOffsetMs,
-                outputSamples,
-              ),
+              source,
               clip.effects,
               this.sampleRate,
               clipOffsetMs,

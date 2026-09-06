@@ -2,8 +2,9 @@
 
 import { Diamond, Gauge, Snowflake } from "lucide-react";
 import type { Clip, ID } from "@movie-desk/core";
-import { hasSpeedRamp, isMediaClip } from "@movie-desk/core";
+import { hasSpeedRamp, isMediaClip, pitchHasUnsupportedRange } from "@movie-desk/core";
 import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { StateHint } from "@/components/state-hint";
 import { InspectorSection } from "@/components/inspector-section";
 import { PrecisionInput } from "@/components/precision-input";
 import { PrecisionSlider } from "@/components/precision-slider";
@@ -17,6 +18,7 @@ interface Props {
 const PRESETS = [0.25, 0.5, 1, 1.5, 2, 4];
 
 export function SpeedSection({ clipId, clip }: Props) {
+  const setPreservePitch = useProjectStore((s) => s.setPreservePitch);
   const previewSpeed = useProjectStore((s) => s.previewClipSpeed);
   const setClipSpeed = useProjectStore((s) => s.setClipSpeed);
   const addKeyframe = useProjectStore((s) => s.addKeyframe);
@@ -105,6 +107,19 @@ export function SpeedSection({ clipId, clip }: Props) {
           </button>
         ))}
       </div>
+      {isMediaClip(clip) && (
+        <>
+          <label className="flex items-center gap-2 text-2xs text-ink-3">
+            <input type="checkbox" checked={clip.preservePitch === true}
+              onChange={(event) => setPreservePitch(clipId, event.target.checked)} />
+            {t("speed.preservePitch")}
+          </label>
+          {clip.preservePitch && <StateHint
+            text={t(pitchHasUnsupportedRange(clip) ? "speed.pitchUnsupported" : "speed.pitchRendering")}
+            tone={pitchHasUnsupportedRange(clip) ? "warning" : "info"}
+            testId="pitch-state-hint" />}
+        </>
+      )}
       <div className="pt-1">
         <div className="mb-1 text-3xs uppercase tracking-wide text-ink-3">{t("speed.ramp")}</div>
         <div className="flex flex-wrap gap-1">

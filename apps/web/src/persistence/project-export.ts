@@ -56,6 +56,7 @@ const clipSchema = z.discriminatedUnion("kind", [
       ...clipBase,
       kind: z.literal("media"),
       assetId: z.string().min(1),
+      preservePitch: z.boolean().optional(),
       trimIn: nonNegative,
       trimOut: nonNegative,
     })

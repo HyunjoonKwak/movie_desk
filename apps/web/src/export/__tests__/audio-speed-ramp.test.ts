@@ -35,6 +35,6 @@ describe("resampleClipAudio", () => {
       [0, 1],
       [4, 4],
     ]);
-    expect([...resampleClipAudio(source, 1000, 1000, ramped)]).toEqual([0, 1, 2, 5]);
+    expect([...resampleClipAudio(source, 1000, 1000, ramped)]).toEqual([0, 1, 2.75, 5.25]);
   });
 });

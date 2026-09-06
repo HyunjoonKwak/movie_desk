@@ -212,6 +212,7 @@ interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
     bezier?: BezierHandles,
   ) => void;
   setClipSpeed: (clipId: ID, speed: number) => void;
+  setPreservePitch: (clipId: ID, enabled: boolean) => void;
   setClipVolume: (clipId: ID, volume: number) => void;
   setClipFit: (clipId: ID, fit: SpatialFit) => void;
   addEffect: (clipId: ID, type: string) => void;
@@ -611,6 +612,10 @@ export const useProjectStore = create<ProjectStoreState>()(
         };
       }),
 
+    setPreservePitch: (clipId, enabled) =>
+      runWith(set, "Preserve pitch", (p) => updateClip(p, clipId, (c) =>
+        c.kind === "media" ? { ...c, preservePitch: enabled } : c,
+      )),
     setClipSpeed: (clipId, speed) =>
       runWith(set, "Set speed", (p) =>
         updateClip(p, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) })),

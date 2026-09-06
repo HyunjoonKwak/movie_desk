@@ -1,3 +1,4 @@
+import { PitchCache, pitchCacheKey, pitchMainSlice, renderPitchInWorker } from "@/audio/pitch-renderer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
 import { hasSpeedRamp, isMediaClip, sampleKeyframeTrack, sourceOffsetForRamp } from "@movie-desk/core";
@@ -11,6 +12,9 @@ class AudioEngine {
   private static readonly MAX_CACHED_BUFFERS = 2;
   private static readonly INITIAL_LOOKAHEAD_MS = 30_000;
   private static readonly REFILL_MS = 15_000;
+  private readonly pitchCache = new PitchCache<AudioBuffer>();
+  private readonly pitchRevisions = new Map<string, number>();
+  private pitchPending = false;
   private ctx: AudioContext | null = null;
   private readonly buffers = new Map<string, AudioBuffer>();
   private readonly pendingBuffers = new Map<string, Promise<AudioBuffer | null>>();
@@ -123,12 +127,15 @@ class AudioEngine {
   }
 
   forget(assetId: string): void {
+    this.pitchCache.forget(assetId);
+    this.pitchRevisions.set(assetId, (this.pitchRevisions.get(assetId) ?? 0) + 1);
     this.buffers.delete(assetId);
   }
 
   retain(assetIds: ReadonlySet<string>): void {
+    this.pitchCache.retain(assetIds);
     for (const assetId of this.buffers.keys()) {
-      if (!assetIds.has(assetId)) this.buffers.delete(assetId);
+      if (!assetIds.has(assetId)) this.forget(assetId);
     }
   }
 
@@ -179,8 +186,40 @@ class AudioEngine {
       if (!buffer || generation !== this.generation) continue;
       for (const clip of clips) {
         if (!isMediaClip(clip)) continue;
-        this.scheduleClip(buffer, clip, rangeStartMs, rangeEndMs, rate, generation);
+        const key = pitchCacheKey(clip, buffer.sampleRate, this.pitchRevisions.get(asset.id) ?? 0);
+        const pitched = clip.preservePitch ? this.pitchCache.get(key) : undefined;
+        this.scheduleClip(pitched ?? buffer, clip, rangeStartMs, rangeEndMs, rate, generation, !!pitched);
+        if (clip.preservePitch && !pitched && !this.pitchPending) void this.preparePitch(buffer, clip, key);
       }
+    }
+  }
+
+  private async preparePitch(buffer: AudioBuffer, clip: MediaClip, key: string): Promise<void> {
+    const outputSamples = Math.floor(clip.duration * buffer.sampleRate / 1000);
+    const bytes = outputSamples * buffer.numberOfChannels * 4;
+    // Admission bounds retained output and in-flight source copies separately.
+    if (bytes > this.pitchCache.limit || buffer.length * buffer.numberOfChannels * 4 > this.pitchCache.limit) return;
+    this.pitchPending = true;
+    try {
+      const channels = await renderPitchInWorker({
+        channels: Array.from({ length: buffer.numberOfChannels }, (_, c) => buffer.getChannelData(c)),
+        sourceSampleRate: buffer.sampleRate, outputSampleRate: buffer.sampleRate,
+        clip, offsetMs: 0, outputSamples,
+      });
+      const rendered = pitchMainSlice(() => this.getCtx().createBuffer(channels.length, outputSamples, buffer.sampleRate));
+      for (let c = 0; c < channels.length; c++) {
+        for (let at = 0; at < outputSamples; at += 65536) {
+          pitchMainSlice(() => rendered.copyToChannel(Float32Array.from(channels[c]!.subarray(at, at + 65536)), c, at));
+          if (at % 524288 === 0) await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        }
+      }
+      if (key === pitchCacheKey(clip, buffer.sampleRate, this.pitchRevisions.get(clip.assetId) ?? 0)) {
+        this.pitchCache.set(key, rendered, bytes, clip.assetId);
+      }
+    } catch {
+      // Immediate varispeed remains audible. Never execute expensive DSP inline.
+    } finally {
+      this.pitchPending = false;
     }
   }
 
@@ -191,6 +230,7 @@ class AudioEngine {
     rangeEndMs: number,
     rate: number,
     generation: number,
+    pitched = false,
   ): void {
     const ctx = this.getCtx();
     const timelineNowMs =
@@ -203,12 +243,14 @@ class AudioEngine {
 
     const relativeStartMs = timelineStartMs - clip.start;
     const relativeEndMs = timelineEndMs - clip.start;
-    const sourceStartMs = sourceOffsetForRamp(clip, relativeStartMs);
-    const sourceEndMs = sourceOffsetForRamp(clip, relativeEndMs);
+    const sourceStartMs = pitched ? relativeStartMs : sourceOffsetForRamp(clip, relativeStartMs);
+    const sourceEndMs = pitched ? relativeEndMs : sourceOffsetForRamp(clip, relativeEndMs);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     const when = this.anchorContextTime + (timelineStartMs - this.anchorTimelineMs) / 1000 / rate;
-    if (hasSpeedRamp(clip)) {
+    if (pitched) {
+      source.playbackRate.value = rate;
+    } else if (hasSpeedRamp(clip)) {
       const speedTrack = clip.keyframes.find((track) => track.target === "speed");
       const timelineDurationMs = timelineEndMs - timelineStartMs;
       const curveDurationSec = timelineDurationMs / 1000 / rate;
@@ -249,7 +291,7 @@ class AudioEngine {
     try {
       source.start(
         when,
-        Math.max(0, (clip.trimIn + sourceStartMs) / 1000),
+        Math.max(0, ((pitched ? 0 : clip.trimIn) + sourceStartMs) / 1000),
         Math.max(0, (sourceEndMs - sourceStartMs) / 1000),
       );
     } catch {

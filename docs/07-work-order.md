@@ -504,3 +504,15 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 C3 2라운드 검증 완료: gate 9/9 PASS(core 125·web 571·desktop 72·scripts 11, E2E 55), C3 단위 20개. 새 벤치는 activity 1행을 포함한 전체 15행이며 최초 관찰 start/import 각 1행 생존, 복원 p95 133ms로 150ms 예산 이내다.
 
 C3 3라운드 마지막 정리 완료: 상한 count 초과 시에만 메타데이터 인덱스로 정리, 새 복구 전 이전 pending을 abandoned로 종료, 순수 보관 테스트 9개 복원 및 힌트 없음 “—” 표시; gate 9/9 PASS(core 125·web 583·desktop 72·scripts 11 = 단위 791, C3 32·E2E 55), [검증](evaluations/2026-09-06-c3-round3-gate.md).
+
+### 2026-09-06 B′2 — pitch-preserving speed
+
+| Work | State | Evidence |
+| --- | --- | --- |
+| B′2 own WSOLA, opt-in model/UI, worker export/preview, 128MiB LRU | PASS — pnpm gate (9/9 steps, E2E 56) | `docs/evaluations/2026-09-06-pitch-speed-audit.md`, `docs/decisions/2026-09-06-pitch-preserving-speed.md` |
+
+No new dependency; absent preservePitch and new speed edits retain legacy sound.
+Worker 60s stereo 2×: 116.59ms DSP / 179.94ms first start / 0.29ms new main copy slice.
+Existing native AudioContext cold startup exceeds 16ms; DSP introduces no such stall.
+Separate coordinator-approved **기존 결함 수정** follows: AAC priming/end padding
+currently makes a 1s export 1.066667s despite exact 1s video and mixed PCM.

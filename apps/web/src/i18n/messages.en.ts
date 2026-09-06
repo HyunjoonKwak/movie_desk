@@ -909,4 +909,7 @@ export const en = {
     "funnel.kind.save-conflict": "Save conflict",
     "funnel.kind.import-retry": "Import retry",
     "funnel.retention": "Activity is pruned above 1,000 rows per project / 5,000 total; funnel and recovery events are retained. Times include breaks and do not measure help received.",
+    "speed.preservePitch": "Preserve pitch",
+    "speed.pitchUnsupported": "Pitch preservation applies only to forward speeds from 0.25× to 4×. Other sections use varispeed.",
+    "speed.pitchRendering": "First playback uses varispeed while audio renders; the rendered audio is reused on subsequent playback.",
 } as const;
