@@ -88,3 +88,79 @@ E2E는 해당 미터를 최대 15초 기다린 다음 기존 5초 예산으로 �
 미터 지연 E2E와 기존 첫 소리 지연 E2E, 샘플러(가져오기 전 프레임 기준)도 포함한다.
 실행 종료 후 32119는 비어 있고 `git diff --check`도 통과했다.
 검토는 코디네이터 Claude에 인계하며 RC DMG 수동 검증은 사용자에게 남아 있다.
+
+## 2라운드 — main rebase와 첫 소리 판정 분리
+
+`git fetch origin` 후 `origin/main=c072cd0b4b45fc31ca6e013b3cac5175e1c0e914`
+위로 두 정리 커밋을 rebase했다(`c046a9c`, `d06a77c`). 충돌 파일은 **없음**.
+`git diff origin/main -- docs/NESTED_SEQUENCE_PLAN.md`는 빈 출력이고,
+“2026-09-07 재검증 — 견적이 더 커졌다” 절을 포함한 main의 80줄 추가를
+파일 전체와 함께 그대로 보존했다. docs/07·docs/09의 기존 정리 내용도 유지했다.
+
+공유 CI의 meter-delay 1000ms 변형에서 보고된 실측은 다음과 같다
+(코디네이터 제공 CI 로그 값이며 이 머신에서 재현한 숫자가 아니다).
+
+| 실행 | meterReadyMs | firstSoundMs | workerMs | dspMs |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 1721.5 | 627.7 | 414.5 | 315.3 |
+| 2 | 1946.0 | 899.9 | 415.4 | 271.4 |
+| 3 | 1698.4 | 675.6 | 414.1 | 320.5 |
+
+`pitch-speed.spec.ts`의 판정을 두 층으로 분리했다.
+
+- **제품 예산:** `LOCAL_FIRST_SOUND_PRODUCT_BUDGET_MS=500`은 그대로 유지한다.
+  `CI`가 설정되지 않은 실제 개발/기준 하드웨어에서 `pnpm gate` 또는
+  `pnpm --filter @movie-desk/web exec playwright test e2e/pitch-speed.spec.ts`
+  실행으로 검증한다. 물리적 스피커 onset 대신 기존과 동일하게 Play 요청부터
+  첫 `AudioBufferSourceNode.start` 호출까지 측정한다.
+- **CI 회귀 상한:** `CI_FIRST_SOUND_REGRESSION_CEILING_MS=2000`은 공유 러너에서만
+  적용한다. 관측 최대 899.9ms의 약 2.2배로, decode/context 초기화와 스케줄링
+  편차에 여유를 주되 초 단위의 총체적 악화를 검출하는 상한이다.
+  이것이 CI에서 500ms 제품 예산 충족을 증명한다는 뜻은 아니다.
+  각 benchmark attachment에 환경과 실제 적용 예산도 기록한다.
+- **환경 공통의 제품 성질:** 지연된 meter의 경우 `firstSoundMs < meterReadyMs`,
+  모든 변형에서 `pitchMainSliceMs <= 16`을 그대로 강하게 단언한다.
+  지연 없는 meter는 정상적으로 decode보다 빨리 준비될 수도 있으므로 순서 단언은
+  의도적으로 지연을 주는 1000ms 변형에 적용한다.
+- **pitch 비동기 독립성 추가:** 첫 worker 결과 이벤트 수신 시각을 Play 요청과
+  같은 기준으로 기록해 `firstSoundMs < workerResultMs`를 두 변형 모두 단언한다.
+  계측 listener는 생성자에서 앱 listener보다 먼저 등록되므로, DSP 결과를 받아
+  재생하는 회귀라면 이 순서가 깨진다. 이는 앱이 결과를 기다리지 않는다는 검증이며
+  worker 내부 계산 종료 순간 자체를 측정한 것이라고 주장하지 않는다.
+  기존 `workerMs`와 `dspMs`는 서로 시작점이 다른 기간이어서 첫 소리와 직접
+  대소 비교하지 않는다.
+
+같은 실행의 decode 기준 비용으로 벽시계 예산을 자동 확장하는 방식은 선택하지 않았다.
+추가 decode는 캐시/메모리/워밍업 상태를 바꾸고, 측정 대상의 decode 회귀가 기준값도
+늘려 결함을 숨길 수 있다. 절대 상한은 고정하고 같은 실행의 이벤트 순서로 제품 성질을
+보호하는 쪽이 이 회귀에 직접적이다. retry/skip 설정, 제품 코드, DSP는 변경하지 않았다.
+
+검증 결과: [2라운드 gate](2026-09-07-release-cleanup-round2-gate.md).
+
+첫 전체 gate는 8/9 단계 PASS, E2E 65/66으로 색상 컨텍스트 복구 테스트가 호출한
+`node scripts/color/managed.mjs --verify`에서 `Color target is not renderable`로
+실패했다. 원본 로그 `/tmp/release-cleanup-round2-gate-attempt1.log`와 오류 문맥
+`/tmp/release-cleanup-round2-color-failure.md`를 보존했다. 같은 명령의 단독 실행은
+변경 없이 `Managed color GPU invariants PASS`였으므로 근본 원인을 확정하지 않는다.
+색상 코드/테스트는 수정하지 않았고, 이후 전체 gate를 다시 실행했다.
+
+추가로 `CI=1 pnpm --filter @movie-desk/web exec playwright test
+ e2e/pitch-speed.spec.ts --grep '60s stereo' --retries=0`은 **2/2 PASS**(15.3초)다.
+이는 로컬 하드웨어에서 CI 분기를 검증한 것이며 공유 CI 러너 재현을 주장하지 않는다.
+지연 변형: 첫 소리 67.96ms, worker 결과 218.92ms, meter 준비 1077.63ms,
+최대 pitch slice 0.075ms. 로그: `/tmp/release-cleanup-round2-pitch-ci.log`.
+모든 32119 서버 실행 전에 `lsof -nP -iTCP:32119 -sTCP:LISTEN`으로 빈 포트를 확인했다.
+
+최종 전체 `pnpm gate`는 **9/9 PASS**, 단위 테스트 **949**
+(core155/web711/desktop72/scripts11), Chromium **66/66 PASS**, retry **0**,
+E2E 단계 **183.2초**, OSV **167** 패키지 취약점 **0**건이다.
+최종 로그는 `/tmp/release-cleanup-round2-gate.log`이며 종료 후 32119는 비어 있다.
+
+| 최종 로컬 gate 변형 | firstSoundMs | workerResultMs | meterReadyMs | pitchMainSliceMs |
+| --- | ---: | ---: | ---: | ---: |
+| meter delay 0ms | 81.90 | 234.66 | 95.51 | 1.05 |
+| meter delay 1000ms | 124.09 | 287.70 | 1128.00 | 0.12 |
+
+`git diff --check` PASS. rebase 후 계획 문서의 Git blob은 `origin/main`과 동일하다.
+이번 검증은 로컬에서 완료했으며 push·main merge는 하지 않았다.
+공유 러너의 실제 CI 결과 확인과 최초 색상 GPU 간헐 실패의 원인 조사는 남아 있다.
