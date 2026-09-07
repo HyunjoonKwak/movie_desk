@@ -9,9 +9,15 @@ const { chromium } = require("@playwright/test");
 const { build } = createRequire(createRequire(require.resolve("vitest")).resolve("vite"))(
   "esbuild",
 );
-const before = execFileSync("git", ["show", "1481e25:apps/web/src/persistence/project-crdt.ts"], {
-  encoding: "utf8",
-});
+const baselineHash = process.argv[3] ?? "40e1c6d";
+const baselineFiles = new Map(
+  ["project-crdt", "timeline-crdt", "project-export"].map((name) => [
+    name,
+    execFileSync("git", ["show", `${baselineHash}:apps/web/src/persistence/${name}.ts`], {
+      encoding: "utf8",
+    }),
+  ]),
+);
 const bundles = [];
 for (const baseline of [true, false]) {
   const result = await build({
@@ -37,11 +43,14 @@ for (const baseline of [true, false]) {
           {
             name: "baseline",
             setup(plugin) {
-              plugin.onLoad({ filter: /\/project-crdt\.ts$/ }, () => ({
-                contents: before,
-                loader: "ts",
-                resolveDir: resolve("apps/web/src/persistence"),
-              }));
+              plugin.onLoad(
+                { filter: /\/(project-crdt|timeline-crdt|project-export)\.ts$/ },
+                (args) => ({
+                  contents: baselineFiles.get(args.path.split("/").at(-1).replace(".ts", "")),
+                  loader: "ts",
+                  resolveDir: resolve("apps/web/src/persistence"),
+                }),
+              );
             },
           },
         ]
@@ -110,7 +119,7 @@ try {
       assets: 1000,
       clips: 1000,
       samplesPerVariant: 300,
-      baseline: "1481e25 project-crdt writer",
+      baseline: "paired baseline persistence modules",
       scope: "Chromium synchronous validated Yjs write; no IDB/import/render timing",
       jsonBytes: new TextEncoder().encode(JSON.stringify(After.prepareStoredProject(project)))
         .byteLength,
@@ -118,7 +127,7 @@ try {
       after: summary(samples.after),
     };
   });
-  const json = JSON.stringify(result, null, 2);
+  const json = JSON.stringify({ ...result, baseline: baselineHash }, null, 2);
   process.stdout.write(`${json}\n`);
   if (process.argv[2]) writeFileSync(process.argv[2], `${json}\n`);
 } finally {

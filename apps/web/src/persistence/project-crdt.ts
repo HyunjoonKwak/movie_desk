@@ -125,6 +125,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         version === 3 ? timelines.read(metaMap.get("rootTimelineId"), localView) : null;
 
       const tracks: Track[] = [];
+      const seenLegacyClips = new Set<string>();
       for (const trackId of nested
         ? []
         : recoverEntityOrder(trackOrder.toArray(), tracksMap, recovery)) {
@@ -139,6 +140,11 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
           }
           if (!clip || clip.id !== clipId)
             throw new NestedTimelineError("Missing or mismatched legacy clip");
+          if (seenLegacyClips.has(clipId)) {
+            recovery("referencesRemoved");
+            return [];
+          }
+          seenLegacyClips.add(clipId);
           return clip;
         });
         tracks.push({ ...track, clips });
@@ -192,6 +198,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
 
       const candidate = {
         id: projectId,
+        ...(nested ? { preservedClips: timelines.preservedClips() } : {}),
         name,
         createdAt,
         updatedAt: Date.now(),
@@ -212,7 +219,14 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
             },
       };
       if (nested) return parseCurrentProject(candidate);
-      const project = parseStoredProject(candidate);
+      const parsedLegacy = parseStoredProject(candidate);
+      const project = parseCurrentProject({
+        ...parsedLegacy,
+        preservedClips: legacyOrphans.map(([, clip]) => ({
+          timelineId: parsedLegacy.rootTimelineId,
+          clip,
+        })),
+      });
       // Yjs transactions do not roll back exceptions. Stage and fully validate on
       // an isolated document, then apply one update to the original.
       const backup = Y.encodeStateAsUpdate(doc);

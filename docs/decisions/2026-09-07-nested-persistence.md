@@ -48,21 +48,28 @@ Entity maps own existence; order arrays own placement. In schemas 2 and 3,
 map-only timelines, tracks, media and collections are appended in sorted ID order
 to the read result, then persisted by the next edit. Order-only IDs are dropped
 for all four entity kinds and clips. Ordinary delete-versus-drag merges therefore
-remain editable. ID mismatches, malformed values and repeated clip ownership
-still fail validation.
+remain editable. ID mismatches and malformed values still fail validation. Repeated clip
+references across tracks keep the first track in deterministic track order and
+remove later references with a recovery notice; the next write heals the arrays.
+The current JSON parser and legacy reader use the same ownership rule.
 
 Map-only clips have no remaining track ownership. Reads report their presence;
 writes preserve their original scoped map entries instead of guessing placement.
 The writer captures existing placements before changing arrays, so an ordinary
 explicit clip deletion still deletes its map entry. Schema-2 migration carries
 unplaced clips into the schema-3 map before legacy-root cleanup. These clips
-remain in the CRDT, not the visible timeline or JSON export; a placement recovery
-UI is outside this phase.
+remain in the CRDT and in the validated optional `preservedClips` project JSON
+payload as `{ timelineId, clip }` entries, including clips stranded beneath
+order-only tracks. Importing that backup restores the scoped CRDT entries.
+Load and JSON-export notices include their count and explicitly state that they
+are absent from the visible timeline and rendered movie. A placement/discard UI
+is outside this phase, so the count notice can recur in a new session.
 
 Full project deletion cascades into child tracks and clips. Concurrent renaming
 can preserve only the metadata: the recovered timeline or track can be empty.
 The chosen policy accepts those content deletions and explicitly reports that
-an item was restored but its contents were removed in another session. Tests
+an item was restored and its contents may have been partially or fully removed
+in another session; merge history cannot prove which contents previously existed. Tests
 use the actual project writer for the deleting replica and assert empty contents,
 rather than simulating only metadata deletion and claiming full restoration.
 

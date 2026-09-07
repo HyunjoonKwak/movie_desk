@@ -1,3 +1,4 @@
+import { preservedClips } from "./preserved-clips";
 import { t } from "@/i18n/use-t";
 import { reloadSpan } from "@/lib/reload-metrics";
 import { useProjectStore } from "@/stores/project-store";
@@ -212,7 +213,9 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
     for (const reason of projectCrdt.takeRecoveryReasons()) {
       if (recoveryNotified.has(reason)) continue;
       recoveryNotified.add(reason);
-      toast.warning(t(`persistence.${reason}`), { id: `${reason}:${projectId}` });
+      toast.warning(t(`persistence.${reason}`, { count: preservedClips(project).length }), {
+        id: `${reason}:${projectId}`,
+      });
     }
     const end = reloadSpan("applyFromDoc");
     applyingFromDoc = true;

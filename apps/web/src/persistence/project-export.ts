@@ -292,6 +292,9 @@ const currentProjectSchema = z
   .object({
     timelines: z.array(timelineSchema).nonempty(),
     rootTimelineId: z.string().min(1),
+    preservedClips: z
+      .array(z.object({ timelineId: z.string().min(1), clip: clipSchema }))
+      .optional(),
   })
   .passthrough();
 
@@ -311,22 +314,43 @@ export const parseCurrentProject = (raw: unknown): Project => {
   try {
     const nested = currentProjectSchema.parse(raw);
     const parsed = projectSchema.parse(nested);
-    const timelines = nested.timelines as unknown as Project["timelines"];
+    const originalTimelines = nested.timelines as unknown as Project["timelines"];
+    const originalRoot = originalTimelines.find(
+      (timeline) => timeline.id === nested.rootTimelineId,
+    );
+    if (!sameJson(parsed.timeline, originalRoot))
+      throw new Error("Root timeline alias disagrees with timelines");
+    const timelines = originalTimelines.map((timeline) => {
+      const seen = new Set<string>();
+      return {
+        ...timeline,
+        tracks: timeline.tracks.map((track) => ({
+          ...track,
+          clips: track.clips.filter((clip) => {
+            if (seen.has(clip.id)) return false;
+            seen.add(clip.id);
+            return true;
+          }),
+        })),
+      };
+    });
     const ids = new Set(timelines.map((timeline) => timeline.id));
     if (ids.size !== timelines.length) throw new Error("Duplicate timeline ID");
     for (const timeline of timelines) {
       if (new Set(timeline.tracks.map((track) => track.id)).size !== timeline.tracks.length)
         throw new Error(`Duplicate track ID in timeline ${timeline.id}`);
-      const clips = timeline.tracks.flatMap((track) => track.clips);
-      if (new Set(clips.map((clip) => clip.id)).size !== clips.length)
-        throw new Error(`Duplicate clip ID in timeline ${timeline.id}`);
     }
     const root = timelines.find((timeline) => timeline.id === nested.rootTimelineId);
     if (!root) throw new Error("Missing root timeline");
-    if (!sameJson(parsed.timeline, root))
-      throw new Error("Root timeline alias disagrees with timelines");
+
     return rememberRestoredProject(
-      rememberAudioRecovery(raw, { ...parsed, timelines, rootTimelineId: root.id, timeline: root }),
+      rememberAudioRecovery(raw, {
+        ...parsed,
+        ...(nested.preservedClips ? { preservedClips: nested.preservedClips } : {}),
+        timelines,
+        rootTimelineId: root.id,
+        timeline: root,
+      }),
     );
   } catch (error) {
     throw new NestedTimelineError(

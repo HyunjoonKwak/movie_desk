@@ -47,18 +47,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("hydrates recovered order with one notice and durably saves through the real live writer", async () => {
+it("hydrates recovered order with each notice once and durably saves through the real live writer", async () => {
   const p = nestedProject();
   await seed(p, (doc) => doc.getArray("timeline-order-v3").delete(1, 1));
   const warning = vi.spyOn(toast, "warning");
   useProjectStore.getState().loadProject(p);
   getLiveDoc();
   await vi.waitFor(() => expect(projectWritesBlocked(p.id)).toBe(false));
-  expect(warning).toHaveBeenCalledTimes(1);
+  expect(warning).toHaveBeenCalledTimes(2);
   expect(useProjectStore.getState().project.timelines).toHaveLength(2);
   useProjectStore.getState().renameProject("Saved recovered child");
   await vi.waitFor(() => expect(useSaveStateStore.getState().state).toBe("saved"));
-  expect(warning).toHaveBeenCalledTimes(1);
+  expect(warning).toHaveBeenCalledTimes(2);
   disposeLiveDoc();
   const result = await reopen(p);
   expect(result?.name).toBe("Saved recovered child");
@@ -111,4 +111,26 @@ it("offers a library recovery copy on invalid metadata and preserves the damaged
   expect(original.getMap("project-meta").get("framerate")).toBe(-1);
   await provider.destroy();
   original.destroy();
+});
+
+it("reports the unplaced clip count once through live hydration", async () => {
+  const p = nestedProject();
+  const child = p.timelines[1]!;
+  await seed(p, (doc) => {
+    const order = doc.getArray(
+      `timeline-clip-order-v3:${JSON.stringify([child.id, child.tracks[0]!.id])}`,
+    );
+    order.delete(0, order.length);
+  });
+  const warning = vi.spyOn(toast, "warning");
+  useProjectStore.getState().loadProject(p);
+  getLiveDoc();
+  await vi.waitFor(() =>
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining("1"), {
+      id: `clipsPreserved:${p.id}`,
+    }),
+  );
+  useProjectStore.getState().renameProject("Preserved with count");
+  await vi.waitFor(() => expect(useSaveStateStore.getState().state).toBe("saved"));
+  expect(warning).toHaveBeenCalledTimes(1);
 });

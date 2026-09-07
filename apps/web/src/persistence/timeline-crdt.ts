@@ -13,6 +13,8 @@ import {
   uniqueSequence,
 } from "./crdt-sequence";
 
+import { preservedClips, type PreservedClip } from "./preserved-clips";
+
 type TimelineMeta = Omit<Timeline, "tracks">;
 type TrackMeta = Omit<Track, "clips">;
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
@@ -43,7 +45,12 @@ export const createTimelineCrdt = (
 
   const write = (project: Project): void => {
     const nextTimelines = new Map<string, TimelineMeta>();
-    const nextClips = new Map<string, Clip>();
+    const nextClips = new Map<string, Clip>(
+      preservedClips(project).map(({ timelineId, clip }) => [
+        timelineClipKey(timelineId, clip.id),
+        clip,
+      ]),
+    );
     // Preserve only already-unplaced clips. Clips removed by this edit were
     // still ordered at entry and continue to follow normal deletion semantics.
     const ordered = new Set<string>();
@@ -88,8 +95,11 @@ export const createTimelineCrdt = (
     sync(clipsMap, nextClips);
   };
 
+  let unplaced: PreservedClip[] = [];
   const read = (rootTimelineId: unknown, localView: Timeline): readonly Timeline[] => {
-    const timelineIds = recoverEntityOrder(timelineOrder.toArray(), timelinesMap, recovered);
+    unplaced = [];
+    const orderedTimelines = new Set(timelineOrder.toArray());
+    const timelineIds = recoverEntityOrder([...orderedTimelines], timelinesMap, recovered);
     if (!timelineIds.length)
       throw new NestedTimelineError(
         "Missing timeline metadata or timeline order; original document is unchanged",
@@ -100,13 +110,9 @@ export const createTimelineCrdt = (
       if (!meta || meta.id !== timelineId)
         throw new NestedTimelineError(`Missing timeline: ${timelineId}`);
       const tracksMap = tracksFor(timelineId);
-      const trackIds = recoverEntityOrder(
-        trackOrderFor(timelineId).toArray(),
-        tracksMap,
-        recovered,
-      );
-      if (!timelineOrder.toArray().includes(timelineId) && !trackIds.length)
-        recovered("contentsRemoved");
+      const orderedTracks = new Set(trackOrderFor(timelineId).toArray());
+      const trackIds = recoverEntityOrder([...orderedTracks], tracksMap, recovered);
+      if (!orderedTimelines.has(timelineId)) recovered("contentsRemoved");
       const tracks = trackIds.map((trackId) => {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
@@ -119,14 +125,17 @@ export const createTimelineCrdt = (
               recovered("referencesRemoved");
               return [];
             }
-            if (!clip || clip.id !== clipId || seenClips.has(key))
+            if (!clip || clip.id !== clipId)
               throw new NestedTimelineError(`Missing or repeated clip: ${key}`);
+            if (seenClips.has(key)) {
+              recovered("referencesRemoved");
+              return [];
+            }
             seenClips.add(key);
             return clip;
           },
         );
-        if (!trackOrderFor(timelineId).toArray().includes(trackId) && !clips.length)
-          recovered("contentsRemoved");
+        if (!orderedTracks.has(trackId)) recovered("contentsRemoved");
         return { ...track, clips };
       });
       const duration = tracks.reduce(
@@ -146,8 +155,26 @@ export const createTimelineCrdt = (
           : {}),
       };
     });
-    for (const key of clipsMap.keys()) if (!seenClips.has(key)) recovered("clipsPreserved");
+    for (const [key, clip] of clipsMap) {
+      if (seenClips.has(key)) continue;
+      const scope: unknown = JSON.parse(key);
+      if (
+        !Array.isArray(scope) ||
+        scope.length !== 2 ||
+        typeof scope[0] !== "string" ||
+        !clip ||
+        scope[1] !== clip.id
+      )
+        throw new NestedTimelineError("Invalid preserved clip identity");
+      unplaced.push({ timelineId: scope[0], clip });
+    }
+    unplaced.sort((a, b) => {
+      const left = timelineClipKey(a.timelineId, a.clip.id);
+      const right = timelineClipKey(b.timelineId, b.clip.id);
+      return left < right ? -1 : left > right ? 1 : 0;
+    });
+    if (unplaced.length) recovered("clipsPreserved");
     return timelines;
   };
-  return { clips: clipsMap, write, read };
+  return { clips: clipsMap, write, read, preservedClips: () => unplaced };
 };

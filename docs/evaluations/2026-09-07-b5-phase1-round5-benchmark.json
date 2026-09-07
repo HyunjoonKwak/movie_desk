@@ -1,0 +1,16 @@
+{
+  "assets": 1000,
+  "clips": 1000,
+  "samplesPerVariant": 300,
+  "baseline": "40e1c6d",
+  "scope": "Chromium synchronous validated Yjs write; no IDB/import/render timing",
+  "jsonBytes": 428840,
+  "before": {
+    "p50Ms": 4,
+    "p95Ms": 4.5
+  },
+  "after": {
+    "p50Ms": 4,
+    "p95Ms": 4.5
+  }
+}

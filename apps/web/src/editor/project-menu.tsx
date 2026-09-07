@@ -1,5 +1,7 @@
 "use client";
 
+import { preservedClips } from "@/persistence/preserved-clips";
+
 import { useT } from "@/i18n/use-t";
 import { FunnelControls } from "@/lib/funnel/report-dialog";
 import { startLibraryAutosave } from "@/persistence/library-autosave";
@@ -103,6 +105,8 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
     } catch (err) {
       toast.error(`${t("project.exportFailed")}: ${err instanceof Error ? err.message : err}`);
     }
+    if (preservedClips(payload).length)
+      toast.warning(t("persistence.clipsPreserved", { count: preservedClips(payload).length }));
     downloadProjectJson(payload);
   };
 
