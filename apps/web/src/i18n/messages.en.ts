@@ -935,4 +935,12 @@ export const en = {
     "mixer.exportPeaks": "Approx. true peak: {peak} dBTP · Clipped samples: {count}",
     "mixer.limited": "Pre-limiter overload samples: {count}",
     "project.audioRecovered": "The audio mixer settings could not be read; the project opened with defaults.",
+    "scopes.luma": "Luma histogram",
+    "scopes.parade": "RGB parade",
+    "scopes.samples": "Samples",
+    "scopes.low": "Near black ≤1",
+    "scopes.high": "Near white ≥254",
+    "scopes.waiting": "Waiting for frame",
+    "scopes.unavailable": "Scopes unavailable in this browser",
+    "scopes.encoded": "Display RGB · full range 0–255 · approximate IRE · sampled clipping",
 } as const;

@@ -1,0 +1,84 @@
+{
+  "inputUploads": [
+    {
+      "name": "srgb",
+      "tags": {
+        "fullRange": true,
+        "matrix": "rgb",
+        "primaries": "bt709",
+        "transfer": "iec61966-2-1"
+      },
+      "uploaded": [
+        180,
+        100,
+        60,
+        255
+      ],
+      "glError": 0
+    },
+    {
+      "name": "rec709",
+      "tags": {
+        "fullRange": true,
+        "matrix": "rgb",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "uploaded": [
+        180,
+        100,
+        60,
+        255
+      ],
+      "glError": 0
+    },
+    {
+      "name": "p3",
+      "tags": {
+        "fullRange": true,
+        "matrix": "rgb",
+        "primaries": "smpte432",
+        "transfer": "iec61966-2-1"
+      },
+      "uploaded": [
+        193,
+        95,
+        49,
+        255
+      ],
+      "glError": 0
+    }
+  ],
+  "frameColor": {
+    "fullRange": true,
+    "matrix": "rgb",
+    "primaries": "bt709",
+    "transfer": "iec61966-2-1"
+  },
+  "encoderConfig": [
+    {
+      "codec": "vp09.00.10.08",
+      "codedHeight": 144,
+      "codedWidth": 256,
+      "colorSpace": {
+        "fullRange": false,
+        "matrix": "smpte170m",
+        "primaries": "smpte170m",
+        "transfer": "smpte170m"
+      },
+      "flip": false,
+      "hardwareAcceleration": "no-preference",
+      "rotation": 0
+    }
+  ],
+  "colrCount": 1,
+  "tags": {
+    "type": "nclx",
+    "primaries": 6,
+    "transfer": 6,
+    "matrix": 6,
+    "fullRange": false
+  },
+  "bytes": 700,
+  "note": "One real VP9 encoded WebGL canvas frame; same VideoFrame options and unchanged encoder metadata forwarding as exporter. Not H264/HDR validation."
+}

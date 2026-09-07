@@ -1,0 +1,95 @@
+{
+  "rows": [
+    {
+      "oldDelayMs": 104.5,
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "currentRgb": [
+        255,
+        255,
+        255
+      ],
+      "expectedRgb": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "oldDelayMs": 102,
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "currentRgb": [
+        255,
+        255,
+        255
+      ],
+      "expectedRgb": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "oldDelayMs": 104.19999998807907,
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "currentRgb": [
+        255,
+        255,
+        255
+      ],
+      "expectedRgb": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "oldDelayMs": 104,
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "currentRgb": [
+        255,
+        255,
+        255
+      ],
+      "expectedRgb": [
+        255,
+        255,
+        255
+      ]
+    },
+    {
+      "oldDelayMs": 103.19999998807907,
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "currentRgb": [
+        255,
+        255,
+        255
+      ],
+      "expectedRgb": [
+        255,
+        255,
+        255
+      ]
+    }
+  ],
+  "note": "Five paused white frames on a visible preserveDrawingBuffer:false canvas. Old 100ms+rAF drawImage schedule vs repository ScopeReadback captured immediately; no editor decode timing claim."
+}

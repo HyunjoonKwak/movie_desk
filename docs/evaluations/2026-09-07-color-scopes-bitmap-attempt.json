@@ -1,0 +1,59 @@
+{
+  "baseline": {
+    "width": 796,
+    "height": 447,
+    "frameIntervalMs": {
+      "count": 119,
+      "p50": 16.664999999999964,
+      "p95": 18.139999999999873,
+      "max": 18.654999999999745
+    },
+    "captureMainMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "workerMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    },
+    "paintMainMs": {
+      "count": 0,
+      "p50": null,
+      "p95": null,
+      "max": null
+    }
+  },
+  "enabled": {
+    "width": 796,
+    "height": 447,
+    "frameIntervalMs": {
+      "count": 119,
+      "p50": 16.670000000000073,
+      "p95": 18.375,
+      "max": 18.49499999999989
+    },
+    "captureMainMs": {
+      "count": 129,
+      "p50": 4.469999998807907,
+      "p95": 5.469999998807907,
+      "max": 15.370000004768372
+    },
+    "workerMs": {
+      "count": 129,
+      "p50": 0.38499999046325684,
+      "p95": 0.4399999976158142,
+      "max": 0.48500001430511475
+    },
+    "paintMainMs": {
+      "count": 129,
+      "p50": 0.019999980926513672,
+      "p95": 0.025000005960464478,
+      "max": 0.025000005960464478
+    }
+  },
+  "note": "1080p actual editor playback, cached still clip, 130 rAF ticks per condition; scope capture, worker and bitmap paint timings exclude React commit."
+}

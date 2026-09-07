@@ -1,4 +1,5 @@
 "use client";
+import { ScopesPanel } from "@/preview/scopes-panel";
 
 import { MixerPanel } from "@/mixer/mixer-panel";
 import { mountFunnel, recordFunnel } from "@/lib/funnel/collector";
@@ -223,7 +224,7 @@ function ResizeHandle({ orientation }: { orientation: "vertical" | "horizontal" 
   );
 }
 
-type MobileDrawer = "media" | "auto" | "inspector" | "mixer";
+type MobileDrawer = "media" | "auto" | "inspector" | "mixer" | "scopes";
 
 function MobileShell({
   onNewProject,
@@ -289,19 +290,29 @@ function MobileShell({
         >
           <AudioLines className="size-5" />
         </button>
+        <button
+          type="button"
+          onClick={() => setDrawer("scopes")}
+          className="btn-ghost flex-1 justify-center"
+          aria-label={t("scopes.tab")}
+        >
+          {t("scopes.tab")}
+        </button>
       </nav>
 
       {drawer && (
         <div className="fixed inset-0 z-50 flex flex-col bg-panel-0">
           <div className="flex items-center justify-between border-b border-white/5 px-3 py-2">
             <span className="text-sm font-medium text-ink-1">
-              {drawer === "media"
-                ? t("media.title")
-                : drawer === "auto"
-                  ? t("auto.tab")
-                  : drawer === "mixer"
-                    ? t("mixer.title")
-                    : t("inspector.title")}
+              {drawer === "scopes"
+                ? t("scopes.tab")
+                : drawer === "media"
+                  ? t("media.title")
+                  : drawer === "auto"
+                    ? t("auto.tab")
+                    : drawer === "mixer"
+                      ? t("mixer.title")
+                      : t("inspector.title")}
             </span>
             <button
               type="button"
@@ -312,7 +323,9 @@ function MobileShell({
             </button>
           </div>
           <div className="flex-1 overflow-hidden">
-            {drawer === "media" ? (
+            {drawer === "scopes" ? (
+              <ScopesPanel />
+            ) : drawer === "media" ? (
               <MediaBin />
             ) : drawer === "auto" ? (
               <AutoEditPanel />

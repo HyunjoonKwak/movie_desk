@@ -1,0 +1,27 @@
+{
+  "baseline": {
+    "width": 240,
+    "height": 135,
+    "threeKernelsMs": {
+      "p50": 0.319500000000005,
+      "p95": 0.4707499999999527
+    },
+    "redVector": {
+      "x": 106,
+      "y": 64
+    }
+  },
+  "current": {
+    "width": 256,
+    "height": 144,
+    "threeKernelsMs": {
+      "p50": 0.36958400000003166,
+      "p95": 0.8738749999999982
+    },
+    "redVector": {
+      "x": 113,
+      "y": 64
+    }
+  },
+  "note": "Node CPU kernel comparison, all three original scopes per iteration; current app runs selected kernel and painting in a worker. This is not GPU readback latency."
+}

@@ -933,4 +933,12 @@ export const ko = {
     "mixer.exportPeaks": "근사 트루피크: {peak} dBTP · 클리핑 샘플: {count}",
     "mixer.limited": "리미터 이전 과부하 샘플: {count}",
     "project.audioRecovered": "오디오 믹서 설정을 읽을 수 없어 기본값으로 프로젝트를 열었습니다.",
+    "scopes.luma": "루마 히스토그램",
+    "scopes.parade": "RGB 퍼레이드",
+    "scopes.samples": "샘플",
+    "scopes.low": "블랙 근처 ≤1",
+    "scopes.high": "화이트 근처 ≥254",
+    "scopes.waiting": "프레임 대기 중",
+    "scopes.unavailable": "이 브라우저에서 스코프를 사용할 수 없습니다",
+    "scopes.encoded": "디스플레이 RGB · 전체 범위 0–255 · 근사 IRE · 샘플 클리핑",
 } as const;

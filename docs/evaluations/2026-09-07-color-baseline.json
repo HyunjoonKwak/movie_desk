@@ -1,0 +1,101 @@
+{
+  "date": "2026-09-07T00:48:18.479Z",
+  "renderer": "WebKit WebGL",
+  "halfFloatExtension": true,
+  "passthroughMaxByteError": 0,
+  "colorBarMaxByteError": 0,
+  "patches": [
+    {
+      "input": 0,
+      "actual": 0,
+      "linearReference": 0,
+      "linearGain": null
+    },
+    {
+      "input": 16,
+      "actual": 32,
+      "linearReference": 26,
+      "linearGain": 2.787570594836475
+    },
+    {
+      "input": 32,
+      "actual": 64,
+      "linearReference": 47,
+      "linearGain": 3.5495716935008232
+    },
+    {
+      "input": 64,
+      "actual": 128,
+      "linearReference": 90,
+      "linearGain": 4.210313644022917
+    },
+    {
+      "input": 118,
+      "actual": 236,
+      "linearReference": 162,
+      "linearGain": 4.630047254710346
+    },
+    {
+      "input": 128,
+      "actual": 255,
+      "linearReference": 176,
+      "linearGain": 4.632621528590677
+    },
+    {
+      "input": 180,
+      "actual": 255,
+      "linearReference": 245,
+      "linearGain": 2.191007555057959
+    },
+    {
+      "input": 230,
+      "actual": 255,
+      "linearReference": 255,
+      "linearGain": 1.2637464967741983
+    },
+    {
+      "input": 250,
+      "actual": 255,
+      "linearReference": 255,
+      "linearGain": 1.0460542614509813
+    },
+    {
+      "input": 255,
+      "actual": 255,
+      "linearReference": 255,
+      "linearGain": 1
+    }
+  ],
+  "blurEdge": [
+    {
+      "x": 126,
+      "actual": 93,
+      "linearReference": 163
+    },
+    {
+      "x": 127,
+      "actual": 102,
+      "linearReference": 170
+    },
+    {
+      "x": 128,
+      "actual": 153,
+      "linearReference": 203
+    },
+    {
+      "x": 129,
+      "actual": 162,
+      "linearReference": 209
+    }
+  ],
+  "blend": {
+    "actual": 128,
+    "linearReference": 188
+  },
+  "baseline1080pSinglePassMs": {
+    "p50": 5.555000007152557,
+    "p95": 7.375,
+    "samples": 60
+  },
+  "note": "Standalone real GLSL draws with 1-pixel readback and gl.finish; not full editor playback. Blur reference encodes measured weighted binary coverage (8-bit quantization)."
+}

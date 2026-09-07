@@ -1,5 +1,6 @@
 "use client";
 
+import { captureScopes } from "@/scopes/frames";
 import { Compositor } from "@/renderer/compositor";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { selectPlayhead, useProjectStore } from "@/stores/project-store";
@@ -54,6 +55,9 @@ export function PreviewViewport() {
     redrawPendingRef.current = false;
     void compositor
       .renderFrame(useProjectStore.getState().project, assetByIdRef.current)
+      .then(() => {
+        if (canvasRef.current) captureScopes(canvasRef.current);
+      })
       .catch(() => {
         // The preview error boundary/logging path handles persistent failures.
       })
@@ -67,6 +71,11 @@ export function PreviewViewport() {
         if (redrawPendingRef.current) queueMicrotask(pump);
       });
   }, []);
+
+  useEffect(() => {
+    window.addEventListener("scopes-redraw", drawLatest);
+    return () => window.removeEventListener("scopes-redraw", drawLatest);
+  }, [drawLatest]);
 
   // Lazily create the compositor once the canvas mounts.
   useEffect(() => {

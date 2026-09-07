@@ -7,7 +7,7 @@ export interface Histogram {
   readonly g: Uint32Array;
   readonly b: Uint32Array;
   readonly luma: Uint32Array;
-  readonly max: number;    // tallest bin, for normalization
+  readonly max: number; // tallest bin, for normalization
 }
 
 export const computeHistogram = (pixels: Uint8ClampedArray): Histogram => {
@@ -56,19 +56,16 @@ export const computeLumaWaveform = (
 };
 
 // Vectorscope: U/V chroma scatter. Returns accumulation grid `size × size`.
-export const computeVectorscope = (
-  pixels: Uint8ClampedArray,
-  size = 256,
-): Uint8ClampedArray => {
+export const computeVectorscope = (pixels: Uint8ClampedArray, size = 256): Uint8ClampedArray => {
   const grid = new Uint8ClampedArray(size * size);
   const half = size / 2;
   for (let i = 0; i < pixels.length; i += 4) {
     const r = pixels[i]! / 255;
     const g = pixels[i + 1]! / 255;
     const b = pixels[i + 2]! / 255;
-    const y = 0.299 * r + 0.587 * g + 0.114 * b;
-    const u = (b - y) * 0.565;
-    const v = (r - y) * 0.713;
+    const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const u = (b - y) / 1.8556;
+    const v = (r - y) / 1.5748;
     const px = Math.round(half + u * half);
     const py = Math.round(half - v * half);
     if (px >= 0 && px < size && py >= 0 && py < size) {
@@ -77,4 +74,35 @@ export const computeVectorscope = (
     }
   }
   return grid;
+};
+
+export const computeParade = (pixels: Uint8ClampedArray, width: number, height: number) => {
+  const cols = width * 3;
+  const map = new Uint8ClampedArray(cols * 256);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      for (let c = 0; c < 3; c++) {
+        const idx = (255 - pixels[(y * width + x) * 4 + c]!) * cols + c * width + x;
+        map[idx] = Math.min(255, map[idx]! + 16);
+      }
+    }
+  return { map, cols };
+};
+
+export const clipping = (pixels: Uint8ClampedArray) => {
+  let low = 0;
+  let high = 0;
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (Math.min(pixels[i]!, pixels[i + 1]!, pixels[i + 2]!) <= 1) low++;
+    if (Math.max(pixels[i]!, pixels[i + 1]!, pixels[i + 2]!) >= 254) high++;
+  }
+  return { low, high, samples: pixels.length / 4 };
+};
+
+export const sampleSize = (width: number, height: number) => {
+  const ratio = Math.min(1, 256 / Math.max(1, width), 144 / Math.max(1, height));
+  return {
+    width: Math.max(1, Math.round(width * ratio)),
+    height: Math.max(1, Math.round(height * ratio)),
+  };
 };
