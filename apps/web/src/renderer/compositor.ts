@@ -16,6 +16,7 @@ import {
   type TextClip,
   type TransitionFrame,
   activeTransitionFor,
+  analyzeSequenceGraph,
   clipTransform,
   isAdjustmentClip,
   isBackdropBlend,
@@ -67,6 +68,8 @@ export interface RenderFrameOptions {
 
 interface FrameContext {
   readonly depth: number;
+  readonly ancestry: readonly ID[];
+  sequenceGraph: ReturnType<typeof analyzeSequenceGraph> | undefined;
   readonly target: RenderTarget;
   readonly playhead: number;
   readonly pingPong: PingPong;
@@ -254,6 +257,16 @@ export class Compositor {
     getAsset: (id: ID) => MediaAsset | undefined,
     options: RenderFrameOptions = {},
   ) {
+    return this.renderSequenceFrame(project, getAsset, options, [project.timeline.id]);
+  }
+
+  private async renderSequenceFrame(
+    project: Project,
+    getAsset: (id: ID) => MediaAsset | undefined,
+    options: RenderFrameOptions,
+    ancestry: readonly ID[],
+    sequenceGraph?: ReturnType<typeof analyzeSequenceGraph>,
+  ) {
     const gl = this.gl;
     if (this.invalidated || gl.isContextLost()) return;
     const target = options.target ?? screenTarget(gl);
@@ -277,6 +290,8 @@ export class Compositor {
     }
     const frame: FrameContext = {
       depth,
+      ancestry,
+      sequenceGraph,
       target,
       playhead: options.playhead ?? project.timeline.playhead,
       pingPong,
@@ -310,32 +325,42 @@ export class Compositor {
     const gl = this.gl;
     if (this.invalidated || gl.isContextLost()) return;
     const assetIds = new Set<string>();
+    const videoIds = new Set<string>();
     const textureIds = new Set<string>();
+    const graphicClipIds = new Set<string>();
+    // Retain the whole document across every allocated lane, including idle
+    // child lanes between root frames. Retention does not allocate resources;
+    // the original bounded caches still govern eviction and byte budgets.
     for (const active of this.activeFrames.values()) {
       for (const asset of active.project.mediaLibrary) {
         assetIds.add(asset.id);
-        textureIds.add(`${active.depth}:${asset.id}`);
+        if (asset.kind === "video") videoIds.add(asset.id);
+      }
+      const timelines = new Map((active.project.timelines ?? []).map((t) => [t.id, t]));
+      timelines.set(active.project.timeline.id, active.project.timeline);
+      for (const timeline of timelines.values()) {
+        for (const track of timeline.tracks) {
+          for (const clip of track.clips) {
+            if (isMediaClip(clip)) {
+              assetIds.add(clip.assetId);
+              if (getAsset(clip.assetId)?.kind === "video") videoIds.add(clip.assetId);
+            }
+            if (isTextClip(clip) || isShapeClip(clip)) {
+              for (const lane of this.colorPingPongs.keys()) graphicClipIds.add(`${lane}:${clip.id}`);
+            }
+          }
+        }
       }
     }
+    for (const id of assetIds)
+      for (const lane of this.colorPingPongs.keys()) textureIds.add(`${lane}:${id}`);
     this.retainedAssetIds = assetIds;
     this.assetTextures.retain(textureIds);
     this.bgMaskTextures.retain(textureIds);
     this.sources.retain(assetIds);
-    const graphicClipIds = new Set<string>();
-    for (const active of this.activeFrames.values()) {
-      for (const track of active.project.timeline.tracks) {
-        for (const clip of track.clips) {
-          if (isTextClip(clip) || isShapeClip(clip)) graphicClipIds.add(`${active.depth}:${clip.id}`);
-        }
-      }
-    }
     this.textTextures.retain(graphicClipIds);
     this.decodeRetry.retain(assetIds);
-    getFrameProvider().retain(
-      new Set(
-        [...this.activeFrames.values()].flatMap((active) => active.project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id)),
-      ),
-    );
+    getFrameProvider().retain(videoIds);
     const visible = visibleAt(project, frame.playhead);
     frame.managed = visible.length > 0 && !this.canBypass(visible, project, getAsset, frame);
     // The sole bypass candidate is uploaded before scene initialization. Alpha
@@ -862,6 +887,35 @@ export class Compositor {
     charFrac = 1,
   ): Promise<WebGLTexture | null> {
     frame.maskTexture = null;
+    // Recursive dispatch is deliberately outside withSource: a child media
+    // upload must be able to acquire the global source queue itself.
+    if (clip.kind === "sequence") {
+      frame.sequenceGraph ??= analyzeSequenceGraph(project);
+      const graph = frame.sequenceGraph;
+      const child = graph.timelines.get(clip.timelineId);
+      if (!child || graph.cyclic.has(child.id) || frame.ancestry.includes(child.id) ||
+          frame.ancestry.length + (graph.depths.get(child.id) ?? 1) > MAX_SEQUENCE_DEPTH)
+        return null;
+      const target = this.acquireChildTarget(frame.depth, frame.target.width, frame.target.height);
+      frame.releaseClip.push(target.release);
+      await this.renderSequenceFrame(
+        { ...project, timeline: child },
+        getAsset,
+        { target, playhead: clip.trimIn + sourceOffsetForRamp(clip, frame.playhead - clip.start) },
+        [...frame.ancestry, child.id],
+        graph,
+      );
+      if (this.invalidated || this.gl.isContextLost()) return null;
+      // Child presentation is premultiplied sRGB; parent effects and blending
+      // consume premultiplied linear pixels. Never treat the FBO as a DOM upload.
+      return this.withGpu(frame.restoreBindings, () => {
+        const linear = this.slot(frame, Compositor.SCRATCH_FIT);
+        this.gl.disable(this.gl.BLEND);
+        this.drawTransfer(target.tex, linear.fbo, "srgb", "linear", frame);
+        this.gl.enable(this.gl.BLEND);
+        return linear.tex;
+      });
+    }
     if (isMediaClip(clip)) {
       const asset = getAsset(clip.assetId);
       if (!asset) return null;

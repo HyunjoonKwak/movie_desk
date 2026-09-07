@@ -1,0 +1,266 @@
+{
+  "baseline": "1feb3b5cd58e9c474b86271a493e8ff64e0f23de",
+  "gpu": "ANGLE Metal requested",
+  "comparisons": [
+    {
+      "name": "opaque bypass",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "brightness",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "contrast",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "exposure",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "saturation",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "hue",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "color-wheels",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "white-balance",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "levels",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "vibrance",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "split-tone",
+      "channels": 147456,
+      "minRgb": 4,
+      "maxRgb": 253,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "gaussian-blur",
+      "channels": 147456,
+      "minRgb": 4,
+      "maxRgb": 251,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "sharpen",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "vignette",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 238,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "sepia",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 237,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "invert",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "grain",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "chroma-key",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "bg-remove",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "alpha bypass promotion",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered normal",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered overlay",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered soft-light",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered multiply",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered screen",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "layered add",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "fit and transform",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 231,
+      "mismatches": 0,
+      "maxDelta": 0
+    },
+    {
+      "name": "adjustment",
+      "channels": 147456,
+      "minRgb": 0,
+      "maxRgb": 255,
+      "mismatches": 0,
+      "maxDelta": 0
+    }
+  ],
+  "reentry": "PASS",
+  "capture": "PASS",
+  "timing": [
+    {
+      "name": "baseline",
+      "samples": 60,
+      "p50Ms": 2.800000011920929,
+      "p95Ms": 3.200000047683716,
+      "meanMs": 2.866666665673256,
+      "warmup": {
+        "allocations": 4,
+        "framebuffers": 4
+      },
+      "steady": {
+        "allocations": 0,
+        "framebuffers": 0,
+        "draws": 240
+      }
+    },
+    {
+      "name": "modified",
+      "samples": 60,
+      "p50Ms": 2.899999976158142,
+      "p95Ms": 3.199999988079071,
+      "meanMs": 2.8699999998013177,
+      "warmup": {
+        "allocations": 4,
+        "framebuffers": 4
+      },
+      "steady": {
+        "allocations": 0,
+        "framebuffers": 0,
+        "draws": 240
+      }
+    }
+  ]
+}

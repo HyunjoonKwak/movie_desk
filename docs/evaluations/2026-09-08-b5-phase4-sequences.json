@@ -1,0 +1,374 @@
+{
+  "protocol": "Real production shaders/compositor with stubbed source I/O; 1920x1080 Metal, expected RGBA pixels, five-second render deadlock timeout; 30 warmups and ten alternating paired 30-frame batches, forced finish/readback per frame.",
+  "evidence": [
+    {
+      "name": "direct positive control",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "one nested level, media source queue completes",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "two nested levels",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "eight timeline levels accepted",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "missing target",
+      "actual": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "self cycle",
+      "actual": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "indirect cycle",
+      "actual": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "depth exceeded",
+      "actual": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "child shape center",
+      "actual": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "transparent child preserves parent corner",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "child premultiplied transfer",
+      "actual": [
+        191,
+        92,
+        140,
+        255
+      ],
+      "expected": [
+        192,
+        92,
+        140,
+        255
+      ],
+      "tolerance": 2
+    },
+    {
+      "name": "empty child target clears reused pixels",
+      "actual": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        0,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 0
+    },
+    {
+      "name": "parent effect processes child in linear light",
+      "actual": [
+        90,
+        176,
+        255,
+        255
+      ],
+      "expected": [
+        90,
+        176,
+        255,
+        255
+      ],
+      "tolerance": 2
+    },
+    {
+      "name": "mapped video time pixels",
+      "actual": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "expected": [
+        64,
+        128,
+        192,
+        255
+      ],
+      "tolerance": 1
+    },
+    {
+      "name": "nested media retained by source pool and frame provider",
+      "video": true,
+      "source": true
+    },
+    {
+      "name": "nested trim/speed timestamp",
+      "actual": 650,
+      "expected": 650
+    },
+    {
+      "name": "speed ramp integral timestamp",
+      "actual": 845,
+      "expected": 845
+    },
+    {
+      "name": "independent root ancestry despite occupied lane",
+      "actual": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "expected": [
+        255,
+        0,
+        0,
+        255
+      ],
+      "tolerance": 1
+    }
+  ],
+  "performance": [
+    {
+      "nestedLevels": 1,
+      "rows": [
+        {
+          "implementation": "flat",
+          "frames": 300,
+          "p50Ms": 5.399999976158142,
+          "p95Ms": 6.699999988079071,
+          "batchMeans": [
+            5.6,
+            5.620000000794729,
+            5.246666665871938,
+            5.796666665871938,
+            6.430000001192093,
+            5.469999998807907,
+            5.4633333345254265,
+            5.183333333333334,
+            5.633333333333334,
+            5.236666667461395
+          ],
+          "counters": {
+            "textureCreates": 0,
+            "textureDeletes": 0,
+            "targetAllocations": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        },
+        {
+          "implementation": "nested",
+          "frames": 300,
+          "p50Ms": 6.5,
+          "p95Ms": 7.900000035762787,
+          "batchMeans": [
+            6.616666666666666,
+            6.523333332935969,
+            6.293333333730698,
+            6.960000000397364,
+            7.759999998410543,
+            6.830000001192093,
+            6.7799999992052715,
+            6.433333333333334,
+            6.293333333730698,
+            6.439999999602636
+          ],
+          "counters": {
+            "textureCreates": 0,
+            "textureDeletes": 0,
+            "targetAllocations": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        }
+      ],
+      "medianPairedRatio": 1.2068429233237752
+    },
+    {
+      "nestedLevels": 2,
+      "rows": [
+        {
+          "implementation": "flat",
+          "frames": 300,
+          "p50Ms": 5.199999988079071,
+          "p95Ms": 6.100000023841858,
+          "batchMeans": [
+            5.236666667461395,
+            5.113333332538605,
+            5.126666667064031,
+            5.956666668256124,
+            5.926666665077209,
+            5.110000000397364,
+            5.2799999992052715,
+            5.256666666269302,
+            5.113333334525426,
+            5.229999999205272
+          ],
+          "counters": {
+            "textureCreates": 0,
+            "textureDeletes": 0,
+            "targetAllocations": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        },
+        {
+          "implementation": "nested",
+          "frames": 300,
+          "p50Ms": 7.400000035762787,
+          "p95Ms": 8.299999952316284,
+          "batchMeans": [
+            7.389999999602636,
+            7.536666667461395,
+            7.35,
+            7.853333332141241,
+            7.563333334525426,
+            7.456666666269302,
+            7.439999999602636,
+            7.376666667064031,
+            7.45,
+            7.693333333730697
+          ],
+          "counters": {
+            "textureCreates": 0,
+            "textureDeletes": 0,
+            "targetAllocations": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        }
+      ],
+      "medianPairedRatio": 1.4336801039200857
+    }
+  ]
+}

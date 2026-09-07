@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { reentryBundle } from "./reentry-bundle.mjs";
 const require = createRequire(new URL("../../apps/web/package.json", import.meta.url));
 const { chromium } = require("@playwright/test");
-const baseline = "84a26767d60bb58ddcdb05861492abacb41b13c9";
+const baseline = process.env.COLOR_BASELINE ?? "84a26767d60bb58ddcdb05861492abacb41b13c9";
 const server = createServer((_, response) =>
   response.end("<!doctype html><title>Phase 3 GPU audit</title>"),
 );
@@ -359,7 +359,10 @@ try {
   });
   const report = { baseline, gpu: "ANGLE Metal requested", ...result };
   writeFileSync(
-    new URL("../../docs/evaluations/2026-09-07-b5-phase3-gpu.json", import.meta.url),
+    new URL(
+      process.env.COLOR_REPORT ?? "../../docs/evaluations/2026-09-07-b5-phase3-gpu.json",
+      import.meta.url,
+    ),
     `${JSON.stringify(report, null, 2)}\n`,
   );
   // biome-ignore lint/suspicious/noConsole: CLI evidence.
