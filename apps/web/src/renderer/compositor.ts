@@ -85,20 +85,33 @@ export class Compositor {
   private readonly colorWarnings = new Set<string>();
   private readonly videoTransferProbe: TransferProbe;
   usesColorApproximation = false;
+  // 192 MiB total: one 4K RGBA16F source plus two 4K stills (rounded budgets).
+  private static readonly SOURCE_TARGET_BYTES = 64 * 1024 * 1024;
+  private static readonly IMAGE_TARGET_BYTES = 128 * 1024 * 1024;
   private readonly sourceTargets = new BoundedResourceCache<
     string,
-    ReturnType<typeof allocateTarget>
-  >(8, (target) => {
-    this.gl.deleteTexture(target.tex);
-    this.gl.deleteFramebuffer(target.fbo);
-  });
+    ReturnType<typeof allocateTarget> & { bytes: number }
+  >(
+    8,
+    (target) => {
+      this.gl.deleteTexture(target.tex);
+      this.gl.deleteFramebuffer(target.fbo);
+    },
+    Compositor.SOURCE_TARGET_BYTES,
+    (target) => target.bytes,
+  );
   private readonly imageTargets = new BoundedResourceCache<
     object,
-    { target: ReturnType<typeof allocateTarget>; url: string }
-  >(12, ({ target }) => {
-    this.gl.deleteTexture(target.tex);
-    this.gl.deleteFramebuffer(target.fbo);
-  });
+    { target: ReturnType<typeof allocateTarget>; url: string; bytes: number }
+  >(
+    12,
+    ({ target }) => {
+      this.gl.deleteTexture(target.tex);
+      this.gl.deleteFramebuffer(target.fbo);
+    },
+    Compositor.IMAGE_TARGET_BYTES,
+    (entry) => entry.bytes,
+  );
   private readonly normalizedSource = document.createElement("canvas");
   private readonly opaqueImages = new WeakMap<object, boolean>();
   private get pingPong() {
@@ -631,15 +644,40 @@ export class Compositor {
     }
     uploadSource(this.gl, tex, directSource ? source : canvas, false);
     const gl = this.gl;
-    const key = `${w}x${h}`;
+    const budget = immutableImage ? Compositor.IMAGE_TARGET_BYTES : Compositor.SOURCE_TARGET_BYTES;
+    const bytesPerPixel = this.colorFormat!.precision === "half-float" ? 8 : 4;
+    // Only oversized sources are resampled, preserving aspect and the selected precision.
+    const scale = Math.min(1, Math.sqrt(budget / (w * h * bytesPerPixel)));
+    const targetWidth = Math.max(1, Math.floor(w * scale));
+    const targetHeight = Math.max(1, Math.floor(h * scale));
+    const bytes = targetWidth * targetHeight * bytesPerPixel;
+    const key = `${targetWidth}x${targetHeight}`;
+    // Resolution slots are mutable: consume each uploadVisualSource result fully
+    // before the next upload; renderFrame currently composites clips sequentially.
     let target = immutableImage ? undefined : this.sourceTargets.get(key);
     if (!target) {
-      target = allocateTarget(gl, w, h, this.colorFormat!);
-      if (immutableImage) this.imageTargets.set(immutableImage, { target, url: imageUrl });
+      if (immutableImage) {
+        this.imageTargets.delete(immutableImage);
+        this.imageTargets.reserve(bytes);
+      } else this.sourceTargets.reserve(bytes);
+      target = { ...allocateTarget(gl, targetWidth, targetHeight, this.colorFormat!), bytes };
+      if (immutableImage) this.imageTargets.set(immutableImage, { target, url: imageUrl, bytes });
       else this.sourceTargets.set(key, target);
     }
     gl.disable(gl.BLEND);
-    this.drawTransfer(tex, target.fbo, interpretation.domain, "linear", w, h, true);
+    this.drawTransfer(
+      tex,
+      target.fbo,
+      interpretation.domain,
+      "linear",
+      targetWidth,
+      targetHeight,
+      true,
+    );
+    // Managed pixels now live in the budgeted target; do not retain a second
+    // full-size RGBA8 upload for every imported photo in assetTextures.
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     gl.enable(gl.BLEND);
     return target.tex;
   }

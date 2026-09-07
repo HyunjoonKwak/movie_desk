@@ -86,3 +86,9 @@ export const isBt709Output = (color: VideoColorSpaceInit | undefined): boolean =
   color.transfer === "bt709" &&
   color.matrix === "bt709" &&
   color.fullRange === false;
+
+// Null fields are Chrome's other representation of missing encoder VUI.
+export const hasConflictingBt709Output = (color: VideoColorSpaceInit): boolean =>
+  (Object.keys(BT709_COLOR_SPACE) as (keyof VideoColorSpaceInit)[]).some(
+    (key) => color[key] != null && color[key] !== BT709_COLOR_SPACE[key],
+  );

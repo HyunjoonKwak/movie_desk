@@ -1,0 +1,283 @@
+{
+  "baseline": "f4adad6",
+  "metric": "Instrumented WebGL requested texture bytes, excluding driver overhead, constructor probes and browser image/canvas backing; JS heap after explicit GC. Actual Compositor rendering 1000 distinct 4K ImageBitmaps in a 1000-asset library, sequentially released source decodes; no import/OPFS benchmark.",
+  "rows": [
+    {
+      "label": "before",
+      "assets": 1000,
+      "source": [
+        3840,
+        2160
+      ],
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "precision": "half-float",
+      "elapsedMs": 13992.299999982119,
+      "heapBefore": 2179098,
+      "heapAfter": 2511485,
+      "retainedTextureBytes": 1642291200,
+      "peakTextureBytes": 1708646400,
+      "cachedImageBytes": null,
+      "oversizedAndResolutionChurn": [],
+      "textureBytesAfterDispose": 0
+    },
+    {
+      "label": "after",
+      "assets": 1000,
+      "source": [
+        3840,
+        2160
+      ],
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
+      "precision": "half-float",
+      "elapsedMs": 11168.800000011921,
+      "heapBefore": 2193614,
+      "heapAfter": 2538821,
+      "retainedTextureBytes": 182476896,
+      "peakTextureBytes": 215654492,
+      "cachedImageBytes": 132710400,
+      "oversizedAndResolutionChurn": [
+        {
+          "width": 6000,
+          "height": 4000,
+          "imageBytes": 134188032,
+          "sourceBytes": 0,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2048,
+          "height": 1144,
+          "imageBytes": 134188032,
+          "sourceBytes": 18743296,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2176,
+          "height": 1208,
+          "imageBytes": 134188032,
+          "sourceBytes": 39772160,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2304,
+          "height": 1272,
+          "imageBytes": 134188032,
+          "sourceBytes": 63217664,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2432,
+          "height": 1336,
+          "imageBytes": 134188032,
+          "sourceBytes": 49438720,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2560,
+          "height": 1400,
+          "imageBytes": 134188032,
+          "sourceBytes": 54665216,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2688,
+          "height": 1464,
+          "imageBytes": 134188032,
+          "sourceBytes": 60153856,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2816,
+          "height": 1528,
+          "imageBytes": 134188032,
+          "sourceBytes": 65904640,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 2944,
+          "height": 1592,
+          "imageBytes": 134188032,
+          "sourceBytes": 37494784,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3072,
+          "height": 1656,
+          "imageBytes": 134188032,
+          "sourceBytes": 40697856,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3200,
+          "height": 1720,
+          "imageBytes": 134188032,
+          "sourceBytes": 44032000,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3328,
+          "height": 1784,
+          "imageBytes": 134188032,
+          "sourceBytes": 47497216,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3456,
+          "height": 1848,
+          "imageBytes": 134188032,
+          "sourceBytes": 51093504,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3584,
+          "height": 1912,
+          "imageBytes": 134188032,
+          "sourceBytes": 54820864,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3712,
+          "height": 1976,
+          "imageBytes": 134188032,
+          "sourceBytes": 58679296,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3840,
+          "height": 2040,
+          "imageBytes": 134188032,
+          "sourceBytes": 62668800,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 3968,
+          "height": 2104,
+          "imageBytes": 134188032,
+          "sourceBytes": 66789376,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 4096,
+          "height": 2168,
+          "imageBytes": 134188032,
+          "sourceBytes": 67103736,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 4224,
+          "height": 2232,
+          "imageBytes": 134188032,
+          "sourceBytes": 67090560,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        },
+        {
+          "width": 4352,
+          "height": 2296,
+          "imageBytes": 134188032,
+          "sourceBytes": 67077288,
+          "pixel": [
+            128,
+            128,
+            128,
+            255
+          ]
+        }
+      ],
+      "textureBytesAfterDispose": 0
+    }
+  ]
+}

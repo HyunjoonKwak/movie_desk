@@ -35,6 +35,7 @@ const WIPE_MODE: Partial<Record<TransitionType, number>> = {
 // This is a migrated artistic interpretation, not encoded W3C compatibility.
 // Normal alpha-over and additive light share the scene domain; see audit for
 // all legacy/new numeric differences and the user-facing migration warning.
+// Widen this literal only alongside an implemented encoded-space blend path.
 export const BLEND_WORKING_SPACE: Readonly<Record<BlendMode, "linear">> = {
   normal: "linear",
   add: "linear",

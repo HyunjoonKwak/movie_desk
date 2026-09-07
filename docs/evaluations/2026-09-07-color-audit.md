@@ -558,3 +558,98 @@ live meter stuck at −60dB for its five-second timeout despite passing the PCM 
 assertions. With **no code or test changes**, a fresh full gate passed that test
 and all 64 E2Es. This transient failure remains recorded rather than suppressed.
 No dependencies, lockfile, audio production code, push or main merge changed.
+
+
+## B’4b round 3 — null metadata and byte-bounded source storage
+
+Review base `f4adad6`, same branch/worktree. No audio implementation/test edits,
+dependencies, push or main merge. The B’3 worklet attachment race is explicitly
+open in [work order](../07-work-order.md): playback starts before asynchronous
+worklet attachment in `870fa35`, so the first meter update is unbounded and can
+remain at -60dB beyond the five-second assertion; rerun success does not close it.
+Waiting explicitly for attachment in the test is a candidate follow-up.
+
+### Encoder metadata
+
+Missing colorSpace, an empty object, and four null members all continue with
+`colorApproximation === true`. Matching partial metadata also warns because it
+cannot verify the whole output contract. Only a supplied non-null field that
+contradicts limited-range BT.709 triggers `ExportColorMetadataError`; complete
+matching metadata produces `colorApproximation === false`. Cleanup tests now
+cover these cases and partial matrix/range contradictions, alongside the
+preflight-only rejection test. Complete verification short-circuits the conflict
+check, retaining compatibility with the existing AAC test's verified-color mock.
+
+### Cache budget and quality tradeoff
+
+The existing entry limits remain secondary caps. Per Compositor, resolution LRU
+storage is limited to **64 MiB (67,108,864 bytes)** and immutable-image storage to
+**128 MiB (134,217,728 bytes)**: **192 MiB total**. RGBA16F costs 8 bytes/pixel;
+SRGB8_ALPHA8 costs 4. One 3840×2160 float source needs 63.28125 MiB, so the rounded
+budgets retain one full 4K mutable source and two full 4K images while preventing
+library-size growth. Eviction occurs before allocating replacement GPU storage;
+replaced/evicted targets release both texture and framebuffer.
+
+A single target exceeding its entire budget is aspect-preservingly resampled
+using floor(source dimension × sqrt(budget/source bytes)), at unchanged storage
+precision. Thus very large photos/above-4K video can lose spatial detail; this is
+an explicit memory/quality tradeoff, not an SRGB8 precision fallback. A 6000×4000
+float still becomes 5016×3344, 134,188,032 bytes, below 128 MiB. The raw RGBA8 upload
+is reduced to 1×1 after conversion so the asset texture cache cannot retain an
+additional full-resolution copy per photo. Ordinary 4K dimensions are unchanged.
+
+192 MiB covers these two caches, **not whole-process VRAM**: project-sized
+ping-pong/scratch/scene targets, the current raw upload, normalization canvas,
+decoded media, driver overhead and separate preview/export contexts are extra.
+A simultaneous preview/export can each have their own 192 MiB budget. The
+resolution-shared mutable target comment states the current sequential-consumer
+contract: fully consume one upload result before performing another upload.
+
+### 1,000-asset before/after measurement
+
+Reproduce: `node scripts/color/cache-memory.mjs`. [Raw results](2026-09-07-color-cache-memory.json).
+Actual Compositor on Apple M4 / ANGLE Metal / RGBA16F; 1000 distinct 3840×2160
+ImageBitmaps rendered sequentially in a 1000-asset library at 1920×1080 output.
+Source decodes are closed after each frame. This exercises renderer caches;
+it is not a folder-import/OPFS or whole-app heap benchmark. Instrumented
+texImage2D/deleteTexture bytes estimate requested GPU texture storage and exclude
+opaque driver overhead, constructor probes, and browser canvas/image backing.
+Heap is Chromium usedJSHeapSize after explicit GC. Decimal MB below.
+
+| Metric | f4adad6 | Round 3 |
+| --- | ---: | ---: |
+| Retained tracked texture bytes | 1,642,291,200 (1642.29 MB) | 182,476,896 (182.48 MB) |
+| Peak tracked texture bytes | 1,708,646,400 (1708.65 MB) | 215,654,492 (215.65 MB) |
+| JS heap before traversal | 2,179,098 | 2,193,614 |
+| JS heap after traversal + GC | 2,511,485 | 2,538,821 |
+| JS heap growth | 332,387 | 345,207 |
+| Texture bytes after dispose | 0 | 0 |
+| Traversal wall time, one run | 13,992.3 ms | 11,168.8 ms |
+
+Retained storage falls 88.89%, peak 87.38%; heap after traversal increases only
+27,336 bytes. Timing is diagnostic from one run, with other validation activity;
+no speedup claim is made. A prior development run took 10,195.4→10,392.9 ms,
+illustrating timing variance. The final run additionally asserts budgets and
+neutral RGBA [128,128,128,255] for the 6000×4000 photo and 19 mutable-source
+resolutions; these extra checks occur after the 1000-asset heap/storage snapshot.
+
+Weighted-cache unit tests cover pre-allocation eviction, LRU touch, replacement,
+retain/clear accounting and oversized rejection. The existing full real-GPU
+managed-color invariant suite also passes (`node scripts/color/managed.mjs
+--verify --metal`). Highp self-replacement now reads as an explicit uniqueness
+assertion; the linear blend literal intentionally stays narrow, with a comment
+requiring an implemented encoded-space path before widening the type.
+
+Validation history: an initial gate stopped at a benchmark multi-declaration
+lint error; the next found the existing AAC color mock lacked the new conflict
+helper. Both were fixed in this batch; no audio test or timeout was changed.
+Final gate results are recorded in [round 3 gate](2026-09-07-color-linear-round3-gate.md).
+
+
+Final `pnpm gate` **9/9 PASS**: core **155**, web **709**, desktop **72**,
+scripts **11**, total **947** unit tests; Chromium E2E **64/64** (185.9 seconds).
+Typecheck zero errors, lint clean, production build passes, OSV checks **167**
+production packages with no known vulnerabilities. `lsof -nP -iTCP:32119
+-sTCP:LISTEN` showed no listener before each gate invocation (only an unrelated
+Time Machine mount warning); no existing server was stopped. Final diff whitespace
+and benchmark Biome checks pass. The B’3 race remains open despite this E2E pass.

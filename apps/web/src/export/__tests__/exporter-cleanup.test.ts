@@ -107,7 +107,13 @@ describe("WebCodecsExporter resource cleanup", () => {
     expect(harness.encoderClose).toHaveBeenCalledOnce();
     expect(harness.dispose).toHaveBeenCalledOnce();
   });
-  it("continues with approximation when encoder metadata is absent", async () => {
+  it.each([
+    undefined,
+    {},
+    { primaries: null, transfer: null, matrix: null, fullRange: null },
+    { primaries: "bt709" as const, transfer: null, matrix: null, fullRange: false },
+  ])("continues with approximation for absent or incomplete metadata: %j", async (metadata) => {
+    harness.metadata = metadata;
     harness.project = {
       ...harness.project!,
       timeline: { ...harness.project!.timeline, duration: 100 },
@@ -123,6 +129,31 @@ describe("WebCodecsExporter resource cleanup", () => {
     expect(harness.encode).toHaveBeenCalledTimes(3);
     expect(harness.frameClose).toHaveBeenCalledTimes(harness.encode.mock.calls.length);
   });
+
+  it("verifies complete BT709 metadata without approximation", async () => {
+    harness.renderFrame.mockResolvedValue(undefined);
+    harness.metadata = { primaries: "bt709", transfer: "bt709", matrix: "bt709", fullRange: false };
+    const result = await new WebCodecsExporter().start(
+      { projectId: harness.project!.id, preset: PRESETS[0]! },
+      vi.fn(),
+    );
+    expect(result.colorApproximation).toBe(false);
+  });
+
+  it.each([{ matrix: "smpte170m" as const }, { fullRange: true }])(
+    "rejects conflicting partial metadata: %j",
+    async (metadata) => {
+      harness.renderFrame.mockResolvedValue(undefined);
+      harness.metadata = metadata;
+      await expect(
+        new WebCodecsExporter().start(
+          { projectId: harness.project!.id, preset: PRESETS[0]! },
+          vi.fn(),
+        ),
+      ).rejects.toThrow("color.encoderMismatch");
+      expect(harness.encode).toHaveBeenCalledOnce();
+    },
+  );
 
   it("rejects non-BT709 metadata after only the preflight frame", async () => {
     harness.renderFrame.mockResolvedValue(undefined);

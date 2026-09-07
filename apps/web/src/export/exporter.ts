@@ -6,7 +6,7 @@ import type { AudioPeakResult } from "@movie-desk/core";
 import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
 import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
-import { isBt709Output } from "./bt709-frame";
+import { hasConflictingBt709Output, isBt709Output } from "./bt709-frame";
 import { Bt709FramePipeline } from "./bt709-pipeline";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
@@ -156,7 +156,8 @@ export class WebCodecsExporter implements Exporter {
         output: (chunk, meta) => {
           if (meta?.decoderConfig?.colorSpace) {
             colorOutputVerified = isBt709Output(meta.decoderConfig.colorSpace);
-            if (!colorOutputVerified) colorOutputError = new ExportColorMetadataError();
+            if (!colorOutputVerified && hasConflictingBt709Output(meta.decoderConfig.colorSpace))
+              colorOutputError = new ExportColorMetadataError();
           }
           muxer.addVideoChunk(chunk, meta);
         },

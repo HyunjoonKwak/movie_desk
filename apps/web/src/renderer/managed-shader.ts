@@ -2,18 +2,24 @@
 // premultiplied pixels. Spatial filters operate on premultiplied RGB and coverage.
 export class ManagedShaderContractError extends Error {}
 
-export const replaceOnce = (source: string, needle: string, replacement: string): string => {
+const assertOnce = (source: string, needle: string): void => {
   const at = source.indexOf(needle);
   if (at < 0 || source.indexOf(needle, at + needle.length) >= 0)
     throw new ManagedShaderContractError(
       `Managed shader expected exactly one occurrence: ${needle}`,
     );
+};
+
+export const replaceOnce = (source: string, needle: string, replacement: string): string => {
+  assertOnce(source, needle);
   return source.replace(needle, replacement);
 };
 
 export const managedShader = (name: string, source: string): string => {
-  let fs = ["transfer", "blend-modes"].includes(name)
-    ? replaceOnce(source, "precision highp float;", "precision highp float;")
+  const alreadyHighp = ["transfer", "blend-modes"].includes(name);
+  if (alreadyHighp) assertOnce(source, "precision highp float;");
+  let fs = alreadyHighp
+    ? source
     : replaceOnce(source, "precision mediump float;", "precision highp float;");
   const replace = (needle: string, replacement: string) => {
     fs = replaceOnce(fs, needle, replacement);
