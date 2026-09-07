@@ -5,6 +5,8 @@ export class BoundedResourceCache<K, V> {
   private readonly entries = new Map<K, { value: V; usedAt: number; weight: number }>();
   private clock = 0;
   private totalWeight = 0;
+  private readonly pins = new Map<K, number>();
+  private readonly retired = new Set<K>();
 
   constructor(
     private readonly maxEntries: number,
@@ -25,14 +27,51 @@ export class BoundedResourceCache<K, V> {
   reserve(weight: number): void {
     if (!Number.isFinite(weight) || weight < 0 || weight > this.maxWeight)
       throw new Error("Resource exceeds cache weight budget");
-    this.pruneToLimit(weight);
+    if (!this.tryReserve(weight, 0)) throw new Error("Resource exceeds available cache budget");
   }
 
   get size(): number {
     return this.entries.size;
   }
 
+  // A lease survives awaits and retain/delete calls. Destruction is deferred
+  // until the last borrower releases; leased bytes still count against the cap.
+  pin(key: K): (() => void) | undefined {
+    if (!this.entries.has(key) || this.retired.has(key)) return undefined;
+    this.pins.set(key, (this.pins.get(key) ?? 0) + 1);
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const count = (this.pins.get(key) ?? 1) - 1;
+      if (count) this.pins.set(key, count);
+      else {
+        this.pins.delete(key);
+        if (this.retired.delete(key)) this.delete(key);
+      }
+    };
+  }
+
+  // Check the whole reservation before evicting anything. A caller can return
+  // a black frame on exhaustion without deleting a parent's live working set.
+  tryReserve(weight: number, entries = 1): boolean {
+    if (!Number.isFinite(weight) || weight < 0 || weight > this.maxWeight) return false;
+    let pinnedWeight = 0;
+    let pinnedCount = 0;
+    for (const [key, entry] of this.entries) {
+      if (this.pins.has(key)) {
+        pinnedWeight += entry.weight;
+        pinnedCount++;
+      }
+    }
+    if (pinnedWeight + weight > this.maxWeight || pinnedCount + entries > this.maxEntries)
+      return false;
+    this.pruneToLimit(weight, entries);
+    return true;
+  }
+
   get(key: K): V | undefined {
+    if (this.retired.has(key)) return undefined;
     const entry = this.entries.get(key);
     if (!entry) return undefined;
     entry.usedAt = ++this.clock;
@@ -44,6 +83,8 @@ export class BoundedResourceCache<K, V> {
     if (!Number.isFinite(weight) || weight < 0 || weight > this.maxWeight)
       throw new Error("Resource exceeds cache weight budget");
     const previous = this.entries.get(key);
+    if (previous && previous.value !== value && this.pins.has(key))
+      throw new Error("Cannot replace a leased resource");
     if (previous && previous.value !== value) this.disposeValue(previous.value, key);
     this.totalWeight += weight - (previous?.weight ?? 0);
     this.entries.set(key, { value, usedAt: ++this.clock, weight });
@@ -53,6 +94,10 @@ export class BoundedResourceCache<K, V> {
   delete(key: K): boolean {
     const entry = this.entries.get(key);
     if (!entry) return false;
+    if (this.pins.has(key)) {
+      this.retired.add(key);
+      return true;
+    }
     this.entries.delete(key);
     this.totalWeight -= entry.weight;
     this.disposeValue(entry.value, key);
@@ -66,17 +111,16 @@ export class BoundedResourceCache<K, V> {
   }
 
   clear(): void {
-    for (const [key, entry] of this.entries) this.disposeValue(entry.value, key);
-    this.entries.clear();
-    this.totalWeight = 0;
+    for (const key of this.entries.keys()) this.delete(key);
   }
 
-  private pruneToLimit(reserved = 0): void {
-    while (this.entries.size > this.maxEntries || this.totalWeight + reserved > this.maxWeight) {
+  private pruneToLimit(reserved = 0, reservedEntries = 0): void {
+    while (this.entries.size + reservedEntries > this.maxEntries || this.totalWeight + reserved > this.maxWeight) {
       let oldestKey: K | undefined;
       let found = false;
       let oldestUse = Number.POSITIVE_INFINITY;
       for (const [key, entry] of this.entries) {
+        if (this.pins.has(key)) continue;
         if (entry.usedAt < oldestUse) {
           oldestKey = key;
           found = true;

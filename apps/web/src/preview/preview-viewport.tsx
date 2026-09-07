@@ -145,7 +145,6 @@ export function PreviewViewport() {
       }
     }
     const compositor = compositorRef.current;
-    compositor.setPlayheadGetter(() => useProjectStore.getState().project.timeline.playhead);
 
     const lost = (event: Event) => {
       event.preventDefault();

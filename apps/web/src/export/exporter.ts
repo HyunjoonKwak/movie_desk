@@ -107,7 +107,6 @@ export class WebCodecsExporter implements Exporter {
       let colorMetadataMissing = false;
       let colorOutputError: Error | null = null;
       let virtualPlayheadMs = 0;
-      compositor.setPlayheadGetter(() => virtualPlayheadMs);
 
       // Include audio only when the preset wants AAC AND the browser can encode
       // it. A browser without an AAC encoder (older Safari, codec-less

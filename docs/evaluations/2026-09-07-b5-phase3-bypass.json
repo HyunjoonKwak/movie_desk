@@ -1,0 +1,146 @@
+{
+  "baseline": "84a26767d60bb58ddcdb05861492abacb41b13c9",
+  "protocol": "Same page, two warmed contexts; 30 alternating warmups, then 10 paired 30-frame batches with reversed implementation order each batch; every timed frame forces 1-pixel readback and checks neutral output, GL errors and context health.",
+  "results": [
+    {
+      "name": "opaque-native-video-bypass",
+      "rows": [
+        {
+          "implementation": "baseline",
+          "frames": 300,
+          "p50Ms": 2.100000023841858,
+          "p95Ms": 2.5,
+          "medianBatchMeanMs": 2.146666665871938,
+          "batchMeans": [
+            2.1,
+            2.226666667064031,
+            1.9633333325386046,
+            1.9700000007947287,
+            2.0066666662693025,
+            2.183333333333333,
+            2.146666665871938,
+            2.1200000007947284,
+            2.15,
+            2.4100000003973645
+          ],
+          "blackFrames": 0,
+          "counters": {
+            "targetAllocations": 0,
+            "textureDeletes": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        },
+        {
+          "implementation": "modified",
+          "frames": 300,
+          "p50Ms": 1.800000011920929,
+          "p95Ms": 2.300000011920929,
+          "medianBatchMeanMs": 1.8166666666666667,
+          "batchMeans": [
+            1.7899999996026357,
+            1.8166666666666667,
+            1.8100000003973642,
+            1.7699999988079071,
+            1.8133333345254263,
+            1.9299999992052714,
+            1.7666666666666666,
+            1.8366666674613952,
+            2.05,
+            2.2299999992052713
+          ],
+          "blackFrames": 0,
+          "counters": {
+            "targetAllocations": 0,
+            "textureDeletes": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        }
+      ],
+      "pairedRatios": [
+        0.8523809521917313,
+        0.8158682633274564,
+        0.9219015285891473,
+        0.8984771563928231,
+        0.9036544858228437,
+        0.8839694652848572,
+        0.8229813667643074,
+        0.8663522013079625,
+        0.9534883720930232,
+        0.9253112028371724
+      ],
+      "medianPairedRatio": 0.8984771563928231
+    },
+    {
+      "name": "opaque-native-still-bypass",
+      "rows": [
+        {
+          "implementation": "baseline",
+          "frames": 300,
+          "p50Ms": 0.9000000357627869,
+          "p95Ms": 1.0999999642372131,
+          "medianBatchMeanMs": 0.9399999996026357,
+          "batchMeans": [
+            0.9600000003973643,
+            0.9200000007947285,
+            0.9,
+            0.9399999996026357,
+            0.9133333345254262,
+            0.9366666654745738,
+            0.9166666666666666,
+            0.9633333325386048,
+            0.95,
+            0.9899999996026357
+          ],
+          "blackFrames": 0,
+          "counters": {
+            "targetAllocations": 0,
+            "textureDeletes": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        },
+        {
+          "implementation": "modified",
+          "frames": 300,
+          "p50Ms": 0.7999999523162842,
+          "p95Ms": 0.9000000357627869,
+          "medianBatchMeanMs": 0.776666667064031,
+          "batchMeans": [
+            0.8566666662693023,
+            0.8199999988079071,
+            0.7399999996026357,
+            0.75,
+            0.7399999996026357,
+            0.776666667064031,
+            0.7900000015894572,
+            0.7299999992052714,
+            0.7666666666666667,
+            0.8100000003973643
+          ],
+          "blackFrames": 0,
+          "counters": {
+            "targetAllocations": 0,
+            "textureDeletes": 0,
+            "fboCreates": 0,
+            "fboDeletes": 0
+          }
+        }
+      ],
+      "pairedRatios": [
+        0.8923611103278227,
+        0.8913043457603935,
+        0.8222222217807064,
+        0.7978723407628149,
+        0.8102189766096126,
+        0.8291814961414509,
+        0.8618181835521351,
+        0.757785466928206,
+        0.8070175438596492,
+        0.8181818189115965
+      ],
+      "medianPairedRatio": 0.8222222217807064
+    }
+  ]
+}

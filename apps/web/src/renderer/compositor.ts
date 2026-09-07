@@ -11,6 +11,7 @@ import {
   type MediaAsset,
   type MediaClip,
   type Project,
+  MAX_SEQUENCE_DEPTH,
   type ShapeClip,
   type TextClip,
   type TransitionFrame,
@@ -49,6 +50,7 @@ import { type TransferProbe, probeVideoTransfer, uploadedVideoDomain } from "./i
 import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
 import { ManagedShaderContractError } from "./managed-shader";
 import { PingPong } from "./ping-pong";
+import { type RenderTarget, type TargetLease, preserveFramebuffer, screenTarget } from "./render-target";
 import { RetryBackoff } from "./retry-backoff";
 import { ScratchPool } from "./scratch-pool";
 import { type Program, ShaderRegistry } from "./shader-registry";
@@ -57,6 +59,26 @@ import { quarterTurns } from "./source-rotation";
 import { IMAGE_TARGET_BYTES, MAX_SOURCE_TARGET_BYTES, SOURCE_TARGET_BYTES } from "./target-budget";
 import { renderTextToCanvas } from "./text-source";
 import { getFrameProvider } from "./webcodecs-decoder";
+
+export interface RenderFrameOptions {
+  readonly target?: RenderTarget;
+  readonly playhead?: number;
+}
+
+interface FrameContext {
+  readonly depth: number;
+  readonly target: RenderTarget;
+  readonly playhead: number;
+  readonly pingPong: PingPong;
+  readonly slots: Map<number, TargetLease>;
+  readonly releaseClip: (() => void)[];
+  readonly project: Project;
+  readonly restoreBindings: boolean;
+  managed: boolean;
+  maskTexture: WebGLTexture | null;
+}
+
+class FrameBudgetError extends Error {}
 
 // Per-clip ping-pong effect chain + final composite to the screen. Effect
 // chain is data-driven by `effects/registry.ts`. Bg-remove receives a mask
@@ -79,9 +101,11 @@ export class Compositor {
   private readonly bgMaskTime = new Map<string, number>();
   private retainedAssetIds = new Set<string>();
   private readonly colorFormat: TargetFormat | null;
-  private readonly colorPingPong: PingPong;
+  private readonly colorPingPongs = new Map<number, PingPong>();
+  private readonly activeFrames = new Map<number, FrameContext>();
+  private readonly childTargets: ScratchPool;
+  private sourceQueue: Promise<void> = Promise.resolve();
   private readonly colorScratch: ScratchPool;
-  private managed = false;
   private invalidated = false;
   private readonly colorWarnings = new Set<string>();
   private readonly videoTransferProbe: TransferProbe;
@@ -119,15 +143,60 @@ export class Compositor {
   );
   private readonly normalizedSource = document.createElement("canvas");
   private readonly opaqueImages = new WeakMap<object, boolean>();
-  private get pingPong() {
-    return this.colorPingPong;
+  private readonly imageTargetKeys = new WeakMap<object, { url: string; key: object }>();
+
+  private imageTargetKey(source: object, url: string): object {
+    let entry = this.imageTargetKeys.get(source);
+    if (!entry || entry.url !== url) {
+      entry = { url, key: {} };
+      this.imageTargetKeys.set(source, entry);
+    }
+    return entry.key;
   }
-  private get scratch() {
-    return this.colorScratch;
+  private slot(frame: FrameContext, role: number): TargetLease {
+    let slot = frame.slots.get(role);
+    if (!slot) {
+      slot = this.colorScratch.lease(frame.depth, role, frame.target.width, frame.target.height);
+      frame.slots.set(role, slot);
+    }
+    return slot;
   }
-  private get sceneFbo() {
-    return this.managed ? this.colorScratch.acquire(3).fbo : null;
+  private sceneFbo(frame: FrameContext) {
+    return frame.managed ? this.slot(frame, 3).fbo : frame.target.fbo;
   }
+
+  acquireChildTarget(depth: number, width: number, height: number): TargetLease {
+    return this.childTargets.lease(depth, 0, width, height);
+  }
+
+  private withGpu<T>(preserve: boolean, work: () => T): T {
+    const gl = this.gl;
+    const restore = preserve ? preserveFramebuffer(gl) : null;
+    try {
+      gl.enable(gl.BLEND);
+      setBlendMode(gl, "normal");
+      return work();
+    } finally {
+      restore?.();
+      gl.enable(gl.BLEND);
+      setBlendMode(gl, "normal");
+    }
+  }
+
+  // DOM media elements have mutable seek state. Serialize acquisition through
+  // upload/segmentation, never the whole render (which would deadlock reentry).
+  // INVARIANT: no nested renderFrame call inside this callback. Phase 4 must
+  // dispatch sequence clips OUTSIDE the media-only callback in uploadClip.
+  // See docs/decisions/2026-09-07-compositor-reentry.md for the async ownership
+  // rule; a global lock-held check would reject legitimate overlapping calls.
+  private async withSource<T>(work: () => Promise<T>): Promise<T> {
+    const previous = this.sourceQueue;
+    let release!: () => void;
+    this.sourceQueue = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try { return await work(); } finally { release(); }
+  }
+
   get colorPrecision() {
     return this.colorFormat?.precision ?? "unsupported";
   }
@@ -158,17 +227,12 @@ export class Compositor {
     this.quad = createQuad(this.gl);
     this.colorFormat = probeColorTarget(this.gl);
     this.videoTransferProbe = probeVideoTransfer(this.gl);
-    this.colorPingPong = new PingPong(this.gl, this.colorFormat ?? undefined);
+    this.childTargets = new ScratchPool(this.gl);
     this.colorScratch = new ScratchPool(this.gl, this.colorFormat ?? undefined);
     this.sources = new FrameSourcePool();
     const gl = this.gl;
     gl.enable(gl.BLEND);
     gl.blendFuncSeparate(gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  }
-
-  private playheadFn: () => number = () => 0;
-  setPlayheadGetter(fn: () => number) {
-    this.playheadFn = fn;
   }
 
   resize(cssWidth: number, cssHeight: number, dpr = Math.min(window.devicePixelRatio || 1, 2)) {
@@ -185,46 +249,120 @@ export class Compositor {
     this.invalidated = true;
   }
 
-  async renderFrame(project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
+  async renderFrame(
+    project: Project,
+    getAsset: (id: ID) => MediaAsset | undefined,
+    options: RenderFrameOptions = {},
+  ) {
     const gl = this.gl;
     if (this.invalidated || gl.isContextLost()) return;
-    const assetIds = new Set<string>(project.mediaLibrary.map((asset) => asset.id));
+    const target = options.target ?? screenTarget(gl);
+    let depth = 0;
+    while (this.activeFrames.has(depth)) depth++;
+    if (depth >= MAX_SEQUENCE_DEPTH) {
+      // Runtime resource exhaustion follows the sequence failure boundary:
+      // black/empty contribution, never an exception or a parent's eviction.
+      this.withGpu(options.target !== undefined, () => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+        gl.viewport(0, 0, target.width, target.height);
+        gl.clearColor(0, 0, 0, target.clearAlpha);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      });
+      return;
+    }
+    let pingPong = this.colorPingPongs.get(depth);
+    if (!pingPong) {
+      pingPong = new PingPong(gl, this.colorFormat ?? undefined);
+      this.colorPingPongs.set(depth, pingPong);
+    }
+    const frame: FrameContext = {
+      depth,
+      target,
+      playhead: options.playhead ?? project.timeline.playhead,
+      pingPong,
+      slots: new Map(),
+      releaseClip: [],
+      project,
+      restoreBindings: options.target !== undefined,
+      managed: false,
+      maskTexture: null,
+    };
+    this.activeFrames.set(depth, frame);
+    try {
+      await this.renderInto(frame, project, getAsset);
+    } catch (error) {
+      if (!(error instanceof FrameBudgetError)) throw error;
+      this.withGpu(frame.restoreBindings, () => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, target.fbo);
+        gl.viewport(0, 0, target.width, target.height);
+        gl.clearColor(0, 0, 0, target.clearAlpha);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      });
+    } finally {
+      for (const release of frame.releaseClip.splice(0)) release();
+      for (const slot of frame.slots.values()) slot.release();
+      this.activeFrames.delete(depth);
+      if (this.invalidated) pingPong.dispose();
+    }
+  }
+
+  private async renderInto(frame: FrameContext, project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
+    const gl = this.gl;
+    if (this.invalidated || gl.isContextLost()) return;
+    const assetIds = new Set<string>();
+    const textureIds = new Set<string>();
+    for (const active of this.activeFrames.values()) {
+      for (const asset of active.project.mediaLibrary) {
+        assetIds.add(asset.id);
+        textureIds.add(`${active.depth}:${asset.id}`);
+      }
+    }
     this.retainedAssetIds = assetIds;
-    this.assetTextures.retain(assetIds);
-    this.bgMaskTextures.retain(assetIds);
+    this.assetTextures.retain(textureIds);
+    this.bgMaskTextures.retain(textureIds);
     this.sources.retain(assetIds);
     const graphicClipIds = new Set<string>();
-    for (const track of project.timeline.tracks) {
-      for (const clip of track.clips) {
-        if (isTextClip(clip) || isShapeClip(clip)) graphicClipIds.add(clip.id);
+    for (const active of this.activeFrames.values()) {
+      for (const track of active.project.timeline.tracks) {
+        for (const clip of track.clips) {
+          if (isTextClip(clip) || isShapeClip(clip)) graphicClipIds.add(`${active.depth}:${clip.id}`);
+        }
       }
     }
     this.textTextures.retain(graphicClipIds);
     this.decodeRetry.retain(assetIds);
     getFrameProvider().retain(
       new Set(
-        project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id),
+        [...this.activeFrames.values()].flatMap((active) => active.project.mediaLibrary.filter((asset) => asset.kind === "video").map((asset) => asset.id)),
       ),
     );
-    const visible = visibleAt(project, project.timeline.playhead);
-    this.managed = visible.length > 0 && !this.canBypass(visible, project, getAsset);
-    if (this.managed && !this.colorFormat) {
+    const visible = visibleAt(project, frame.playhead);
+    frame.managed = visible.length > 0 && !this.canBypass(visible, project, getAsset, frame);
+    // The sole bypass candidate is uploaded before scene initialization. Alpha
+    // can promote this context here, but can never clear a partially drawn scene.
+    const prepared = !frame.managed && visible.length === 1
+      ? await this.uploadClip(visible[0]!, getAsset, project, frame)
+      : undefined;
+    if (this.invalidated || gl.isContextLost()) return;
+    if (frame.managed && !this.colorFormat) {
       this.warnColor("unsupported");
       throw new Error("Linear color processing is unsupported on this GPU");
     }
-    if (this.managed && this.colorFormat?.precision === "srgb8") this.warnColor("precision");
-    if (this.managed) {
-      try {
-        this.colorPingPong.resize(gl.drawingBufferWidth, gl.drawingBufferHeight);
-      } catch (error) {
-        this.warnColor("unsupported");
-        throw error;
+    if (frame.managed && this.colorFormat?.precision === "srgb8") this.warnColor("precision");
+    this.withGpu(frame.restoreBindings, () => {
+      if (frame.managed) {
+        try {
+          frame.pingPong.resize(frame.target.width, frame.target.height);
+        } catch (error) {
+          this.warnColor("unsupported");
+          throw error;
+        }
       }
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-    gl.clearColor(0, 0, 0, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo(frame));
+      gl.viewport(0, 0, frame.target.width, frame.target.height);
+      gl.clearColor(0, 0, 0, frame.target.clearAlpha);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    });
 
     if (visible.length === 0) return;
     const ordered = [...visible].reverse();
@@ -232,80 +370,82 @@ export class Compositor {
     for (const clip of ordered) {
       // Adjustment layers re-process the frame already drawn beneath them.
       if (isAdjustmentClip(clip)) {
-        this.applyAdjustmentLayer(clip, project);
+        this.withGpu(frame.restoreBindings, () => this.applyAdjustmentLayer(clip, project, frame));
         continue;
       }
       // Text clips may animate (typewriter changes the rendered glyphs).
       const textAnim = isTextClip(clip)
-        ? textAnimAt(clip, Math.max(0, project.timeline.playhead - clip.start))
+        ? textAnimAt(clip, Math.max(0, frame.playhead - clip.start))
         : null;
-      let sourceTex = await this.uploadClip(clip, getAsset, project, textAnim?.charFrac ?? 1);
+      let sourceTex = prepared !== undefined ? prepared : await this.uploadClip(clip, getAsset, project, frame, textAnim?.charFrac ?? 1);
       if (this.invalidated || gl.isContextLost()) return;
-      if (!sourceTex) continue;
+      if (!sourceTex) {
+        for (const release of frame.releaseClip.splice(0)) release();
+        continue;
+      }
 
       // Spatial conform: resample media into the frame aspect (fill/fit) so it
       // isn't stretched. Skipped for the default "stretch".
       if (isMediaClip(clip) && clip.fit && clip.fit !== "stretch") {
         const asset = getAsset(clip.assetId);
         if (asset?.width && asset?.height) {
-          sourceTex = this.applyFit(sourceTex, asset.width / asset.height, clip.fit);
+          const input = sourceTex;
+          sourceTex = this.withGpu(frame.restoreBindings, () => this.applyFit(input, asset.width! / asset.height!, clip.fit as "fill" | "fit", frame));
         }
-      }
-
-      let maskTexture: WebGLTexture | null = null;
-      if (isMediaClip(clip) && clip.effects.some((e) => e.enabled && e.type === "bg-remove")) {
-        const asset = getAsset(clip.assetId);
-        if (asset) maskTexture = await this.uploadBgMask(asset);
-        if (this.invalidated || gl.isContextLost()) return;
       }
 
       // Resolve keyframe-driven effect param overrides at the current clip
       // time so animations actually move. Targets are dotted paths into the
       // params, e.g. "effects.<id>.amount".
-      const { effects: animatedEffects, kfValues } = animateEffects(clip, project);
-      const finalTex = this.applyEffectChain(sourceTex, animatedEffects, maskTexture);
+      this.withGpu(frame.restoreBindings, () => {
+        const { effects: animatedEffects, kfValues } = animateEffects(clip, project, frame.playhead);
+        const finalTex = this.applyEffectChain(sourceTex, animatedEffects, frame.maskTexture, frame);
 
-      // Final composite to screen with clip transform applied. Slides/fades
-      // fold into the transform; wipes drive a GPU mask instead. Transform
-      // keyframes (transform.x/y/scale/rotation/opacity) override the static
-      // transform when present.
-      // Text animations override the base transform (fade/slide/pop); other
-      // clips use their static transform plus any keyframe overrides.
-      const baseTf = textAnim ? textAnim.transform : clipTransform(clip);
-      const tf = {
-        x: kfValues["transform.x"] ?? baseTf.x,
-        y: kfValues["transform.y"] ?? baseTf.y,
-        scale: kfValues["transform.scale"] ?? baseTf.scale,
-        rotation: kfValues["transform.rotation"] ?? baseTf.rotation,
-        opacity: kfValues["transform.opacity"] ?? baseTf.opacity,
-      };
-      const transition = activeTransitionFor(clip, project.timeline.playhead);
-      const wipe = transition && isWipe(transition.type) ? transition : null;
-      const composed = wipe ? tf : applyTransitionToTransform(tf, transition);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      if (isBackdropBlend(clip.blendMode)) {
-        this.compositeBackdropBlend(finalTex, composed, clip.mask, clip.blendMode, wipe);
-      } else {
-        setBlendMode(gl, clip.blendMode);
-        const prog = this.shaders.get("blit", this.managed);
-        prog.use();
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, finalTex);
-        gl.uniform1i(prog.uniform("u_tex"), 0);
-        setTransformUniforms(gl, prog, composed);
-        setWipeUniforms(gl, prog, wipe);
-        setMaskUniforms(gl, prog, clip.mask);
-        this.quad.draw();
+        // Final composite to screen with clip transform applied. Slides/fades
+        // fold into the transform; wipes drive a GPU mask instead. Transform
+        // keyframes (transform.x/y/scale/rotation/opacity) override the static
+        // transform when present.
+        // Text animations override the base transform (fade/slide/pop); other
+        // clips use their static transform plus any keyframe overrides.
+        const baseTf = textAnim ? textAnim.transform : clipTransform(clip);
+        const tf = {
+          x: kfValues["transform.x"] ?? baseTf.x,
+          y: kfValues["transform.y"] ?? baseTf.y,
+          scale: kfValues["transform.scale"] ?? baseTf.scale,
+          rotation: kfValues["transform.rotation"] ?? baseTf.rotation,
+          opacity: kfValues["transform.opacity"] ?? baseTf.opacity,
+        };
+        const transition = activeTransitionFor(clip, frame.playhead);
+        const wipe = transition && isWipe(transition.type) ? transition : null;
+        const composed = wipe ? tf : applyTransitionToTransform(tf, transition);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo(frame));
+        gl.viewport(0, 0, frame.target.width, frame.target.height);
+        if (isBackdropBlend(clip.blendMode)) {
+          this.compositeBackdropBlend(finalTex, composed, clip.mask, clip.blendMode, wipe, frame);
+        } else {
+          setBlendMode(gl, clip.blendMode);
+          const prog = this.shaders.get("blit", frame.managed);
+          prog.use();
+          gl.activeTexture(gl.TEXTURE0);
+          gl.bindTexture(gl.TEXTURE_2D, finalTex);
+          gl.uniform1i(prog.uniform("u_tex"), 0);
+          setTransformUniforms(gl, prog, composed, frame.target.width / frame.target.height);
+          setWipeUniforms(gl, prog, wipe);
+          setMaskUniforms(gl, prog, clip.mask);
+          this.quad.draw();
+        }
+      });
+      for (const release of frame.releaseClip.splice(0)) release();
+    }
+    this.withGpu(frame.restoreBindings, () => {
+      if (frame.managed) {
+        gl.disable(gl.BLEND);
+        this.drawTransfer(this.slot(frame, 3).tex, frame.target.fbo, "linear", "srgb", frame);
+        gl.enable(gl.BLEND);
       }
-    }
-    if (this.managed) {
-      gl.disable(gl.BLEND);
-      this.drawTransfer(this.colorScratch.acquire(3).tex, null, "linear", "srgb");
-      gl.enable(gl.BLEND);
-    }
-    // Restore default premultiplied-over blending for the next frame.
-    setBlendMode(gl, "normal");
+      // Restore default premultiplied-over blending for the next frame.
+      setBlendMode(gl, "normal");
+    });
   }
 
   // Composites a clip with one of the backdrop-reading blend modes by
@@ -317,20 +457,21 @@ export class Compositor {
     mask: Clip["mask"],
     mode: BackdropBlendMode,
     wipe: TransitionFrame | null,
+    frame: FrameContext,
   ) {
     const gl = this.gl;
-    const w = gl.drawingBufferWidth;
-    const h = gl.drawingBufferHeight;
-    const sceneFbo = this.sceneFbo;
-    const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
+    const w = frame.target.width;
+    const h = frame.target.height;
+    const sceneFbo = this.sceneFbo(frame);
+    const backdrop = this.slot(frame, Compositor.SCRATCH_BACKDROP);
     gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFbo);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo(frame));
     gl.viewport(0, 0, w, h);
     setBlendMode(gl, "normal");
-    const prog = this.shaders.get("blend-modes", this.managed);
+    const prog = this.shaders.get("blend-modes", frame.managed);
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, finalTex);
@@ -342,7 +483,7 @@ export class Compositor {
     if (resLoc) gl.uniform2f(resLoc, w, h);
     const modeLoc = prog.uniform("u_mode");
     if (modeLoc) gl.uniform1i(modeLoc, BACKDROP_BLEND_MODE[mode]);
-    setTransformUniforms(gl, prog, tf);
+    setTransformUniforms(gl, prog, tf, frame.target.width / frame.target.height);
     setWipeUniforms(gl, prog, wipe);
     setMaskUniforms(gl, prog, mask);
     this.quad.draw();
@@ -350,12 +491,12 @@ export class Compositor {
 
   // Renders `src` into a frame-sized scratch slot, resampled to cover (fill)
   // or be contained (fit) at the source's aspect ratio instead of stretched.
-  private applyFit(src: WebGLTexture, sourceAspect: number, mode: "fill" | "fit"): WebGLTexture {
+  private applyFit(src: WebGLTexture, sourceAspect: number, mode: "fill" | "fit", frame: FrameContext): WebGLTexture {
     const gl = this.gl;
-    const w = gl.drawingBufferWidth;
-    const h = gl.drawingBufferHeight;
+    const w = frame.target.width;
+    const h = frame.target.height;
     const frameAspect = w / h;
-    const slot = this.scratch.acquire(Compositor.SCRATCH_FIT);
+    const slot = this.slot(frame, Compositor.SCRATCH_FIT);
     // UV scale: <1 crops (cover), >1 letterboxes (contain).
     let sx = 1;
     let sy = 1;
@@ -389,13 +530,13 @@ export class Compositor {
 
   // Turns a decoded frame by the container's display rotation into a
   // frame-sized scratch slot. Only the WebCodecs path needs it.
-  private applySourceRotation(src: WebGLTexture, rotation: MediaAsset["rotation"]): WebGLTexture {
+  private applySourceRotation(src: WebGLTexture, rotation: MediaAsset["rotation"], frame: FrameContext): WebGLTexture {
     const turns = quarterTurns(rotation ?? 0);
     if (turns === 0) return src;
     const gl = this.gl;
-    const w = gl.drawingBufferWidth;
-    const h = gl.drawingBufferHeight;
-    const slot = this.scratch.acquire(Compositor.SCRATCH_ROTATE);
+    const w = frame.target.width;
+    const h = frame.target.height;
+    const slot = this.slot(frame, Compositor.SCRATCH_ROTATE);
     gl.bindFramebuffer(gl.FRAMEBUFFER, slot.fbo);
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
@@ -419,32 +560,32 @@ export class Compositor {
   // Captures the frame drawn so far, runs the adjustment's effect chain over
   // it, then redraws the result with the clip's mask + opacity. No-op when the
   // adjustment has no enabled effects.
-  private applyAdjustmentLayer(clip: AdjustmentClip, project: Project) {
+  private applyAdjustmentLayer(clip: AdjustmentClip, project: Project, frame: FrameContext) {
     const gl = this.gl;
     if (!clip.effects.some((e) => e.enabled)) return;
-    const w = gl.drawingBufferWidth;
-    const h = gl.drawingBufferHeight;
+    const w = frame.target.width;
+    const h = frame.target.height;
 
-    const sceneFbo = this.sceneFbo;
-    const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
+    const sceneFbo = this.sceneFbo(frame);
+    const backdrop = this.slot(frame, Compositor.SCRATCH_BACKDROP);
     gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFbo);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
-    const { effects, kfValues } = animateEffects(clip, project);
-    const resultTex = this.applyEffectChain(backdrop.tex, effects, null);
+    const { effects, kfValues } = animateEffects(clip, project, frame.playhead);
+    const resultTex = this.applyEffectChain(backdrop.tex, effects, null, frame);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo(frame));
     gl.viewport(0, 0, w, h);
     setBlendMode(gl, "normal");
-    const prog = this.shaders.get("blit", this.managed);
+    const prog = this.shaders.get("blit", frame.managed);
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, resultTex);
     gl.uniform1i(prog.uniform("u_tex"), 0);
     const tf = clipTransform(clip);
     const opacity = kfValues["transform.opacity"] ?? tf.opacity;
-    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity });
+    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity }, frame.target.width / frame.target.height);
     setWipeUniforms(gl, prog, null);
     setMaskUniforms(gl, prog, clip.mask);
     this.quad.draw();
@@ -454,6 +595,7 @@ export class Compositor {
     clips: readonly Clip[],
     project: Project,
     getAsset: (id: ID) => MediaAsset | undefined,
+    frame: FrameContext,
   ): boolean {
     if (clips.length !== 1) return false;
     const clip = clips[0]!;
@@ -462,8 +604,8 @@ export class Compositor {
     const tf = clipTransform(clip);
     return (
       !!asset &&
-      asset.width === this.gl.drawingBufferWidth &&
-      asset.height === this.gl.drawingBufferHeight &&
+      asset.width === frame.target.width &&
+      asset.height === frame.target.height &&
       !asset.rotation &&
       (!clip.fit || clip.fit === "stretch") &&
       !clip.mask &&
@@ -473,8 +615,8 @@ export class Compositor {
       tf.scale === 1 &&
       tf.rotation === 0 &&
       tf.opacity === 1 &&
-      Object.keys(animateEffects(clip, project).kfValues).length === 0 &&
-      !activeTransitionFor(clip, project.timeline.playhead) &&
+      Object.keys(animateEffects(clip, project, frame.playhead).kfValues).length === 0 &&
+      !activeTransitionFor(clip, frame.playhead) &&
       !clip.effects.some((fx) => fx.enabled && (getEffect(fx.type)?.passes.length ?? 0) > 0)
     );
   }
@@ -484,8 +626,9 @@ export class Compositor {
     fbo: WebGLFramebuffer | null,
     from: ColorDomain,
     to: ColorDomain,
-    w = this.gl.drawingBufferWidth,
-    h = this.gl.drawingBufferHeight,
+    frame: FrameContext,
+    w = frame.target.width,
+    h = frame.target.height,
     straight = false,
   ) {
     const gl = this.gl;
@@ -499,7 +642,7 @@ export class Compositor {
     gl.uniform1i(prog.uniform("u_straight"), straight ? 1 : 0);
     gl.uniform1i(prog.uniform("u_from"), domainIndex(from));
     gl.uniform1i(prog.uniform("u_to"), domainIndex(to));
-    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 });
+    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }, frame.target.width / frame.target.height);
     this.quad.draw();
   }
 
@@ -569,175 +712,209 @@ export class Compositor {
   private uploadVisualSource(
     tex: WebGLTexture,
     source: TexImageSource,
+    frame: FrameContext,
     asset?: MediaAsset,
   ): WebGLTexture {
-    const videoFrame =
-      typeof VideoFrame !== "undefined" && source instanceof VideoFrame ? source : null;
-    const interpretation = videoFrame
-      ? uploadedVideoDomain(videoFrame.colorSpace.toJSON(), this.videoTransferProbe)
-      : { domain: "srgb" as const, approximate: source instanceof HTMLVideoElement };
-    if (interpretation.approximate) {
-      this.usesColorApproximation = true;
-      this.warnColor("approximation", asset);
-    }
-    if (
-      typeof VideoFrame !== "undefined" &&
-      source instanceof VideoFrame &&
-      ["pq", "hlg", "smpte2084", "arib-std-b67"].includes(String(source.colorSpace.transfer))
-    )
-      this.warnColor("hdr", asset);
-    if (!this.managed && this.sourceHasAlpha(source)) {
-      this.managed = true;
-      if (!this.colorFormat) {
-        this.warnColor("unsupported");
-        throw new Error("Linear alpha compositing is unsupported");
+    // Cache hits perform no GPU work. Avoid a GL-state roundtrip per immutable
+    // layer in paused previews and repeated export frames.
+    const immutable = source instanceof HTMLImageElement ||
+      (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap);
+    if (frame.managed && immutable) {
+      const url = source instanceof HTMLImageElement ? source.currentSrc : "";
+      const key = this.imageTargetKey(source, url);
+      const cached = this.imageTargets.get(key);
+      if (cached?.url === url) {
+        frame.releaseClip.push(this.imageTargets.pin(key)!);
+        return cached.target.tex;
       }
-      if (this.colorFormat.precision === "srgb8") this.warnColor("precision");
+    }
+    return this.withGpu(frame.restoreBindings, () => {
+      const videoFrame =
+        typeof VideoFrame !== "undefined" && source instanceof VideoFrame ? source : null;
+      const interpretation = videoFrame
+        ? uploadedVideoDomain(videoFrame.colorSpace.toJSON(), this.videoTransferProbe)
+        : { domain: "srgb" as const, approximate: source instanceof HTMLVideoElement };
+      if (interpretation.approximate) {
+        this.usesColorApproximation = true;
+        this.warnColor("approximation", asset);
+      }
+      if (
+        typeof VideoFrame !== "undefined" &&
+        source instanceof VideoFrame &&
+        ["pq", "hlg", "smpte2084", "arib-std-b67"].includes(String(source.colorSpace.transfer))
+      )
+        this.warnColor("hdr", asset);
+      if (!frame.managed && this.sourceHasAlpha(source)) {
+        frame.managed = true;
+        if (!this.colorFormat) {
+          this.warnColor("unsupported");
+          throw new Error("Linear alpha compositing is unsupported");
+        }
+        if (this.colorFormat.precision === "srgb8") this.warnColor("precision");
+
+      }
+      if (!frame.managed) {
+        const cache = asset ? this.assetTextures : this.textTextures;
+        const key = `${frame.depth}:${asset?.id ?? ""}`;
+        if (asset) frame.releaseClip.push(cache.pin(key)!);
+        return uploadSource(this.gl, tex, source);
+      }
+      const immutableImage =
+        source instanceof HTMLImageElement ||
+        (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
+          ? source
+          : null;
+      const imageUrl = source instanceof HTMLImageElement ? source.currentSrc : "";
+      const imageKey = immutableImage ? this.imageTargetKey(immutableImage, imageUrl) : null;
+      const cachedImage = imageKey ? this.imageTargets.get(imageKey) : undefined;
+      if (cachedImage?.url === imageUrl) {
+        frame.releaseClip.push(this.imageTargets.pin(imageKey!)!);
+        return cachedImage.target.tex;
+      }
+      // Images use the browser's sRGB image/profile conversion. VideoFrames use
+      // the measured upload transfer directly. DOM video is explicitly approximate:
+      // an sRGB Canvas2D target alone does not prove BT.709 transfer normalization.
+      const dimensions = source as {
+        videoWidth?: number;
+        videoHeight?: number;
+        displayWidth?: number;
+        displayHeight?: number;
+        width: number;
+        height: number;
+        naturalWidth?: number;
+        naturalHeight?: number;
+      };
+      const w =
+        dimensions.videoWidth ||
+        dimensions.displayWidth ||
+        dimensions.naturalWidth ||
+        dimensions.width;
+      const h =
+        dimensions.videoHeight ||
+        dimensions.displayHeight ||
+        dimensions.naturalHeight ||
+        dimensions.height;
+      const canvas = this.normalizedSource;
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+      const ctx = canvas.getContext("2d", { colorSpace: "srgb" });
+      if (!ctx) throw new Error("sRGB source normalization is unavailable");
+      const sourceCanvas = source instanceof HTMLCanvasElement ? source : null;
+      const alreadySrgb =
+        sourceCanvas?.getContext("2d")?.getContextAttributes().colorSpace === "srgb";
+      const directSource = alreadySrgb || videoFrame || source instanceof HTMLVideoElement;
+      if (!directSource) {
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(source as CanvasImageSource, 0, 0);
+      }
+      uploadSource(this.gl, tex, directSource ? source : canvas, false);
       const gl = this.gl;
-      this.colorPingPong.resize(gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
-      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-      gl.clearColor(0, 0, 0, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-    }
-    if (!this.managed) return uploadSource(this.gl, tex, source);
-    const immutableImage =
-      source instanceof HTMLImageElement ||
-      (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
-        ? source
-        : null;
-    const imageUrl = source instanceof HTMLImageElement ? source.currentSrc : "";
-    const cachedImage = immutableImage ? this.imageTargets.get(immutableImage) : undefined;
-    if (cachedImage?.url === imageUrl) return cachedImage.target.tex;
-    // Images use the browser's sRGB image/profile conversion. VideoFrames use
-    // the measured upload transfer directly. DOM video is explicitly approximate:
-    // an sRGB Canvas2D target alone does not prove BT.709 transfer normalization.
-    const dimensions = source as {
-      videoWidth?: number;
-      videoHeight?: number;
-      displayWidth?: number;
-      displayHeight?: number;
-      width: number;
-      height: number;
-      naturalWidth?: number;
-      naturalHeight?: number;
-    };
-    const w =
-      dimensions.videoWidth ||
-      dimensions.displayWidth ||
-      dimensions.naturalWidth ||
-      dimensions.width;
-    const h =
-      dimensions.videoHeight ||
-      dimensions.displayHeight ||
-      dimensions.naturalHeight ||
-      dimensions.height;
-    const canvas = this.normalizedSource;
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-    const ctx = canvas.getContext("2d", { colorSpace: "srgb" });
-    if (!ctx) throw new Error("sRGB source normalization is unavailable");
-    const sourceCanvas = source instanceof HTMLCanvasElement ? source : null;
-    const alreadySrgb =
-      sourceCanvas?.getContext("2d")?.getContextAttributes().colorSpace === "srgb";
-    const directSource = alreadySrgb || videoFrame || source instanceof HTMLVideoElement;
-    if (!directSource) {
-      ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(source as CanvasImageSource, 0, 0);
-    }
-    uploadSource(this.gl, tex, directSource ? source : canvas, false);
-    const gl = this.gl;
-    const budget = immutableImage ? Compositor.IMAGE_TARGET_BYTES : Compositor.SOURCE_TARGET_BYTES;
-    const bytesPerPixel = this.colorFormat!.precision === "half-float" ? 8 : 4;
-    // Only oversized sources are resampled, preserving aspect and the selected precision.
-    // Keep room for a project-sized target even when one input is oversized.
-    const sourceBudget = Math.min(budget, Compositor.MAX_SOURCE_TARGET_BYTES);
-    const scale = Math.min(1, Math.sqrt(sourceBudget / (w * h * bytesPerPixel)));
-    const targetWidth = Math.max(1, Math.floor(w * scale));
-    const targetHeight = Math.max(1, Math.floor(h * scale));
-    const bytes = targetWidth * targetHeight * bytesPerPixel;
-    const key = `${targetWidth}x${targetHeight}`;
-    // Resolution slots are mutable: consume each uploadVisualSource result fully
-    // before the next upload; renderFrame currently composites clips sequentially.
-    let target = immutableImage ? undefined : this.sourceTargets.get(key);
-    if (!target) {
-      if (immutableImage) {
-        this.imageTargets.delete(immutableImage);
-        this.imageTargets.reserve(bytes);
-      } else this.sourceTargets.reserve(bytes);
-      target = { ...allocateTarget(gl, targetWidth, targetHeight, this.colorFormat!), bytes };
-      if (immutableImage) this.imageTargets.set(immutableImage, { target, url: imageUrl, bytes });
-      else this.sourceTargets.set(key, target);
-    }
-    gl.disable(gl.BLEND);
-    this.drawTransfer(
-      tex,
-      target.fbo,
-      interpretation.domain,
-      "linear",
-      targetWidth,
-      targetHeight,
-      true,
-    );
-    // Managed pixels now live in the budgeted target; do not retain a second
-    // full-size RGBA8 upload for every imported photo in assetTextures.
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.enable(gl.BLEND);
-    return target.tex;
+      const budget = immutableImage ? Compositor.IMAGE_TARGET_BYTES : Compositor.SOURCE_TARGET_BYTES;
+      const bytesPerPixel = this.colorFormat!.precision === "half-float" ? 8 : 4;
+      // Only oversized sources are resampled, preserving aspect and the selected precision.
+      // Keep room for a project-sized target even when one input is oversized.
+      const sourceBudget = Math.min(budget, Compositor.MAX_SOURCE_TARGET_BYTES);
+      const scale = Math.min(1, Math.sqrt(sourceBudget / (w * h * bytesPerPixel)));
+      const targetWidth = Math.max(1, Math.floor(w * scale));
+      const targetHeight = Math.max(1, Math.floor(h * scale));
+      const bytes = targetWidth * targetHeight * bytesPerPixel;
+      const key = `${frame.depth}:${targetWidth}x${targetHeight}`;
+      // Mutable slots are depth-local; byte leases protect suspended ancestors.
+      // All depths share the existing budget, rather than multiplying it by depth.
+      let target = immutableImage ? undefined : this.sourceTargets.get(key);
+      if (!target) {
+        if (immutableImage) {
+          this.imageTargets.delete(imageKey!);
+          if (!this.imageTargets.tryReserve(bytes)) throw new FrameBudgetError();
+        } else if (!this.sourceTargets.tryReserve(bytes)) throw new FrameBudgetError();
+        target = { ...allocateTarget(gl, targetWidth, targetHeight, this.colorFormat!), bytes };
+        if (immutableImage) this.imageTargets.set(imageKey!, { target, url: imageUrl, bytes });
+        else this.sourceTargets.set(key, target);
+      }
+      frame.releaseClip.push(immutableImage ? this.imageTargets.pin(imageKey!)! : this.sourceTargets.pin(key)!);
+      gl.disable(gl.BLEND);
+      this.drawTransfer(
+        tex,
+        target.fbo,
+        interpretation.domain,
+        "linear",
+        frame,
+        targetWidth,
+        targetHeight,
+        true,
+      );
+      // Managed pixels now live in the budgeted target; do not retain a second
+      // full-size RGBA8 upload for every imported photo in assetTextures.
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.enable(gl.BLEND);
+      return target.tex;
+    });
   }
 
   private async uploadClip(
     clip: Clip,
     getAsset: (id: ID) => MediaAsset | undefined,
     project: Project,
+    frame: FrameContext,
     charFrac = 1,
   ): Promise<WebGLTexture | null> {
+    frame.maskTexture = null;
     if (isMediaClip(clip)) {
       const asset = getAsset(clip.assetId);
       if (!asset) return null;
-      return this.uploadClipSource(clip, asset);
+      return this.withSource(async () => {
+        if (this.invalidated || this.gl.isContextLost()) return null;
+        const texture = await this.uploadClipSource(clip, asset, frame);
+        if (this.invalidated || this.gl.isContextLost()) return null;
+        if (texture && clip.effects.some((e) => e.enabled && e.type === "bg-remove"))
+          frame.maskTexture = await this.uploadBgMask(asset, frame);
+        return texture;
+      });
     }
-    if (isTextClip(clip)) return this.uploadTextClip(clip, project, charFrac);
-    if (isShapeClip(clip)) return this.uploadShapeClip(clip, project);
+    if (isTextClip(clip)) return this.uploadTextClip(clip, project, frame, charFrac);
+    if (isShapeClip(clip)) return this.uploadShapeClip(clip, project, frame);
     return null;
   }
 
-  private uploadTextClip(clip: TextClip, project: Project, charFrac = 1): WebGLTexture {
+  private uploadTextClip(clip: TextClip, project: Project, frame: FrameContext, charFrac = 1): WebGLTexture {
     const w = project.resolution.w;
     const h = project.resolution.h;
     const canvas = renderTextToCanvas(clip, w, h, charFrac);
-    let tex = this.textTextures.get(clip.id);
+    let tex = this.textTextures.get(`${frame.depth}:${clip.id}`);
     if (!tex) {
+      if (!this.textTextures.tryReserve(0)) throw new FrameBudgetError();
       tex = createTexture(this.gl);
-      this.textTextures.set(clip.id, tex);
+      this.textTextures.set(`${frame.depth}:${clip.id}`, tex);
     }
-    return this.uploadVisualSource(tex, canvas);
+    return this.uploadVisualSource(tex, canvas, frame);
   }
 
-  private uploadShapeClip(clip: ShapeClip, project: Project): WebGLTexture {
+  private uploadShapeClip(clip: ShapeClip, project: Project, frame: FrameContext): WebGLTexture {
     const w = project.resolution.w;
     const h = project.resolution.h;
     const canvas = renderShapeToCanvas(clip, w, h);
-    let tex = this.textTextures.get(clip.id);
+    let tex = this.textTextures.get(`${frame.depth}:${clip.id}`);
     if (!tex) {
+      if (!this.textTextures.tryReserve(0)) throw new FrameBudgetError();
       tex = createTexture(this.gl);
-      this.textTextures.set(clip.id, tex);
+      this.textTextures.set(`${frame.depth}:${clip.id}`, tex);
     }
-    return this.uploadVisualSource(tex, canvas);
+    return this.uploadVisualSource(tex, canvas, frame);
   }
 
   private applyEffectChain(
     input: WebGLTexture,
     effects: readonly EffectInstance[],
-    maskTexture: WebGLTexture | null = null,
+    maskTexture: WebGLTexture | null,
+    frame: FrameContext,
   ): WebGLTexture {
     const gl = this.gl;
     const enabled = effects.filter((e) => e.enabled);
     if (enabled.length === 0) return input;
-    const { w, h } = this.pingPong.size();
+    const { w, h } = frame.pingPong.size();
     let current = input;
     let domain: ColorDomain = "linear";
     gl.disable(gl.BLEND);
@@ -771,20 +948,20 @@ export class Compositor {
         this.warnColor("lutUnsupported");
         throw error;
       }
-      if (this.managed && nextDomain !== domain) {
-        const [, dst] = this.pingPong.current();
-        this.drawTransfer(current, dst.fbo, domain, nextDomain);
+      if (frame.managed && nextDomain !== domain) {
+        const [, dst] = frame.pingPong.current();
+        this.drawTransfer(current, dst.fbo, domain, nextDomain, frame);
         current = dst.tex;
-        this.pingPong.swap();
+        frame.pingPong.swap();
         domain = nextDomain;
       }
       for (const pass of def.passes) {
-        const [, dst] = this.pingPong.current();
+        const [, dst] = frame.pingPong.current();
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
         gl.viewport(0, 0, w, h);
         let prog: ReturnType<ShaderRegistry["get"]>;
         try {
-          prog = this.shaders.get(pass.shader, this.managed);
+          prog = this.shaders.get(pass.shader, frame.managed);
         } catch (error) {
           if (error instanceof ManagedShaderContractError) throw error;
           // A shader that failed to compile/link (or is missing)
@@ -859,14 +1036,14 @@ export class Compositor {
         }
         this.quad.draw();
         current = dst.tex;
-        this.pingPong.swap();
+        frame.pingPong.swap();
       }
     }
-    if (this.managed && domain !== "linear") {
-      const [, dst] = this.pingPong.current();
-      this.drawTransfer(current, dst.fbo, domain, "linear");
+    if (frame.managed && domain !== "linear") {
+      const [, dst] = frame.pingPong.current();
+      this.drawTransfer(current, dst.fbo, domain, "linear", frame);
       current = dst.tex;
-      this.pingPong.swap();
+      frame.pingPong.swap();
     }
     gl.enable(gl.BLEND);
     return current;
@@ -877,10 +1054,10 @@ export class Compositor {
   // a changed asset record (relink, rebuilt proxy) retries at once.
   private readonly decodeRetry = new RetryBackoff();
 
-  private async uploadClipSource(clip: MediaClip, asset: MediaAsset): Promise<WebGLTexture | null> {
+  private async uploadClipSource(clip: MediaClip, asset: MediaAsset, frame: FrameContext): Promise<WebGLTexture | null> {
     // Map timeline time → source time. A frozen clip always shows one source
     // frame; otherwise this is the speed-ramp integral (or constant-speed).
-    const clipRel = this.playheadFn() - clip.start;
+    const clipRel = frame.playhead - clip.start;
     const relativeMs =
       clip.freeze !== undefined
         ? clip.freeze
@@ -917,23 +1094,24 @@ export class Compositor {
           }
         })();
       }
-      const frame = provider.framesFor(asset.id, Math.max(0, relativeMs));
-      if (frame) {
-        let tex = this.assetTextures.get(asset.id);
+      const decodedFrame = provider.framesFor(asset.id, Math.max(0, relativeMs));
+      if (decodedFrame) {
+        let tex = this.assetTextures.get(`${frame.depth}:${asset.id}`);
         if (!tex) {
+          if (!this.assetTextures.tryReserve(0)) throw new FrameBudgetError();
           tex = createTexture(this.gl);
-          this.assetTextures.set(asset.id, tex);
+          this.assetTextures.set(`${frame.depth}:${asset.id}`, tex);
         }
-        tex = this.uploadVisualSource(tex, frame, asset);
+        tex = this.uploadVisualSource(tex, decodedFrame, frame, asset);
         // WebCodecs frames come back unrotated; the media element path below
         // already honours the container's display matrix.
-        return asset.rotation ? this.applySourceRotation(tex, asset.rotation) : tex;
+        return asset.rotation ? this.withGpu(frame.restoreBindings, () => this.applySourceRotation(tex!, asset.rotation, frame)) : tex;
       }
     }
 
     // Fallback: <video> / <img> element seek.
     const source = await this.sources.get(asset);
-    if (!source) return null;
+    if (!source || this.invalidated || this.gl.isContextLost()) return null;
     if (source instanceof HTMLVideoElement) {
       const targetSec = Math.max(0, relativeMs / 1000);
       if (Math.abs(source.currentTime - targetSec) > 0.04) {
@@ -947,36 +1125,43 @@ export class Compositor {
         });
       }
     }
-    let tex = this.assetTextures.get(asset.id);
+    if (this.invalidated || this.gl.isContextLost()) return null;
+    let tex = this.assetTextures.get(`${frame.depth}:${asset.id}`);
     if (!tex) {
+      if (!this.assetTextures.tryReserve(0)) throw new FrameBudgetError();
       tex = createTexture(this.gl);
-      this.assetTextures.set(asset.id, tex);
+      this.assetTextures.set(`${frame.depth}:${asset.id}`, tex);
     }
-    return this.uploadVisualSource(tex, source, asset);
+    return this.uploadVisualSource(tex, source, frame, asset);
   }
 
-  private async uploadBgMask(asset: MediaAsset): Promise<WebGLTexture | null> {
+  private async uploadBgMask(asset: MediaAsset, frame: FrameContext): Promise<WebGLTexture | null> {
     const source = await this.sources.get(asset);
-    if (!source) return null;
+    if (!source || this.invalidated || this.gl.isContextLost()) return null;
 
     // Reuse the last mask when the source frame hasn't moved. `currentTime`
     // is stable across idle re-renders of a paused clip and identical for
     // still images (which lack it, so they key on 0).
     const srcTime = "currentTime" in source ? source.currentTime : 0;
-    const cached = this.bgMaskTextures.get(asset.id);
-    if (cached && this.bgMaskTime.get(asset.id) === srcTime) return cached;
+    const cached = this.bgMaskTextures.get(`${frame.depth}:${asset.id}`);
+    if (cached && this.bgMaskTime.get(`${frame.depth}:${asset.id}`) === srcTime) {
+      frame.releaseClip.push(this.bgMaskTextures.pin(`${frame.depth}:${asset.id}`)!);
+      return cached;
+    }
 
     try {
       const segmenter = await getSegmenter();
       const mask = await segmenter.segmentFor(source);
-      if (!mask) return null;
+      if (!mask || this.invalidated || this.gl.isContextLost()) return null;
       let tex = cached;
       if (!tex) {
+        if (!this.bgMaskTextures.tryReserve(0)) throw new FrameBudgetError();
         tex = createTexture(this.gl);
-        this.bgMaskTextures.set(asset.id, tex);
+        this.bgMaskTextures.set(`${frame.depth}:${asset.id}`, tex);
       }
       uploadSource(this.gl, tex, mask);
-      this.bgMaskTime.set(asset.id, srcTime);
+      this.bgMaskTime.set(`${frame.depth}:${asset.id}`, srcTime);
+      frame.releaseClip.push(this.bgMaskTextures.pin(`${frame.depth}:${asset.id}`)!);
       return tex;
     } catch (err) {
       // biome-ignore lint/suspicious/noConsole: MediaPipe failures otherwise disappear silently.
@@ -1002,7 +1187,10 @@ export class Compositor {
     this.sourceTargets.clear();
     this.imageTargets.clear();
     this.shaders.dispose();
-    this.colorPingPong.dispose();
+    for (const [depth, pingPong] of this.colorPingPongs) {
+      if (!this.activeFrames.has(depth)) pingPong.dispose();
+    }
+    this.childTargets.dispose();
     this.sources.dispose();
   }
 }

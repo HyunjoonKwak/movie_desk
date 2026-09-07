@@ -24,8 +24,6 @@ export const computeAutoWhiteBalance = async (): Promise<WhiteBalanceResult | nu
   const compositor = new Compositor(canvas);
   try {
     compositor.resize(W, H);
-    const at = project.timeline.playhead;
-    compositor.setPlayheadGetter(() => at);
     await compositor.renderFrame(project, getAsset);
     await compositor.renderFrame(project, getAsset);
 

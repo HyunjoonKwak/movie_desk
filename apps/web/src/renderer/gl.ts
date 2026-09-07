@@ -142,6 +142,8 @@ export const probeColorTarget = (gl: GL): TargetFormat | null => {
 };
 
 export const allocateTarget = (gl: GL, w: number, h: number, format?: TargetFormat) => {
+  const read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
+  const draw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING) as WebGLFramebuffer | null;
   const tex = createTexture(gl);
   gl.texImage2D(
     gl.TEXTURE_2D,
@@ -164,9 +166,12 @@ export const allocateTarget = (gl: GL, w: number, h: number, format?: TargetForm
   if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
     gl.deleteFramebuffer(fbo);
     gl.deleteTexture(tex);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read);
+    gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, draw);
     throw new Error("Color target is not renderable");
   }
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindFramebuffer(gl.READ_FRAMEBUFFER, read);
+  gl.bindFramebuffer(gl.DRAW_FRAMEBUFFER, draw);
   return { tex, fbo };
 };
 

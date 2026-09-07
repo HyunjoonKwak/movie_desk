@@ -18,7 +18,6 @@ export const exportStillFrame = async (): Promise<void> => {
   try {
     compositor.resize(w, h);
     const at = project.timeline.playhead;
-    compositor.setPlayheadGetter(() => at);
     // Render twice: the first pass primes async media decoders, the second
     // composites the now-available frame.
     await compositor.renderFrame(project, getAsset);

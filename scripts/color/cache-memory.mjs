@@ -63,10 +63,12 @@ const browser = await chromium.launch({
 });
 const rows = [];
 try {
-  for (const [label, implementation] of [
+  const implementations = [
     ["before", oldModules],
     ["after", newModules],
-  ]) {
+  ];
+  if (process.env.CACHE_BENCH_REVERSE === "1") implementations.reverse();
+  for (const [label, implementation] of implementations) {
     const page = await browser.newPage();
     await page.goto(`http://127.0.0.1:${server.address().port}`);
     rows.push(
@@ -188,6 +190,16 @@ try {
             resident -= sizes.get(texture) || 0;
             sizes.delete(texture);
             return deleteTexture(texture);
+          };
+          let checkedFrames = 0;
+          let blackFrames = 0;
+          const originalRender = compositor.renderFrame.bind(compositor);
+          compositor.renderFrame = async (...args) => {
+            await originalRender(...args);
+            const pixel = new Uint8Array(4);
+            gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
+            checkedFrames++;
+            if (pixel[0] === 0 && pixel[1] === 0 && pixel[2] === 0) blackFrames++;
           };
           const photo = document.createElement("canvas");
           photo.width = 3840;
@@ -350,6 +362,11 @@ try {
             ["4k-video-1080p-video", videoAssets, videoAssets.map((a) => mediaClip(a.id))],
             ["three-4k-stills", stillAssets, stillAssets.map((a) => mediaClip(a.id))],
             [
+              "two-videos-three-4k-stills",
+              [...videoAssets, ...stillAssets],
+              [...videoAssets, ...stillAssets].map((a) => mediaClip(a.id)),
+            ],
+            [
               "oversized-video-1080p-title",
               [oversizedAsset],
               [mediaClip(oversizedAsset.id), title],
@@ -375,6 +392,7 @@ try {
             const titleVisible =
               clips.includes(title) && centerRow.some((v, i) => i % 4 === 0 && v > 200);
             if (clips.includes(title) && !titleVisible) throw new Error(`Title missing in ${name}`);
+            const startBlackFrames = blackFrames;
             const startAllocations = targetAllocations;
             const startBytes = targetAllocatedBytes;
             const startDeletes = textureDeletes;
@@ -394,6 +412,7 @@ try {
             frameTimes.sort((a, b) => a - b);
             const row = {
               name,
+              blackFrames: blackFrames - startBlackFrames,
               titleVisible,
               frames: frameTimes.length,
               warmupFrames: 30,
@@ -426,7 +445,11 @@ try {
           compositor.dispose();
           if (liveFramebuffers.size !== 0) throw new Error(`FBO leak: ${liveFramebuffers.size}`);
           if (resident !== 0) throw new Error(`Texture leak: ${resident}`);
+          if (blackFrames)
+            throw new Error(`Unexpected black frames: ${blackFrames}/${checkedFrames}`);
           return {
+            blackFrames,
+            checkedFrames,
             label,
             assets: assets.length,
             source: [3840, 2160],
@@ -461,7 +484,10 @@ try {
     rows,
   };
   writeFileSync(
-    path.join(root, "docs/evaluations/2026-09-07-color-cache-memory-round4.json"),
+    path.resolve(
+      root,
+      process.argv[3] ?? "docs/evaluations/2026-09-07-color-cache-memory-round4.json",
+    ),
     `${JSON.stringify(report, null, 2)}\n`,
   );
   // biome-ignore lint/suspicious/noConsole: CLI benchmark report.

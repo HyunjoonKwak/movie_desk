@@ -1,3 +1,5 @@
+import { readTargetPixels } from "@/renderer/read-target";
+import type { RenderTarget } from "@/renderer/render-target";
 import { decodeTransfer, encodeTransfer } from "@/renderer/color";
 
 export const BT709_COLOR_SPACE: VideoColorSpaceInit = {
@@ -63,12 +65,11 @@ export class Bt709FrameCapture {
     this.rgba = new Uint8Array(canvas.width * canvas.height * 4);
     this.yuv = new Uint8Array((canvas.width * canvas.height * 3) / 2);
   }
-  capture(timestamp: number, duration: number): VideoFrame {
+  capture(timestamp: number, duration: number, target?: RenderTarget): VideoFrame {
     const { width, height } = this.canvas;
     const gl = this.canvas.getContext("webgl2");
     if (!gl || gl.isContextLost()) throw new Error("Export color readback is unavailable");
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, this.rgba);
+    readTargetPixels(gl, width, height, this.rgba, target);
     rgbaToBt709I420(this.rgba, width, height, this.yuv, true);
     return new VideoFrame(this.yuv, {
       format: "I420",

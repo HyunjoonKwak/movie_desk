@@ -258,6 +258,38 @@ try {
           rows,
         };
       }
+      // Phase 3 moved private pass state into a frame context. Adapt only this
+      // direct-pass fixture; all historical assertions/calls below stay intact.
+      // Production renderFrame calls already supply their own context and pass
+      // straight through. Each direct upload is consumed before the next one.
+      if (managed.compositor.colorPingPongs) {
+        const compositor = managed.compositor;
+        compositor.colorPingPong = compositor.colorPingPongs.get(0);
+        const frame = {
+          depth: 0,
+          target: { fbo: null, width: 256, height: 144, clearAlpha: 1 },
+          playhead: 0,
+          project: managed.project,
+          pingPong: compositor.colorPingPong,
+          slots: new Map(),
+          releaseClip: [],
+          managed: true,
+          maskTexture: null,
+          restoreBindings: false,
+        };
+        const upload = compositor.uploadVisualSource.bind(compositor);
+        compositor.uploadVisualSource = (texture, source, context, asset) => {
+          if (context) return upload(texture, source, context, asset);
+          try {
+            return upload(texture, source, frame);
+          } finally {
+            for (const release of frame.releaseClip.splice(0)) release();
+          }
+        };
+        const effects = compositor.applyEffectChain.bind(compositor);
+        compositor.applyEffectChain = (input, chain, mask, context) =>
+          effects(input, chain, mask, context ?? frame);
+      }
       // Alternating resolutions must retain source targets and immutable images.
       managed.compositor.managed = true;
       const small = document.createElement("canvas");

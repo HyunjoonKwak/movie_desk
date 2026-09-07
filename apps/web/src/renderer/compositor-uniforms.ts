@@ -105,7 +105,7 @@ export const setWipeUniforms = (gl: GL, prog: Program, wipe: TransitionFrame | n
   if (softLoc) gl.uniform1f(softLoc, 0.04);
 };
 
-export const setTransformUniforms = (gl: GL, prog: Program, tf: ClipTf): void => {
+export const setTransformUniforms = (gl: GL, prog: Program, tf: ClipTf, aspectRatio = gl.drawingBufferWidth / gl.drawingBufferHeight): void => {
   const dest = prog.uniform("u_dest");
   if (dest) gl.uniform4f(dest, 0, 0, 1, 1);
   const opacity = prog.uniform("u_opacity");
@@ -117,7 +117,7 @@ export const setTransformUniforms = (gl: GL, prog: Program, tf: ClipTf): void =>
   const rotation = prog.uniform("u_rotation");
   if (rotation) gl.uniform1f(rotation, tf.rotation);
   const aspect = prog.uniform("u_aspect");
-  if (aspect) gl.uniform1f(aspect, gl.drawingBufferWidth / gl.drawingBufferHeight);
+  if (aspect) gl.uniform1f(aspect, aspectRatio);
 };
 
 // Picks fixed-function GL blend factors for the clip's blend mode. Source
@@ -145,10 +145,11 @@ export const setBlendMode = (gl: GL, mode: Clip["blendMode"]): void => {
 export const animateEffects = (
   clip: Clip,
   project: Project,
+  playhead = project.timeline.playhead,
 ): { effects: readonly EffectInstance[]; kfValues: Readonly<Record<string, number>> } => {
   const kfValues = sampleKeyframes(
     clip.keyframes,
-    Math.max(0, project.timeline.playhead - clip.start),
+    Math.max(0, playhead - clip.start),
   );
   const effects = clip.effects.map((e) => {
     const overrides: Record<string, number | string | boolean> = {};

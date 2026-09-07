@@ -1,3 +1,5 @@
+import { readTargetPixels } from "@/renderer/read-target";
+import type { RenderTarget } from "@/renderer/render-target";
 import { BT709_COLOR_SPACE, Bt709FrameCapture } from "./bt709-frame";
 import { createBt709Worker } from "./bt709-worker-factory";
 
@@ -75,9 +77,9 @@ export class Bt709FramePipeline {
     signal?.addEventListener("abort", this.abort, { once: true });
     if (signal?.aborted) this.dispose();
   }
-  capture(timestamp: number, duration: number): Promise<VideoFrame> {
+  capture(timestamp: number, duration: number, target?: RenderTarget): Promise<VideoFrame> {
     if (this.stopped) return Promise.reject(new Error("Color conversion stopped"));
-    if (this.synchronous) return Promise.resolve(this.synchronous.capture(timestamp, duration));
+    if (this.synchronous) return Promise.resolve(this.synchronous.capture(timestamp, duration, target));
     const slot = this.slots.pop();
     if (!slot) return Promise.reject(new Error("Color conversion queue is full"));
     const gl = this.canvas.getContext("webgl2");
@@ -85,16 +87,12 @@ export class Bt709FramePipeline {
       this.slots.push(slot);
       return Promise.reject(new Error("Export color readback is unavailable"));
     }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    gl.readPixels(
-      0,
-      0,
-      this.canvas.width,
-      this.canvas.height,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      new Uint8Array(slot.rgba),
-    );
+    try {
+      readTargetPixels(gl, this.canvas.width, this.canvas.height, new Uint8Array(slot.rgba), target);
+    } catch (error) {
+      this.slots.push(slot);
+      return Promise.reject(error);
+    }
     const id = this.sequence++;
     const result = new Promise<VideoFrame>((resolve, reject) => {
       const timer = setTimeout(() => this.fail(new Error("Color conversion timed out")), 30000);

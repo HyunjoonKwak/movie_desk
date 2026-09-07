@@ -1,63 +1,84 @@
-// Frame-sized scratch textures shared across render passes. Multiple passes
-// (backdrop capture for overlay/soft-light blends, adjustment-layer capture,
-// spatial-conform fit target) each used to keep their own private texture
-// + framebuffer pair with duplicated lazy-alloc / resize logic. The pool
-// consolidates that into a single, indexed cache.
-//
-// Slots are addressed by a stable integer so independent call sites can
-// reserve "slot 0 = backdrop", "slot 1 = fit target" without coordination.
-// Concurrent use of the SAME slot in one frame would alias — but the
-// compositor's pipeline only ever holds one role at a time per slot.
-
 import type { GL } from "./gl";
 import { type TargetFormat, allocateTarget } from "./gl";
+import type { TargetLease } from "./render-target";
 
 export interface ScratchSlot {
   readonly tex: WebGLTexture;
   readonly fbo: WebGLFramebuffer;
 }
 
+interface Entry extends ScratchSlot {
+  readonly width: number;
+  readonly height: number;
+  leased: boolean;
+}
+
+// Depth separates suspended frames; role separates simultaneously live passes.
+// Size belongs to the entry, not a global invalidation flag. A leased entry is
+// never resized or destroyed, even when another invocation requests its key.
+// Each key retains at most one idle size; extra live leases retire on release.
 export class ScratchPool {
-  private slots = new Map<number, ScratchSlot>();
-  private size = { w: 0, h: 0 };
+  private readonly slots = new Map<string, Entry[]>();
+  private disposed = false;
 
   constructor(
     private readonly gl: GL,
     private readonly format?: TargetFormat,
   ) {}
 
-  // Hand back the slot at `index`, reallocating all slots when the drawing
-  // buffer has resized since the last call. Allocates new slots on demand.
-  acquire(index: number): ScratchSlot {
-    this.ensureSize();
-    let slot = this.slots.get(index);
-    if (!slot) {
-      slot = this.allocSlot();
-      this.slots.set(index, slot);
+  lease(depth: number, role: number, width: number, height: number): TargetLease {
+    if (this.disposed) throw new Error("Scratch pool is disposed");
+    const key = `${depth}:${role}`;
+    const entries = this.slots.get(key) ?? [];
+    let entry = entries.find((e) => !e.leased && e.width === width && e.height === height);
+    if (!entry) {
+      for (const idle of entries.filter((e) => !e.leased)) {
+        this.destroy(idle);
+        entries.splice(entries.indexOf(idle), 1);
+      }
+      entry = { ...allocateTarget(this.gl, width, height, this.format), width, height, leased: false };
+      entries.push(entry);
+      this.slots.set(key, entries);
     }
-    return slot;
+    entry.leased = true;
+    const selected = entry;
+    let released = false;
+    return {
+      ...selected,
+      clearAlpha: 0,
+      release: () => {
+        if (released) return;
+        released = true;
+        selected.leased = false;
+        if (this.disposed || entries.some((e) => e !== selected && !e.leased)) {
+          this.destroy(selected);
+          entries.splice(entries.indexOf(selected), 1);
+        }
+        if (!entries.length) this.slots.delete(key);
+      },
+    };
+  }
+
+  // Legacy audit access to the idle root slot; rendering uses explicit leases.
+  acquire(role: number): ScratchSlot {
+    const lease = this.lease(0, role, this.gl.drawingBufferWidth, this.gl.drawingBufferHeight);
+    lease.release();
+    return { tex: lease.tex, fbo: lease.fbo! };
   }
 
   dispose(): void {
-    for (const s of this.slots.values()) {
-      this.gl.deleteTexture(s.tex);
-      this.gl.deleteFramebuffer(s.fbo);
+    this.disposed = true;
+    for (const [key, entries] of this.slots) {
+      for (const entry of entries.filter((e) => !e.leased)) {
+        this.destroy(entry);
+        entries.splice(entries.indexOf(entry), 1);
+      }
+      if (!entries.length) this.slots.delete(key);
     }
-    this.slots.clear();
-    this.size = { w: 0, h: 0 };
   }
 
-  private ensureSize(): void {
-    const w = this.gl.drawingBufferWidth;
-    const h = this.gl.drawingBufferHeight;
-    if (w === this.size.w && h === this.size.h && this.slots.size > 0) return;
-    // Viewport changed (or first call): blow away cached slots so the next
-    // acquire reallocates at the correct size.
-    this.dispose();
-    this.size = { w, h };
-  }
-
-  private allocSlot(): ScratchSlot {
-    return allocateTarget(this.gl, this.size.w, this.size.h, this.format);
+  private destroy(entry: Entry): void {
+    this.gl.deleteTexture(entry.tex);
+    this.gl.deleteFramebuffer(entry.fbo);
   }
 }

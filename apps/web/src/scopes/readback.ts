@@ -1,3 +1,4 @@
+import { type RenderTarget, screenTarget } from "@/renderer/render-target";
 import { sampleSize } from "./compute";
 
 export interface ScopePixels {
@@ -36,14 +37,14 @@ export class ScopeReadback {
     }
   }
 
-  capture(done: (data: ScopePixels) => void, failed: () => void) {
+  capture(done: (data: ScopePixels) => void, failed: () => void, target: RenderTarget = screenTarget(this.gl)) {
     if (this.disposed || this.fence) {
       failed();
       return;
     }
     const gl = this.gl;
     const start = performance.now();
-    const size = sampleSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+    const size = sampleSize(target.width, target.height);
     const read = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
     const draw = gl.getParameter(gl.DRAW_FRAMEBUFFER_BINDING);
     const pack = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
@@ -66,12 +67,12 @@ export class ScopeReadback {
         gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.buffer);
         gl.bufferData(gl.PIXEL_PACK_BUFFER, this.width * this.height * 4, gl.STREAM_READ);
       }
-      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.READ_FRAMEBUFFER, target.fbo);
       gl.blitFramebuffer(
         0,
         0,
-        gl.drawingBufferWidth,
-        gl.drawingBufferHeight,
+        target.width,
+        target.height,
         0,
         0,
         this.width,

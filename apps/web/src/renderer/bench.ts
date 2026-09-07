@@ -32,7 +32,6 @@ const runRenderBench = async (frames = 60): Promise<BenchResult> => {
   try {
     c.resize(w, h);
     let virtual = 0;
-    c.setPlayheadGetter(() => virtual);
     // Warm-up pass — compiles + uploads aren't paid in steady-state.
     await c.renderFrame(
       syncRootTimeline({ ...project, timeline: { ...project.timeline, playhead: 0 } }),

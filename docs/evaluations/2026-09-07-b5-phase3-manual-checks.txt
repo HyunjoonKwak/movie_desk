@@ -1,0 +1,28 @@
+Offline install
+Scope: all 4 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+Done in 587ms
+
+Managed audit: COLOR_GPU=metal node scripts/color/managed.mjs --verify
+Managed color GPU invariants PASS
+
+Targeted reentry/browser pressure
+[WebServer] (node:74480) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:74482) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:74488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 4 tests using 1 worker
+
+(node:74542) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 [chromium] › e2e/compositor-reentry.spec.ts:17:3 › compositor preserves offscreen ownership across async reentry (native, normal budget) (1.2s)
+  ✓  2 [chromium] › e2e/compositor-reentry.spec.ts:17:3 › compositor preserves offscreen ownership across async reentry (native, budget pressure) (798ms)
+  ✓  3 [chromium] › e2e/compositor-reentry.spec.ts:17:3 › compositor preserves offscreen ownership across async reentry (srgb8, normal budget) (810ms)
+  ✓  4 [chromium] › e2e/compositor-reentry.spec.ts:17:3 › compositor preserves offscreen ownership across async reentry (srgb8, budget pressure) (756ms)
+
+  4 passed (7.9s)
