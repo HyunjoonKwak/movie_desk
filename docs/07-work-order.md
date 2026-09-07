@@ -448,7 +448,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
-| B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 구현·gate PASS, 통합 리뷰 대기 | 오디오 선행 결정 + ID/collection/root alias. core160·web718·desktop72·scripts11(961), E2E64/64, gate9/9. 중첩 기능·스키마는 후속 Phase 1+7 원자적 배치. [보고서](evaluations/2026-09-07-b5-phase0-report.md) |
+| B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·rebase·gate PASS, 통합 리뷰 대기 | 저장 경계 자기 치유·실패 안내, 게이트웨이 대상 합성, Phase 1 방어 주석. main4791476 기준 core161·web721·desktop72·scripts11(965), E2E66/66, gate9/9. 호출부 이관·중첩 영속화는 Phase 1+7. [2라운드 보고서](evaluations/2026-09-07-b5-phase0-round2-report.md) |
 | D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
@@ -843,3 +843,14 @@ Chromium **66/66**(186.3초, retry0), OSV167 취약점0, tsc·lint·build PASS.
 `pnpm gate` **9/9 PASS**, core160·web718·desktop72·scripts11(**961**), E2E **64/64**,
 OSV167 취약점0이며 32119 사용 전 lsof와 다른 gate 프로세스가 없음을 확인했다.
 [gate 기록](evaluations/2026-09-07-b5-phase0-gate.md). Phase 1 이후 구현과 통합 리뷰가 남는다.
+
+
+B'5 Phase 0 2라운드: `toLegacyProject`가 같은 ID의 루트 객체 불일치를 자체 정규화하고,
+자동저장 디바운스·cleanup 실패 모두 토스트와 저장 실패 상태에 반영한다. 이후 편집의
+성공한 저장으로 복구되며 Yjs 저장 완료가 오류 표시를 숨기지 않는다. `replaceTrack` 결과는
+대상 ID를 운반해 `recompute` 합성 시 자식 duration을 갱신한다. Phase 1의 중첩 검증 오류는
+CRDT catch에서 null로 삼키면 안 된다는 경고를 남겼다. 기존 호출부 18+2곳은 루트 기본값을
+유지하며 이관은 Phase 1이다. main `4791476`으로 rebase했고 최종 gate **9/9 PASS**,
+core161·web721·desktop72·scripts11(**965**), E2E **66/66**(186.5초, retry0), OSV167 취약점0이다.
+[항목별 결과 및 잔여 사항](evaluations/2026-09-07-b5-phase0-round2-report.md),
+[최종 gate](evaluations/2026-09-07-b5-phase0-round2-gate.md). 통합 리뷰가 남는다.

@@ -18,3 +18,29 @@ The ProjectMenu autosave subscription is extracted to `library-autosave.ts` so b
 ## Scope
 
 No nested feature, schema opening, routing behavior change, merge, tag or push. The v1 codec remains untouched by this branch; CRDT stays version 2. i18n changes are two new keys appended with four-space indentation to each language, explicitly approved by the coordinator; existing lines are unchanged and no formatter ran on those files.
+
+## Integration and validation
+
+Rebased onto main `4791476` (release cleanup included). The original Phase 0
+commit is now `125333f`; review corrections are `17af10f`. Conflicts were limited
+to the project-export test imports and the work-order append location: the new
+version-error tests use the Phase 0 adapter, and both work-order entries survive.
+Protected codec, E2E files, and docs/09 match main exactly.
+
+The pre-rebase gate passed 9/9 (core 161, web 721, desktop 72, scripts 11 = 965;
+Chromium 64/64), before the final append-only wording placement and badge color
+correction. Its [summary](2026-09-07-b5-phase0-round2-prerebase-gate.md) is retained
+as intermediate evidence, not the final integration gate. Raw log:
+`/tmp/b5-phase0-round2-gate.log`.
+
+Final rebased [gate](2026-09-07-b5-phase0-round2-gate.md): **9/9 PASS**.
+Core **161**, web **721**, desktop **72**, scripts **11** = **965** unit tests;
+Chromium **66/66 PASS**, retry 0, **186.5s**. Typecheck, lint, production build and
+i18n parity pass; OSV **167** production packages with zero known vulnerabilities.
+Both gate runs checked 32119 with lsof before use (no listener) and found no
+competing gate process. Build emitted only the existing MediaPipe dynamic
+import warning. Final raw log: `/tmp/b5-phase0-round2-rebased-gate.log`.
+
+Remaining work: integration review and Phase 1–7 implementation. If main moves
+again before integration, rebase and revalidate the resulting tree; no merge or
+push was performed by this worker.
