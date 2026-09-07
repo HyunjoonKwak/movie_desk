@@ -5,6 +5,14 @@ correctness, signal/tag verification and performance results follow in the
 “B’4b managed pipeline” section.
 
 
+B’4b round-2 summary: managed blend modes deliberately remain linear, with the
+17-mode compatibility table below and an explicit migration warning. This changes
+existing artistic blends; it is not encoded W3C compatibility. **SwiftShader
+1080p playback regressed from p50 16.7 to 50.0ms (3×, approximately 20fps)**,
+while Apple M4 Metal stayed at 16.7ms. Software rendering remains a B’6 performance
+blocker; no tested low-cost precision reduction resolves it in this change.
+
+
 Base: fetched origin/main `1ba350ba73272abf7a8b3d872c691a0d7e0271ae`.
 Working checkout: `HyunjoonKwak/codex-b4-color`, retained by coordinator approval.
 Scope was explicitly split: this round ships scopes and evidence; B’4b owns
@@ -437,3 +445,116 @@ Final `pnpm gate --report docs/evaluations/2026-09-07-color-linear-gate.md`:
 Port32119 was checked with `lsof` before each gate/browser run. Catalog diffs
 remain append-only (11 keys per language, four-space indentation); no dependency,
 lockfile, push, main merge or other-worktree changes. See the [final gate report](2026-09-07-color-linear-gate.md).
+
+
+## B’4b review round 2 — 8cf9505
+
+### Deliberate blend working-space contract and migration
+
+`BLEND_WORKING_SPACE` declares **linear Rec.709 for all 17 modes**, including
+13 backdrop-reading artistic operations and normal/multiply/screen/add. The
+rationale is a single scene-light domain for adjustment layers, additive light,
+opacity and spatial filtering, with highlight headroom retained between passes.
+This is an explicit artistic reinterpretation: overlay thresholds, soft-light,
+dodge/burn and nonseparable lum/setSat are evaluated on linear channels. It does
+**not** reproduce encoded W3C artwork or preserve the appearance of existing
+multiply textures and soft-light grades. Users may need to retune those projects;
+`color.migration` now names all blend modes and representative affected modes in
+both languages. This follows the review’s permitted linear-retention option;
+encoded compatibility rendering was not implemented.
+
+Real SwiftShader GPU readback, opaque sRGB foreground **(179,77,102)** over opaque
+backdrop **(51,128,204)**, opacity 1, no effects, native size. Output values are
+8-bit display sRGB; every alpha is 255. The legacy column is actual `0e6804a`
+rendering, the new column is this checkout. With opacity 1, the comparison isolates
+blend-domain changes from the legacy fixed-function opacity behavior.
+
+| Blend mode | Legacy RGB | Managed linear RGB |
+| --- | --- | --- |
+| normal | 179,77,102 | 179,77,102 |
+| multiply | 36,39,82 | 33,34,80 |
+| screen | 194,166,224 | 182,143,212 |
+| add | 230,205,255 | 185,147,223 |
+| darken | 51,77,102 | 51,77,102 |
+| lighten | 179,128,204 | 179,128,204 |
+| overlay | 72,78,194 | 48,50,152 |
+| soft-light | 76,103,196 | 48,76,175 |
+| hard-light | 133,77,163 | 48,50,111 |
+| color-dodge | 171,183,255 | 69,133,217 |
+| color-burn | 0,0,128 | 0,0,0 |
+| difference | 128,51,102 | 173,105,183 |
+| exclusion | 158,128,143 | 180,139,200 |
+| hue | 216,63,101 | 202,41,94 |
+| saturation | 72,123,174 | 85,127,182 |
+| color | 182,80,105 | 181,82,106 |
+| luminosity | 48,125,201 | 42,125,202 |
+
+Reproduce: `node scripts/color/managed.mjs --blend-audit --baseline=0e6804a`.
+[GPU measurement JSON](2026-09-07-color-blend-round2.json). These are one colored
+fixture, not an exhaustive perceptual or HDR validation of every blend mode.
+
+### Export preflight, resources and shader contracts
+
+The exporter renders, encodes and flushes the first actual frame in preparing,
+then enters the remaining-frame loop. Its chunk is retained exactly once with
+timestamp zero. Present non-BT.709 metadata fails before frame two, using a
+translated error; absent metadata continues with `colorApproximation`, whose
+translated completion warning now explicitly covers omitted encoder metadata.
+Later contradictory metadata still fails. Platform encoder compatibility has not
+been claimed beyond the local Chromium evidence; this change removes the
+18,000-frame delayed rejection for absent metadata.
+
+Converted mutable sources use an 8-entry LRU keyed by resolution; immutable
+images use a separate 12-entry cache, unaffected by intervening video/canvas
+uploads. Both release texture/FBO pairs on eviction/disposal. The GPU invariant
+suite checks repeated alternating 256×144 and 64×32 sources and image identity.
+Scene framebuffer acquisition now precedes backdrop texture binding, preventing
+scratch allocation from changing that binding during capture.
+
+All 24 registered shaders pass `managedShader` in unit tests. Required replacement
+anchors must occur exactly once; formatting/missing/duplicate anchors throw a
+contract error which also propagates out of the compositor’s compile fallback.
+Sharpen convolves premultiplied RGBA together, clamps coverage, rescales RGB when
+coverage overshoots and writes RGB zero at zero/negative coverage. The GPU suite
+checks a half-covered white edge for matched RGB/coverage, alpha sharpening and
+absence of a bright RGB ring. The prior implementation already returned early
+before `straightSample`, but it only sharpened RGB and retained center alpha.
+
+### Software-renderer regression and remaining scope
+
+[Original SwiftShader results](2026-09-07-color-managed.json): 1080p playback
+**p50 16.7→50.0ms, 3× slower (~20fps)**. The Metal p50 **16.7→16.7ms** result
+cannot stand in for software rendering on remote sessions or systems without GPU
+acceleration. B’6 owns reduced preview resolution / transfer-pass caching,
+software-renderer detection and a dismissible performance notice, followed by
+repeatable p50/p95 measurements on the same fixture. These are proposals, not
+implemented mitigations. Automatically forcing SRGB8 is not offered as a fix:
+it already loses subtle gradients/highlight headroom and has no measured playback
+benefit here.
+
+Optional fixes included: both measurement scripts accept `--baseline=SHA`
+(default `0e6804a`), and backdrop texture binding is safe across lazy scratch
+allocation. Optional follow-ups remain: DOM video alpha-probe caching, release-date
+migration gating, dismissible DOM approximation notices, area-scaled conversion
+timeout with a synchronous retry, and LUT translation-key typing.
+
+
+### Round-2 final verification
+
+`pnpm gate --report docs/evaluations/2026-09-07-color-linear-round2-gate.md`:
+**9/9 PASS**, core155 + web701 + desktop72 + scripts11 = **939 unit tests**,
+**64/64 Chromium E2Es** (181.0s gate step), OSV **167** production packages,
+**zero** known vulnerabilities, production build, typecheck and lint passed.
+[Gate report](2026-09-07-color-linear-round2-gate.md). Before each gate, `lsof`
+reported no TCP listener on 32119 (with an unrelated TimeMachine mount warning).
+The 17 blend rows were also checked for exact agreement with the measurement JSON;
+`node scripts/color/managed.mjs --verify` passed standalone and inside the E2E.
+
+Failed-run history: the first unit run exposed a frozen video-encoder test double
+that replayed all GOP packets on each flush. Only its video submission/drain logic
+in `aac-fallback.test.ts` changed; production audio processing and audio assertions
+did not change. The next full run passed 63/64 E2Es, with the existing audio-mixer
+live meter stuck at −60dB for its five-second timeout despite passing the PCM gain
+assertions. With **no code or test changes**, a fresh full gate passed that test
+and all 64 E2Es. This transient failure remains recorded rather than suppressed.
+No dependencies, lockfile, audio production code, push or main merge changed.

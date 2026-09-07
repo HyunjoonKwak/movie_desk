@@ -48,9 +48,12 @@ function modules(base) {
   visit("apps/web/src/renderer/compositor.ts");
   return result;
 }
+const blendOnly = process.argv.includes("--blend-audit");
 const verifyOnly = process.argv.includes("--verify");
 const newModules = modules();
-const oldModules = verifyOnly ? newModules : modules("0e6804a");
+const oldModules = verifyOnly
+  ? newModules
+  : modules(process.argv.find((arg) => arg.startsWith("--baseline="))?.slice(11) ?? "0e6804a");
 const legacyJs = ts.transpileModule(
   readFileSync(new URL("./legacy-bypass.fixture.ts", import.meta.url), "utf8"),
   { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } },
@@ -69,7 +72,7 @@ try {
   const page = await browser.newPage();
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   const result = await page.evaluate(
-    async ({ oldModules, newModules, legacyJs }) => {
+    async ({ oldModules, newModules, legacyJs, blendOnly }) => {
       const frozen = {};
       new Function("exports", legacyJs)(frozen);
       const sources = new Map();
@@ -192,6 +195,141 @@ try {
         after.every((x, i) => x === frozenRamp[i]),
         "Frozen legacy ramp mismatch",
       );
+      if (blendOnly) {
+        const bg = document.createElement("canvas");
+        const fg = document.createElement("canvas");
+        bg.width = fg.width = 256;
+        bg.height = fg.height = 144;
+        bg.getContext("2d").fillStyle = "rgb(51,128,204)";
+        bg.getContext("2d").fillRect(0, 0, 256, 144);
+        fg.getContext("2d").fillStyle = "rgb(179,77,102)";
+        fg.getContext("2d").fillRect(0, 0, 256, 144);
+        sources.set("blend-bg", bg);
+        sources.set("blend-fg", fg);
+        const rows = [];
+        const modes = current.get("packages/core/src/index.ts").BLEND_MODES;
+        for (const mode of modes) {
+          const row = { mode, workingSpace: "linear" };
+          for (const [name, instance] of [
+            ["legacy", legacy],
+            ["managed", managed],
+          ]) {
+            const assets = ["blend-bg", "blend-fg"].map((id) => ({ ...instance.asset, id }));
+            const clips = assets.map((asset, i) => ({
+              ...instance.clip,
+              id: asset.id,
+              assetId: asset.id,
+              blendMode: i ? mode : "normal",
+              transform: { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+            }));
+            const project = {
+              ...instance.project,
+              mediaLibrary: assets,
+              timeline: {
+                ...instance.project.timeline,
+                tracks: clips
+                  .slice()
+                  .reverse()
+                  .map((clip) => ({ id: clip.id, kind: "video", clips: [clip] })),
+              },
+            };
+            await instance.compositor.renderFrame(project, (id) =>
+              assets.find((asset) => asset.id === id),
+            );
+            const pixel = new Uint8Array(4);
+            instance.gl.readPixels(
+              128,
+              72,
+              1,
+              1,
+              instance.gl.RGBA,
+              instance.gl.UNSIGNED_BYTE,
+              pixel,
+            );
+            assert(instance.gl.getError() === 0, `Blend GL error: ${mode}`);
+            row[name] = [...pixel];
+          }
+          rows.push(row);
+        }
+        legacy.compositor.dispose();
+        managed.compositor.dispose();
+        return {
+          fixture: { backdrop: [51, 128, 204], foreground: [179, 77, 102], foregroundOpacity: 1 },
+          rows,
+        };
+      }
+      // Alternating resolutions must retain source targets and immutable images.
+      managed.compositor.managed = true;
+      const small = document.createElement("canvas");
+      small.width = 64;
+      small.height = 32;
+      const uploadTexture = managed.gl.createTexture();
+      managed.gl.bindTexture(managed.gl.TEXTURE_2D, uploadTexture);
+      managed.gl.texParameteri(
+        managed.gl.TEXTURE_2D,
+        managed.gl.TEXTURE_MIN_FILTER,
+        managed.gl.LINEAR,
+      );
+      managed.gl.texParameteri(
+        managed.gl.TEXTURE_2D,
+        managed.gl.TEXTURE_MAG_FILTER,
+        managed.gl.LINEAR,
+      );
+      const bitmap = await createImageBitmap(source);
+      const imageTarget = managed.compositor.uploadVisualSource(uploadTexture, bitmap);
+      const targetA = managed.compositor.uploadVisualSource(uploadTexture, source);
+      const targetB = managed.compositor.uploadVisualSource(uploadTexture, small);
+      for (let i = 0; i < 5; i++) {
+        assert(
+          managed.compositor.uploadVisualSource(uploadTexture, source) === targetA,
+          "Large source target reallocated",
+        );
+        assert(
+          managed.compositor.uploadVisualSource(uploadTexture, small) === targetB,
+          "Small source target reallocated",
+        );
+        assert(
+          managed.compositor.uploadVisualSource(uploadTexture, bitmap) === imageTarget,
+          "Immutable image cache missed",
+        );
+      }
+      const edge = document.createElement("canvas");
+      edge.width = 256;
+      edge.height = 144;
+      const edgeContext = edge.getContext("2d");
+      edgeContext.fillStyle = "rgba(255,255,255,0.5)";
+      edgeContext.fillRect(128, 0, 128, 144);
+      const edgeSource = managed.compositor.uploadVisualSource(uploadTexture, edge);
+      managed.compositor.colorPingPong.resize(256, 144);
+      const edgeResult = managed.compositor.applyEffectChain(
+        edgeSource,
+        [{ id: "edge-sharpen", type: "sharpen", enabled: true, params: { amount: 1 } }],
+        null,
+      );
+      const edgeFbo = managed.gl.createFramebuffer();
+      managed.gl.bindFramebuffer(managed.gl.FRAMEBUFFER, edgeFbo);
+      managed.gl.framebufferTexture2D(
+        managed.gl.FRAMEBUFFER,
+        managed.gl.COLOR_ATTACHMENT0,
+        managed.gl.TEXTURE_2D,
+        edgeResult,
+        0,
+      );
+      const edgePixels = new Float32Array(256 * 4);
+      managed.gl.readPixels(0, 72, 256, 1, managed.gl.RGBA, managed.gl.FLOAT, edgePixels);
+      assert(managed.gl.getError() === 0, "Sharpen readback failed");
+      for (let i = 0; i < edgePixels.length; i += 4) {
+        const a = edgePixels[i + 3];
+        assert(a >= 0 && a <= 1, "Sharpen coverage out of range");
+        assert(
+          Math.abs(edgePixels[i] - a) < 0.002,
+          "Sharpen created a bright RGB ring at the alpha edge",
+        );
+      }
+      assert(edgePixels[128 * 4 + 3] > 0.9, "Sharpen did not filter coverage");
+      managed.gl.deleteFramebuffer(edgeFbo);
+      bitmap.close();
+      managed.gl.deleteTexture(uploadTexture);
       const effects = [];
       for (const def of current.effects.filter((d) => d.passes.length && d.type !== "lut")) {
         const params = Object.fromEntries(def.params.map((p) => [p.key, p.default]));
@@ -621,9 +759,14 @@ try {
         adjustedEffects,
       };
     },
-    { oldModules, newModules, legacyJs },
+    { oldModules, newModules, legacyJs, blendOnly },
   );
-  if (!verifyOnly)
+  if (blendOnly)
+    writeFileSync(
+      path.join(root, "docs/evaluations/2026-09-07-color-blend-round2.json"),
+      `${JSON.stringify(result, null, 2)}\n`,
+    );
+  else if (!verifyOnly)
     writeFileSync(
       path.join(
         root,

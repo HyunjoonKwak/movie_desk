@@ -113,17 +113,25 @@ const setup = async (mode: Mode) => {
     encodeQueueSize = 0;
     constructor(private init: VideoEncoderInit) {}
     configure() {}
-    encode() {}
+    private submitted = 0;
+    private emitted = 0;
+    encode() {
+      this.submitted++;
+    }
     close() {
       this.state = "closed";
     }
     async flush() {
-      videoPackets.forEach((p, i) =>
+      // Flush drains submitted frames; preflight adds an early flush and must
+      // never replay an already emitted GOP on the final flush.
+      const end = Math.min(this.submitted, videoPackets.length);
+      for (let i = this.emitted; i < end; i++) {
         this.init.output(
-          webChunk(p) as unknown as EncodedVideoChunk,
+          webChunk(videoPackets[i]!) as unknown as EncodedVideoChunk,
           i === 0 ? { decoderConfig: videoConfig } : {},
-        ),
-      );
+        );
+      }
+      this.emitted = end;
     }
   }
   vi.stubGlobal("window", { VideoEncoder: FakeVideoEncoder, VideoDecoder: class {} });

@@ -1,0 +1,289 @@
+{
+  "fixture": {
+    "backdrop": [
+      51,
+      128,
+      204
+    ],
+    "foreground": [
+      179,
+      77,
+      102
+    ],
+    "foregroundOpacity": 1
+  },
+  "rows": [
+    {
+      "mode": "normal",
+      "workingSpace": "linear",
+      "legacy": [
+        179,
+        77,
+        102,
+        255
+      ],
+      "managed": [
+        179,
+        77,
+        102,
+        255
+      ]
+    },
+    {
+      "mode": "multiply",
+      "workingSpace": "linear",
+      "legacy": [
+        36,
+        39,
+        82,
+        255
+      ],
+      "managed": [
+        33,
+        34,
+        80,
+        255
+      ]
+    },
+    {
+      "mode": "screen",
+      "workingSpace": "linear",
+      "legacy": [
+        194,
+        166,
+        224,
+        255
+      ],
+      "managed": [
+        182,
+        143,
+        212,
+        255
+      ]
+    },
+    {
+      "mode": "add",
+      "workingSpace": "linear",
+      "legacy": [
+        230,
+        205,
+        255,
+        255
+      ],
+      "managed": [
+        185,
+        147,
+        223,
+        255
+      ]
+    },
+    {
+      "mode": "darken",
+      "workingSpace": "linear",
+      "legacy": [
+        51,
+        77,
+        102,
+        255
+      ],
+      "managed": [
+        51,
+        77,
+        102,
+        255
+      ]
+    },
+    {
+      "mode": "lighten",
+      "workingSpace": "linear",
+      "legacy": [
+        179,
+        128,
+        204,
+        255
+      ],
+      "managed": [
+        179,
+        128,
+        204,
+        255
+      ]
+    },
+    {
+      "mode": "overlay",
+      "workingSpace": "linear",
+      "legacy": [
+        72,
+        78,
+        194,
+        255
+      ],
+      "managed": [
+        48,
+        50,
+        152,
+        255
+      ]
+    },
+    {
+      "mode": "soft-light",
+      "workingSpace": "linear",
+      "legacy": [
+        76,
+        103,
+        196,
+        255
+      ],
+      "managed": [
+        48,
+        76,
+        175,
+        255
+      ]
+    },
+    {
+      "mode": "hard-light",
+      "workingSpace": "linear",
+      "legacy": [
+        133,
+        77,
+        163,
+        255
+      ],
+      "managed": [
+        48,
+        50,
+        111,
+        255
+      ]
+    },
+    {
+      "mode": "color-dodge",
+      "workingSpace": "linear",
+      "legacy": [
+        171,
+        183,
+        255,
+        255
+      ],
+      "managed": [
+        69,
+        133,
+        217,
+        255
+      ]
+    },
+    {
+      "mode": "color-burn",
+      "workingSpace": "linear",
+      "legacy": [
+        0,
+        0,
+        128,
+        255
+      ],
+      "managed": [
+        0,
+        0,
+        0,
+        255
+      ]
+    },
+    {
+      "mode": "difference",
+      "workingSpace": "linear",
+      "legacy": [
+        128,
+        51,
+        102,
+        255
+      ],
+      "managed": [
+        173,
+        105,
+        183,
+        255
+      ]
+    },
+    {
+      "mode": "exclusion",
+      "workingSpace": "linear",
+      "legacy": [
+        158,
+        128,
+        143,
+        255
+      ],
+      "managed": [
+        180,
+        139,
+        200,
+        255
+      ]
+    },
+    {
+      "mode": "hue",
+      "workingSpace": "linear",
+      "legacy": [
+        216,
+        63,
+        101,
+        255
+      ],
+      "managed": [
+        202,
+        41,
+        94,
+        255
+      ]
+    },
+    {
+      "mode": "saturation",
+      "workingSpace": "linear",
+      "legacy": [
+        72,
+        123,
+        174,
+        255
+      ],
+      "managed": [
+        85,
+        127,
+        182,
+        255
+      ]
+    },
+    {
+      "mode": "color",
+      "workingSpace": "linear",
+      "legacy": [
+        182,
+        80,
+        105,
+        255
+      ],
+      "managed": [
+        181,
+        82,
+        106,
+        255
+      ]
+    },
+    {
+      "mode": "luminosity",
+      "workingSpace": "linear",
+      "legacy": [
+        48,
+        125,
+        201,
+        255
+      ],
+      "managed": [
+        42,
+        125,
+        202,
+        255
+      ]
+    }
+  ]
+}

@@ -61,7 +61,9 @@ function modules(base) {
 const managedOnly = process.argv.includes("--managed-only");
 const neutral = process.argv.includes("--neutral");
 const durationSeconds = Number(process.env.COLOR_EXPORT_SECONDS ?? 600);
-const oldModules = managedOnly ? {} : modules("0e6804a");
+const oldModules = managedOnly
+  ? {}
+  : modules(process.argv.find((arg) => arg.startsWith("--baseline="))?.slice(11) ?? "0e6804a");
 const newModules = modules();
 const compileWorkerFile = (file) =>
   ts.transpileModule(readFileSync(path.join(root, `apps/web/src/${file}.ts`), "utf8"), {

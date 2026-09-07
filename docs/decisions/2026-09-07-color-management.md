@@ -159,3 +159,16 @@ boundary. A no-effect opaque-black performance fixture avoids a content/entropy
 change across that boundary; its decoded plane hash and file size are compared
 between exporters rather than requiring a lossy codec to reproduce ideal black
 without quantization error.
+
+
+## B’4b review clarification
+
+All 17 blend modes intentionally use linear Rec.709 (`BLEND_WORKING_SPACE`),
+including artistic backdrop modes. This keeps blending in the same scene domain
+as alpha, light addition and spatial filtering, but reinterprets the encoded
+artistic definitions; it is not W3C encoded-blend appearance compatibility.
+The audit now includes all 17 actual legacy/new GPU RGB rows, and both migration
+catalogs explicitly name the blend changes. Existing grades/textures may need
+retuning. Export preflight encodes/flushes the first real frame before the long
+loop: present incompatible metadata is fatal; missing metadata is an explicit
+approximation warning rather than a delayed whole-export failure.

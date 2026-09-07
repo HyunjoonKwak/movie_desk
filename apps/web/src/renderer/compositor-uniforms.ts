@@ -3,13 +3,14 @@
 // the hot path uniforms in one place.
 
 import {
-  sampleKeyframes,
   type BackdropBlendMode,
+  type BlendMode,
   type Clip,
   type EffectInstance,
   type Project,
   type TransitionFrame,
   type TransitionType,
+  sampleKeyframes,
 } from "@movie-desk/core";
 import type { GL } from "./gl";
 import type { Program } from "./shader-registry";
@@ -30,6 +31,30 @@ const WIPE_MODE: Partial<Record<TransitionType, number>> = {
 // would need a `?? 0` fallback and would quietly render the new mode as
 // overlay. The GLSL side has no compiler to enforce the other half of this
 // contract, so blend-modes.test.ts checks the cases exist in the source.
+// Managed blends deliberately use linear Rec.709, including artistic modes.
+// This is a migrated artistic interpretation, not encoded W3C compatibility.
+// Normal alpha-over and additive light share the scene domain; see audit for
+// all legacy/new numeric differences and the user-facing migration warning.
+export const BLEND_WORKING_SPACE: Readonly<Record<BlendMode, "linear">> = {
+  normal: "linear",
+  add: "linear",
+  multiply: "linear",
+  screen: "linear",
+  overlay: "linear",
+  "soft-light": "linear",
+  darken: "linear",
+  lighten: "linear",
+  "hard-light": "linear",
+  "color-dodge": "linear",
+  "color-burn": "linear",
+  difference: "linear",
+  exclusion: "linear",
+  hue: "linear",
+  saturation: "linear",
+  color: "linear",
+  luminosity: "linear",
+};
+
 export const BACKDROP_BLEND_MODE: Record<BackdropBlendMode, number> = {
   overlay: 0,
   "soft-light": 1,
@@ -73,7 +98,7 @@ export const setWipeUniforms = (gl: GL, prog: Program, wipe: TransitionFrame | n
   const modeLoc = prog.uniform("u_wipe_mode");
   const progLoc = prog.uniform("u_wipe_progress");
   const softLoc = prog.uniform("u_wipe_softness");
-  const mode = wipe ? WIPE_MODE[wipe.type] ?? 1 : 0;
+  const mode = wipe ? (WIPE_MODE[wipe.type] ?? 1) : 0;
   if (modeLoc) gl.uniform1i(modeLoc, mode);
   if (progLoc) gl.uniform1f(progLoc, wipe ? wipe.progress : 1);
   if (softLoc) gl.uniform1f(softLoc, 0.04);

@@ -495,7 +495,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | B'3 오디오 미터·버스 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 3라운드 + 문서 라운드 + 첫 소리 수정 완료, main 통합(7ed748c, 수정 870fa35) | `codex/b3-audio-bus` · [감사](evaluations/2026-09-07-audio-bus-audit.md), [모델 결정](decisions/2026-09-07-audio-bus-model.md). 선택 모델·CRDT/JSON 저장, 공용 라우팅·스테레오 팬, 실측 peak/RMS/3초 LUFS, 버스·마스터 UI·정밀 undo, export 근사 true peak·과부하 안내. PCM 최대 오차 1.49e-8, 8트랙 미터 처리 최대 0.10ms, 전체 E2E 59 PASS. 2라운드 H1–H3·M2–M10·LOW 4건 반영, full gate 9/9 PASS, 단위 858·E2E 60 PASS; M1 true peak 워커 이전 후속 통합 후 CI에서 첫 소리 546~848ms(예산 500ms) 회귀가 드러났다 — 재생 시작이 미터 워클릿 로딩을 기다렸기 때문. `870fa35`가 재생을 먼저 시작하고 워클릿 완료 시 정지 세대 가드와 함께 미터를 붙이도록 바꿔 로컬 210→76ms(워클릿 1초 지연에도 63ms)로 회복했다. [경위](evaluations/audio-bus/first-sound-regression.md). |
 
 | B'4a 컬러 감사·스코프 | Codex 구현 · Claude 감독·리뷰 | 구현·리뷰 완료, main 통합(0e6804a) | 현재 `HyunjoonKwak/codex-b4-color` · [감사](evaluations/2026-09-07-color-audit.md), [색 관리 결정](decisions/2026-09-07-color-management.md). 기존 스코프를 GPU 다운샘플·비동기 PBO 리드백·워커 계산/표시로 교체, RGB/루마 히스토그램·루마/RGB 파형·BT.709 벡터·클리핑 눈금과 390px 접근 추가. `pnpm gate` 9/9 PASS(단위 886·Chromium E2E 62), 1080p 캡처/리드백 p95 0.065ms + 표시 p95 0.030ms, 프레임 간격 p50 16.665ms 유지. 승인된 B'4b 구현은 다음 행 |
-| B'4b 선형 SDR 색 파이프라인 | Codex 구현 · Claude 감독·리뷰 | 구현·gate 완료, Claude 최종 리뷰 대기 | RGBA16F 선형 Rec.709 장면·효과 공간 경계, SRGB8 폴백 실동작 검사, LUT sRGB/BT.709/linear 선택·undo·내보내기 일치, BT.709 I420 신호와 6개 프리셋 1/1/1 태그 검증. `pnpm gate` 9/9 PASS(단위 910·Chromium E2E 64). 무효과 native 단일 불투명 클립 합성 147,456·실제 VP9 230,400 채널 차이 0, +1EV 선형 이득 1.99987×. Metal 1080p 프레임 간격 p50 16.7→16.7ms; DOM SDR 근사·HDR 비지원·8-bit 폴백 정밀도 한계는 화면에 안내. [감사](evaluations/2026-09-07-color-audit.md), [결정](decisions/2026-09-07-color-management.md) |
+| B'4b 선형 SDR 색 파이프라인 | Codex 구현 · Claude 감독·리뷰 | 구현·gate 완료, Claude 최종 리뷰 대기 | RGBA16F 선형 Rec.709 장면·효과 공간 경계, SRGB8 폴백 실동작 검사, LUT sRGB/BT.709/linear 선택·undo·내보내기 일치, BT.709 I420 신호와 6개 프리셋 1/1/1 태그 검증. `pnpm gate` 9/9 PASS(단위 939·Chromium E2E 64). 무효과 native 단일 불투명 클립 합성 147,456·실제 VP9 230,400 채널 차이 0, +1EV 선형 이득 1.99987×. Metal 1080p 프레임 간격 p50 16.7→16.7ms; **SwiftShader p50 16.7→50.0ms(3배, 약 20fps) 회귀는 B’6 후속**; DOM SDR 근사·HDR 비지원·8-bit 폴백 정밀도 한계는 화면에 안내. [감사](evaluations/2026-09-07-color-audit.md), [결정](decisions/2026-09-07-color-management.md) |
 
 ### C3 구현 메모 (2026-09-06)
 
@@ -726,3 +726,23 @@ ANGLE Metal 재생은 p50 16.7→16.7ms·p95 18.4→18.2ms이며, 중립 내보�
 단위 테스트와 Chromium E2E **64개** 통과, OSV 167 패키지 취약점 0건. 초기
 gate에서 잡힌 새 안내 토스트의 타임라인 클릭 차단은 미리보기 내부 C2 StateHint로
 옮겨 해결했고, 기존 marquee E2E를 수정하지 않은 채 통과했다. [gate 보고서](evaluations/2026-09-07-color-linear-gate.md).
+
+
+B’4b 2라운드(8cf9505 리뷰): 17종 블렌드 모두 선형 Rec.709 계약을 선언하고
+인코딩 W3C 외관과의 비호환을 명시했다. 17종 실제 GPU 전후 RGB는
+[감사 표](evaluations/2026-09-07-color-audit.md)와
+[측정 JSON](evaluations/2026-09-07-color-blend-round2.json)에 기록했으며,
+마이그레이션 문구에 multiply·screen·overlay·soft-light를 포함했다. 내보내기는
+첫 실제 프레임을 preparing에서 인코딩·flush해 다른 색 메타데이터를 즉시
+거부하고, 메타데이터 없음은 번역된 근사 안내로 계속한다. 해상도별 소스 타깃
+LRU와 별도 정지 이미지 캐시, 엄격한 셰이더 치환 계약, RGBA 샤프닝을 반영했다.
+SwiftShader **16.7→50.0ms(3배)** 회귀를 숨기지 않으며, B’6에서 낮은 미리보기
+해상도·전송 패스 캐시·성능 안내를 검증한다. 정밀도 저하를 자동 완화책으로
+적용하지 않았고, 현재 소프트웨어 렌더러 성능 개선을 주장하지 않는다.
+
+2라운드 최종 `pnpm gate` **9/9 PASS**: core155·web701·desktop72·scripts11,
+총 **939** 단위 테스트, Chromium **64/64**(181.0초), OSV **167** 패키지 취약점
+0건, build·tsc·biome 통과. [gate 표](evaluations/2026-09-07-color-linear-round2-gate.md).
+첫 단위 실패는 테스트 VideoEncoder의 중복 flush 재생을 바로잡았고, 이후 기존
+오디오 미터 E2E의 5초 시간 초과 한 건은 코드·테스트 수정 없이 전체 gate
+재실행에서 통과했다. 자세한 실패 이력과 선택 항목의 잔여 범위는 감사에 남겼다.

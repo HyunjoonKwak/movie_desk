@@ -47,6 +47,7 @@ import {
 } from "./gl";
 import { type TransferProbe, probeVideoTransfer, uploadedVideoDomain } from "./input-color";
 import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
+import { ManagedShaderContractError } from "./managed-shader";
 import { PingPong } from "./ping-pong";
 import { RetryBackoff } from "./retry-backoff";
 import { ScratchPool } from "./scratch-pool";
@@ -84,11 +85,21 @@ export class Compositor {
   private readonly colorWarnings = new Set<string>();
   private readonly videoTransferProbe: TransferProbe;
   usesColorApproximation = false;
-  private sourceTarget: { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number } | null =
-    null;
+  private readonly sourceTargets = new BoundedResourceCache<
+    string,
+    ReturnType<typeof allocateTarget>
+  >(8, (target) => {
+    this.gl.deleteTexture(target.tex);
+    this.gl.deleteFramebuffer(target.fbo);
+  });
+  private readonly imageTargets = new BoundedResourceCache<
+    object,
+    { target: ReturnType<typeof allocateTarget>; url: string }
+  >(12, ({ target }) => {
+    this.gl.deleteTexture(target.tex);
+    this.gl.deleteFramebuffer(target.fbo);
+  });
   private readonly normalizedSource = document.createElement("canvas");
-  private lastImageSource: HTMLImageElement | ImageBitmap | null = null;
-  private lastImageUrl = "";
   private readonly opaqueImages = new WeakMap<object, boolean>();
   private get pingPong() {
     return this.colorPingPong;
@@ -292,9 +303,10 @@ export class Compositor {
     const gl = this.gl;
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
+    const sceneFbo = this.sceneFbo;
     const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFbo);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
@@ -395,9 +407,10 @@ export class Compositor {
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
 
+    const sceneFbo = this.sceneFbo;
     const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, sceneFbo);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
     gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
     const { effects, kfValues } = animateEffects(clip, project);
@@ -576,14 +589,8 @@ export class Compositor {
         ? source
         : null;
     const imageUrl = source instanceof HTMLImageElement ? source.currentSrc : "";
-    if (
-      immutableImage &&
-      this.lastImageSource === immutableImage &&
-      this.lastImageUrl === imageUrl &&
-      this.sourceTarget
-    )
-      return this.sourceTarget.tex;
-    this.lastImageSource = null;
+    const cachedImage = immutableImage ? this.imageTargets.get(immutableImage) : undefined;
+    if (cachedImage?.url === imageUrl) return cachedImage.target.tex;
     // Images use the browser's sRGB image/profile conversion. VideoFrames use
     // the measured upload transfer directly. DOM video is explicitly approximate:
     // an sRGB Canvas2D target alone does not prove BT.709 transfer normalization.
@@ -624,19 +631,17 @@ export class Compositor {
     }
     uploadSource(this.gl, tex, directSource ? source : canvas, false);
     const gl = this.gl;
-    if (!this.sourceTarget || this.sourceTarget.w !== w || this.sourceTarget.h !== h) {
-      if (this.sourceTarget) {
-        gl.deleteTexture(this.sourceTarget.tex);
-        gl.deleteFramebuffer(this.sourceTarget.fbo);
-      }
-      this.sourceTarget = { ...allocateTarget(gl, w, h, this.colorFormat!), w, h };
+    const key = `${w}x${h}`;
+    let target = immutableImage ? undefined : this.sourceTargets.get(key);
+    if (!target) {
+      target = allocateTarget(gl, w, h, this.colorFormat!);
+      if (immutableImage) this.imageTargets.set(immutableImage, { target, url: imageUrl });
+      else this.sourceTargets.set(key, target);
     }
     gl.disable(gl.BLEND);
-    this.drawTransfer(tex, this.sourceTarget.fbo, interpretation.domain, "linear", w, h, true);
+    this.drawTransfer(tex, target.fbo, interpretation.domain, "linear", w, h, true);
     gl.enable(gl.BLEND);
-    this.lastImageSource = immutableImage;
-    this.lastImageUrl = imageUrl;
-    return this.sourceTarget.tex;
+    return target.tex;
   }
 
   private async uploadClip(
@@ -735,7 +740,8 @@ export class Compositor {
         let prog: ReturnType<ShaderRegistry["get"]>;
         try {
           prog = this.shaders.get(pass.shader, this.managed);
-        } catch {
+        } catch (error) {
+          if (error instanceof ManagedShaderContractError) throw error;
           // A shader that failed to compile/link (or is missing)
           // degrades this one effect to a no-op instead of throwing out of the
           // whole chain and dropping the entire composited frame — mirrors the
@@ -948,10 +954,8 @@ export class Compositor {
     this.retainedAssetIds.clear();
     disposeLutTextures(this.gl);
     this.colorScratch.dispose();
-    if (this.sourceTarget) {
-      this.gl.deleteTexture(this.sourceTarget.tex);
-      this.gl.deleteFramebuffer(this.sourceTarget.fbo);
-    }
+    this.sourceTargets.clear();
+    this.imageTargets.clear();
     this.shaders.dispose();
     this.colorPingPong.dispose();
     this.sources.dispose();

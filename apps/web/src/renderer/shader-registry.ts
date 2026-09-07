@@ -29,7 +29,7 @@ import { fs as whiteBalanceFs } from "./shaders/white-balance";
 
 // Built-in fragment shaders. Each name maps to the GLSL source from a single
 // dedicated file under shaders/.
-const SHADERS: Readonly<Record<string, string>> = {
+export const SHADERS: Readonly<Record<string, string>> = {
   transfer: transferFs,
   blit: blitFs,
   brightness: brightnessFs,

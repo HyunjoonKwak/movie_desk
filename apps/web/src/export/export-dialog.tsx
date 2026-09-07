@@ -13,6 +13,7 @@ import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import {
   ExportCancelledError,
+  ExportColorMetadataError,
   type ExportDestination,
   WebCodecsExporter,
   downloadBlob,
@@ -157,7 +158,12 @@ export function ExportDialog({ open, onOpenChange }: Props) {
         setMissingNames(names);
         toast.error(t("export.missingMedia", { names: names.join(", ") }));
       } else {
-        const msg = err instanceof Error ? err.message : "Unknown error";
+        const msg =
+          err instanceof ExportColorMetadataError
+            ? t("color.encoderMismatch")
+            : err instanceof Error
+              ? err.message
+              : "Unknown error";
         setFailure(true);
         toast.error(t("export.failed", { msg }));
       }

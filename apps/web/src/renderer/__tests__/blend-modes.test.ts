@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
 import { BLEND_MODES, isBackdropBlend } from "@movie-desk/core";
-import { BACKDROP_BLEND_MODE } from "../compositor-uniforms";
-import { MASK_FN, MASK_UNIFORMS, WIPE_FN, WIPE_UNIFORMS } from "../shaders/common";
+import { describe, expect, it } from "vitest";
+import { BACKDROP_BLEND_MODE, BLEND_WORKING_SPACE } from "../compositor-uniforms";
 import { fs as blendModesFs } from "../shaders/blend-modes";
 import { fs as blitFs } from "../shaders/blit";
+import { MASK_FN, MASK_UNIFORMS, WIPE_FN, WIPE_UNIFORMS } from "../shaders/common";
 
 // There is no compiler between the TypeScript mode table and the GLSL switch it
 // indexes, and the shader only fails at link time in a real GL context — which
@@ -11,6 +11,10 @@ import { fs as blitFs } from "../shaders/blit";
 // shader source is the cheap defence that catches a mode added on one side
 // only. Pixel correctness is out of reach here; that needs a Playwright run.
 describe("backdrop blend mode table", () => {
+  it("declares a working space for all 17 blends", () => {
+    expect(Object.keys(BLEND_WORKING_SPACE).sort()).toEqual([...BLEND_MODES].sort());
+    expect(new Set(Object.values(BLEND_WORKING_SPACE))).toEqual(new Set(["linear"]));
+  });
   const backdropModes = BLEND_MODES.filter((m) => isBackdropBlend(m));
 
   it("has an entry for every backdrop-reading mode", () => {
@@ -39,16 +43,12 @@ describe("blend-modes shader source", () => {
   it("branches on every integer the mode table can produce", () => {
     for (const [mode, value] of Object.entries(BACKDROP_BLEND_MODE)) {
       const branch = new RegExp(`u_mode\\s*==\\s*${value}\\b`);
-      expect(branch.test(blendModesFs), `missing GLSL case ${value} for "${mode}"`).toBe(
-        true,
-      );
+      expect(branch.test(blendModesFs), `missing GLSL case ${value} for "${mode}"`).toBe(true);
     }
   });
 
   it("does not branch on integers outside the mode table", () => {
-    const cases = [...blendModesFs.matchAll(/u_mode\s*==\s*(\d+)\b/g)].map((m) =>
-      Number(m[1]),
-    );
+    const cases = [...blendModesFs.matchAll(/u_mode\s*==\s*(\d+)\b/g)].map((m) => Number(m[1]));
     const declared = new Set<number>(Object.values(BACKDROP_BLEND_MODE));
     // u_wipe_mode comparisons are a different uniform and must not be caught.
     for (const c of cases) {

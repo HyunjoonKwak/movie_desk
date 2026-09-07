@@ -20,6 +20,14 @@ const isWebCodecsSupported = (): boolean =>
 // Renders project frames offscreen via the existing Compositor, encodes each
 // frame with WebCodecs VideoEncoder, mixes audio across all unmuted clips,
 // and muxes both into an MP4 (H.264 + AAC) or WebM.
+// Structured error translated by the export dialog.
+export class ExportColorMetadataError extends Error {
+  constructor() {
+    super("color.encoderMismatch");
+    this.name = "ExportColorMetadataError";
+  }
+}
+
 // Thrown when the user cancels; the dialog reports it as a cancel, not a failure.
 export class ExportCancelledError extends Error {
   constructor(options?: ErrorOptions) {
@@ -95,6 +103,7 @@ export class WebCodecsExporter implements Exporter {
       compositor.resize(preset.width, preset.height, 1);
       colorPipeline = new Bt709FramePipeline(canvas, abortController.signal);
       let colorOutputVerified = false;
+      let colorMetadataMissing = false;
       let colorOutputError: Error | null = null;
       let virtualPlayheadMs = 0;
       compositor.setPlayheadGetter(() => virtualPlayheadMs);
@@ -145,18 +154,16 @@ export class WebCodecsExporter implements Exporter {
 
       encoder = new VideoEncoder({
         output: (chunk, meta) => {
-          if (meta?.decoderConfig) {
+          if (meta?.decoderConfig?.colorSpace) {
             colorOutputVerified = isBt709Output(meta.decoderConfig.colorSpace);
-            if (!colorOutputVerified)
-              colorOutputError = new Error(
-                "This encoder cannot produce verified BT.709 color output",
-              );
+            if (!colorOutputVerified) colorOutputError = new ExportColorMetadataError();
           }
           muxer.addVideoChunk(chunk, meta);
         },
         error: (e) => {
           // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
           console.error("Encoder error:", e);
+          colorOutputError = e;
         },
       });
       encoder.configure({
@@ -166,6 +173,28 @@ export class WebCodecsExporter implements Exporter {
         bitrate: preset.videoBitrateKbps * 1000,
         framerate: preset.fps,
       });
+
+      // Encode and flush the actual first frame before committing to the long
+      // render loop. Keep its chunk in the muxer: no duplicate frame or timestamp.
+      virtualPlayheadMs = rangeStart;
+      await compositor.renderFrame(
+        {
+          ...project,
+          timeline: { ...project.timeline, playhead: virtualPlayheadMs },
+        },
+        getAsset,
+      );
+      if (this.cancelled) throw new ExportCancelledError();
+      const firstFrame = await colorPipeline.capture(0, Math.round(1_000_000 / preset.fps));
+      try {
+        if (this.cancelled) throw new ExportCancelledError();
+        encoder.encode(firstFrame, { keyFrame: true });
+      } finally {
+        firstFrame.close();
+      }
+      await encoder.flush();
+      if (colorOutputError) throw colorOutputError;
+      colorMetadataMissing = !colorOutputVerified;
 
       onProgress({ stage: "rendering", progress: 0 });
       const renderStartedAt = performance.now();
@@ -183,7 +212,7 @@ export class WebCodecsExporter implements Exporter {
         await waitForEncoderQueue(encoder!);
       };
 
-      for (let f = 0; f < totalFrames; f++) {
+      for (let f = 1; f < totalFrames; f++) {
         if (this.cancelled) {
           throw new ExportCancelledError();
         }
@@ -332,15 +361,13 @@ export class WebCodecsExporter implements Exporter {
       onProgress({ stage: "muxing", progress: 0.95 });
       await encoder.flush();
       if (colorOutputError) throw colorOutputError;
-      if (!colorOutputVerified)
-        throw new Error("The encoder did not report verifiable BT.709 color metadata");
       const buffer = await muxer.finalize();
 
       onProgress({ stage: "finalizing", progress: 1 });
 
       const name = sanitizeName(project.name) || "export";
       return {
-        colorApproximation: compositor.usesColorApproximation,
+        colorApproximation: compositor.usesColorApproximation || colorMetadataMissing,
         pitchFallback,
         aacCorrectionFallback,
         ...(audioPeaks ? { audioPeaks } : {}),
