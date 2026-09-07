@@ -6,9 +6,11 @@ import type { Clip, Project, Track } from "@movie-desk/core";
 import { toast } from "sonner";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
+import { installCheckedWriter } from "./checked-indexeddb";
 import { allowProjectWrites, blockProjectWrites, isRestoredMaintenance } from "./hydration-state";
-import { createProjectCrdt } from "./project-crdt";
+import { createProjectCrdt, discardMigrationBackup } from "./project-crdt";
 import { parseStoredProject } from "./project-io";
+import { insertRecoveredProject } from "./project-library";
 import { useSaveStateStore } from "./save-state-store";
 
 // The live document: the active project mirrored into a Yjs doc that
@@ -73,7 +75,7 @@ let live: LiveDoc | null = null;
 export const projectPersistenceName = (projectId: Project["id"]): string =>
   `cut-editor:project:${encodeURIComponent(projectId)}`;
 
-export const getLiveDoc = (): LiveDoc => {
+export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): LiveDoc => {
   const projectId = useProjectStore.getState().project.id;
   if (live?.projectId === projectId) return live;
   live?.dispose();
@@ -101,11 +103,39 @@ export const getLiveDoc = (): LiveDoc => {
     );
   };
 
+  let invalidEdit = false;
+  const saveFailed = (_error: unknown): void => {
+    if (disposed) return;
+    useSaveStateStore.getState().setDocumentError(true);
+    toast.error(t("project.saveFailed"), { id: `document-save-failed:${projectId}` });
+  };
+  const saved = (): void => {
+    if (disposed || failed || invalidEdit) return;
+    useSaveStateStore.getState().setDocumentError(false);
+    useSaveStateStore.getState().markSaved();
+  };
+  const checkpoint = installCheckedWriter(persistence, {
+    saved,
+    failed: saveFailed,
+    cleanup: () => {
+      if (!disposed) doc.transact(() => discardMigrationBackup(doc), LOCAL_ORIGIN);
+    },
+  });
+
   const flush = (): void => {
     const project = useProjectStore.getState().project;
     if (disposed || !restored || failed || project.id !== projectId) return;
-    doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
-    queueMicrotask(() => useSaveStateStore.getState().markSaved());
+    try {
+      const retry = useSaveStateStore.getState().documentError;
+      doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
+      invalidEdit = false;
+      if (retry) checkpoint();
+    } catch (error) {
+      // Temporary invalid edit states must not escape the store subscription.
+      // Leave hydration usable: the next valid edit retries the save.
+      invalidEdit = true;
+      saveFailed(error);
+    }
   };
 
   // Loads the stored document into the store. Runs when IndexedDB finishes
@@ -186,14 +216,30 @@ export const getLiveDoc = (): LiveDoc => {
     if (restored && !failed) useSaveStateStore.getState().markSaved();
   });
 
-  void persistence.whenSynced
-    .then(() => {
+  const recoverLibrary = async (project: Project | null): Promise<void> => {
+    if (failed || !project || !options.recoverMissingLibrary) return;
+    try {
+      await insertRecoveredProject(project);
+    } catch {
+      if (disposed) return;
+      useSaveStateStore.getState().setLibraryError(true);
+      toast.error(t("project.saveFailed"), { id: "library-save-failed" });
+    }
+  };
+
+  const restore = async (): Promise<void> => {
+    try {
+      await persistence.whenSynced;
       loaded();
       if (disposed) return;
       restored = true;
       if (projectCrdt.isInitialized()) {
-        applyFromDoc();
+        const recovered = applyFromDoc();
         if (!failed) allowProjectWrites(projectId);
+        // Also checkpoint an already-migrated document whose previous session
+        // ended between committing v3 and discarding recovery data.
+        if (!failed && doc.getMap("migration-backup-v2").size) checkpoint();
+        await recoverLibrary(recovered);
         return;
       }
 
@@ -210,10 +256,14 @@ export const getLiveDoc = (): LiveDoc => {
         projectCrdt.write(seed);
         // Retain legacy roots as recovery evidence.
       }, LOCAL_ORIGIN);
-      if (oldSnapshot || oldStructure) applyFromDoc();
+      const recovered = oldSnapshot || oldStructure ? applyFromDoc() : seed;
       if (!failed) allowProjectWrites(projectId);
-    })
-    .catch(fail);
+      await recoverLibrary(recovered);
+    } catch (error) {
+      fail(error);
+    }
+  };
+  void restore();
 
   live = {
     projectId,

@@ -88,3 +88,17 @@ export const getActiveProjectId = async (): Promise<string | null> => {
   const row = await getDb().meta.get("activeProjectId");
   return row?.value ?? null;
 };
+
+// Recovery creates a missing library entry, never rewrites an existing v1 row.
+export const insertRecoveredProject = async (p: Project): Promise<void> => {
+  const database = getDb();
+  await database.transaction("rw", database.projects, async () => {
+    if (await database.projects.get(p.id)) return;
+    await database.projects.add({
+      id: p.id,
+      name: p.name,
+      updatedAt: p.updatedAt,
+      json: JSON.stringify(prepareStoredProject(p)),
+    });
+  });
+};

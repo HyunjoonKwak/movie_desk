@@ -7,8 +7,10 @@ import { createProjectCrdt } from "../project-crdt";
 const provider = vi.hoisted(() => ({ doc: null as Y.Doc | null, sync: () => {} }));
 vi.mock("y-indexeddb", () => ({
   IndexeddbPersistence: class {
+    doc: Y.Doc;
     whenSynced: Promise<void>;
     constructor(_name: string, doc: Y.Doc) {
+      this.doc = doc;
       provider.doc = doc;
       this.whenSynced = new Promise((resolve) => {
         provider.sync = resolve;
@@ -16,6 +18,12 @@ vi.mock("y-indexeddb", () => ({
     }
     on() {}
     destroy() {}
+  },
+}));
+vi.mock("../checked-indexeddb", () => ({
+  installCheckedWriter: (p: { doc: Y.Doc }, callbacks: { saved: () => void }) => {
+    p.doc.on("update", () => queueMicrotask(callbacks.saved));
+    return () => queueMicrotask(callbacks.saved);
   },
 }));
 import { disposeLiveDoc, getLiveDoc } from "../live-doc";
@@ -134,3 +142,53 @@ it("keeps preview maintenance after hydration out of the persisted CRDT until a 
   expect(reloaded.name).toBe("Actual edit");
   expect(reloaded.mediaLibrary[0]).not.toHaveProperty("thumbDataUrl");
 });
+
+it.each(["duration", "start", "id", "root"])(
+  "contains invalid %s edits and resumes saving after correction",
+  async (field) => {
+    const Y = await import("yjs");
+    const { nestedProject } = await import("./fixtures/nested-project");
+    const { useSaveStateStore } = await import("../save-state-store");
+    const p = nestedProject();
+    useProjectStore.getState().loadProject(p);
+    getLiveDoc();
+    createProjectCrdt(provider.doc!).write(p);
+    provider.sync();
+    await Promise.resolve();
+    await Promise.resolve();
+    const good = useProjectStore.getState().project;
+    const before = Y.encodeStateAsUpdate(provider.doc!);
+    const bad = {
+      ...good,
+      timeline:
+        field === "root"
+          ? { ...good.timeline, id: "wrong" as typeof good.timeline.id }
+          : {
+              ...good.timeline,
+              tracks: good.timeline.tracks.map((track, i) =>
+                i
+                  ? track
+                  : {
+                      ...track,
+                      clips: track.clips.map((clip) => ({
+                        ...clip,
+                        [field]: field === "duration" ? 0 : field === "start" ? Number.NaN : "",
+                      })),
+                    },
+              ),
+            },
+      name: "Transient edit",
+    };
+    expect(() => useProjectStore.setState({ project: bad })).not.toThrow();
+    expect(Y.encodeStateAsUpdate(provider.doc!)).toEqual(before);
+    expect(useSaveStateStore.getState().documentError).toBe(true);
+    await Promise.resolve();
+    expect(useSaveStateStore.getState().state).toBe("error");
+    expect(() =>
+      useProjectStore.setState({ project: { ...good, name: "Corrected" } }),
+    ).not.toThrow();
+    await Promise.resolve();
+    expect(useSaveStateStore.getState().documentError).toBe(false);
+    expect(createProjectCrdt(provider.doc!).read(p.id, p.timeline)?.name).toBe("Corrected");
+  },
+);

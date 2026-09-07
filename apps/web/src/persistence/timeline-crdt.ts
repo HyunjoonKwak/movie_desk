@@ -74,7 +74,7 @@ export const createTimelineCrdt = (doc: Y.Doc) => {
 
   const read = (rootTimelineId: unknown, localView: Timeline): readonly Timeline[] => {
     const timelineIds = uniqueSequence(timelineOrder.toArray());
-    if (!timelineIds.length || timelinesMap.size !== timelineIds.length)
+    if (!timelineIds.length)
       throw new NestedTimelineError(
         "Missing timeline metadata or timeline order; original document is unchanged",
       );
@@ -85,8 +85,6 @@ export const createTimelineCrdt = (doc: Y.Doc) => {
         throw new NestedTimelineError(`Missing timeline: ${timelineId}`);
       const tracksMap = tracksFor(timelineId);
       const trackIds = uniqueSequence(trackOrderFor(timelineId).toArray());
-      if (tracksMap.size !== trackIds.length)
-        throw new NestedTimelineError(`Incomplete track order: ${timelineId}`);
       const tracks = trackIds.map((trackId) => {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
@@ -118,8 +116,6 @@ export const createTimelineCrdt = (doc: Y.Doc) => {
           : {}),
       };
     });
-    if (seenClips.size !== clipsMap.size)
-      throw new NestedTimelineError("Unordered clips in timeline document");
     return timelines;
   };
   return { clips: clipsMap, write, read };

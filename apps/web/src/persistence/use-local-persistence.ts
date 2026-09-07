@@ -3,7 +3,7 @@
 import { t } from "@/i18n/use-t";
 import { usePreviewStore } from "@/stores/preview-store";
 import { useProjectStore } from "@/stores/project-store";
-import { createEmptyProject, type ID } from "@movie-desk/core";
+import { type ID, createEmptyProject } from "@movie-desk/core";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { disposeLiveDoc, getLiveDoc } from "./live-doc";
@@ -41,7 +41,7 @@ export const useLocalPersistence = (): boolean => {
           toast.error(`${t("project.activeCorrupt")}: ${activeResult.reason}`);
         }
 
-        getLiveDoc();
+        getLiveDoc({ recoverMissingLibrary: activeResult?.status === "missing" });
         // Records written by older builds carry inline thumbnails; move
         // them to the preview store as they show up.
         stopMigration = startInlinePreviewMigration(useProjectStore);

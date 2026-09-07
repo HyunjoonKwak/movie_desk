@@ -72,10 +72,9 @@ it.each(["timelines", "rootTimelineId", "both"])(
     createProjectCrdt(doc).write(p);
     const before = Y.encodeStateAsUpdate(doc);
     const actual = codec.parseCurrentProject;
+    let candidate: Record<string, unknown> = {};
     const parser = vi.spyOn(codec, "parseCurrentProject").mockImplementationOnce((raw) => {
-      const candidate = { ...(raw as Record<string, unknown>) };
-      expect(candidate.timelines).toEqual(p.timelines);
-      expect(candidate.rootTimelineId).toBe(p.rootTimelineId);
+      candidate = { ...(raw as Record<string, unknown>) };
       return actual(
         Object.fromEntries(
           Object.entries(candidate).filter(
@@ -88,6 +87,8 @@ it.each(["timelines", "rootTimelineId", "both"])(
     });
     try {
       expect(() => createProjectCrdt(doc).read(p.id, p.timeline)).toThrow(NestedTimelineError);
+      expect(candidate.timelines).toEqual(p.timelines);
+      expect(candidate.rootTimelineId).toBe(p.rootTimelineId);
       expect(Y.encodeStateAsUpdate(doc)).toEqual(before);
     } finally {
       parser.mockRestore();
@@ -95,3 +96,55 @@ it.each(["timelines", "rootTimelineId", "both"])(
     }
   },
 );
+
+it.each([2, 3])(
+  "opens a schema %s delete-versus-move merge and heals it on the next write",
+  (version) => {
+    const p = nestedProject();
+    const source = version === 2 ? legacyCrdt({ ...p, timelines: [p.timeline] }) : new Y.Doc();
+    if (version === 3) createProjectCrdt(source).write(p);
+    const a = new Y.Doc();
+    const b = new Y.Doc();
+    const initial = Y.encodeStateAsUpdate(source);
+    Y.applyUpdate(a, initial);
+    Y.applyUpdate(b, initial);
+    const track = p.timeline.tracks[0]!;
+    const clip = track.clips[0]!;
+    const mapName = version === 2 ? "clips" : "clips-v3";
+    const key = version === 2 ? clip.id : JSON.stringify([p.rootTimelineId, clip.id]);
+    const orderName =
+      version === 2
+        ? `track-clips-v2:${track.id}`
+        : `timeline-clip-order-v3:${JSON.stringify([p.rootTimelineId, track.id])}`;
+    a.transact(() => {
+      a.getMap(mapName).delete(key);
+      a.getArray(orderName).delete(0, 1);
+    });
+    b.getMap(mapName).set(key, { ...clip, start: 500 });
+    Y.applyUpdate(a, Y.encodeStateAsUpdate(b));
+    expect(a.getMap(mapName).has(key)).toBe(true);
+    expect(a.getArray(orderName).length).toBe(0);
+    const crdt = createProjectCrdt(a);
+    const recovered = crdt.read(p.id, p.timeline)!;
+    expect(recovered.timeline.tracks[0]!.clips).toEqual([]);
+    crdt.write({ ...recovered, name: "Recovered edit" });
+    const reopened = new Y.Doc();
+    Y.applyUpdate(reopened, Y.encodeStateAsUpdate(a));
+    expect(createProjectCrdt(reopened).read(p.id, p.timeline)?.name).toBe("Recovered edit");
+    expect(
+      reopened.getMap("clips-v3").has(JSON.stringify([recovered.rootTimelineId, clip.id])),
+    ).toBe(false);
+    for (const doc of [source, a, b, reopened]) doc.destroy();
+  },
+);
+
+it("omits an oversized embedded backup while retaining original roots until durable cleanup", () => {
+  const p = createEmptyProject();
+  const doc = legacyCrdt(p);
+  doc.getMap("project").set("snapshot", "x".repeat(2 * 1024 * 1024));
+  createProjectCrdt(doc).read(p.id, p.timeline);
+  expect(doc.getMap("migration-backup-v2").has("update")).toBe(false);
+  expect(doc.getMap("migration-backup-v2").get("pendingCleanup")).toBe(true);
+  expect(doc.getMap("project").has("snapshot")).toBe(true);
+  doc.destroy();
+});

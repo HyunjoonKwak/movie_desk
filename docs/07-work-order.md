@@ -449,7 +449,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
 | B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·rebase·gate PASS, 통합 리뷰 대기 | 저장 경계 자기 치유·실패 안내, 게이트웨이 대상 합성, Phase 1 방어 주석. main4791476 기준 core161·web721·desktop72·scripts11(965), E2E66/66, gate9/9. 호출부 이관·중첩 영속화는 Phase 1+7. [2라운드 보고서](evaluations/2026-09-07-b5-phase0-round2-report.md) |
-| B'5 Phase 1+7 | Codex 구현 · Claude 감독/리뷰 | 구현·gate 완료, Claude 검토 대기 | gate9/9, core162·web756·desktop72·scripts11(1,001), E2E68/68 두 번 PASS. JSON v2·CRDT v3 동시 연결, 읽기 시점 v1 변환, 원자적 v2 CRDT 마이그레이션과 전체 원본 백업, 자식/충돌 ID 왕복·실패 원본 보존. [결정](decisions/2026-09-07-nested-persistence.md) |
+| B'5 Phase 1+7 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·gate 완료, 재검토 대기 | gate9/9, core162·web770·desktop72·scripts11(1,015), 최종 E2E68/68 두 번 PASS. 삭제↔이동 병합 복구, 무효 편집 저장 오류 처리, 1MiB 백업 상한·커밋 후 폐기/압축, 후보 필드 테스트 보강. [2라운드 결과](evaluations/2026-09-07-b5-phase1-round2-report.md) · [결정](decisions/2026-09-07-nested-persistence.md) |
 | D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
@@ -888,3 +888,24 @@ v1 라이브러리·snapshot은 형태 기반 인메모리 변환만 하며 열�
 검토 완료·main 통합을 주장하지 않는다.
 [보고서](evaluations/2026-09-07-b5-phase1-report.md) ·
 [gate](evaluations/2026-09-07-b5-phase1-gate.md).
+
+
+### 2026-09-07 B′5 Phase 1+7 — 2라운드 리뷰 반영
+
+`1481e25` 리뷰의 필수 4건을 수정했다. v2/v3 삭제↔이동 병합의 미참조 항목은
+읽기에서 제외하고 이후 쓰기로 정리하며, 실제로 순서에 남아 있는 누락 항목은
+계속 검증한다. 일시적 무효 편집은 UI 예외 대신 저장 실패로 표시하고 정상 편집에서
+재시도한다. 마이그레이션 백업은 1MiB 상한, v3 IndexedDB 커밋 확인 뒤 폐기 및
+원자적 로그 압축으로 바꿨으며, 용량 초과·abort를 표시한다. 후보 필드 단언은
+mock 바깥으로 옮겼다. 자식 오디오 복구 알림·누락 라이브러리 행 복원·간결한 오류
+문구도 반영했고 루트 JSON 별칭 중복 유지 이유는 결정 문서에 기록했다.
+
+A5 규모 저장 벤치(1,000자산/1,000클립, 각 300회)에서 `1481e25` 대비
+동기 Yjs 쓰기 p50 **4.70→3.90ms**, p95 **5.20→4.60ms**였다.
+전체 가져오기/렌더/IndexedDB 커밋 시간 측정은 아니다.
+[2라운드 결과·검증](evaluations/2026-09-07-b5-phase1-round2-report.md),
+[결정](decisions/2026-09-07-nested-persistence.md).
+
+2라운드 최종 검증: **pnpm gate 9/9 PASS**, 단위 **1,015개**(core162·web770·desktop72·scripts11),
+저장 관련 **150개**, 전체 E2E **68/68 두 번 PASS(2.7m·2.6m)**. 각 실행 전 32119 lsof 확인.
+기존 RC1 도그푸딩 기록지는 변경하지 않았다.

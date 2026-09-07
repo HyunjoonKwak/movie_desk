@@ -1,13 +1,15 @@
-import { createEmptyProject, newId, type MediaClip, type MediaAsset } from "@movie-desk/core";
+import { useProjectStore } from "@/stores/project-store";
+import { type MediaAsset, type MediaClip, createEmptyProject, newId } from "@movie-desk/core";
 import { afterEach, expect, it, vi } from "vitest";
 import type * as Y from "yjs";
-import { useProjectStore } from "@/stores/project-store";
 
 const provider = vi.hoisted(() => ({ doc: null as Y.Doc | null, sync: () => {} }));
 vi.mock("y-indexeddb", () => ({
   IndexeddbPersistence: class {
+    doc: Y.Doc;
     whenSynced: Promise<void>;
     constructor(_name: string, doc: Y.Doc) {
+      this.doc = doc;
       provider.doc = doc;
       this.whenSynced = new Promise((resolve) => {
         provider.sync = resolve;
@@ -15,6 +17,12 @@ vi.mock("y-indexeddb", () => ({
     }
     on() {}
     destroy() {}
+  },
+}));
+vi.mock("../checked-indexeddb", () => ({
+  installCheckedWriter: (p: { doc: Y.Doc }, callbacks: { saved: () => void }) => {
+    p.doc.on("update", () => queueMicrotask(callbacks.saved));
+    return () => queueMicrotask(callbacks.saved);
   },
 }));
 import { disposeLiveDoc, getLiveDoc } from "../live-doc";

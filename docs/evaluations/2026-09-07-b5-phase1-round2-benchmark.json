@@ -1,0 +1,16 @@
+{
+  "assets": 1000,
+  "clips": 1000,
+  "samplesPerVariant": 300,
+  "baseline": "1481e25 project-crdt writer",
+  "scope": "Chromium synchronous validated Yjs write; no IDB/import/render timing",
+  "jsonBytes": 428840,
+  "before": {
+    "p50Ms": 4.699999988079071,
+    "p95Ms": 5.199999988079071
+  },
+  "after": {
+    "p50Ms": 3.900000035762787,
+    "p95Ms": 4.600000023841858
+  }
+}

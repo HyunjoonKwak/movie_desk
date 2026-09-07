@@ -10,6 +10,8 @@ import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
 import { createTimelineCrdt } from "./timeline-crdt";
 
 const PROJECT_CRDT_SCHEMA_VERSION = 3;
+export const MIGRATION_BACKUP_LIMIT = 1024 * 1024;
+
 const CLIPS_MAP_NAME = "clips";
 
 const META = "project-meta";
@@ -64,7 +66,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
 
   const write = (input: Project): void => {
-    const project = jsonClone(prepareStoredProject(input));
+    const project = prepareStoredProject(input);
     doc.transact(() => {
       timelines.write(project);
       setJsonValue(metaMap, "rootTimelineId", project.rootTimelineId);
@@ -115,17 +117,12 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
           throw new NestedTimelineError("Missing or mismatched legacy track");
-        const clips = uniqueSequence(clipOrderFor(trackId).toArray())
-          .map((clipId) => {
-            const clip = clipsMap.get(clipId);
-            if (clip?.id !== clipId)
-              throw new NestedTimelineError("Missing or mismatched legacy clip");
-            return clip;
-          })
-          .map((clip) => {
-            if (!clip) throw new NestedTimelineError("Missing legacy clip");
-            return clip;
-          });
+        const clips = uniqueSequence(clipOrderFor(trackId).toArray()).map((clipId) => {
+          const clip = clipsMap.get(clipId);
+          if (clip?.id !== clipId)
+            throw new NestedTimelineError("Missing or mismatched legacy clip");
+          return clip;
+        });
         tracks.push({ ...track, clips });
       }
       const duration = tracks.reduce(
@@ -136,33 +133,28 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
           ),
         0,
       );
-      const mediaLibrary = uniqueSequence(mediaOrder.toArray())
+      const mediaIds = uniqueSequence(mediaOrder.toArray());
+      const collectionIds = uniqueSequence(collectionOrder.toArray());
+      const mediaLibrary = mediaIds
         .map((assetId) => mediaMap.get(assetId))
         .filter((asset): asset is MediaAsset => asset !== undefined);
 
-      if (!nested) {
-        if (
-          tracksMap.size !== tracks.length ||
-          clipsMap.size !== tracks.flatMap((track) => track.clips).length
-        )
-          throw new NestedTimelineError("Unordered legacy tracks or clips");
-      }
+      // Delete versus move can leave unreferenced map entries after a merge.
+      // Order is authoritative; migration rewrites only the reachable entities.
       const name = metaMap.get("name");
       const createdAt = metaMap.get("createdAt");
       const framerate = metaMap.get("framerate");
       const resolution = metaMap.get("resolution");
       const markers = metaMap.get("markers");
       // Optional: documents written before A3 have no collections.
-      const collections = uniqueSequence(collectionOrder.toArray())
+      const collections = collectionIds
         .map((collectionId) => collectionsMap.get(collectionId))
         .filter((collection): collection is MediaCollection => collection !== undefined);
       if (
-        mediaLibrary.length !== mediaMap.size ||
-        mediaLibrary.length !== uniqueSequence(mediaOrder.toArray()).length ||
-        collections.length !== collectionsMap.size ||
-        collections.length !== uniqueSequence(collectionOrder.toArray()).length ||
-        mediaLibrary.some((asset, i) => asset.id !== uniqueSequence(mediaOrder.toArray())[i]) ||
-        collections.some((item, i) => item.id !== uniqueSequence(collectionOrder.toArray())[i])
+        mediaLibrary.length !== mediaIds.length ||
+        collections.length !== collectionIds.length ||
+        mediaLibrary.some((asset, i) => asset.id !== mediaIds[i]) ||
+        collections.some((item, i) => item.id !== collectionIds[i])
       )
         throw new NestedTimelineError("Incomplete media or collection order");
       if (
@@ -208,7 +200,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         const next = createProjectCrdt(staged);
         next.write(project);
         next.read(projectId, localView);
-        staged.getMap("migration-backup-v2").set("update", backup);
+        if (backup.byteLength <= MIGRATION_BACKUP_LIMIT)
+          staged.getMap("migration-backup-v2").set("update", backup);
+        staged.getMap("migration-backup-v2").set("pendingCleanup", true);
         Y.applyUpdate(doc, Y.encodeStateAsUpdate(staged, Y.encodeStateVector(doc)));
       } finally {
         staged.destroy();
@@ -229,4 +223,23 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
     write,
     read,
   };
+};
+
+// Called only after a schema-3 IndexedDB transaction commits. Deleting these
+// values also lets Yjs GC release large inline previews during compaction.
+export const discardMigrationBackup = (doc: Y.Doc): void => {
+  if (doc.getMap("project-meta").get("schemaVersion") !== 3) return;
+  doc.transact(() => {
+    doc.getMap("migration-backup-v2").clear();
+    doc.getMap("tracks-v2").clear();
+    doc.getArray("track-order-v2").delete(0, doc.getArray("track-order-v2").length);
+    doc.getMap("clips").clear();
+    doc.getMap("project").clear();
+    doc.getMap("structure").clear();
+    for (const [name] of doc.share) {
+      if (!name.startsWith(CLIP_ORDER_PREFIX)) continue;
+      const order = doc.getArray(name);
+      order.delete(0, order.length);
+    }
+  });
 };

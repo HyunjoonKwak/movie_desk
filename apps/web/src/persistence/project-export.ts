@@ -330,7 +330,7 @@ export const parseCurrentProject = (raw: unknown): Project => {
     );
   } catch (error) {
     throw new NestedTimelineError(
-      `Cannot open nested project; original data is unchanged: ${error instanceof Error ? error.message : String(error)}`,
+      `Cannot open nested project; original data is unchanged: ${error instanceof z.ZodError ? "Some required project fields are missing or invalid" : error instanceof Error ? error.message : String(error)}`,
     );
   }
 };
@@ -349,8 +349,11 @@ const rememberAudioRecovery = (raw: unknown, project: Project): Project => {
   const input = raw as Project;
   if (
     (input.audio !== undefined && project.audio === undefined) ||
-    input.timeline.tracks.some(
-      (track, i) => track.audio !== undefined && project.timeline.tracks[i]?.audio === undefined,
+    (input.timelines ?? [input.timeline]).some((timeline, index) =>
+      timeline.tracks.some(
+        (track, i) =>
+          track.audio !== undefined && project.timelines[index]?.tracks[i]?.audio === undefined,
+      ),
     )
   )
     recoveredAudio.add(project);
@@ -360,7 +363,12 @@ export const takeAudioRecovery = (project: Project): boolean => recoveredAudio.d
 export const parseStoredProject = (raw: unknown): Project => {
   if (raw && typeof raw === "object" && ("timelines" in raw || "rootTimelineId" in raw))
     return parseCurrentProject(raw);
-  const legacy = projectSchema.parse(raw);
+  const result = projectSchema.safeParse(raw);
+  if (!result.success)
+    throw new Error(
+      "Cannot open project: some required fields are missing or invalid; original data is unchanged",
+    );
+  const legacy = result.data;
   return rememberAudioRecovery(raw, parseCurrentProject(hydrateProjectTimelines(legacy)));
 };
 

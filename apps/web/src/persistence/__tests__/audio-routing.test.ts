@@ -118,3 +118,25 @@ describe("audio routing persistence", () => {
     expect(() => parseStoredProject({ ...p, timeline: { ...p.timeline, tracks: null } })).toThrow();
   });
 });
+
+it("reports discarded audio on an inactive child timeline", async () => {
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const p = nestedProject();
+  const raw = {
+    ...p,
+    timelines: p.timelines.map((timeline, index) =>
+      index === 0
+        ? timeline
+        : {
+            ...timeline,
+            tracks: timeline.tracks.map((track, i) =>
+              i ? track : { ...track, audio: { pan: 2 } },
+            ),
+          },
+    ),
+  };
+  const restored = parseStoredProject(raw);
+  expect(restored.timelines[1]!.tracks[0]!.audio).toBeUndefined();
+  expect(takeAudioRecovery(restored)).toBe(true);
+  expect(takeAudioRecovery(restored)).toBe(false);
+});
