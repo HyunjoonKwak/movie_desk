@@ -6,7 +6,12 @@ import {
   type Track,
 } from "@movie-desk/core";
 import type * as Y from "yjs";
-import { reconcileSequence, recoverEntityOrder, uniqueSequence } from "./crdt-sequence";
+import {
+  type RecoveryReason,
+  reconcileSequence,
+  recoverEntityOrder,
+  uniqueSequence,
+} from "./crdt-sequence";
 
 type TimelineMeta = Omit<Timeline, "tracks">;
 type TrackMeta = Omit<Track, "clips">;
@@ -23,7 +28,10 @@ export const timelineTrackMapName = (timelineId: string): string =>
 export const timelineClipKey = (timelineId: string, clipId: string): string =>
   JSON.stringify([timelineId, clipId]);
 
-export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {}) => {
+export const createTimelineCrdt = (
+  doc: Y.Doc,
+  recovered: (reason: RecoveryReason) => void = () => {},
+) => {
   const timelinesMap = doc.getMap<TimelineMeta>("timelines-v3");
   const timelineOrder = doc.getArray<string>("timeline-order-v3");
   const clipsMap = doc.getMap<Clip>("clips-v3");
@@ -36,6 +44,14 @@ export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {})
   const write = (project: Project): void => {
     const nextTimelines = new Map<string, TimelineMeta>();
     const nextClips = new Map<string, Clip>();
+    // Preserve only already-unplaced clips. Clips removed by this edit were
+    // still ordered at entry and continue to follow normal deletion semantics.
+    const ordered = new Set<string>();
+    for (const timelineId of timelinesMap.keys())
+      for (const trackId of tracksFor(timelineId).keys())
+        for (const clipId of clipOrderFor(timelineId, trackId).toArray())
+          ordered.add(timelineClipKey(timelineId, clipId));
+    for (const [key, clip] of clipsMap) if (!ordered.has(key)) nextClips.set(key, clip);
     for (const timeline of project.timelines) {
       const { tracks, ...meta } = timeline;
       nextTimelines.set(timeline.id, meta);
@@ -89,6 +105,8 @@ export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {})
         tracksMap,
         recovered,
       );
+      if (!timelineOrder.toArray().includes(timelineId) && !trackIds.length)
+        recovered("contentsRemoved");
       const tracks = trackIds.map((trackId) => {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
@@ -98,15 +116,17 @@ export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {})
             const key = timelineClipKey(timelineId, clipId);
             const clip = clipsMap.get(key);
             if (clip === undefined) {
-              recovered();
+              recovered("referencesRemoved");
               return [];
             }
-            if (clip.id !== clipId || seenClips.has(key))
+            if (!clip || clip.id !== clipId || seenClips.has(key))
               throw new NestedTimelineError(`Missing or repeated clip: ${key}`);
             seenClips.add(key);
             return clip;
           },
         );
+        if (!trackOrderFor(timelineId).toArray().includes(trackId) && !clips.length)
+          recovered("contentsRemoved");
         return { ...track, clips };
       });
       const duration = tracks.reduce(
@@ -126,6 +146,7 @@ export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {})
           : {}),
       };
     });
+    for (const key of clipsMap.keys()) if (!seenClips.has(key)) recovered("clipsPreserved");
     return timelines;
   };
   return { clips: clipsMap, write, read };

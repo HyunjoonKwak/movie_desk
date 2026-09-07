@@ -107,7 +107,8 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
       const copy = {
         ...row.project,
         id: newId(),
-        name: `${row.project.name} (${t("snap.restore")})`,
+        updatedAt: Date.now(),
+        name: `${row.project.name} (${t("persistence.copyName")})`,
       };
       await upsertProject(copy);
       if (disposed) return;
@@ -148,7 +149,10 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
       retryTimer = setTimeout(() => {
         retryTimer = null;
         retryDelay = Math.min(retryDelay * 2, 30000);
-        if (!disposed && !failed) checkpoint();
+        if (!disposed && !failed) {
+          if (persistence.db) checkpoint();
+          else saveFailed(new Error("Persistence database is not available"));
+        }
       }, retryDelay);
     }
   };
@@ -187,7 +191,7 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
   // Loads the stored document into the store. Runs when IndexedDB finishes
   // restoring; those transactions carry the provider's origin, not ours.
   // loadProject resets undo history, which is what a fresh open wants.
-  let recoveryNotified = false;
+  const recoveryNotified = new Set<string>();
   const applyFromDoc = (): Project | null => {
     if (disposed) return null;
     const localProject = useProjectStore.getState().project;
@@ -205,9 +209,10 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
       readEnd();
     }
     if (!project) return null;
-    if (projectCrdt.takeRecovery() && !recoveryNotified) {
-      recoveryNotified = true;
-      toast.warning(t("persistence.orderRecovered"), { id: `order-recovery:${projectId}` });
+    for (const reason of projectCrdt.takeRecoveryReasons()) {
+      if (recoveryNotified.has(reason)) continue;
+      recoveryNotified.add(reason);
+      toast.warning(t(`persistence.${reason}`), { id: `${reason}:${projectId}` });
     }
     const end = reloadSpan("applyFromDoc");
     applyingFromDoc = true;

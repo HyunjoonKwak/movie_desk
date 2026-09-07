@@ -43,16 +43,23 @@ export const reconcileSequence = (sequence: Y.Array<string>, desiredValues: read
   }
 };
 
+export type RecoveryReason =
+  | "orderRecovered"
+  | "referencesRemoved"
+  | "clipsPreserved"
+  | "contentsRemoved";
+
 // Entity maps own existence; order arrays only own placement. Recover map-only
 // entities deterministically so every replica presents the same appended order.
 export const recoverEntityOrder = <T>(
   order: readonly string[],
   map: Y.Map<T>,
-  recovered: () => void,
+  recovered: (reason: RecoveryReason) => void,
 ): string[] => {
-  const ids = uniqueSequence(order);
+  const ids = uniqueSequence(order).filter((id) => map.has(id));
+  if (ids.length !== uniqueSequence(order).length) recovered("referencesRemoved");
   const seen = new Set(ids);
   const orphans = [...map.keys()].filter((id) => !seen.has(id)).sort();
-  if (orphans.length) recovered();
+  if (orphans.length) recovered("orderRecovered");
   return [...ids, ...orphans];
 };

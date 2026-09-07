@@ -6,8 +6,13 @@ import {
 import { NestedTimelineError } from "@movie-desk/core";
 import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
 import * as Y from "yjs";
-import { reconcileSequence, recoverEntityOrder, uniqueSequence } from "./crdt-sequence";
-import { createTimelineCrdt } from "./timeline-crdt";
+import {
+  type RecoveryReason,
+  reconcileSequence,
+  recoverEntityOrder,
+  uniqueSequence,
+} from "./crdt-sequence";
+import { createTimelineCrdt, timelineClipKey } from "./timeline-crdt";
 
 const PROJECT_CRDT_SCHEMA_VERSION = 3;
 export const MIGRATION_BACKUP_LIMIT = 1024 * 1024;
@@ -47,6 +52,7 @@ export interface ProjectCrdt {
   readonly clips: Y.Map<Clip>;
   isInitialized(): boolean;
   takeRecovery(): boolean;
+  takeRecoveryReasons(): RecoveryReason[];
   write(project: Project): void;
   read(projectId: Project["id"], localView: Project["timeline"]): Project | null;
 }
@@ -63,9 +69,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const collectionsMap = doc.getMap<MediaCollection>(COLLECTIONS);
   const collectionOrder = doc.getArray<string>(COLLECTION_ORDER);
   const clipsMap = doc.getMap<Clip>(CLIPS_MAP_NAME);
-  let recovered = false;
-  const recovery = () => {
-    recovered = true;
+  const reasons = new Set<RecoveryReason>();
+  const recovery = (reason: RecoveryReason) => {
+    reasons.add(reason);
   };
   const timelines = createTimelineCrdt(doc, recovery);
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
@@ -103,6 +109,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   };
 
   const read = (projectId: Project["id"], localView: Project["timeline"]): Project | null => {
+    reasons.clear();
     const version = metaMap.get(META_SCHEMA);
     if (version === undefined) {
       if (metaMap.size || tracksMap.size || clipsMap.size || doc.getMap("timelines-v3").size)
@@ -127,15 +134,20 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         const clips = uniqueSequence(clipOrderFor(trackId).toArray()).flatMap((clipId) => {
           const clip = clipsMap.get(clipId);
           if (clip === undefined) {
-            recovery();
+            recovery("referencesRemoved");
             return [];
           }
-          if (clip.id !== clipId)
+          if (!clip || clip.id !== clipId)
             throw new NestedTimelineError("Missing or mismatched legacy clip");
           return clip;
         });
         tracks.push({ ...track, clips });
       }
+      const legacyPlaced = new Set(tracks.flatMap((track) => track.clips.map((clip) => clip.id)));
+      const legacyOrphans = nested
+        ? []
+        : [...clipsMap].filter(([id]) => !legacyPlaced.has(id as Clip["id"]));
+      if (legacyOrphans.length) recovery("clipsPreserved");
       const duration = tracks.reduce(
         (max, track) =>
           track.clips.reduce(
@@ -209,6 +221,11 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         Y.applyUpdate(staged, backup);
         const next = createProjectCrdt(staged);
         next.write(project);
+        for (const [id, clip] of legacyOrphans) {
+          if (!clip || clip.id !== id)
+            throw new NestedTimelineError("Missing or mismatched legacy clip");
+          next.clips.set(timelineClipKey(project.rootTimelineId, id), clip);
+        }
         next.read(projectId, localView);
         if (backup.byteLength <= MIGRATION_BACKUP_LIMIT)
           staged.getMap("migration-backup-v2").set("update", backup);
@@ -219,6 +236,7 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       }
       return project;
     } catch (error) {
+      reasons.clear();
       if (error instanceof NestedTimelineError) throw error;
       throw new NestedTimelineError(
         `Cannot open CRDT project; original data is unchanged: ${error instanceof Error ? error.message : String(error)}`,
@@ -229,8 +247,13 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   return {
     clips: timelines.clips,
     takeRecovery: () => {
-      const value = recovered;
-      recovered = false;
+      const value = reasons.size > 0;
+      reasons.clear();
+      return value;
+    },
+    takeRecoveryReasons: () => {
+      const value = [...reasons];
+      reasons.clear();
       return value;
     },
     isInitialized: () =>

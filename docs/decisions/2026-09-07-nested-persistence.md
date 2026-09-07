@@ -46,17 +46,33 @@ null (null is reserved for an empty document).
 
 Entity maps own existence; order arrays own placement. In schemas 2 and 3,
 map-only timelines, tracks, media and collections are appended in sorted ID order
-to the read result, then their placement is persisted by the next edit. This
-preserves concurrent delete-versus-rename survivors instead of silently deleting
-their contents during the next write. A clip order reference with no map value
-is dropped: ordinary delete-versus-reorder can reinsert an array item without
-resetting the deleted map value. Both repairs set a consumable recovery flag;
-live hydration displays one recovery notice per open session. Mismatched IDs,
-missing ordered timeline/track/media metadata and repeated clip ownership still
-fail validation. Map-only clips have no remaining track ownership and retain the
-previous delete-versus-move behavior; assigning a new track would invent intent.
-Regression fixtures use independent replicas, actual sequence reconciliation,
-full project delete/rename writes, and an edit/save/reopen after each merge.
+to the read result, then persisted by the next edit. Order-only IDs are dropped
+for all four entity kinds and clips. Ordinary delete-versus-drag merges therefore
+remain editable. ID mismatches, malformed values and repeated clip ownership
+still fail validation.
+
+Map-only clips have no remaining track ownership. Reads report their presence;
+writes preserve their original scoped map entries instead of guessing placement.
+The writer captures existing placements before changing arrays, so an ordinary
+explicit clip deletion still deletes its map entry. Schema-2 migration carries
+unplaced clips into the schema-3 map before legacy-root cleanup. These clips
+remain in the CRDT, not the visible timeline or JSON export; a placement recovery
+UI is outside this phase.
+
+Full project deletion cascades into child tracks and clips. Concurrent renaming
+can preserve only the metadata: the recovered timeline or track can be empty.
+The chosen policy accepts those content deletions and explicitly reports that
+an item was restored but its contents were removed in another session. Tests
+use the actual project writer for the deleting replica and assert empty contents,
+rather than simulating only metadata deletion and claiming full restoration.
+
+Recovery reasons distinguish appended order (including bottom-of-stack tracks),
+removed references, preserved unplaced clips, and removed contents. Each reason
+is notified once per open session, and failed reads clear accumulated reasons.
+The regression matrix covers all ten entity/direction combinations with real
+Yjs merges and subsequent edit/save/reopen, plus legacy migration coverage.
+Recovery copies receive a dedicated localized name and current updatedAt; idle
+retry continues its backoff when the provider database is temporarily absent.
 
 The pre-migration encoded backup is embedded only up to 1 MiB; larger documents
 retain the original roots until schema 3 commits, without another full embedded

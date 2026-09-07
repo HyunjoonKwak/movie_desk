@@ -1,5 +1,4 @@
-import { NestedTimelineError } from "@movie-desk/core";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import * as Y from "yjs";
 import { createTimelineCrdt, timelineClipKey } from "../timeline-crdt";
 import { nestedProject } from "./fixtures/nested-project";
@@ -19,14 +18,16 @@ it("namespaces timeline, track, clip order and duplicate clip IDs losslessly", (
   restored.destroy();
 });
 
-it("stops on missing child metadata instead of silently dropping children", () => {
+it("drops missing child order and reports recovery without mutating the source", () => {
   const project = nestedProject();
   const doc = new Y.Doc();
-  const crdt = createTimelineCrdt(doc);
+  const recovered = vi.fn();
+  const crdt = createTimelineCrdt(doc, recovered);
   crdt.write(project);
   doc.getMap("timelines-v3").delete(project.timelines[1]!.id);
   const before = Y.encodeStateAsUpdate(doc);
-  expect(() => crdt.read(project.rootTimelineId, project.timeline)).toThrow(NestedTimelineError);
+  expect(crdt.read(project.rootTimelineId, project.timeline)).toEqual([project.timeline]);
+  expect(recovered).toHaveBeenCalledWith("referencesRemoved");
   expect(Y.encodeStateAsUpdate(doc)).toEqual(before);
   doc.destroy();
 });

@@ -40,9 +40,15 @@ it.each(["track", "metadata", "media", "staging"])(
   (failure) => {
     const p = createEmptyProject();
     const doc = legacyCrdt(p);
-    if (failure === "track") doc.getMap("tracks-v2").delete(p.timeline.tracks[0]!.id);
+    if (failure === "track")
+      doc
+        .getMap("tracks-v2")
+        .set(p.timeline.tracks[0]!.id, { ...p.timeline.tracks[0]!, id: "wrong" });
     if (failure === "metadata") doc.getMap("project-meta").set("framerate", -1);
-    if (failure === "media") doc.getArray("media-order-v2").push(["missing"]);
+    if (failure === "media") {
+      doc.getArray("media-order-v2").push(["missing"]);
+      doc.getMap("media-v2").set("missing", { id: "wrong" });
+    }
     const before = Y.encodeStateAsUpdate(doc);
     const parser =
       failure === "staging"
@@ -125,13 +131,14 @@ it.each([2, 3])(
     const crdt = createProjectCrdt(a);
     const recovered = crdt.read(p.id, p.timeline)!;
     expect(recovered.timeline.tracks[0]!.clips).toEqual([]);
+    expect(crdt.takeRecovery()).toBe(true);
     crdt.write({ ...recovered, name: "Recovered edit" });
     const reopened = new Y.Doc();
     Y.applyUpdate(reopened, Y.encodeStateAsUpdate(a));
     expect(createProjectCrdt(reopened).read(p.id, p.timeline)?.name).toBe("Recovered edit");
     expect(
       reopened.getMap("clips-v3").has(JSON.stringify([recovered.rootTimelineId, clip.id])),
-    ).toBe(false);
+    ).toBe(true);
     for (const doc of [source, a, b, reopened]) doc.destroy();
   },
 );
@@ -158,8 +165,23 @@ it.each([2, 3])(
       .getMap(version === 2 ? "clips" : "clips-v3")
       .set(version === 2 ? clip.id : JSON.stringify([p.rootTimelineId, clip.id]), null);
     const before = Y.encodeStateAsUpdate(doc);
-    expect(() => createProjectCrdt(doc).read(p.id, p.timeline)).toThrow(NestedTimelineError);
+    expect(() => createProjectCrdt(doc).read(p.id, p.timeline)).toThrow(
+      version === 2 ? "Missing or mismatched legacy clip" : "Missing or repeated clip",
+    );
     expect(Y.encodeStateAsUpdate(doc)).toEqual(before);
     doc.destroy();
   },
 );
+
+it.each(["track", "media"])("recovers missing ordered legacy %s during migration", (entity) => {
+  const p = createEmptyProject();
+  const doc = legacyCrdt(p);
+  if (entity === "track") doc.getMap("tracks-v2").delete(p.timeline.tracks[0]!.id);
+  else doc.getArray("media-order-v2").push(["deleted"]);
+  const crdt = createProjectCrdt(doc);
+  const opened = crdt.read(p.id, p.timeline)!;
+  expect(crdt.takeRecoveryReasons()).toContain("referencesRemoved");
+  crdt.write({ ...opened, name: "Recovered migration" });
+  expect(crdt.read(p.id, p.timeline)?.name).toBe("Recovered migration");
+  doc.destroy();
+});
