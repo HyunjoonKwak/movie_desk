@@ -8,6 +8,7 @@ export interface DecoderStats {
   readonly configures: readonly string[];
   readonly frames: number;
   readonly seeks: number;
+  readonly errors: readonly string[];
 }
 
 declare global {
@@ -18,7 +19,7 @@ declare global {
 
 export const installDecoderStats = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
-    const stats = { configures: [] as string[], frames: 0, seeks: 0 };
+    const stats = { configures: [] as string[], frames: 0, seeks: 0, errors: [] as string[] };
     window.__decoderStats = stats;
     const Native = window.VideoDecoder;
     if (Native) {
@@ -26,6 +27,10 @@ export const installDecoderStats = async (page: Page): Promise<void> => {
         constructor(init: VideoDecoderInit) {
           super({
             ...init,
+            error: (error) => {
+              stats.errors.push(`${error.name}: ${error.message}`);
+              init.error(error);
+            },
             output: (frame) => {
               stats.frames += 1;
               init.output(frame);

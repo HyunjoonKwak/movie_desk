@@ -290,19 +290,14 @@ export const toProjectExport = (project: Project): ProjectExport => ({
   project: { ...project, timeline: { ...project.timeline, magnetic: true } } as Project,
 });
 
-// A project file from another app version. The UI translates it; the message
-// stays readable for logs and tests.
+// Machine-readable rejection; project-menu translates direction and versions.
 export class ProjectVersionError extends Error {
   constructor(
     readonly direction: "older" | "newer",
     readonly fileVersion: number,
     readonly appVersion: number,
   ) {
-    super(
-      direction === "older"
-        ? `This project uses an unsupported older format (file v${fileVersion}, this app v${appVersion}).`
-        : `This project needs a newer version of the app (file v${fileVersion}, this app v${appVersion}).`,
-    );
+    super(`PROJECT_VERSION_${direction.toUpperCase()}:file=${fileVersion}:app=${appVersion}`);
     this.name = "ProjectVersionError";
   }
 }

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyProject, newId } from "@movie-desk/core";
-import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-export";
+import {
+  ProjectVersionError,
+  parseProjectExport,
+  parseStoredProject,
+  toProjectExport,
+} from "../project-export";
 
 // The JSON export is the user's escape hatch for their work — a lossy or
 // crash-prone round-trip is silent data loss. These guard both directions.
@@ -72,15 +77,24 @@ describe("project-export", () => {
     expect(() => parseProjectExport(corrupt)).toThrow();
   });
 
-  it("rejects a file written by a newer app version", () => {
-    const env = toProjectExport(createEmptyProject());
-    expect(() => parseProjectExport({ ...env, version: env.version + 1 })).toThrow();
-  });
-
-  it("rejects an older version until an explicit migration exists", () => {
-    const env = toProjectExport(createEmptyProject());
-    expect(() => parseProjectExport({ ...env, version: 0 })).toThrow(/older format/);
-  });
+  it.each(["older", "newer"] as const)(
+    "rejects %s files with structured version details",
+    (direction) => {
+      const env = toProjectExport(createEmptyProject());
+      const fileVersion = env.version + (direction === "older" ? -1 : 1);
+      let error: unknown;
+      try {
+        parseProjectExport({ ...env, version: fileVersion });
+      } catch (caught) {
+        error = caught;
+      }
+      expect(error).toBeInstanceOf(ProjectVersionError);
+      expect(error).toMatchObject({ direction, fileVersion, appVersion: env.version });
+      expect((error as Error).message).toBe(
+        `PROJECT_VERSION_${direction.toUpperCase()}:file=${fileVersion}:app=${env.version}`,
+      );
+    },
+  );
 
   it("rejects unknown discriminants and incomplete tracks", () => {
     const good = toProjectExport(createEmptyProject());

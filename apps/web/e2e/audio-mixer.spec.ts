@@ -27,7 +27,7 @@ test.beforeAll(async () => {
 });
 
 const tone = () => {
-  const frames = 48000;
+  const frames = 48000 * 30;
   const out = Buffer.alloc(44 + frames * 2);
   out.write("RIFF");
   out.writeUInt32LE(out.length - 8, 4);
@@ -89,6 +89,15 @@ const prepare = async (page: Page) => {
 };
 
 test("track -6 dB halves export PCM RMS and one undo restores gain", async ({ page }) => {
+  // Force attachment to happen after playback begins; keep audible test PCM
+  // long enough for the separate, bounded attachment wait below.
+  await page.addInitScript(() => {
+    const addModule = Worklet.prototype.addModule;
+    Worklet.prototype.addModule = async function (...args) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return addModule.apply(this, args);
+    };
+  });
   await prepare(page);
   expect(
     await page.locator("[data-track] > div:first-child").evaluateAll((headers) =>
@@ -121,15 +130,12 @@ test("track -6 dB halves export PCM RMS and one undo restores gain", async ({ pa
   // Insert/undo can leave the transport at the clip end; measure audible PCM from the start.
   await page.getByRole("button", { name: "Go to start", exact: true }).click();
   await page.getByRole("button", { name: "Play", exact: true }).click();
+  const meter = page.getByRole("meter", { name: "Measured master", exact: true }).first();
+  // The accessible label switches only after enableMetering attaches the taps.
+  // Loading has its own budget; the five-second signal assertion starts after it.
+  await expect(meter).toBeVisible({ timeout: 15_000 });
   await expect
-    .poll(async () =>
-      Number(
-        await page
-          .getByRole("meter", { name: "Measured master", exact: true })
-          .first()
-          .getAttribute("aria-valuenow"),
-      ),
-    )
+    .poll(async () => Number(await meter.getAttribute("aria-valuenow")))
     .toBeGreaterThan(-60);
   const pause = page.getByRole("button", { name: "Pause", exact: true });
   if (await pause.isVisible()) await pause.click();

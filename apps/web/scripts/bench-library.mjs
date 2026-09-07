@@ -300,7 +300,7 @@ try {
       open.onsuccess = () => {
         const db = open.result;
         const request = db.transaction("rows").objectStore("rows").getAll();
-        request.onsuccess = () => { db.close(); resolveRows({ rows: request.result.length, observedStarts: request.result.filter((r) => r.event === "start" && r.data.baseline === false).length, observedImports: request.result.filter((r) => r.event === "import" && r.data.baseline === false).length, events: request.result.reduce((counts, row) => ({ ...counts, [row.event]: (counts[row.event] ?? 0) + 1 }), {}) }); };
+        request.onsuccess = () => { db.close(); resolveRows({ rows: request.result.length, observedStarts: request.result.filter((r) => r.event === "start" && r.data.baseline === false).length, observedImports: request.result.filter((r) => r.event === "import" && r.data.baseline === false).length, events: request.result.reduce((counts, row) => { counts[row.event] = (counts[row.event] ?? 0) + 1; return counts; }, {}) }); };
         request.onerror = () => { db.close(); reject(request.error); };
       };
     });
