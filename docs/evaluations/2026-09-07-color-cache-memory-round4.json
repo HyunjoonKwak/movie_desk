@@ -1,5 +1,5 @@
 {
-  "baseline": "d94481c",
+  "baseline": "0e6804a84fc81eb4a5aeaa9f984e37ad7bffd281",
   "metric": "Instrumented WebGL requested texture bytes, excluding driver overhead, constructor probes and browser image/canvas backing; JS heap after explicit GC. Actual Compositor rendering 1000 distinct 4K ImageBitmaps in a 1000-asset library, sequentially released source decodes, followed by simultaneous-source warm steady-state workloads using real text rasterization and VideoFrame uploads (decode time excluded); no import/OPFS benchmark.",
   "rows": [
     {
@@ -10,18 +10,18 @@
         2160
       ],
       "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)",
-      "precision": "half-float",
+      "precision": "rgba8-unmanaged",
       "budgets": {
-        "sourceBytes": 67108864,
-        "imageBytes": 134217728,
+        "sourceBytes": null,
+        "imageBytes": null,
         "maxSingleTargetBytes": null
       },
-      "elapsedMs": 11047.899999976158,
-      "heapBefore": 2238466,
-      "heapAfter": 2613001,
-      "retainedTextureBytes": 182476896,
-      "peakTextureBytes": 215654492,
-      "cachedImageBytes": 132710400,
+      "elapsedMs": 3293.0999999940395,
+      "heapBefore": 2068926,
+      "heapAfter": 2348889,
+      "retainedTextureBytes": 796262400,
+      "peakTextureBytes": 796262400,
+      "cachedImageBytes": null,
       "oversizedAndResolutionChurn": [],
       "workingSets": [
         {
@@ -30,20 +30,20 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            11.128333333631357,
-            14.38833333303531,
-            14.116666666666667
+            1.5733333334326745,
+            2.065000000099341,
+            1.9400000000993411
           ],
-          "meanFrameMs": 13.209999999900658,
-          "medianFrameMs": 13.5,
-          "p95FrameMs": 18.399999976158142,
-          "targetAllocations": 360,
-          "targetAllocatedBytes": 14929920000,
-          "textureDeletes": 360,
-          "framebufferCreates": 360,
-          "framebufferDeletes": 360,
-          "sourceCacheBytes": 16588800,
-          "imageCacheBytes": 0
+          "meanFrameMs": 1.857777777645323,
+          "medianFrameMs": 1.800000011920929,
+          "p95FrameMs": 4.0999999940395355,
+          "targetAllocations": 0,
+          "targetAllocatedBytes": 0,
+          "textureDeletes": 0,
+          "framebufferCreates": 0,
+          "framebufferDeletes": 0,
+          "sourceCacheBytes": null,
+          "imageCacheBytes": null
         },
         {
           "name": "4k-video-1080p-video",
@@ -51,20 +51,20 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            11.256666666766007,
-            13.209999999900658,
-            13.538333333532016
+            1.6333333333333333,
+            2.1450000002980234,
+            1.9816666662693023
           ],
-          "meanFrameMs": 12.66388888872332,
-          "medianFrameMs": 13.199999988079071,
-          "p95FrameMs": 16.900000005960464,
-          "targetAllocations": 360,
-          "targetAllocatedBytes": 14929920000,
-          "textureDeletes": 360,
-          "framebufferCreates": 360,
-          "framebufferDeletes": 360,
-          "sourceCacheBytes": 16588800,
-          "imageCacheBytes": 0
+          "meanFrameMs": 1.9199999999668864,
+          "medianFrameMs": 1.9000000059604645,
+          "p95FrameMs": 3.800000011920929,
+          "targetAllocations": 0,
+          "targetAllocatedBytes": 0,
+          "textureDeletes": 0,
+          "framebufferCreates": 0,
+          "framebufferDeletes": 0,
+          "sourceCacheBytes": null,
+          "imageCacheBytes": null
         },
         {
           "name": "three-4k-stills",
@@ -72,20 +72,20 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            29.656666666766007,
-            35.671666666368644,
-            34.69000000009934
+            3.7116666664679845,
+            4.311666666467985,
+            4.488333333532015
           ],
-          "meanFrameMs": 33.33722222199042,
-          "medianFrameMs": 34.599999994039536,
-          "p95FrameMs": 40,
-          "targetAllocations": 540,
-          "targetAllocatedBytes": 35831808000,
-          "textureDeletes": 540,
-          "framebufferCreates": 540,
-          "framebufferDeletes": 540,
-          "sourceCacheBytes": 0,
-          "imageCacheBytes": 132710400
+          "meanFrameMs": 4.169999999966886,
+          "medianFrameMs": 4.0999999940395355,
+          "p95FrameMs": 6.5999999940395355,
+          "targetAllocations": 0,
+          "targetAllocatedBytes": 0,
+          "textureDeletes": 0,
+          "framebufferCreates": 0,
+          "framebufferDeletes": 0,
+          "sourceCacheBytes": null,
+          "imageCacheBytes": null
         },
         {
           "name": "oversized-video-1080p-title",
@@ -93,20 +93,20 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            17.076666666567327,
-            21.476666666567326,
-            20.22166666686535
+            3.5683333337306977,
+            4.3533333331346515,
+            4.194999999801317
           ],
-          "meanFrameMs": 19.58555555558867,
-          "medianFrameMs": 20.599999994039536,
-          "p95FrameMs": 25.80000001192093,
-          "targetAllocations": 360,
-          "targetAllocatedBytes": 15060539520,
-          "textureDeletes": 360,
-          "framebufferCreates": 360,
-          "framebufferDeletes": 360,
-          "sourceCacheBytes": 16588800,
-          "imageCacheBytes": 0
+          "meanFrameMs": 4.035555555754238,
+          "medianFrameMs": 4,
+          "p95FrameMs": 6.5,
+          "targetAllocations": 0,
+          "targetAllocatedBytes": 0,
+          "textureDeletes": 0,
+          "framebufferCreates": 0,
+          "framebufferDeletes": 0,
+          "sourceCacheBytes": null,
+          "imageCacheBytes": null
         }
       ],
       "textureBytesAfterDispose": 0,
@@ -126,9 +126,9 @@
         "imageBytes": 201326592,
         "maxSingleTargetBytes": 134217728
       },
-      "elapsedMs": 11487.199999988079,
-      "heapBefore": 2241122,
-      "heapAfter": 2616281,
+      "elapsedMs": 11052.699999988079,
+      "heapBefore": 2245282,
+      "heapAfter": 2619769,
       "retainedTextureBytes": 248832096,
       "peakTextureBytes": 282009692,
       "cachedImageBytes": 199065600,
@@ -381,13 +381,13 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            6.319999999801317,
-            7.4783333331346515,
-            7.696666666865349
+            5.653333333134651,
+            6.76166666696469,
+            7.41333333303531
           ],
-          "meanFrameMs": 7.161666666799121,
-          "medianFrameMs": 7.100000023841858,
-          "p95FrameMs": 10,
+          "meanFrameMs": 6.608333333333333,
+          "medianFrameMs": 6.799999982118607,
+          "p95FrameMs": 9.400000005960464,
           "targetAllocations": 0,
           "targetAllocatedBytes": 0,
           "textureDeletes": 0,
@@ -402,13 +402,13 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            6.190000000099341,
-            7.408333333333333,
-            7.561666666467985
+            5.918333333730698,
+            7.1883333330353105,
+            7.183333333333334
           ],
-          "meanFrameMs": 7.050555555191305,
-          "medianFrameMs": 7.0999999940395355,
-          "p95FrameMs": 9.700000017881393,
+          "meanFrameMs": 6.760555555588669,
+          "medianFrameMs": 6.800000011920929,
+          "p95FrameMs": 9.600000023841858,
           "targetAllocations": 0,
           "targetAllocatedBytes": 0,
           "textureDeletes": 0,
@@ -423,13 +423,13 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            0.08166666676600774,
-            2.878333333134651,
-            3.1033333336313564
+            0.10166666706403096,
+            2.66333333303531,
+            2.9983333334326745
           ],
-          "meanFrameMs": 2.0205555556548966,
-          "medianFrameMs": 2.5999999940395355,
-          "p95FrameMs": 5.0999999940395355,
+          "meanFrameMs": 1.9188888889220026,
+          "medianFrameMs": 2.699999988079071,
+          "p95FrameMs": 5,
           "targetAllocations": 0,
           "targetAllocatedBytes": 0,
           "textureDeletes": 0,
@@ -444,13 +444,13 @@
           "frames": 180,
           "warmupFrames": 30,
           "batchMeanFrameMs": [
-            13.06500000009934,
-            16.031666666766007,
-            15.66333333303531
+            12.26333333303531,
+            15.020000000298023,
+            15.15999999990066
           ],
-          "meanFrameMs": 14.913333333200878,
-          "medianFrameMs": 15.5,
-          "p95FrameMs": 22.200000017881393,
+          "meanFrameMs": 14.14166666633553,
+          "medianFrameMs": 14.599999994039536,
+          "p95FrameMs": 19.19999998807907,
           "targetAllocations": 0,
           "targetAllocatedBytes": 0,
           "textureDeletes": 0,

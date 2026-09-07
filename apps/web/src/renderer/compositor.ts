@@ -54,6 +54,7 @@ import { ScratchPool } from "./scratch-pool";
 import { type Program, ShaderRegistry } from "./shader-registry";
 import { renderShapeToCanvas } from "./shape-source";
 import { quarterTurns } from "./source-rotation";
+import { IMAGE_TARGET_BYTES, MAX_SOURCE_TARGET_BYTES, SOURCE_TARGET_BYTES } from "./target-budget";
 import { renderTextToCanvas } from "./text-source";
 import { getFrameProvider } from "./webcodecs-decoder";
 
@@ -89,9 +90,9 @@ export class Compositor {
   // plus a 4K project-sized graphic fits in 192 MiB without mutual eviction.
   // The separate image budget holds three 4K RGBA16F stills simultaneously.
   // These are per-compositor cache bounds, excluding scene/scratch/raw uploads.
-  private static readonly SOURCE_TARGET_BYTES = 192 * 1024 * 1024;
-  private static readonly IMAGE_TARGET_BYTES = 192 * 1024 * 1024;
-  private static readonly MAX_SOURCE_TARGET_BYTES = 128 * 1024 * 1024;
+  private static readonly SOURCE_TARGET_BYTES = SOURCE_TARGET_BYTES;
+  private static readonly IMAGE_TARGET_BYTES = IMAGE_TARGET_BYTES;
+  private static readonly MAX_SOURCE_TARGET_BYTES = MAX_SOURCE_TARGET_BYTES;
   private readonly sourceTargets = new BoundedResourceCache<
     string,
     ReturnType<typeof allocateTarget> & { bytes: number }

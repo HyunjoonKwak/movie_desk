@@ -47,7 +47,11 @@ function modules(base) {
   return result;
 }
 
-const baseline = process.argv[2] ?? "f4adad6";
+// Bench default baselines must be reachable from main, never branch-only commits.
+const baseline = execFileSync("git", ["rev-parse", process.argv[2] ?? "0e6804a"], {
+  cwd: root,
+  encoding: "utf8",
+}).trim();
 const oldModules = modules(baseline);
 const newModules = modules();
 const server = createServer((_, res) =>
@@ -123,7 +127,7 @@ try {
           canvas.height = 1080;
           const compositor = new Compositor(canvas);
           const gl = canvas.getContext("webgl2");
-          if (compositor.colorPrecision !== "half-float")
+          if (label === "after" && compositor.colorPrecision !== "half-float")
             throw new Error("This byte-accounting benchmark requires RGBA16F support");
           const extension = gl.getExtension("WEBGL_debug_renderer_info");
           const renderer = extension
@@ -165,7 +169,11 @@ try {
                 ? args[4]
                 : source.naturalHeight || source.displayHeight || source.height;
             const bytes = width * height * (args[2] === gl.RGBA16F ? 8 : 4);
-            if (args.length === 9 && args[2] === gl.RGBA16F && source === null) {
+            if (
+              args.length === 9 &&
+              source === null &&
+              (args[2] === gl.RGBA16F || width > 1 || height > 1)
+            ) {
               targetAllocations++;
               targetAllocatedBytes += bytes;
             }
@@ -234,8 +242,8 @@ try {
           const heapAfter = performance.memory.usedJSHeapSize;
           const retainedTextureBytes = resident;
           const benchmarkPeak = peak;
-          const cachedImageBytes = compositor.imageTargets.weight ?? null;
-          if (label === "after" && cachedImageBytes > 192 * 1024 * 1024)
+          const cachedImageBytes = compositor.imageTargets?.weight ?? null;
+          if (label === "after" && cachedImageBytes > Compositor.IMAGE_TARGET_BYTES)
             throw new Error("Image budget exceeded");
           const elapsedMs = performance.now() - started;
           const stress = [];
@@ -258,8 +266,8 @@ try {
               if (Math.abs(pixel[0] - 128) > 1 || pixel[3] !== 255 || gl.getError() !== gl.NO_ERROR)
                 throw new Error("Oversize/resolution churn changed neutral pixels");
               if (
-                compositor.imageTargets.weight > 192 * 1024 * 1024 ||
-                compositor.sourceTargets.weight > 192 * 1024 * 1024
+                compositor.imageTargets.weight > Compositor.IMAGE_TARGET_BYTES ||
+                compositor.sourceTargets.weight > Compositor.SOURCE_TARGET_BYTES
               )
                 throw new Error("Oversize/resolution churn exceeded budget");
               stress.push({
@@ -347,8 +355,8 @@ try {
               [mediaClip(oversizedAsset.id), title],
             ],
           ]) {
-            compositor.sourceTargets.clear();
-            compositor.imageTargets.clear();
+            compositor.sourceTargets?.clear();
+            compositor.imageTargets?.clear();
             project.mediaLibrary = fixtureAssets;
             project.timeline.tracks = [...clips].reverse().map((clip, i) => ({
               id: `layer-${i}`,
@@ -398,8 +406,8 @@ try {
               textureDeletes: textureDeletes - startDeletes,
               framebufferCreates: framebufferCreates - startFboCreates,
               framebufferDeletes: framebufferDeletes - startFboDeletes,
-              sourceCacheBytes: compositor.sourceTargets.weight ?? null,
-              imageCacheBytes: compositor.imageTargets.weight ?? null,
+              sourceCacheBytes: compositor.sourceTargets?.weight ?? null,
+              imageCacheBytes: compositor.imageTargets?.weight ?? null,
             };
             if (
               label === "after" &&
@@ -423,7 +431,7 @@ try {
             assets: assets.length,
             source: [3840, 2160],
             renderer,
-            precision: compositor.colorPrecision,
+            precision: compositor.colorPrecision ?? "rgba8-unmanaged",
             budgets: {
               sourceBytes: Compositor.SOURCE_TARGET_BYTES ?? null,
               imageBytes: Compositor.IMAGE_TARGET_BYTES ?? null,

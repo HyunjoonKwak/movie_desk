@@ -1,0 +1,3 @@
+export const SOURCE_TARGET_BYTES = 192 * 1024 * 1024;
+export const IMAGE_TARGET_BYTES = 192 * 1024 * 1024;
+export const MAX_SOURCE_TARGET_BYTES = 128 * 1024 * 1024;

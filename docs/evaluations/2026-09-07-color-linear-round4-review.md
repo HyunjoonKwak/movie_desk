@@ -21,14 +21,49 @@ stills are not a no-thrashing guarantee. Both preview and export can hold their
 own caches; scene, scratch, ping-pong, current raw upload, decoder/canvas backing
 and driver overhead remain outside these bounds.
 
+### Hardware assumption and concurrent preview/export
+
+The 384 MiB cache policy assumes, as an engineering support floor for up-to-4K
+work, a GPU with at least **2 GiB dedicated VRAM** and **8 GiB system RAM**, or
+an integrated/unified-memory system with at least **8 GiB shared memory** and
+roughly **2 GiB available to graphics workloads**. This is a planning assumption,
+not a measured minimum-spec certification; the benchmark only tested Apple M4.
+Other applications and OS reservations reduce available memory.
+
+Export creates a second Compositor (`export/exporter.ts`) while the preview
+Compositor (`preview/preview-viewport.tsx`) remains alive. Therefore the worst
+concurrent **cache ceiling is 768 MiB (805,306,368 bytes)**, before any excluded
+storage. Doubling the round 4 single-compositor tracked traversal peaks gives
+**431,308,984 → 564,019,384 bytes (431.3 → 564.0 MB)**, an estimate for two
+identical workloads, not a concurrent measurement or overall process limit.
+The true worst-case total is not bounded by these caches: scene/scratch/ping-pong,
+raw uploads, decoded frames, Canvas/ImageBitmap backing, driver overhead and
+other browser/OS memory add to the 768 MiB cache ceiling. Four-K export targets
+can also be larger than this benchmark's 1080p project targets.
+
+Below that floor or under competing memory pressure, smooth preview and export
+throughput are expected to degrade first (stalls, dropped preview frames, and
+on unified memory, compression/swap); allocation failure or WebGL context loss
+may follow, and drivers need not fail in that order. Cache ceilings do not adapt
+to available hardware memory. Oversized-source downscaling already reduces
+fine detail and may alias regardless of hardware; a visible quality notice is
+warranted when scaling activates because exported pixels are affected, but its
+UI implementation is deferred from this documentation-only follow-up.
+
 Insertion still reserves weighted capacity before allocation, and eviction
 still deletes both the texture and framebuffer. Spatial scaling retains RGBA16F
 8-byte/texel accounting and aspect ratio. Oversized sources use `LINEAR` sampling
 without mipmaps, so downscaling can introduce aliasing as well as softness.
 
 The benchmark accepts `process.argv[2]` as its comparison revision, defaulting to
-`f4adad6`, and records the same resolved argument in its JSON. For this review use
-`node scripts/color/cache-memory.mjs d94481c`. Text and shape renderers are real
+main-reachable `0e6804a`, and records its resolved full commit hash in JSON.
+**Rule: bench default baselines must be reachable from main.** Reproduce with
+`node scripts/color/cache-memory.mjs` (or explicitly pass `0e6804a`). The main
+baseline predates managed color targets; it is measured as RGBA8/unmanaged with
+absent managed-cache fields reported as null, while the after row requires
+half-float. This comparison includes the color-pipeline change, so it does not
+isolate the round 4 cache repair. The earlier branch-only `d94481c` comparison
+is historical evidence only; the checked-in JSON is regenerated from main. Text and shape renderers are real
 modules now; only media acquisition/provider and unrelated AI/LUT boundaries
 are fixtures. Timestamped real VideoFrames exercise video uploads; decode time
 is deliberately excluded. Each simultaneous working set uses 30 warmup frames
@@ -83,53 +118,51 @@ run `lsof -nP -iTCP:32119 -sTCP:LISTEN` and refuse an occupied port. Save full
 stdout/stderr and copy test-results after every run before the next can replace
 it. No audio code, sampler code, assertion, timeout, or retry policy is changed.
 
-## Measured working sets and memory arithmetic
+## Reproducible main-baseline measurements (round 5)
 
-[Raw round 4 JSON](2026-09-07-color-cache-memory-round4.json), Apple M4 / ANGLE
-Metal, half-float. The baseline argument is `d94481c`; the original round 3 JSON
-is preserved separately. These are instrumented wall times, not GPU timestamp
-queries, and exclude decoding. No other benchmark or E2E command ran concurrently.
+[Raw JSON](2026-09-07-color-cache-memory-round4.json) was regenerated in round 5
+using default `node scripts/color/cache-memory.mjs`, baseline
+`0e6804a84fc81eb4a5aeaa9f984e37ad7bffd281` (verified reachable from main),
+Apple M4 / ANGLE Metal. No other benchmark or E2E ran concurrently.
+The historical round 4 branch-to-branch result (title 13.210 → 7.162 ms,
+360 → 0 allocations) is superseded in this artifact by a reproducible comparison
+against main; it must not be read as the current JSON's before row.
+Main uses RGBA8 encoded-space rendering without managed caches, whereas after
+uses linear half-float rendering. These timings compare different color paths,
+not just cache budgets; the video/title workloads are slower than main.
 
-| Same-frame working set | Mean ms, before → after | p95 ms, before → after | Target allocations in 180 frames, before → after | Allocated target bytes, before → after |
-| --- | ---: | ---: | ---: | ---: |
-| 4K video + 1080p title | 13.210 → 7.162 | 18.4 → 10.0 | 360 → 0 | 14,929,920,000 → 0 |
-| 4K video + 1080p video | 12.664 → 7.051 | 16.9 → 9.7 | 360 → 0 | 14,929,920,000 → 0 |
-| Three 4K stills | 33.337 → 2.021 | 40.0 → 5.1 | 540 → 0 | 35,831,808,000 → 0 |
-| 6000×4000 video + 1080p title | 19.586 → 14.913 | 25.8 → 22.2 | 360 → 0 | 15,060,539,520 → 0 |
+| Same-frame working set | Mean ms, main → after | p95 ms, main → after | Target allocations in 180 frames, main → after |
+| --- | ---: | ---: | ---: |
+| 4k-video-1080p-title | 1.858 → 6.608 | 4.1 → 9.4 | 0 → 0 |
+| 4k-video-1080p-video | 1.920 → 6.761 | 3.8 → 9.6 | 0 → 0 |
+| three-4k-stills | 4.170 → 1.919 | 6.6 → 5.0 | 0 → 0 |
+| oversized-video-1080p-title | 4.036 → 14.142 | 6.5 → 19.2 | 0 → 0 |
 
-Texture deletions and framebuffer creations/deletions equal the before allocation
-counts and are all zero after warmup in the new implementation. Both title cases
-verify visible bright glyph pixels on the real rasterized title. 4K+1080p source
-cache storage is exactly 82,944,000 bytes after the repair; the three-still image
-cache is 199,065,600 bytes. The oversized-video + title cache uses 150,776,832 bytes.
-The required title workload improves in all three batch means (11.128/14.388/14.117
-ms before, 6.320/7.478/7.697 ms after); no frame-time regression is observed in this
-measurement. Raw video/title uploads still occur each frame and shrink afterward;
-zero target allocation does not mean zero raw texture upload/storage activity.
+All after working sets have zero target allocations, texture deletes, and FBO
+creates/deletes following warmup. Both title cases assert visible real glyphs.
+4K+1080p managed source storage is 82,944,000 bytes, three-still image storage is
+199,065,600 bytes, and oversized-video + title storage is 150,776,832 bytes.
+Target allocation counts include nontrivial RGBA8 targets in the old renderer
+and RGBA16F targets in the new renderer; raw 1×1 upload resets are excluded.
 
-| 1000 distinct 4K still traversal metric | d94481c | Round 4 |
+| 1000 distinct 4K still traversal metric | Main | After |
 | --- | ---: | ---: |
-| Retained tracked texture bytes | 182,476,896 | 248,832,096 |
-| Peak tracked texture bytes | 215,654,492 | 282,009,692 |
-| Cached image bytes | 132,710,400 | 199,065,600 |
-| Heap before GC-controlled traversal | 2,238,466 | 2,241,122 |
-| Heap after traversal + GC | 2,613,001 | 2,616,281 |
-| Heap growth | 374,535 | 375,159 |
-| Traversal wall time, ms | 11,047.9 | 11,487.2 |
+| Retained tracked texture bytes | 796,262,400 | 248,832,096 |
+| Peak tracked texture bytes | 796,262,400 | 282,009,692 |
+| Cached managed image bytes (null = unavailable) | null | 199,065,600 |
+| Heap before GC-controlled traversal | 2,068,926 | 2,245,282 |
+| Heap after traversal + GC | 2,348,889 | 2,619,769 |
+| Traversal wall time, ms | 3,293.1 | 11,052.7 |
 | Tracked texture bytes / framebuffers after dispose | 0 / 0 | 0 / 0 |
 
-The extra retained 4K still accounts exactly for both storage increases:
-248,832,096 − 182,476,896 = 282,009,692 − 215,654,492 = **66,355,200** bytes.
-After retained storage decomposes as three 4K targets (199,065,600), project-sized
-managed working storage (49,766,400), and 24 one-pixel RGBA8 uploads (96).
-Peak adds one 4K RGBA8 upload less its prior 4-byte placeholder:
-248,832,096 + 33,177,600 − 4 = **282,009,692**. Heap after traversal differs by
-3,280 bytes. Sequential one-shot traversal is 4.0% slower in this single run;
-it does not benefit from retaining a third never-revisited image. We make no
-sequential throughput improvement claim. The same-frame title regression is
-resolved at the measured memory cost, within explicit cache ceilings.
+The main renderer retains 24 raw 4K textures (796,262,400 bytes). After retained
+storage is three managed 4K targets (199,065,600), project-sized working storage
+(49,766,400), and 24 one-pixel RGBA8 uploads (96), totaling 248,832,096 bytes.
+One live 4K upload minus its placeholder adds 33,177,596 bytes to reach the
+282,009,692-byte tracked peak. This excludes decoder/canvas and driver storage,
+and is a sequential traversal rather than an import/OPFS measurement.
 
-## Final verification and reproduction results
+## Historical round 4 verification and reproduction results
 
 `pnpm gate --report docs/evaluations/2026-09-07-color-linear-round4-gate.md`:
 **9/9 PASS** ([gate table](2026-09-07-color-linear-round4-gate.md)), core **155**,
