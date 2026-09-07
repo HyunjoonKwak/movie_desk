@@ -7,6 +7,7 @@ export const colorWheels: EffectDefinition = {
   type: "color-wheels",
   name: "Color wheels (3-way)",
   keywords: ["grade", "lift", "gamma", "gain", "shadows", "highlights"],
+  workingSpace: "linear",
   category: "color",
   params: [
     { kind: "number", key: "liftR", label: "Lift R", min: -0.5, max: 0.5, step: 0.01, default: 0 },

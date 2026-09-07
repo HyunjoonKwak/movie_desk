@@ -30,6 +30,7 @@ export interface ExportProgress {
 }
 
 export interface ExportResult {
+  readonly colorApproximation?: boolean;
   readonly audioPeaks?: import("@movie-desk/core").AudioPeakResult & {
     readonly limitedSamples: number;
   };

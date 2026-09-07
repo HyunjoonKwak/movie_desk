@@ -46,11 +46,19 @@ interface EffectPass {
   >;
 }
 
-export interface EffectDefinition {
+interface EffectDefinitionBase {
   readonly type: string;
   readonly name: string;
   readonly keywords: readonly string[];
-  readonly category: "color" | "blur" | "stylize" | "transform" | "audio";
   readonly params: readonly ParamDef[];
   readonly passes: readonly EffectPass[];
 }
+
+export type EffectDefinition = EffectDefinitionBase &
+  (
+    | { readonly category: "audio"; readonly workingSpace?: never }
+    | {
+        readonly category: "color" | "blur" | "stylize" | "transform";
+        readonly workingSpace: "linear" | "encoded";
+      }
+  );

@@ -1,0 +1,78 @@
+{
+  "fixture": "1920x1080 opaque black still, no effects (same limited Y16/U128/V128 signal), 600s at 30fps, VP9 6Mbps, video-only",
+  "scope": "Actual WebCodecsExporter, Compositor, encoder queue, Mp4Writer and final Blob; in-memory image source and preflight adapter, no audio or source-file I/O",
+  "rows": [
+    {
+      "decoded": {
+        "color": {
+          "fullRange": false,
+          "matrix": "smpte170m",
+          "primaries": "smpte170m",
+          "transfer": "smpte170m"
+        },
+        "format": "I420",
+        "blackYuvMismatches": 1649,
+        "maxError": 3,
+        "histograms": [
+          {
+            "13": 93,
+            "14": 35,
+            "15": 291,
+            "16": 2071951,
+            "17": 867,
+            "18": 177,
+            "19": 186
+          },
+          {
+            "128": 518400
+          },
+          {
+            "128": 518400
+          }
+        ],
+        "planeSha256": "fba85dc76edb671885fafcac49ec9acf8e6bd598fe2eec42701d84e91279daaa"
+      },
+      "name": "legacy",
+      "durationSeconds": 600,
+      "frames": 18000,
+      "totalMs": 287661.59999999404,
+      "bytes": 1067918
+    },
+    {
+      "decoded": {
+        "color": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "format": "I420",
+        "blackYuvMismatches": 1649,
+        "maxError": 3,
+        "histograms": [
+          {
+            "13": 93,
+            "14": 35,
+            "15": 291,
+            "16": 2071951,
+            "17": 867,
+            "18": 177,
+            "19": 186
+          },
+          {
+            "128": 518400
+          },
+          {
+            "128": 518400
+          }
+        ],
+        "planeSha256": "fba85dc76edb671885fafcac49ec9acf8e6bd598fe2eec42701d84e91279daaa"
+      },
+      "name": "managed",
+      "durationSeconds": 600,
+      "frames": 18000,
+      "totalMs": 238809.20000001788,
+      "bytes": 1067918
+    }
+  ]
+}

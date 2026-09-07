@@ -4,6 +4,7 @@ export const brightness: EffectDefinition = {
   type: "brightness",
   name: "Brightness",
   keywords: ["light", "exposure"],
+  workingSpace: "encoded",
   category: "color",
   params: [
     {

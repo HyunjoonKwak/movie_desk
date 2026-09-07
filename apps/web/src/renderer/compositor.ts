@@ -24,8 +24,8 @@ import {
   isWipe,
 } from "@movie-desk/core";
 import { sourceOffsetForRamp, textAnimAt, visibleAt } from "@movie-desk/core";
-import { RetryBackoff } from "./retry-backoff";
 import { BoundedResourceCache } from "./bounded-resource-cache";
+import { type ColorDomain, domainIndex, lutDomain } from "./color";
 import {
   BACKDROP_BLEND_MODE,
   animateEffects,
@@ -35,9 +35,20 @@ import {
   setWipeUniforms,
 } from "./compositor-uniforms";
 import { FrameSourcePool } from "./frame-source";
-import { type GL, createGL, createQuad, createTexture, uploadSource } from "./gl";
+import {
+  type GL,
+  type TargetFormat,
+  allocateTarget,
+  createGL,
+  createQuad,
+  createTexture,
+  probeColorTarget,
+  uploadSource,
+} from "./gl";
+import { type TransferProbe, probeVideoTransfer, uploadedVideoDomain } from "./input-color";
 import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
 import { PingPong } from "./ping-pong";
+import { RetryBackoff } from "./retry-backoff";
 import { ScratchPool } from "./scratch-pool";
 import { type Program, ShaderRegistry } from "./shader-registry";
 import { renderShapeToCanvas } from "./shape-source";
@@ -65,8 +76,32 @@ export class Compositor {
   // currentTime) segment once and stay cached.
   private readonly bgMaskTime = new Map<string, number>();
   private retainedAssetIds = new Set<string>();
-  private readonly pingPong: PingPong;
-  private readonly scratch: ScratchPool;
+  private readonly colorFormat: TargetFormat | null;
+  private readonly colorPingPong: PingPong;
+  private readonly colorScratch: ScratchPool;
+  private managed = false;
+  private invalidated = false;
+  private readonly colorWarnings = new Set<string>();
+  private readonly videoTransferProbe: TransferProbe;
+  usesColorApproximation = false;
+  private sourceTarget: { tex: WebGLTexture; fbo: WebGLFramebuffer; w: number; h: number } | null =
+    null;
+  private readonly normalizedSource = document.createElement("canvas");
+  private lastImageSource: HTMLImageElement | ImageBitmap | null = null;
+  private lastImageUrl = "";
+  private readonly opaqueImages = new WeakMap<object, boolean>();
+  private get pingPong() {
+    return this.colorPingPong;
+  }
+  private get scratch() {
+    return this.colorScratch;
+  }
+  private get sceneFbo() {
+    return this.managed ? this.colorScratch.acquire(3).fbo : null;
+  }
+  get colorPrecision() {
+    return this.colorFormat?.precision ?? "unsupported";
+  }
   // Stable slot indices for the scratch pool. Slot 0 holds the captured
   // backdrop (adjustment layer + overlay/soft-light blend); slot 1 holds
   // the spatial-conform (fit) target. They never alias in a single iteration.
@@ -92,8 +127,10 @@ export class Compositor {
     );
     this.shaders = new ShaderRegistry(this.gl);
     this.quad = createQuad(this.gl);
-    this.pingPong = new PingPong(this.gl);
-    this.scratch = new ScratchPool(this.gl);
+    this.colorFormat = probeColorTarget(this.gl);
+    this.videoTransferProbe = probeVideoTransfer(this.gl);
+    this.colorPingPong = new PingPong(this.gl, this.colorFormat ?? undefined);
+    this.colorScratch = new ScratchPool(this.gl, this.colorFormat ?? undefined);
     this.sources = new FrameSourcePool();
     const gl = this.gl;
     gl.enable(gl.BLEND);
@@ -105,8 +142,7 @@ export class Compositor {
     this.playheadFn = fn;
   }
 
-  resize(cssWidth: number, cssHeight: number) {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  resize(cssWidth: number, cssHeight: number, dpr = Math.min(window.devicePixelRatio || 1, 2)) {
     const canvas = this.gl.canvas as HTMLCanvasElement;
     const w = Math.max(1, Math.round(cssWidth * dpr));
     const h = Math.max(1, Math.round(cssHeight * dpr));
@@ -114,11 +150,15 @@ export class Compositor {
       canvas.width = w;
       canvas.height = h;
     }
-    this.pingPong.resize(w, h);
+  }
+
+  invalidate() {
+    this.invalidated = true;
   }
 
   async renderFrame(project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
     const gl = this.gl;
+    if (this.invalidated || gl.isContextLost()) return;
     const assetIds = new Set<string>(project.mediaLibrary.map((asset) => asset.id));
     this.retainedAssetIds = assetIds;
     this.assetTextures.retain(assetIds);
@@ -138,7 +178,21 @@ export class Compositor {
       ),
     );
     const visible = visibleAt(project, project.timeline.playhead);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.managed = visible.length > 0 && !this.canBypass(visible, project, getAsset);
+    if (this.managed && !this.colorFormat) {
+      this.warnColor("unsupported");
+      throw new Error("Linear color processing is unsupported on this GPU");
+    }
+    if (this.managed && this.colorFormat?.precision === "srgb8") this.warnColor("precision");
+    if (this.managed) {
+      try {
+        this.colorPingPong.resize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      } catch (error) {
+        this.warnColor("unsupported");
+        throw error;
+      }
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
     gl.clearColor(0, 0, 0, 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -157,6 +211,7 @@ export class Compositor {
         ? textAnimAt(clip, Math.max(0, project.timeline.playhead - clip.start))
         : null;
       let sourceTex = await this.uploadClip(clip, getAsset, project, textAnim?.charFrac ?? 1);
+      if (this.invalidated || gl.isContextLost()) return;
       if (!sourceTex) continue;
 
       // Spatial conform: resample media into the frame aspect (fill/fit) so it
@@ -172,6 +227,7 @@ export class Compositor {
       if (isMediaClip(clip) && clip.effects.some((e) => e.enabled && e.type === "bg-remove")) {
         const asset = getAsset(clip.assetId);
         if (asset) maskTexture = await this.uploadBgMask(asset);
+        if (this.invalidated || gl.isContextLost()) return;
       }
 
       // Resolve keyframe-driven effect param overrides at the current clip
@@ -197,13 +253,13 @@ export class Compositor {
       const transition = activeTransitionFor(clip, project.timeline.playhead);
       const wipe = transition && isWipe(transition.type) ? transition : null;
       const composed = wipe ? tf : applyTransitionToTransform(tf, transition);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
       gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
       if (isBackdropBlend(clip.blendMode)) {
         this.compositeBackdropBlend(finalTex, composed, clip.mask, clip.blendMode, wipe);
       } else {
         setBlendMode(gl, clip.blendMode);
-        const prog = this.shaders.get("blit");
+        const prog = this.shaders.get("blit", this.managed);
         prog.use();
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, finalTex);
@@ -213,6 +269,11 @@ export class Compositor {
         setMaskUniforms(gl, prog, clip.mask);
         this.quad.draw();
       }
+    }
+    if (this.managed) {
+      gl.disable(gl.BLEND);
+      this.drawTransfer(this.colorScratch.acquire(3).tex, null, "linear", "srgb");
+      gl.enable(gl.BLEND);
     }
     // Restore default premultiplied-over blending for the next frame.
     setBlendMode(gl, "normal");
@@ -233,12 +294,13 @@ export class Compositor {
     const h = gl.drawingBufferHeight;
     const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
-    gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, w, h, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
     gl.viewport(0, 0, w, h);
     setBlendMode(gl, "normal");
-    const prog = this.shaders.get("blend-modes");
+    const prog = this.shaders.get("blend-modes", this.managed);
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, finalTex);
@@ -289,7 +351,9 @@ export class Compositor {
     gl.uniform1f(prog.uniform("u_scale"), 1);
     gl.uniform1f(prog.uniform("u_rotation"), 0);
     gl.uniform2f(prog.uniform("u_uv_scale"), sx, sy);
+    gl.disable(gl.BLEND);
     this.quad.draw();
+    gl.enable(gl.BLEND);
     return slot.tex;
   }
 
@@ -316,7 +380,9 @@ export class Compositor {
     gl.uniform1f(prog.uniform("u_scale"), 1);
     gl.uniform1f(prog.uniform("u_rotation"), 0);
     gl.uniform1i(prog.uniform("u_turns"), turns);
+    gl.disable(gl.BLEND);
     this.quad.draw();
+    gl.enable(gl.BLEND);
     return slot.tex;
   }
 
@@ -331,15 +397,16 @@ export class Compositor {
 
     const backdrop = this.scratch.acquire(Compositor.SCRATCH_BACKDROP);
     gl.bindTexture(gl.TEXTURE_2D, backdrop.tex);
-    gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, w, h, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
 
     const { effects, kfValues } = animateEffects(clip, project);
     const resultTex = this.applyEffectChain(backdrop.tex, effects, null);
 
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
     gl.viewport(0, 0, w, h);
     setBlendMode(gl, "normal");
-    const prog = this.shaders.get("blit");
+    const prog = this.shaders.get("blit", this.managed);
     prog.use();
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, resultTex);
@@ -350,6 +417,226 @@ export class Compositor {
     setWipeUniforms(gl, prog, null);
     setMaskUniforms(gl, prog, clip.mask);
     this.quad.draw();
+  }
+
+  private canBypass(
+    clips: readonly Clip[],
+    project: Project,
+    getAsset: (id: ID) => MediaAsset | undefined,
+  ): boolean {
+    if (clips.length !== 1) return false;
+    const clip = clips[0]!;
+    if (!isMediaClip(clip)) return false;
+    const asset = getAsset(clip.assetId);
+    const tf = clipTransform(clip);
+    return (
+      !!asset &&
+      asset.width === this.gl.drawingBufferWidth &&
+      asset.height === this.gl.drawingBufferHeight &&
+      !asset.rotation &&
+      (!clip.fit || clip.fit === "stretch") &&
+      !clip.mask &&
+      (!clip.blendMode || clip.blendMode === "normal") &&
+      tf.x === 0 &&
+      tf.y === 0 &&
+      tf.scale === 1 &&
+      tf.rotation === 0 &&
+      tf.opacity === 1 &&
+      Object.keys(animateEffects(clip, project).kfValues).length === 0 &&
+      !activeTransitionFor(clip, project.timeline.playhead) &&
+      !clip.effects.some((fx) => fx.enabled && (getEffect(fx.type)?.passes.length ?? 0) > 0)
+    );
+  }
+
+  private drawTransfer(
+    src: WebGLTexture,
+    fbo: WebGLFramebuffer | null,
+    from: ColorDomain,
+    to: ColorDomain,
+    w = this.gl.drawingBufferWidth,
+    h = this.gl.drawingBufferHeight,
+    straight = false,
+  ) {
+    const gl = this.gl;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.viewport(0, 0, w, h);
+    const prog = this.shaders.get("transfer");
+    prog.use();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, src);
+    gl.uniform1i(prog.uniform("u_tex"), 0);
+    gl.uniform1i(prog.uniform("u_straight"), straight ? 1 : 0);
+    gl.uniform1i(prog.uniform("u_from"), domainIndex(from));
+    gl.uniform1i(prog.uniform("u_to"), domainIndex(to));
+    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 });
+    this.quad.draw();
+  }
+
+  private warnColor(code: string, asset?: MediaAsset) {
+    const key = `${code}:${asset?.id ?? "gpu"}`;
+    if (this.colorWarnings.has(key)) return;
+    this.colorWarnings.add(key);
+    window.dispatchEvent(
+      new CustomEvent("color-processing-warning", { detail: { code, name: asset?.name ?? "" } }),
+    );
+  }
+
+  private sourceHasAlpha(source: TexImageSource): boolean {
+    // Decoded YUV without an alpha plane is opaque. DOM video is handled by
+    // the documented browser SDR fallback; immutable images are scanned once.
+    if (source instanceof HTMLVideoElement) {
+      if (typeof VideoFrame === "undefined") return true;
+      try {
+        const frame = new VideoFrame(source);
+        const opaque = ["I420", "I422", "I444", "NV12", "RGBX", "BGRX"].includes(
+          String(frame.format),
+        );
+        frame.close();
+        return !opaque;
+      } catch {
+        return true;
+      }
+    }
+    if (
+      typeof VideoFrame !== "undefined" &&
+      source instanceof VideoFrame &&
+      ["I420", "I422", "I444", "NV12", "RGBX", "BGRX"].includes(String(source.format))
+    )
+      return false;
+    const cached = this.opaqueImages.get(source);
+    if (cached !== undefined) return !cached;
+    const dimensions = source as {
+      naturalWidth?: number;
+      naturalHeight?: number;
+      displayWidth?: number;
+      displayHeight?: number;
+      width: number;
+      height: number;
+    };
+    const canvas = this.normalizedSource;
+    canvas.width = dimensions.naturalWidth || dimensions.displayWidth || dimensions.width;
+    canvas.height = dimensions.naturalHeight || dimensions.displayHeight || dimensions.height;
+    const ctx = canvas.getContext("2d", { colorSpace: "srgb" });
+    if (!ctx) return true;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(source as CanvasImageSource, 0, 0);
+    const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let opaque = true;
+    for (let i = 3; i < pixels.length; i += 4)
+      if (pixels[i] !== 255) {
+        opaque = false;
+        break;
+      }
+    if (
+      source instanceof HTMLImageElement ||
+      (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
+    )
+      this.opaqueImages.set(source, opaque);
+    return !opaque;
+  }
+
+  private uploadVisualSource(
+    tex: WebGLTexture,
+    source: TexImageSource,
+    asset?: MediaAsset,
+  ): WebGLTexture {
+    const videoFrame =
+      typeof VideoFrame !== "undefined" && source instanceof VideoFrame ? source : null;
+    const interpretation = videoFrame
+      ? uploadedVideoDomain(videoFrame.colorSpace.toJSON(), this.videoTransferProbe)
+      : { domain: "srgb" as const, approximate: source instanceof HTMLVideoElement };
+    if (interpretation.approximate) {
+      this.usesColorApproximation = true;
+      this.warnColor("approximation", asset);
+    }
+    if (
+      typeof VideoFrame !== "undefined" &&
+      source instanceof VideoFrame &&
+      ["pq", "hlg", "smpte2084", "arib-std-b67"].includes(String(source.colorSpace.transfer))
+    )
+      this.warnColor("hdr", asset);
+    if (!this.managed && this.sourceHasAlpha(source)) {
+      this.managed = true;
+      if (!this.colorFormat) {
+        this.warnColor("unsupported");
+        throw new Error("Linear alpha compositing is unsupported");
+      }
+      if (this.colorFormat.precision === "srgb8") this.warnColor("precision");
+      const gl = this.gl;
+      this.colorPingPong.resize(gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.sceneFbo);
+      gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+    }
+    if (!this.managed) return uploadSource(this.gl, tex, source);
+    const immutableImage =
+      source instanceof HTMLImageElement ||
+      (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap)
+        ? source
+        : null;
+    const imageUrl = source instanceof HTMLImageElement ? source.currentSrc : "";
+    if (
+      immutableImage &&
+      this.lastImageSource === immutableImage &&
+      this.lastImageUrl === imageUrl &&
+      this.sourceTarget
+    )
+      return this.sourceTarget.tex;
+    this.lastImageSource = null;
+    // Images use the browser's sRGB image/profile conversion. VideoFrames use
+    // the measured upload transfer directly. DOM video is explicitly approximate:
+    // an sRGB Canvas2D target alone does not prove BT.709 transfer normalization.
+    const dimensions = source as {
+      videoWidth?: number;
+      videoHeight?: number;
+      displayWidth?: number;
+      displayHeight?: number;
+      width: number;
+      height: number;
+      naturalWidth?: number;
+      naturalHeight?: number;
+    };
+    const w =
+      dimensions.videoWidth ||
+      dimensions.displayWidth ||
+      dimensions.naturalWidth ||
+      dimensions.width;
+    const h =
+      dimensions.videoHeight ||
+      dimensions.displayHeight ||
+      dimensions.naturalHeight ||
+      dimensions.height;
+    const canvas = this.normalizedSource;
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d", { colorSpace: "srgb" });
+    if (!ctx) throw new Error("sRGB source normalization is unavailable");
+    const sourceCanvas = source instanceof HTMLCanvasElement ? source : null;
+    const alreadySrgb =
+      sourceCanvas?.getContext("2d")?.getContextAttributes().colorSpace === "srgb";
+    const directSource = alreadySrgb || videoFrame || source instanceof HTMLVideoElement;
+    if (!directSource) {
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(source as CanvasImageSource, 0, 0);
+    }
+    uploadSource(this.gl, tex, directSource ? source : canvas, false);
+    const gl = this.gl;
+    if (!this.sourceTarget || this.sourceTarget.w !== w || this.sourceTarget.h !== h) {
+      if (this.sourceTarget) {
+        gl.deleteTexture(this.sourceTarget.tex);
+        gl.deleteFramebuffer(this.sourceTarget.fbo);
+      }
+      this.sourceTarget = { ...allocateTarget(gl, w, h, this.colorFormat!), w, h };
+    }
+    gl.disable(gl.BLEND);
+    this.drawTransfer(tex, this.sourceTarget.fbo, interpretation.domain, "linear", w, h, true);
+    gl.enable(gl.BLEND);
+    this.lastImageSource = immutableImage;
+    this.lastImageUrl = imageUrl;
+    return this.sourceTarget.tex;
   }
 
   private async uploadClip(
@@ -377,8 +664,7 @@ export class Compositor {
       tex = createTexture(this.gl);
       this.textTextures.set(clip.id, tex);
     }
-    uploadSource(this.gl, tex, canvas);
-    return tex;
+    return this.uploadVisualSource(tex, canvas);
   }
 
   private uploadShapeClip(clip: ShapeClip, project: Project): WebGLTexture {
@@ -390,8 +676,7 @@ export class Compositor {
       tex = createTexture(this.gl);
       this.textTextures.set(clip.id, tex);
     }
-    uploadSource(this.gl, tex, canvas);
-    return tex;
+    return this.uploadVisualSource(tex, canvas);
   }
 
   private applyEffectChain(
@@ -404,6 +689,8 @@ export class Compositor {
     if (enabled.length === 0) return input;
     const { w, h } = this.pingPong.size();
     let current = input;
+    let domain: ColorDomain = "linear";
+    gl.disable(gl.BLEND);
 
     for (const fx of enabled) {
       const def = getEffect(fx.type);
@@ -421,13 +708,33 @@ export class Compositor {
           continue;
         }
       }
+      if (def.passes.length === 0) continue;
+      let nextDomain: ColorDomain;
+      try {
+        nextDomain =
+          fx.type === "lut"
+            ? lutDomain(fx.params.colorSpace)
+            : def.workingSpace === "encoded"
+              ? "srgb"
+              : "linear";
+      } catch (error) {
+        this.warnColor("lutUnsupported");
+        throw error;
+      }
+      if (this.managed && nextDomain !== domain) {
+        const [, dst] = this.pingPong.current();
+        this.drawTransfer(current, dst.fbo, domain, nextDomain);
+        current = dst.tex;
+        this.pingPong.swap();
+        domain = nextDomain;
+      }
       for (const pass of def.passes) {
         const [, dst] = this.pingPong.current();
         gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
         gl.viewport(0, 0, w, h);
         let prog: ReturnType<ShaderRegistry["get"]>;
         try {
-          prog = this.shaders.get(pass.shader);
+          prog = this.shaders.get(pass.shader, this.managed);
         } catch {
           // A shader that failed to compile/link (or is missing)
           // degrades this one effect to a no-op instead of throwing out of the
@@ -504,6 +811,13 @@ export class Compositor {
         this.pingPong.swap();
       }
     }
+    if (this.managed && domain !== "linear") {
+      const [, dst] = this.pingPong.current();
+      this.drawTransfer(current, dst.fbo, domain, "linear");
+      current = dst.tex;
+      this.pingPong.swap();
+    }
+    gl.enable(gl.BLEND);
     return current;
   }
 
@@ -559,7 +873,7 @@ export class Compositor {
           tex = createTexture(this.gl);
           this.assetTextures.set(asset.id, tex);
         }
-        uploadSource(this.gl, tex, frame);
+        tex = this.uploadVisualSource(tex, frame, asset);
         // WebCodecs frames come back unrotated; the media element path below
         // already honours the container's display matrix.
         return asset.rotation ? this.applySourceRotation(tex, asset.rotation) : tex;
@@ -587,8 +901,7 @@ export class Compositor {
       tex = createTexture(this.gl);
       this.assetTextures.set(asset.id, tex);
     }
-    uploadSource(this.gl, tex, source);
-    return tex;
+    return this.uploadVisualSource(tex, source, asset);
   }
 
   private async uploadBgMask(asset: MediaAsset): Promise<WebGLTexture | null> {
@@ -625,6 +938,7 @@ export class Compositor {
   // ----
 
   dispose() {
+    this.invalidate();
     this.assetTextures.clear();
     this.textTextures.clear();
     this.bgMaskTextures.clear();
@@ -633,9 +947,13 @@ export class Compositor {
     this.decodeRetry.clear();
     this.retainedAssetIds.clear();
     disposeLutTextures(this.gl);
-    this.scratch.dispose();
+    this.colorScratch.dispose();
+    if (this.sourceTarget) {
+      this.gl.deleteTexture(this.sourceTarget.tex);
+      this.gl.deleteFramebuffer(this.sourceTarget.fbo);
+    }
     this.shaders.dispose();
-    this.pingPong.dispose();
+    this.colorPingPong.dispose();
     this.sources.dispose();
   }
 }

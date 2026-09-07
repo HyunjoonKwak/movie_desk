@@ -1,7 +1,18 @@
-import { createEmptyProject, TruePeakMeter } from "@movie-desk/core";
+import { TruePeakMeter, createEmptyProject } from "@movie-desk/core";
 import { afterEach, expect, it, vi } from "vitest";
 import { WebCodecsExporter } from "../exporter";
 import { PRESETS } from "../presets";
+// These tests isolate audio/mux timing with frozen packets; real color output is
+// verified separately by bt709-frame tests and the GPU/codec audit.
+vi.mock("../bt709-frame", () => ({
+  Bt709FrameCapture: class {
+    dispose() {}
+    capture() {
+      return { close() {} };
+    }
+  },
+  isBt709Output: () => true,
+}));
 vi.mock("@/renderer/compositor", () => ({
   Compositor: class {
     resize() {}
@@ -81,6 +92,7 @@ afterEach(() => vi.unstubAllGlobals());
 it("reports post-clamp encoder PCM peaks separately from pre-clamp overload counts", async () => {
   const encoded: Float32Array[] = [];
   class FakeEncoder {
+    constructor(private readonly init: VideoEncoderInit) {}
     static async isConfigSupported() {
       return { supported: true };
     }
@@ -90,7 +102,9 @@ it("reports post-clamp encoder PCM peaks separately from pre-clamp overload coun
     encode(data: { pcm?: Float32Array }) {
       if (data.pcm) encoded.push(data.pcm);
     }
-    async flush() {}
+    async flush() {
+      this.init.output({} as EncodedVideoChunk, { decoderConfig: { codec: "fixture" } });
+    }
     close() {
       this.state = "closed";
     }

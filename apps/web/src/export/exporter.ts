@@ -6,6 +6,8 @@ import type { AudioPeakResult } from "@movie-desk/core";
 import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
 import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
+import { isBt709Output } from "./bt709-frame";
+import { Bt709FramePipeline } from "./bt709-pipeline";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
@@ -84,11 +86,16 @@ export class WebCodecsExporter implements Exporter {
     canvas.height = preset.height;
     const compositor = new Compositor(canvas);
     let encoder: VideoEncoder | null = null;
+    let colorPipeline: Bt709FramePipeline | null = null;
+    const pendingFrames: { index: number; frame: Promise<VideoFrame> }[] = [];
     let audioPeaks: (AudioPeakResult & { limitedSamples: number }) | undefined;
     let pitchFallback = false;
     let aacCorrectionFallback = false;
     try {
-      compositor.resize(preset.width, preset.height);
+      compositor.resize(preset.width, preset.height, 1);
+      colorPipeline = new Bt709FramePipeline(canvas, abortController.signal);
+      let colorOutputVerified = false;
+      let colorOutputError: Error | null = null;
       let virtualPlayheadMs = 0;
       compositor.setPlayheadGetter(() => virtualPlayheadMs);
 
@@ -137,7 +144,16 @@ export class WebCodecsExporter implements Exporter {
       });
 
       encoder = new VideoEncoder({
-        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        output: (chunk, meta) => {
+          if (meta?.decoderConfig) {
+            colorOutputVerified = isBt709Output(meta.decoderConfig.colorSpace);
+            if (!colorOutputVerified)
+              colorOutputError = new Error(
+                "This encoder cannot produce verified BT.709 color output",
+              );
+          }
+          muxer.addVideoChunk(chunk, meta);
+        },
         error: (e) => {
           // biome-ignore lint/suspicious/noConsole: WebCodecs reports encoder failures via callbacks.
           console.error("Encoder error:", e);
@@ -154,6 +170,19 @@ export class WebCodecsExporter implements Exporter {
       onProgress({ stage: "rendering", progress: 0 });
       const renderStartedAt = performance.now();
 
+      const encodeOldest = async () => {
+        const pending = pendingFrames.shift();
+        if (!pending) return;
+        const frame = await pending.frame;
+        try {
+          if (this.cancelled) throw new ExportCancelledError();
+          encoder!.encode(frame, { keyFrame: pending.index % 60 === 0 });
+        } finally {
+          frame.close();
+        }
+        await waitForEncoderQueue(encoder!);
+      };
+
       for (let f = 0; f < totalFrames; f++) {
         if (this.cancelled) {
           throw new ExportCancelledError();
@@ -166,19 +195,15 @@ export class WebCodecsExporter implements Exporter {
           timeline: { ...project.timeline, playhead: virtualPlayheadMs },
         };
         await compositor.renderFrame(frameProject, getAsset);
-        const frame = new VideoFrame(canvas, {
-          timestamp: Math.round((f * 1_000_000) / preset.fps),
-          duration: Math.round(1_000_000 / preset.fps),
+        if (colorOutputError) throw colorOutputError;
+        pendingFrames.push({
+          index: f,
+          frame: colorPipeline.capture(
+            Math.round((f * 1_000_000) / preset.fps),
+            Math.round(1_000_000 / preset.fps),
+          ),
         });
-        try {
-          encoder.encode(frame, { keyFrame: f % 60 === 0 });
-        } finally {
-          frame.close();
-        }
-        // Rendering outruns a software encoder many times over; without this
-        // every pending 1080p frame sits in memory and "rendering 99%" hides
-        // the real progress. Let the queue drain before decoding more.
-        await waitForEncoderQueue(encoder);
+        if (pendingFrames.length >= 2) await encodeOldest();
         if (f % 5 === 0) {
           const elapsedSec = (performance.now() - renderStartedAt) / 1000;
           const realisedFps = f / Math.max(0.01, elapsedSec);
@@ -191,6 +216,8 @@ export class WebCodecsExporter implements Exporter {
           });
         }
       }
+
+      while (pendingFrames.length) await encodeOldest();
 
       if (includeAudio) {
         const duck = useDuckingStore.getState();
@@ -304,12 +331,16 @@ export class WebCodecsExporter implements Exporter {
       if (this.cancelled) throw new ExportCancelledError();
       onProgress({ stage: "muxing", progress: 0.95 });
       await encoder.flush();
+      if (colorOutputError) throw colorOutputError;
+      if (!colorOutputVerified)
+        throw new Error("The encoder did not report verifiable BT.709 color metadata");
       const buffer = await muxer.finalize();
 
       onProgress({ stage: "finalizing", progress: 1 });
 
       const name = sanitizeName(project.name) || "export";
       return {
+        colorApproximation: compositor.usesColorApproximation,
         pitchFallback,
         aacCorrectionFallback,
         ...(audioPeaks ? { audioPeaks } : {}),
@@ -317,7 +348,15 @@ export class WebCodecsExporter implements Exporter {
         mime: "video/mp4",
         suggestedName: `${name}.mp4`,
       };
+    } catch (error) {
+      if (this.cancelled || abortController.signal.aborted)
+        throw new ExportCancelledError({ cause: error });
+      throw error;
     } finally {
+      colorPipeline?.dispose();
+      await Promise.allSettled(
+        pendingFrames.map((pending) => pending.frame.then((frame) => frame.close())),
+      );
       if (this.abortController === abortController) this.abortController = null;
       if (encoder?.state !== "closed") encoder?.close();
       compositor.dispose();

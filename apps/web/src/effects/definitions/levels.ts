@@ -6,6 +6,7 @@ export const levels: EffectDefinition = {
   type: "levels",
   name: "Levels",
   keywords: ["black point", "white point", "gamma", "contrast", "histogram"],
+  workingSpace: "encoded",
   category: "color",
   params: [
     { kind: "number", key: "black", label: "Black point", min: 0, max: 0.5, step: 0.01, default: 0 },

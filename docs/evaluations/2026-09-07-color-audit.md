@@ -1,5 +1,10 @@
 # B’4a color audit — 2026-09-07
 
+The original B’4a audit and gate history are preserved below. The B’4b implementation,
+correctness, signal/tag verification and performance results follow in the
+“B’4b managed pipeline” section.
+
+
 Base: fetched origin/main `1ba350ba73272abf7a8b3d872c691a0d7e0271ae`.
 Working checkout: `HyunjoonKwak/codex-b4-color`, retained by coordinator approval.
 Scope was explicitly split: this round ships scopes and evidence; B’4b owns
@@ -206,3 +211,229 @@ production build, Chromium installation and browser E2E. Unit counts: core
 The offline frame lifetime/sparse clipping and kernel comparison harnesses also
 passed; the frozen baseline fixture removes the need for historical git objects. No dependency or lockfile changes, no exporter/audio edits,
 no push or main merge. B’4b remains a separate implementation/review round.
+
+## B’4b managed pipeline (implemented; full gate passed)
+
+Base `0e6804a`; same branch. The new scene/effect targets are linear Rec.709,
+premultiplied in linear light. The compositor keeps a legacy bypass for an opaque,
+single, native-resolution untransformed clip; resampling, effects and compositing
+use the managed scene. Presentation encodes once to sRGB. Encoded artistic effect
+groups convert at domain boundaries, process straight RGB, and restore premultiplication.
+Blur filters coverage along with premultiplied RGB. Adjustment captures preserve
+the scene target's storage format instead of reallocating RGBA8 via copyTexImage2D.
+
+`node scripts/color/managed.mjs` runs the current and `0e6804a` compositors on a real
+WebGL context with a deterministic in-memory source adapter (actual compositor,
+effect registry, shaders and core timeline functions). It compares **147,456**
+synthetic ramp channels and **230,400** channels from the checked-in VP9 MP4:
+**zero mismatches** in both bypass fixtures. GPU extension suppression forces
+SRGB8_ALPHA8 fallback, so the fallback result is not a mocked arithmetic result.
+The baseline requires the documented base Git object; there is no network access.
+
+| Managed GPU check | Result |
+| --- | --- |
+| Code 118, exposure +1EV | 236 before → 162 after |
+| Linear scene gain at code 118 | 1.99986862198× (half-float quantization; ideal 2×) |
+| Code 180, +3EV then −3EV | 180; highlights survive intermediate values above one |
+| White at half opacity over black | 188 in RGBA16F and SRGB8_ALPHA8 |
+| −3EV then +3EV, all 256 gray codes, RGBA16F | 256 distinct codes, maximum error 0 |
+| Same chain, SRGB8_ALPHA8 | 100 distinct codes, maximum error 4 (SwiftShader) / 6 (Metal); visible banding risk |
+| Quarter-intensity 1D LUT at source code 118 | sRGB 30; BT.709 encoded 42; linear 60 |
+
+The LUT fixture maps 1 to 0.25; interpolation retains the existing 8-bit LUT texture
+precision. A selected space applies to both LUT input and output. The effect
+parameter persists with the project, and changing interpretation/importing a LUT
+now records history instead of using the slider's history-bypassing setter.
+An explicit sRGB assumption is visible for old LUTs. Unsupported space strings
+fail instead of being silently guessed.
+
+Every visual definition declares its working space. The JSON records every
+effect's parameters and old/new gray result (including encoded identity checks).
+These samples are not an exhaustive artistic-equivalence claim. In particular,
+linear wheels/white balance/grain/vignette intentionally change appearance.
+Unbounded exposure is tested separately from the clipped SDR output boundary.
+
+### Output signal and tags
+
+`node scripts/color/managed-output.mjs` checks every shipped preset with the real
+encoder and pinned muxer. It then decodes **without injecting color metadata**,
+requiring the bitstream to identify BT.709 independently of container metadata.
+All six presets encode successfully in this local Chromium environment; each
+reports BT.709 primaries/transfer/matrix, limited range, one matching 1/1/1 `colr`,
+and decoded center luma **106** for sRGB code **118**. H.264 and VP9 are both tested.
+An unsupported encoder/configuration on another browser is not relabeled.
+
+| Preset | Dimensions | Codec | Encoder / bitstream / MP4 |
+| --- | --- | --- | --- |
+| Family message | 1280×720 | H.264 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+| YouTube 1080p | 1920×1080 | H.264 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+| YouTube 4K | 3840×2160 | H.264 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+| TV / Tablet | 3840×2160 | H.264 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+| TikTok / Reels | 1080×1920 | H.264 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+| Web | 1920×1080 | VP9 | BT.709 limited / BT.709 limited / 1/1/1 limited |
+
+The CPU conversion runs in a dedicated worker using two transferable RGBA/I420
+slots and drains frames in timestamp order, with the existing encoder queue bound.
+Worker absence uses the same conversion synchronously; worker failure, timeout
+and cancellation reject pending frames and release resources. A GPU-packing
+attempt was rejected: the 30-frame 1080p boundary+encoder benchmark rose from
+167.4ms to 1474.3ms. Its measured tags and times are preserved in
+[color GPU packing attempt](2026-09-07-color-gpu-pack-attempt.json); the rejected
+shader is not shipped. This is a component experiment, not a 10-minute estimate.
+Complete 10-minute exporter measurements and the bounded-overlap follow-up are
+recorded below, separately from this component experiment.
+
+### Decoded/uploaded representation evidence
+
+| Input path | Gamut handling | Transfer handling | Classification / measured evidence |
+| --- | --- | --- | --- |
+| WebCodecs raw RGBA, sRGB | Browser Rec.709 | sRGB inverse | (180,100,60) → (180,100,60) after neutral managed processing |
+| WebCodecs raw RGBA, BT.709 | Browser Rec.709 | Runtime probe selects BT.709 inverse when samples survive unchanged | (180,100,60) → (188,114,75); analytic sRGB output (187.60,113.60,75.35) |
+| WebCodecs I420 / NV12, BT.709 limited | Browser YCbCr/RGB and Rec.709 | Same probed BT.709 inverse, separately exercised with actual YUV planes | Y117/U128/V128 uploads as RGB118; managed display RGB131, analytic unquantized reference130.12 (within 1 code) |
+| WebCodecs raw P3 / sRGB | Browser converts gamut once | sRGB inverse; no repeated source-gamut matrix | (180,100,60) uploads (193,95,49), retained by the managed identity |
+| DOM video element | Browser SDR conversion | Explicit sRGB assumption; source transfer normalization is not claimed | Approximate; actual 320×180 MP4 bypass matches legacy in every channel; named StateHint in editing and warning in export results |
+| HTML image / ImageBitmap, sRGB PNG | Browser image/profile conversion to sRGB | sRGB inverse | Black/white PNG identity has zero mismatched channels for both paths; not an exhaustive ICC or animated-image test |
+
+The VideoFrame probe is repeated per restored GL context. Unit tests cover
+preserved transfer, conversion to sRGB and unknown/unclassifiable output; unknown
+metadata/probes produce a visible SDR approximation instead of a second guessed
+transform. PQ/HLG tags produce an HDR warning, not an HDR accuracy claim.
+The old-to-new input results above are interpretation tests, not evidence that
+all decoder formats, ICC profiles or browser versions behave identically.
+
+### Effect samples and precision scope
+
+All values below are output sRGB byte codes at the recorded sample coordinate.
+Parameters are preserved in [the GPU measurements](2026-09-07-color-managed.json);
+neutral settings are deliberate identity checks, not a claim that adjusted looks
+are unchanged. Grain depends on the GLSL implementation (the separate Metal
+artifact records its own sample). Curves are not currently shipped.
+
+| Effect | Declared space | Before RGB | After RGB |
+| --- | --- | --- | --- |
+| brightness | encoded | 118, 118, 118 | 118, 118, 118 |
+| contrast | encoded | 118, 118, 118 | 118, 118, 118 |
+| exposure | linear | 236, 236, 236 | 162, 162, 162 |
+| saturation | encoded | 118, 118, 118 | 118, 118, 118 |
+| hue | encoded | 118, 118, 118 | 118, 118, 118 |
+| color-wheels | linear | 118, 118, 118 | 118, 118, 118 |
+| white-balance | linear | 118, 118, 118 | 118, 118, 118 |
+| levels | encoded | 118, 118, 118 | 118, 118, 118 |
+| vibrance | encoded | 118, 118, 118 | 118, 118, 118 |
+| split-tone | encoded | 137, 128, 117 | 136, 128, 117 |
+| gaussian-blur | linear | 118, 118, 118 | 118, 118, 118 |
+| sharpen | linear | 118, 118, 118 | 118, 118, 118 |
+| vignette | linear | 60, 60, 60 | 85, 85, 85 |
+| sepia | encoded | 159, 142, 111 | 159, 142, 111 |
+| invert | encoded | 137, 137, 137 | 137, 137, 137 |
+| grain | linear | 111, 111, 111 | 123, 123, 123 |
+| chroma-key | encoded | 118, 118, 118 | 118, 118, 118 |
+| bg-remove | linear | 118, 118, 118 | 118, 118, 118 |
+
+The separate spatial probes change an alpha edge 128→188, a sigma-2 blur edge
+102→170, and a two-pixel black/white resize 128→188. LUT interpretations are in
+the earlier table. Half-float output remains quantized at the final 8-bit SDR
+presentation boundary; the fallback loses shadow codes and clips highlights
+above one. A persistent precision StateHint makes this limitation visible.
+
+### Playback performance and measurement limits
+
+The machine is an Apple M4 Mac. Default headless Chromium reports SwiftShader,
+so a separate `COLOR_GPU=metal node scripts/color/managed.mjs` run explicitly
+selects ANGLE Metal. Both runs use an attached 1080p canvas, requestAnimationFrame
+and actual compositor/effect work; they do not claim source-decoder throughput.
+
+| Renderer, 1080p +1EV | Legacy interval p50 / p95 | Managed interval p50 / p95 | Main-thread submission p50 / p95, old → new |
+| --- | --- | --- | --- |
+| ANGLE Metal (Apple M4) | 16.7 / 18.4ms | 16.7 / 18.2ms | 0.1 / 0.4ms → 0.2 / 0.4ms |
+| SwiftShader (software) | 16.7 / 18.6ms | 50.0 / 66.7ms | 2.0 / 2.3ms → 3.1 / 5.6ms |
+
+Metal maintains the display cadence; timer-floor `gl.finish` samples (0–0.2ms)
+are not precise GPU duration estimates. Software rendering exceeds the +20%
+threshold: linear transfer shaders and additional float passes execute on CPU.
+This is an explicit software-renderer limitation, not hidden by the hardware
+result. Raw measurements are in the [Metal](2026-09-07-color-managed-metal.json)
+and [SwiftShader](2026-09-07-color-managed.json) artifacts.
+
+Non-neutral white balance (temperature 0.5, tint 0.2) at gray118 changes
+(141,110,103) → (142,108,98); an independent linear arithmetic reference gives
+exactly (142,108,98). Color-wheel RGB gain +0.25 changes (148,148,148) →
+(131,131,131), also matching the independent linear reference. Both neutral
+identities are asserted separately in the GPU invariant suite.
+
+### Complete 10-minute export, graded fixture
+
+`node scripts/color/ten-minute-export.mjs` exports all **18,000** 1080p30 frames
+through the real exporter, compositor, bounded encoder queue, muxer and final
+Blob. A generated PNG gradient with +1EV and in-memory source/preflight adapters
+isolates video work; there is no audio or source-file I/O. These are measured
+complete exports on SwiftShader, not 30-frame extrapolations.
+
+| Revision / conversion | Complete time | Output bytes | Delta from legacy |
+| --- | --- | --- | --- |
+| 0e6804a legacy | 608.7926s | 65,500,182 | — |
+| Managed, synchronous CPU bridge | 776.9624s | 212,281,677 | +168.1698s / +27.62% |
+| Managed, two-slot Worker bridge | 675.2099s | 212,281,677 | +66.4173s / +10.91% |
+
+The worker reduces the managed run by **101.7525s**. The graded +1EV fixture
+preserves gradients that the old encoded exposure clipped; the encoded output
+is 3.24× larger, so its extra encoding work is mixed into this delta. **This is
+not a pure color-conversion overhead figure.** Evidence: [legacy and synchronous
+runs](2026-09-07-color-ten-minute-export.json), [worker run](2026-09-07-color-ten-minute-pipelined.json).
+The supervisor requested a no-effect neutral comparison with identical YUV
+content to separate that cost; it is recorded in the next section.
+
+### Complete 10-minute export, matched neutral content
+
+`node scripts/color/ten-minute-export.mjs --neutral` runs both complete exporters
+with a native-size, opaque black PNG, **no effects**, 1080p30, 18,000 frames,
+VP9 6Mbps and the same video-only in-memory adapter. Black is chosen because
+sRGB→BT.709 transfer/matrix conversion leaves its ideal limited-range signal
+Y16/U128/V128 unchanged; a colored ramp would still change encoder input even
+without an effect. The encoder settings, frame count and timestamps are identical.
+
+| No-effect fixture | Complete time | Output bytes | Decoded first-frame plane SHA-256 |
+| --- | --- | --- | --- |
+| 0e6804a legacy | 287.6616s | 1,067,918 | fba85dc76edb671885fafcac49ec9acf8e6bd598fe2eec42701d84e91279daaa |
+| Managed, two-slot Worker | 238.8092s | 1,067,918 | fba85dc76edb671885fafcac49ec9acf8e6bd598fe2eec42701d84e91279daaa |
+
+The controlled end-to-end delta is **−48.8524s (−16.98%)**: the new bounded
+pipeline is faster on this matched-content fixture. This includes overlap and
+replacing the browser's Canvas-to-VideoFrame conversion; it is not a standalone
+arithmetic function benchmark or a claim that CPU conversion is free. The first
+lossy-decoded frame has 1,649 luma samples within three codes of ideal black in
+**both** paths, with identical full decoded data hashes and all chroma samples128.
+An initial check against ideal black exposed that codec error; the final check
+compares the two actual outputs. Container/bitstream tags change from SMPTE170M
+to BT.709 as intended, while decoded sample bytes match for this neutral content.
+See [the full neutral results](2026-09-07-color-ten-minute-neutral.json).
+
+The +1EV result (+66.4173s / +10.91%) remains separately labeled as including
+changed image content, extra linear rendering and encoding load. B’6 follow-up:
+software-renderer transfer/float-pass optimization and actual-video hardware
+10-minute exports, with both matched-content and graded fixtures. The neutral
+benchmark shows no remaining positive end-to-end conversion regression in this
+local setup; broader hardware/browser/decoder claims require those follow-ups.
+
+### Automated verification scope
+
+Unit tests cover transfer round trips, effect domain declarations, input-probe
+classification, BT.709 matrix/range/scanline orientation and two-slot ownership,
+reversed worker responses, failures, cancellation and synchronous fallback.
+The two new E2Es exercise LUT space selection/undo plus actual exported decoded
+pixels, and visible approximation/context restoration plus the GPU invariant
+suite. The latter also forces both target types unavailable and verifies that
+opaque bypass still works while managed operations fail explicitly.
+
+The first full gate caught an interaction regression: the 12-second migration
+toast intercepted an empty-track click in the existing marquee E2E. The notice
+is now a dismissible StateHint confined to the preview, so it cannot cover
+timeline gestures; the existing test is unchanged. Final gate results below supersede that failed first run.
+
+Final `pnpm gate --report docs/evaluations/2026-09-07-color-linear-gate.md`:
+**9/9 PASS**, core155 + web672 + desktop72 + scripts11 = **910 unit tests**,
+**64 Chromium E2Es** (183.8s gate step), OSV **167** production packages with
+**zero** known vulnerabilities, production build and type/lint checks passed.
+Port32119 was checked with `lsof` before each gate/browser run. Catalog diffs
+remain append-only (11 keys per language, four-space indentation); no dependency,
+lockfile, push, main merge or other-worktree changes. See the [final gate report](2026-09-07-color-linear-gate.md).

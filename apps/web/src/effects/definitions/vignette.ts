@@ -4,6 +4,7 @@ export const vignette: EffectDefinition = {
   type: "vignette",
   name: "Vignette",
   keywords: ["edge", "darken"],
+  workingSpace: "linear",
   category: "stylize",
   params: [
     {

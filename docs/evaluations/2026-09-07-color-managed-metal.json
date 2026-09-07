@@ -1,0 +1,594 @@
+{
+  "bypass": {
+    "channels": 147456,
+    "mismatches": 0
+  },
+  "realFixture": {
+    "channels": 230400,
+    "mismatches": 0
+  },
+  "precision": "half-float",
+  "linearGain": 1.999868621979911,
+  "blend": {
+    "float": 188,
+    "srgb8": 188
+  },
+  "fallbackExposure": 162,
+  "highlightsRoundTrip180": 180,
+  "precisionRamp": {
+    "float": {
+      "uniqueCodes": 256,
+      "maxError": 0
+    },
+    "srgb8": {
+      "uniqueCodes": 100,
+      "maxError": 6
+    }
+  },
+  "lutRows": [
+    {
+      "colorSpace": "srgb",
+      "code118": 29
+    },
+    {
+      "colorSpace": "bt709",
+      "code118": 42
+    },
+    {
+      "colorSpace": "linear",
+      "code118": 60
+    }
+  ],
+  "performanceRows": [
+    {
+      "name": "legacy",
+      "width": 1920,
+      "height": 1080,
+      "samples": 60,
+      "p50Ms": 0,
+      "p95Ms": 0.09999999403953552,
+      "meanMs": 0.010000000397364298
+    },
+    {
+      "name": "managed",
+      "width": 1920,
+      "height": 1080,
+      "samples": 60,
+      "p50Ms": 0,
+      "p95Ms": 0.19999998807907104,
+      "meanMs": 0.0399999996026357
+    }
+  ],
+  "playbackRows": [
+    {
+      "name": "legacy",
+      "width": 1920,
+      "height": 1080,
+      "intervalMs": {
+        "count": 119,
+        "p50": 16.699999999999818,
+        "p95": 18.399999999999636,
+        "max": 18.600000000000364
+      },
+      "submissionMs": {
+        "count": 119,
+        "p50": 0.09999999403953552,
+        "p95": 0.4000000059604645,
+        "max": 0.7000000178813934
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+    },
+    {
+      "name": "managed",
+      "width": 1920,
+      "height": 1080,
+      "intervalMs": {
+        "count": 119,
+        "p50": 16.699999999999818,
+        "p95": 18.199999999999818,
+        "max": 18.5
+      },
+      "submissionMs": {
+        "count": 119,
+        "p50": 0.19999998807907104,
+        "p95": 0.4000000059604645,
+        "max": 0.5
+      },
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Unspecified Version)"
+    }
+  ],
+  "inputRows": [
+    {
+      "name": "WebCodecs RGB sRGB",
+      "oldRgb": [
+        180,
+        100,
+        60
+      ],
+      "newRgb": [
+        180,
+        100,
+        60
+      ],
+      "expected": [
+        180,
+        100,
+        60
+      ]
+    },
+    {
+      "name": "WebCodecs RGB BT709",
+      "oldRgb": [
+        180,
+        100,
+        60
+      ],
+      "newRgb": [
+        188,
+        114,
+        75
+      ],
+      "expected": [
+        187.6012180823493,
+        113.59672396481972,
+        75.34880989665933
+      ]
+    },
+    {
+      "name": "WebCodecs RGB P3",
+      "oldRgb": [
+        193,
+        95,
+        49
+      ],
+      "newRgb": [
+        193,
+        95,
+        49
+      ],
+      "expected": [
+        193,
+        95,
+        49
+      ]
+    },
+    {
+      "name": "WebCodecs I420 BT709",
+      "oldRgb": [
+        118,
+        118,
+        118
+      ],
+      "newRgb": [
+        130,
+        130,
+        130
+      ],
+      "expected": [
+        130.12245928587183,
+        130.12245928587183,
+        130.12245928587183
+      ]
+    },
+    {
+      "name": "WebCodecs NV12 BT709",
+      "oldRgb": [
+        118,
+        118,
+        118
+      ],
+      "newRgb": [
+        130,
+        130,
+        130
+      ],
+      "expected": [
+        130.12245928587183,
+        130.12245928587183,
+        130.12245928587183
+      ]
+    },
+    {
+      "name": "HTML image sRGB PNG",
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "newRgb": [
+        0,
+        0,
+        0
+      ],
+      "mismatches": 0
+    },
+    {
+      "name": "ImageBitmap sRGB",
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "newRgb": [
+        0,
+        0,
+        0
+      ],
+      "mismatches": 0
+    }
+  ],
+  "alpha": {
+    "old": 128,
+    "managed": 188
+  },
+  "blur": {
+    "old": 102,
+    "managed": 170
+  },
+  "resize": {
+    "old": 128,
+    "managed": 188
+  },
+  "effects": [
+    {
+      "type": "brightness",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "contrast",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "exposure",
+      "space": "linear",
+      "params": {
+        "stops": 1
+      },
+      "oldGray118": [
+        236,
+        236,
+        236,
+        255
+      ],
+      "newGray118": [
+        162,
+        162,
+        162,
+        255
+      ]
+    },
+    {
+      "type": "saturation",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "hue",
+      "space": "encoded",
+      "params": {
+        "degrees": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "color-wheels",
+      "space": "linear",
+      "params": {
+        "liftR": 0,
+        "liftG": 0,
+        "liftB": 0,
+        "gammaR": 0,
+        "gammaG": 0,
+        "gammaB": 0,
+        "gainR": 0,
+        "gainG": 0,
+        "gainB": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "white-balance",
+      "space": "linear",
+      "params": {
+        "temperature": 0,
+        "tint": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "levels",
+      "space": "encoded",
+      "params": {
+        "black": 0,
+        "white": 1,
+        "gamma": 1
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "vibrance",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "split-tone",
+      "space": "encoded",
+      "params": {
+        "shadowColor": "#1e3a5f",
+        "highlightColor": "#f5b971",
+        "amount": 0.3,
+        "balance": 0
+      },
+      "oldGray118": [
+        137,
+        128,
+        117,
+        255
+      ],
+      "newGray118": [
+        136,
+        128,
+        117,
+        255
+      ]
+    },
+    {
+      "type": "gaussian-blur",
+      "space": "linear",
+      "params": {
+        "sigma": 4
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "sharpen",
+      "space": "linear",
+      "params": {
+        "amount": 0.5
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "vignette",
+      "space": "linear",
+      "params": {
+        "intensity": 0.5,
+        "softness": 0.5
+      },
+      "oldGray118": [
+        60,
+        60,
+        60,
+        255
+      ],
+      "newGray118": [
+        85,
+        85,
+        85,
+        255
+      ]
+    },
+    {
+      "type": "sepia",
+      "space": "encoded",
+      "params": {
+        "amount": 1
+      },
+      "oldGray118": [
+        159,
+        142,
+        111,
+        255
+      ],
+      "newGray118": [
+        159,
+        142,
+        110,
+        255
+      ]
+    },
+    {
+      "type": "invert",
+      "space": "encoded",
+      "params": {
+        "amount": 1
+      },
+      "oldGray118": [
+        137,
+        137,
+        137,
+        255
+      ],
+      "newGray118": [
+        137,
+        137,
+        137,
+        255
+      ]
+    },
+    {
+      "type": "grain",
+      "space": "linear",
+      "params": {
+        "amount": 0.1
+      },
+      "oldGray118": [
+        107,
+        107,
+        107,
+        255
+      ],
+      "newGray118": [
+        128,
+        128,
+        128,
+        255
+      ]
+    },
+    {
+      "type": "chroma-key",
+      "space": "encoded",
+      "params": {
+        "keyColor": "#00ff00",
+        "similarity": 0.4,
+        "smoothness": 0.1,
+        "spill": 0.5
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "bg-remove",
+      "space": "linear",
+      "params": {
+        "feather": 0.05
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    }
+  ]
+}

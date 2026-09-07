@@ -1,0 +1,475 @@
+{
+  "rows": [
+    {
+      "preset": "family-720p",
+      "width": 1280,
+      "height": 720,
+      "status": "encoded",
+      "captureMs": 252.09999999403954,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "avc1.42001F",
+        "codedHeight": 720,
+        "codedWidth": 1280,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "description": [
+          1,
+          66,
+          192,
+          31,
+          255,
+          225,
+          0,
+          18,
+          103,
+          66,
+          192,
+          31,
+          140,
+          104,
+          5,
+          0,
+          91,
+          166,
+          160,
+          32,
+          32,
+          32,
+          240,
+          136,
+          70,
+          160,
+          1,
+          0,
+          4,
+          104,
+          206,
+          60,
+          128
+        ],
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 3531
+    },
+    {
+      "preset": "youtube-1080p",
+      "width": 1920,
+      "height": 1080,
+      "status": "encoded",
+      "captureMs": 223.10000002384186,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "avc1.42002A",
+        "codedHeight": 1080,
+        "codedWidth": 1920,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "description": [
+          1,
+          66,
+          192,
+          40,
+          255,
+          225,
+          0,
+          19,
+          103,
+          66,
+          192,
+          40,
+          140,
+          104,
+          7,
+          128,
+          34,
+          126,
+          89,
+          168,
+          8,
+          8,
+          8,
+          60,
+          34,
+          17,
+          168,
+          1,
+          0,
+          4,
+          104,
+          206,
+          60,
+          128
+        ],
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 7200
+    },
+    {
+      "preset": "youtube-4k",
+      "width": 3840,
+      "height": 2160,
+      "status": "encoded",
+      "captureMs": 417.5,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "avc1.420033",
+        "codedHeight": 2160,
+        "codedWidth": 3840,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "description": [
+          1,
+          66,
+          192,
+          51,
+          255,
+          225,
+          0,
+          19,
+          103,
+          66,
+          192,
+          51,
+          140,
+          104,
+          3,
+          192,
+          4,
+          62,
+          154,
+          128,
+          128,
+          128,
+          131,
+          194,
+          33,
+          26,
+          128,
+          1,
+          0,
+          4,
+          104,
+          206,
+          60,
+          128
+        ],
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 25774
+    },
+    {
+      "preset": "tv-tablet-4k",
+      "width": 3840,
+      "height": 2160,
+      "status": "encoded",
+      "captureMs": 363.7000000178814,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "avc1.420033",
+        "codedHeight": 2160,
+        "codedWidth": 3840,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "description": [
+          1,
+          66,
+          192,
+          51,
+          255,
+          225,
+          0,
+          19,
+          103,
+          66,
+          192,
+          51,
+          140,
+          104,
+          3,
+          192,
+          4,
+          62,
+          154,
+          128,
+          128,
+          128,
+          131,
+          194,
+          33,
+          26,
+          128,
+          1,
+          0,
+          4,
+          104,
+          206,
+          60,
+          128
+        ],
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 25774
+    },
+    {
+      "preset": "tiktok-9-16",
+      "width": 1080,
+      "height": 1920,
+      "status": "encoded",
+      "captureMs": 229.10000002384186,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "avc1.42002A",
+        "codedHeight": 1920,
+        "codedWidth": 1080,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "description": [
+          1,
+          66,
+          192,
+          40,
+          255,
+          225,
+          0,
+          19,
+          103,
+          66,
+          192,
+          40,
+          140,
+          104,
+          4,
+          64,
+          60,
+          121,
+          121,
+          168,
+          8,
+          8,
+          8,
+          60,
+          34,
+          17,
+          168,
+          1,
+          0,
+          4,
+          104,
+          206,
+          60,
+          128
+        ],
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 7155
+    },
+    {
+      "preset": "web-vp9",
+      "width": 1920,
+      "height": 1080,
+      "status": "encoded",
+      "captureMs": 234.09999999403954,
+      "inputColor": {
+        "fullRange": false,
+        "matrix": "bt709",
+        "primaries": "bt709",
+        "transfer": "bt709"
+      },
+      "decoderConfig": {
+        "codec": "vp09.00.10.08",
+        "codedHeight": 1080,
+        "codedWidth": 1920,
+        "colorSpace": {
+          "fullRange": false,
+          "matrix": "bt709",
+          "primaries": "bt709",
+          "transfer": "bt709"
+        },
+        "flip": false,
+        "hardwareAcceleration": "no-preference",
+        "rotation": 0
+      },
+      "decoded": [
+        {
+          "colorSpace": {
+            "fullRange": false,
+            "matrix": "bt709",
+            "primaries": "bt709",
+            "transfer": "bt709"
+          },
+          "format": "I420",
+          "centerY": 106
+        }
+      ],
+      "container": {
+        "primaries": 1,
+        "transfer": 1,
+        "matrix": 1,
+        "fullRange": false
+      },
+      "bytes": 1587
+    }
+  ],
+  "performanceRows": [
+    {
+      "managed": false,
+      "frames": 30,
+      "width": 1920,
+      "height": 1080,
+      "totalMs": 167.40000000596046
+    },
+    {
+      "managed": true,
+      "frames": 30,
+      "width": 1920,
+      "height": 1080,
+      "totalMs": 1474.2999999821186
+    }
+  ]
+}

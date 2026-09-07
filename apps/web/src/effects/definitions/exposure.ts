@@ -4,6 +4,7 @@ export const exposure: EffectDefinition = {
   type: "exposure",
   name: "Exposure",
   keywords: ["light", "stops"],
+  workingSpace: "linear",
   category: "color",
   params: [
     { kind: "number", key: "stops", label: "Stops", min: -3, max: 3, step: 0.05, default: 0 },

@@ -6,6 +6,7 @@ export const vibrance: EffectDefinition = {
   type: "vibrance",
   name: "Vibrance",
   keywords: ["saturation", "color", "pop"],
+  workingSpace: "encoded",
   category: "color",
   params: [
     { kind: "number", key: "amount", label: "Amount", min: -1, max: 1, step: 0.01, default: 0 },

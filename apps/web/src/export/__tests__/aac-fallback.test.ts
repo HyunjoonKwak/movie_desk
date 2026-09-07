@@ -1,19 +1,30 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import * as presentation from "@/media/mux/audio-presentation";
 import { createEmptyProject } from "@movie-desk/core";
 import {
   ALL_FORMATS,
   BufferSource,
+  type EncodedPacket,
   EncodedPacketSink,
   Input,
-  type EncodedPacket,
 } from "mediabunny";
 import { afterEach, expect, it, vi } from "vitest";
 import * as priming from "../aac-priming";
-import * as presentation from "@/media/mux/audio-presentation";
 import { WebCodecsExporter } from "../exporter";
 import { PRESETS } from "../presets";
 
+// These tests isolate audio/mux timing with frozen packets; real color output is
+// verified separately by bt709-frame tests and the GPU/codec audit.
+vi.mock("../bt709-frame", () => ({
+  Bt709FrameCapture: class {
+    dispose() {}
+    capture() {
+      return { close() {} };
+    }
+  },
+  isBt709Output: () => true,
+}));
 vi.mock("@/renderer/compositor", () => ({
   Compositor: class {
     resize() {}

@@ -7,6 +7,7 @@ export const bgRemove: EffectDefinition = {
   type: "bg-remove",
   name: "Background removal",
   keywords: ["green screen", "person", "mask", "segmentation"],
+  workingSpace: "linear",
   category: "stylize",
   params: [
     {

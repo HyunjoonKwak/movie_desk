@@ -2,12 +2,12 @@
 
 import type { MessageKey } from "@/i18n/messages";
 import { useT } from "@/i18n/use-t";
+import { recordExport } from "@/lib/funnel/collector";
 import { useProjectStore } from "@/stores/project-store";
 import { useRangeStore } from "@/stores/range-store";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, CheckCircle2, Download, FolderOpen, Loader2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { recordExport } from "@/lib/funnel/collector";
 import { toast } from "sonner";
 import { ProjectAudioMixer } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
@@ -18,9 +18,9 @@ import {
   downloadBlob,
   revealExport,
 } from "./exporter";
-import { MissingMediaError } from "./preflight";
 import { LoudnessMeter, type LoudnessResult } from "./loudness";
 import { useNormalizeStore } from "./normalize-store";
+import { MissingMediaError } from "./preflight";
 import { PRESETS, estimateExportSizeMb } from "./presets";
 import type { ExportProgress } from "./types";
 
@@ -55,6 +55,7 @@ interface ExportedFile {
   readonly audioPeaks?: import("@movie-desk/core").AudioPeakResult & {
     readonly limitedSamples: number;
   };
+  readonly colorApproximation?: boolean;
   readonly pitchFallback?: boolean;
   readonly aacCorrectionFallback?: boolean;
   readonly name: string;
@@ -135,6 +136,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
           preset: label,
           destination,
           ...(result.audioPeaks ? { audioPeaks: result.audioPeaks } : {}),
+          colorApproximation: result.colorApproximation === true,
           pitchFallback: result.pitchFallback === true,
           aacCorrectionFallback: result.aacCorrectionFallback === true,
         });
@@ -281,6 +283,13 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                       <StateHint
                         tone="warning"
                         text={t("mixer.limited", { count: file.audioPeaks.limitedSamples })}
+                      />
+                    )}
+                    {file.colorApproximation && (
+                      <StateHint
+                        testId="export-color-hint"
+                        tone="warning"
+                        text={t("color.exportApproximation")}
                       />
                     )}
                     {file.pitchFallback && (

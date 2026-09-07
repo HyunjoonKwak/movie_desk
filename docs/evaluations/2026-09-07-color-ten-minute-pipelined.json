@@ -1,0 +1,13 @@
+{
+  "fixture": "1920x1080 gradient still, +1EV, 600s at 30fps, VP9 6Mbps, video-only",
+  "scope": "Actual WebCodecsExporter, Compositor, encoder queue, Mp4Writer and final Blob; in-memory image source and preflight adapter, no audio or source-file I/O",
+  "rows": [
+    {
+      "name": "pipelined",
+      "durationSeconds": 600,
+      "frames": 18000,
+      "totalMs": 675209.900000006,
+      "bytes": 212281677
+    }
+  ]
+}

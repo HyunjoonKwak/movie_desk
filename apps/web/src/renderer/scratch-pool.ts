@@ -10,7 +10,7 @@
 // compositor's pipeline only ever holds one role at a time per slot.
 
 import type { GL } from "./gl";
-import { createTexture } from "./gl";
+import { type TargetFormat, allocateTarget } from "./gl";
 
 export interface ScratchSlot {
   readonly tex: WebGLTexture;
@@ -18,32 +18,39 @@ export interface ScratchSlot {
 }
 
 export class ScratchPool {
-  private slots: ScratchSlot[] = [];
+  private slots = new Map<number, ScratchSlot>();
   private size = { w: 0, h: 0 };
 
-  constructor(private readonly gl: GL) {}
+  constructor(
+    private readonly gl: GL,
+    private readonly format?: TargetFormat,
+  ) {}
 
   // Hand back the slot at `index`, reallocating all slots when the drawing
   // buffer has resized since the last call. Allocates new slots on demand.
   acquire(index: number): ScratchSlot {
     this.ensureSize();
-    while (this.slots.length <= index) this.slots.push(this.allocSlot());
-    return this.slots[index]!;
+    let slot = this.slots.get(index);
+    if (!slot) {
+      slot = this.allocSlot();
+      this.slots.set(index, slot);
+    }
+    return slot;
   }
 
   dispose(): void {
-    for (const s of this.slots) {
+    for (const s of this.slots.values()) {
       this.gl.deleteTexture(s.tex);
       this.gl.deleteFramebuffer(s.fbo);
     }
-    this.slots = [];
+    this.slots.clear();
     this.size = { w: 0, h: 0 };
   }
 
   private ensureSize(): void {
     const w = this.gl.drawingBufferWidth;
     const h = this.gl.drawingBufferHeight;
-    if (w === this.size.w && h === this.size.h && this.slots.length > 0) return;
+    if (w === this.size.w && h === this.size.h && this.slots.size > 0) return;
     // Viewport changed (or first call): blow away cached slots so the next
     // acquire reallocates at the correct size.
     this.dispose();
@@ -51,25 +58,6 @@ export class ScratchPool {
   }
 
   private allocSlot(): ScratchSlot {
-    const gl = this.gl;
-    const tex = createTexture(gl);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.RGBA,
-      this.size.w,
-      this.size.h,
-      0,
-      gl.RGBA,
-      gl.UNSIGNED_BYTE,
-      null,
-    );
-    const fbo = gl.createFramebuffer();
-    if (!fbo) throw new Error("ScratchPool: createFramebuffer failed");
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { tex, fbo };
+    return allocateTarget(this.gl, this.size.w, this.size.h, this.format);
   }
 }

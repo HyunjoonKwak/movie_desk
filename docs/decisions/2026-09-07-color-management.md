@@ -1,6 +1,7 @@
 # B’4 color management decision — 2026-09-07
 
-Status: design accepted for B’4b; B’4a implements only display scopes and the audit.
+Status: B’4b implemented on the accepted B’4a design; verification and limits are
+recorded in the color audit. B’4a originally implemented only scopes and the audit.
 Coordinator approved this split through dispatch ctx_cc52c83a90be. No render color
 conversion, effect behavior or export metadata is changed in B’4a.
 
@@ -38,7 +39,8 @@ extension presence alone is insufficient. Keep highlight values above 1 through
 linear intermediates and only clip at a documented SDR output boundary.
 
 Fallback: sRGB-capable texture targets (`SRGB8_ALPHA8`) where renderable, hardware
-sRGB sampling decode, explicit encode when writing encoded storage, and blending
+sRGB sampling decode, automatic attachment encode when writing linear shader
+values to sRGB storage, and blending
 only where the attachment’s semantics actually guarantee linear destination
 blending. Never silently return to encoded-RGBA8 arithmetic. Probe this complete
 path; if it cannot implement the required pass, surface a reduced-precision or
@@ -98,3 +100,62 @@ worker calculation/painting, desktop/mobile access, audit and performance eviden
 B’4b: managed targets and boundaries, effect declarations, LUT interpretation UI,
 HDR metadata warnings, verified output tags, transfer round-trip and +1EV tests,
 byte-identical bypass tests, export-decoded pixel E2E and capability-fallback tests.
+
+## B’4b implementation refinement (supervisor-approved)
+
+Dispatch `ctx_1defbeeaabee` approved a runtime VideoFrame transfer probe and an
+explicit browser SDR approximation for DOM video, rather than adding a new raw
+YUV decoder to this batch. A known BT.709 RGB patch is uploaded on each new GL
+context: preserved code values select the BT.709 inverse transfer; normalized
+sRGB values select the sRGB inverse; unrecognized results explicitly assume
+sRGB and surface an approximation warning. Source gamut conversion remains the
+browser's upload operation and is not repeated in the shader. This probe does
+not make every decoder, ICC profile, or HDR format accurate. The audit separates
+raw RGB upload evidence from actual file/decoder evidence.
+
+Canvas2D `colorSpace: "srgb"` alone is not proof of source transfer normalization:
+the measured Chromium path preserves BT.709 RGB codes even when drawing into that
+canvas. DOM video is therefore labeled as browser SDR approximation in a
+persistent dismissible StateHint and in completed export results. A new raw YUV
+fallback path is deferred to a separately scoped batch (potentially B’6).
+
+For SRGB8_ALPHA8 attachments, WebGL performs storage encoding, sampling decoding
+and destination-linear blending in hardware. Adding another shader encode at
+the storage write would encode twice. The implementation therefore uses the
+attachment's automatic encoding and probes the complete draw/blend/sample path,
+not merely FBO completeness. Unsupported targets fail explicitly; the legacy
+bypass remains available. Eight-bit fallback clips above one and loses shadow
+precision across attenuation/recovery passes; measured bounds are in the audit.
+
+Export converts the final opaque sRGB presentation bytes to BT.709 transfer and
+limited-range BT.709 I420, including an actual 2x2 chroma reduction. Encoder output
+metadata must independently report BT.709/BT.709/BT.709 limited range; missing or
+conflicting metadata rejects the export. The muxer is not relabeled. This SDR
+boundary has 8-bit RGB quantization before YUV conversion, and CPU readback/
+conversion costs are measured separately from GPU playback. Export dimensions
+use device scale one so the frame layout matches the requested preset.
+
+Storage no longer clips the linear signal between passes (including negative
+white-balance/grain/sharpen results). Operations with intrinsic bounded domains,
+such as LUT domains, levels, color dodge/burn and hue/saturation gamut projection,
+retain their mathematical bounds; those are artistic operations, not target
+precision clamps. The outer backdrop clamp is removed in the managed variant so
+ordinary extended-range overlay/difference results are not clipped by storage.
+
+The DOM-video approximation uses the direct WebGL upload, preserving that browser
+path's existing sample handling. An extra Canvas2D copy does not fix the measured
+transfer ambiguity and is therefore not paid on each fallback video frame.
+Export conversion uses a dedicated worker with exactly two transferable RGBA/I420
+slots; frame N conversion overlaps frame N+1 rendering and the encoder consumes
+in order. Worker absence has a synchronous color-correct fallback. Abort, worker
+failure and timeout reject pending work and release resources rather than
+silently encoding missing or reordered frames.
+
+The migration notice is once per project in local storage when populated clips
+may be affected (visual effects, blends, images with possible alpha, transforms
+or resampling). The compatibility guarantee is about the legacy render bytes;
+BT.709 export deliberately changes the representation and tags at the output
+boundary. A no-effect opaque-black performance fixture avoids a content/entropy
+change across that boundary; its decoded plane hash and file size are compared
+between exporters rather than requiring a lossy codec to reproduce ideal black
+without quantization error.

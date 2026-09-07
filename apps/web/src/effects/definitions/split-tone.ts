@@ -15,6 +15,7 @@ export const splitTone: EffectDefinition = {
   type: "split-tone",
   name: "Split tone",
   keywords: ["teal orange", "shadows", "highlights", "grade", "tone"],
+  workingSpace: "encoded",
   category: "color",
   params: [
     { kind: "color", key: "shadowColor", label: "Shadows", default: "#1e3a5f" },

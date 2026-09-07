@@ -17,7 +17,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 | Frame-aware scrub and playback | ✅ | ✅ | ✅ | ✅ |
 | Keyframed transforms/effects/speed | ✅ | ✅ | ✅ | ✅ |
 | Pitch-preserving speed changes | ✅ | ✅ | ✅ | ✅ |
-| Color scopes, grading, 1D/3D LUTs | 🟡 | 🟡 | ✅ | 🟡 SDR scopes verified; color management pending |
+| Color scopes, grading, 1D/3D LUTs | 🟡 | 🟡 | ✅ | 🟡 Linear SDR grading/scopes and selectable LUT space verified; DOM SDR approximation, no HDR |
 | Multicam program editing | ❌ | ❌ | ✅ | ✅ ⭐ |
 
 ## Effects and graphics

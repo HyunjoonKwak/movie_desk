@@ -1,11 +1,11 @@
 "use client";
 
-import { captureScopes } from "@/scopes/frames";
 import { Compositor } from "@/renderer/compositor";
+import { captureScopes } from "@/scopes/frames";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { selectPlayhead, useProjectStore } from "@/stores/project-store";
-import type { ID } from "@movie-desk/core";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { type ID, clipTransform, isMediaClip } from "@movie-desk/core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for
 // console-driven render benchmarks.
 import "@/renderer/bench";
@@ -28,6 +28,59 @@ export function PreviewViewport() {
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
   const t = useT();
 
+  const [migrationProject, setMigrationProject] = useState<string | null>(null);
+  const [colorNotice, setColorNotice] = useState<string | null>(null);
+  useEffect(() => {
+    const warning = (event: Event) => {
+      const { code, name } = (event as CustomEvent<{ code: string; name: string }>).detail;
+      setColorNotice(t(`color.${code}`, { name }));
+    };
+    window.addEventListener("color-processing-warning", warning);
+    return () => window.removeEventListener("color-processing-warning", warning);
+  }, [t]);
+  useEffect(() => {
+    const key = `cut.linear-color-notice.${project.id}`;
+    const clips = project.timeline.tracks.flatMap((track) => track.clips);
+    if (
+      !clips.some((clip) => {
+        const transform = clipTransform(clip);
+        const asset = isMediaClip(clip)
+          ? project.mediaLibrary.find((asset) => asset.id === clip.assetId)
+          : undefined;
+        return (
+          clip.effects.some((fx) => fx.enabled && !fx.type.startsWith("audio-")) ||
+          !!clip.mask ||
+          transform.opacity !== 1 ||
+          transform.scale !== 1 ||
+          transform.rotation !== 0 ||
+          transform.x !== 0 ||
+          transform.y !== 0 ||
+          (isMediaClip(clip) && !!clip.fit && clip.fit !== "stretch") ||
+          !!asset?.rotation ||
+          asset?.kind === "image" ||
+          (!!asset &&
+            (asset.width !== project.resolution.w || asset.height !== project.resolution.h))
+        );
+      }) &&
+      clips.length < 2
+    )
+      return;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+      setMigrationProject(project.id);
+    } catch {
+      /* Storage can be unavailable in private browsing. */
+    }
+  }, [
+    project.id,
+    project.timeline.tracks,
+    project.mediaLibrary,
+    project.resolution.w,
+    project.resolution.h,
+  ]);
+
+  const [contextGeneration, setContextGeneration] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const compositorRef = useRef<Compositor | null>(null);
   const disposePendingRef = useRef<Compositor | null>(null);
@@ -77,7 +130,8 @@ export function PreviewViewport() {
     return () => window.removeEventListener("scopes-redraw", drawLatest);
   }, [drawLatest]);
 
-  // Lazily create the compositor once the canvas mounts.
+  // Lazily create the compositor, repeating capability probes after restoration.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: contextGeneration intentionally recreates invalidated GPU resources.
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -93,13 +147,28 @@ export function PreviewViewport() {
     const compositor = compositorRef.current;
     compositor.setPlayheadGetter(() => useProjectStore.getState().project.timeline.playhead);
 
+    const lost = (event: Event) => {
+      event.preventDefault();
+      compositor.invalidate();
+      compositorRef.current = null;
+      redrawPendingRef.current = false;
+      if (renderingRef.current) disposePendingRef.current = compositor;
+      else compositor.dispose();
+    };
+    const restored = () => setContextGeneration((value) => value + 1);
+    canvas.addEventListener("webglcontextlost", lost);
+    canvas.addEventListener("webglcontextrestored", restored);
     const ro = new ResizeObserver(() => {
+      if (compositorRef.current !== compositor) return;
       const rect = canvas.getBoundingClientRect();
       compositor.resize(rect.width, rect.height);
     });
     ro.observe(canvas);
+    drawLatest();
     return () => {
       ro.disconnect();
+      canvas.removeEventListener("webglcontextlost", lost);
+      canvas.removeEventListener("webglcontextrestored", restored);
       if (compositorRef.current !== compositor) return;
       compositorRef.current = null;
       redrawPendingRef.current = false;
@@ -108,7 +177,7 @@ export function PreviewViewport() {
       if (renderingRef.current) disposePendingRef.current = compositor;
       else compositor.dispose();
     };
-  }, []);
+  }, [contextGeneration, drawLatest]);
 
   // A single wall-clock loop owns playback. It deliberately does not depend on
   // `project`/`playhead`: those change every tick and used to recreate the loop,
@@ -167,6 +236,26 @@ export function PreviewViewport() {
         <RegionOverlay />
         <GuidesOverlay />
         <MissingMediaNotice />
+        {(colorNotice || migrationProject === project.id) && (
+          <div className="absolute inset-x-0 bottom-0 space-y-2 bg-black/90 p-2">
+            {migrationProject === project.id && (
+              <StateHint
+                testId="color-migration-hint"
+                tone="info"
+                text={t("color.migration")}
+                dismiss={{ label: t("state.dismiss"), onClick: () => setMigrationProject(null) }}
+              />
+            )}
+            {colorNotice && (
+              <StateHint
+                testId="color-processing-hint"
+                tone="warning"
+                text={colorNotice}
+                dismiss={{ label: t("state.dismiss"), onClick: () => setColorNotice(null) }}
+              />
+            )}
+          </div>
+        )}
         {!project.timeline.tracks.some((track) => track.clips.length > 0) && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
             <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />

@@ -1,5 +1,5 @@
 import type { GL } from "./gl";
-import { createTexture } from "./gl";
+import { type TargetFormat, allocateTarget } from "./gl";
 
 interface Target {
   fbo: WebGLFramebuffer;
@@ -14,7 +14,10 @@ export class PingPong {
   private width = 0;
   private height = 0;
 
-  constructor(private readonly gl: GL) {}
+  constructor(
+    private readonly gl: GL,
+    private readonly format?: TargetFormat,
+  ) {}
 
   resize(w: number, h: number) {
     if (w === this.width && h === this.height && this.a && this.b) return;
@@ -26,19 +29,7 @@ export class PingPong {
   }
 
   private allocTarget(w: number, h: number): Target {
-    const gl = this.gl;
-    const tex = createTexture(gl);
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    const fbo = gl.createFramebuffer();
-    if (!fbo) throw new Error("createFramebuffer failed");
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
-      throw new Error("FBO incomplete");
-    }
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    return { fbo, tex };
+    return allocateTarget(this.gl, w, h, this.format);
   }
 
   // Returns [src, dst] for the next pass, then call .swap()

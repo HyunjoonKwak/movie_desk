@@ -1,0 +1,641 @@
+{
+  "bypass": {
+    "channels": 147456,
+    "mismatches": 0
+  },
+  "realFixture": {
+    "channels": 230400,
+    "mismatches": 0
+  },
+  "precision": "half-float",
+  "linearGain": 1.999868621979911,
+  "blend": {
+    "float": 188,
+    "srgb8": 188
+  },
+  "fallbackExposure": 162,
+  "highlightsRoundTrip180": 180,
+  "precisionRamp": {
+    "float": {
+      "uniqueCodes": 256,
+      "maxError": 0
+    },
+    "srgb8": {
+      "uniqueCodes": 100,
+      "maxError": 4
+    }
+  },
+  "lutRows": [
+    {
+      "colorSpace": "srgb",
+      "code118": 30
+    },
+    {
+      "colorSpace": "bt709",
+      "code118": 42
+    },
+    {
+      "colorSpace": "linear",
+      "code118": 60
+    }
+  ],
+  "performanceRows": [
+    {
+      "name": "legacy",
+      "width": 1920,
+      "height": 1080,
+      "samples": 60,
+      "p50Ms": 2.699999988079071,
+      "p95Ms": 18.80000001192093,
+      "meanMs": 3.8899999996026358
+    },
+    {
+      "name": "managed",
+      "width": 1920,
+      "height": 1080,
+      "samples": 60,
+      "p50Ms": 3,
+      "p95Ms": 80.80000001192093,
+      "meanMs": 13.63666666696469
+    }
+  ],
+  "playbackRows": [
+    {
+      "name": "legacy",
+      "width": 1920,
+      "height": 1080,
+      "intervalMs": {
+        "count": 119,
+        "p50": 16.69999999999891,
+        "p95": 18.600000000000364,
+        "max": 33.30000000000018
+      },
+      "submissionMs": {
+        "count": 119,
+        "p50": 2,
+        "p95": 2.300000011920929,
+        "max": 2.4000000059604645
+      },
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)"
+    },
+    {
+      "name": "managed",
+      "width": 1920,
+      "height": 1080,
+      "intervalMs": {
+        "count": 119,
+        "p50": 50,
+        "p95": 66.69999999999891,
+        "max": 68.59999999999854
+      },
+      "submissionMs": {
+        "count": 119,
+        "p50": 3.0999999940395355,
+        "p95": 5.5999999940395355,
+        "max": 8.099999994039536
+      },
+      "renderer": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (LLVM 10.0.0) (0x0000C0DE)), SwiftShader driver)"
+    }
+  ],
+  "inputRows": [
+    {
+      "name": "WebCodecs RGB sRGB",
+      "oldRgb": [
+        180,
+        100,
+        60
+      ],
+      "newRgb": [
+        180,
+        100,
+        60
+      ],
+      "expected": [
+        180,
+        100,
+        60
+      ]
+    },
+    {
+      "name": "WebCodecs RGB BT709",
+      "oldRgb": [
+        180,
+        100,
+        60
+      ],
+      "newRgb": [
+        188,
+        114,
+        75
+      ],
+      "expected": [
+        187.6012180823493,
+        113.59672396481972,
+        75.34880989665933
+      ]
+    },
+    {
+      "name": "WebCodecs RGB P3",
+      "oldRgb": [
+        193,
+        95,
+        49
+      ],
+      "newRgb": [
+        193,
+        95,
+        49
+      ],
+      "expected": [
+        193,
+        95,
+        49
+      ]
+    },
+    {
+      "name": "WebCodecs I420 BT709",
+      "oldRgb": [
+        118,
+        118,
+        118
+      ],
+      "newRgb": [
+        131,
+        131,
+        131
+      ],
+      "expected": [
+        130.12245928587183,
+        130.12245928587183,
+        130.12245928587183
+      ]
+    },
+    {
+      "name": "WebCodecs NV12 BT709",
+      "oldRgb": [
+        118,
+        118,
+        118
+      ],
+      "newRgb": [
+        131,
+        131,
+        131
+      ],
+      "expected": [
+        130.12245928587183,
+        130.12245928587183,
+        130.12245928587183
+      ]
+    },
+    {
+      "name": "HTML image sRGB PNG",
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "newRgb": [
+        0,
+        0,
+        0
+      ],
+      "mismatches": 0
+    },
+    {
+      "name": "ImageBitmap sRGB",
+      "oldRgb": [
+        0,
+        0,
+        0
+      ],
+      "newRgb": [
+        0,
+        0,
+        0
+      ],
+      "mismatches": 0
+    }
+  ],
+  "alpha": {
+    "old": 128,
+    "managed": 188
+  },
+  "blur": {
+    "old": 102,
+    "managed": 170
+  },
+  "resize": {
+    "old": 128,
+    "managed": 188
+  },
+  "effects": [
+    {
+      "type": "brightness",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "contrast",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "exposure",
+      "space": "linear",
+      "params": {
+        "stops": 1
+      },
+      "oldGray118": [
+        236,
+        236,
+        236,
+        255
+      ],
+      "newGray118": [
+        162,
+        162,
+        162,
+        255
+      ]
+    },
+    {
+      "type": "saturation",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "hue",
+      "space": "encoded",
+      "params": {
+        "degrees": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "color-wheels",
+      "space": "linear",
+      "params": {
+        "liftR": 0,
+        "liftG": 0,
+        "liftB": 0,
+        "gammaR": 0,
+        "gammaG": 0,
+        "gammaB": 0,
+        "gainR": 0,
+        "gainG": 0,
+        "gainB": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "white-balance",
+      "space": "linear",
+      "params": {
+        "temperature": 0,
+        "tint": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "levels",
+      "space": "encoded",
+      "params": {
+        "black": 0,
+        "white": 1,
+        "gamma": 1
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "vibrance",
+      "space": "encoded",
+      "params": {
+        "amount": 0
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "split-tone",
+      "space": "encoded",
+      "params": {
+        "shadowColor": "#1e3a5f",
+        "highlightColor": "#f5b971",
+        "amount": 0.3,
+        "balance": 0
+      },
+      "oldGray118": [
+        137,
+        128,
+        117,
+        255
+      ],
+      "newGray118": [
+        136,
+        128,
+        117,
+        255
+      ]
+    },
+    {
+      "type": "gaussian-blur",
+      "space": "linear",
+      "params": {
+        "sigma": 4
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "sharpen",
+      "space": "linear",
+      "params": {
+        "amount": 0.5
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "vignette",
+      "space": "linear",
+      "params": {
+        "intensity": 0.5,
+        "softness": 0.5
+      },
+      "oldGray118": [
+        60,
+        60,
+        60,
+        255
+      ],
+      "newGray118": [
+        85,
+        85,
+        85,
+        255
+      ]
+    },
+    {
+      "type": "sepia",
+      "space": "encoded",
+      "params": {
+        "amount": 1
+      },
+      "oldGray118": [
+        159,
+        142,
+        111,
+        255
+      ],
+      "newGray118": [
+        159,
+        142,
+        111,
+        255
+      ]
+    },
+    {
+      "type": "invert",
+      "space": "encoded",
+      "params": {
+        "amount": 1
+      },
+      "oldGray118": [
+        137,
+        137,
+        137,
+        255
+      ],
+      "newGray118": [
+        137,
+        137,
+        137,
+        255
+      ]
+    },
+    {
+      "type": "grain",
+      "space": "linear",
+      "params": {
+        "amount": 0.1
+      },
+      "oldGray118": [
+        110,
+        110,
+        110,
+        255
+      ],
+      "newGray118": [
+        127,
+        127,
+        127,
+        255
+      ]
+    },
+    {
+      "type": "chroma-key",
+      "space": "encoded",
+      "params": {
+        "keyColor": "#00ff00",
+        "similarity": 0.4,
+        "smoothness": 0.1,
+        "spill": 0.5
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    },
+    {
+      "type": "bg-remove",
+      "space": "linear",
+      "params": {
+        "feather": 0.05
+      },
+      "oldGray118": [
+        118,
+        118,
+        118,
+        255
+      ],
+      "newGray118": [
+        118,
+        118,
+        118,
+        255
+      ]
+    }
+  ],
+  "adjustedEffects": [
+    {
+      "type": "white-balance",
+      "params": {
+        "temperature": 0.5,
+        "tint": 0.2
+      },
+      "before": [
+        141,
+        110,
+        103
+      ],
+      "after": [
+        142,
+        108,
+        98
+      ],
+      "expected": [
+        142,
+        108,
+        98
+      ]
+    },
+    {
+      "type": "color-wheels",
+      "params": {
+        "gainR": 0.25,
+        "gainG": 0.25,
+        "gainB": 0.25
+      },
+      "before": [
+        148,
+        148,
+        148
+      ],
+      "after": [
+        131,
+        131,
+        131
+      ],
+      "expected": [
+        131,
+        131,
+        131
+      ]
+    }
+  ]
+}

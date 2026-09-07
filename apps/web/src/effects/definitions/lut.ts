@@ -10,14 +10,34 @@ export const lut: EffectDefinition = {
   type: "lut",
   name: "LUT (.cube)",
   keywords: ["look", "grade", "filter"],
+  workingSpace: "encoded",
   category: "color",
   params: [
-    { kind: "number", key: "intensity", label: "Intensity", min: 0, max: 1, step: 0.01, default: 1 },
+    {
+      kind: "enum",
+      key: "colorSpace",
+      label: "LUT input / output space",
+      default: "srgb",
+      options: [
+        { value: "srgb", label: "sRGB (assumed unless specified)" },
+        { value: "bt709", label: "BT.709 encoded" },
+        { value: "linear", label: "Linear Rec.709" },
+      ],
+    },
+    {
+      kind: "number",
+      key: "intensity",
+      label: "Intensity",
+      min: 0,
+      max: 1,
+      step: 0.01,
+      default: 1,
+    },
     {
       kind: "enum",
       key: "lutId",
       label: "LUT",
-      options: [],            // populated dynamically by the UI
+      options: [], // populated dynamically by the UI
       default: "",
     },
   ],

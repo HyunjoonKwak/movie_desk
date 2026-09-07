@@ -1,18 +1,18 @@
 "use client";
 
-import { useRef } from "react";
-import { GripVertical, Plus, Trash2, Upload } from "lucide-react";
-import { toast } from "sonner";
-import type { Clip, ID } from "@movie-desk/core";
-import { newId } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
 import { InspectorSection } from "@/components/inspector-section";
-import { listEffects } from "@/effects/registry";
-import { useT, type Translate } from "@/i18n/use-t";
-import type { MessageKey } from "@/i18n/messages";
-import type { EffectDefinition } from "@/effects/types";
 import { useLutStore } from "@/effects/lut/lut-store";
 import { parseCube } from "@/effects/lut/parse-cube";
+import { listEffects } from "@/effects/registry";
+import type { EffectDefinition } from "@/effects/types";
+import type { MessageKey } from "@/i18n/messages";
+import { type Translate, useT } from "@/i18n/use-t";
+import { useProjectStore } from "@/stores/project-store";
+import type { Clip, ID } from "@movie-desk/core";
+import { newId } from "@movie-desk/core";
+import { GripVertical, Plus, Trash2, Upload } from "lucide-react";
+import { useRef } from "react";
+import { toast } from "sonner";
 
 interface Props {
   clipId: ID;
@@ -27,6 +27,7 @@ const EFFECT_NAME_KEY: Record<string, MessageKey> = {
 };
 
 const PARAM_LABEL_KEY: Record<string, MessageKey> = {
+  "lut.colorSpace": "color.lut.space",
   "brightness.amount": "effects.brightness.amount",
   "gaussian-blur.sigma": "effects.gaussianBlur.sigma",
   "vignette.intensity": "effects.vignette.intensity",
@@ -128,7 +129,8 @@ const groupByCategory = (defs: readonly EffectDefinition[]) => {
     grouped.set(d.category, list);
   }
   const sorted: { category: string; items: EffectDefinition[] }[] = [];
-  for (const cat of order) if (grouped.has(cat)) sorted.push({ category: cat, items: grouped.get(cat)! });
+  for (const cat of order)
+    if (grouped.has(cat)) sorted.push({ category: cat, items: grouped.get(cat)! });
   for (const [cat, items] of grouped) {
     if (!order.includes(cat)) sorted.push({ category: cat, items });
   }
@@ -242,6 +244,7 @@ export function EffectsSection({ clipId, effects }: Props) {
                           min={p.min}
                           max={p.max}
                           step={p.step}
+                          aria-label={paramLabel(t, def.type, p)}
                           value={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, Number(e.target.value))}
                           className="mt-1 w-full accent-accent"
@@ -253,9 +256,12 @@ export function EffectsSection({ clipId, effects }: Props) {
                     const v = String(fx.params[p.key] ?? p.default);
                     return (
                       <div key={p.key} className="flex items-center gap-2">
-                        <span className="flex-1 text-2xs text-ink-3">{p.label}</span>
+                        <span className="flex-1 text-2xs text-ink-3">
+                          {paramLabel(t, def.type, p)}
+                        </span>
                         <input
                           type="color"
+                          aria-label={paramLabel(t, def.type, p)}
                           value={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, e.target.value)}
                           className="h-6 w-10 cursor-pointer rounded border border-white/5 bg-transparent"
@@ -290,15 +296,20 @@ export function EffectsSection({ clipId, effects }: Props) {
                     const v = String(fx.params[p.key] ?? p.default);
                     return (
                       <div key={p.key} className="flex items-center gap-2">
-                        <span className="flex-1 text-2xs text-ink-3">{p.label}</span>
+                        <span className="flex-1 text-2xs text-ink-3">
+                          {paramLabel(t, def.type, p)}
+                        </span>
                         <select
+                          aria-label={paramLabel(t, def.type, p)}
                           value={v}
                           onChange={(e) => setParam(clipId, fx.id, p.key, e.target.value)}
                           className="rounded bg-white/5 px-2 py-1 text-xs text-ink-1 outline-none"
                         >
                           {p.options.map((o) => (
                             <option key={o.value} value={o.value} className="bg-panel-2">
-                              {o.label}
+                              {def.type === "lut" && p.key === "colorSpace"
+                                ? t(`color.lut.${o.value}` as MessageKey)
+                                : o.label}
                             </option>
                           ))}
                         </select>

@@ -4,6 +4,7 @@ export const gaussianBlur: EffectDefinition = {
   type: "gaussian-blur",
   name: "Gaussian Blur",
   keywords: ["blur", "soft"],
+  workingSpace: "linear",
   category: "blur",
   params: [
     {

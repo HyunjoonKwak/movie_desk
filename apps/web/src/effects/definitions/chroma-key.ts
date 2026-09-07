@@ -6,6 +6,7 @@ export const chromaKey: EffectDefinition = {
   type: "chroma-key",
   name: "Chroma key",
   keywords: ["green screen", "blue screen", "key", "transparency"],
+  workingSpace: "encoded",
   category: "stylize",
   params: [
     { kind: "color", key: "keyColor", label: "Key color", default: "#00ff00" },
