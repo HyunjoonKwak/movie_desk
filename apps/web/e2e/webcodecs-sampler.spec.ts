@@ -52,10 +52,11 @@ test("analysis decodes an MP4 through a real VideoDecoder", async ({ page }) => 
   const fixtureDir = path.join(test.info().project.testDir, "fixtures");
 
   await page.goto("/editor");
+  // Analysis starts in the background on import, not on opening Auto edit.
+  const before = await readDecoderStats(page);
   await importMediaFiles(page, path.join(fixtureDir, FIXTURE));
   await expect(page.getByText(FIXTURE, { exact: true })).toBeVisible();
 
-  const before = await readDecoderStats(page);
   await page.getByRole("button", { name: "Auto edit" }).click();
   await expect(page.getByText("1/1", { exact: true })).toBeVisible({ timeout: 90_000 });
 
