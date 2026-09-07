@@ -854,3 +854,24 @@ CRDT catch에서 null로 삼키면 안 된다는 경고를 남겼다. 기존 호
 core161·web721·desktop72·scripts11(**965**), E2E **66/66**(186.5초, retry0), OSV167 취약점0이다.
 [항목별 결과 및 잔여 사항](evaluations/2026-09-07-b5-phase0-round2-report.md),
 [최종 gate](evaluations/2026-09-07-b5-phase0-round2-gate.md). 통합 리뷰가 남는다.
+
+### 2026-09-07 main CI 색 복구 검증 구조 수정 — Codex 구현, Claude 감독·리뷰
+
+`origin/main 8f028cf` 기준 `codex/ci-color-verify`: 색 복구 E2E에서 별도 Node/GPU
+감사 스크립트 호출과 두 번째 브라우저를 제거했다. 기존 감사는 무조건 float 읽기와
+하이라이트 보존을 요구하므로 SRGB8도 정상인 CI 복구 검증과 계약이 달랐다.
+원래 CI의 `Command failed`만으로 특정 GPU 프로브 실패를 확정할 수는 없으며,
+원인 후보와 검증 구조의 확정된 문제를 [보고서](evaluations/2026-09-07-ci-color-verify.md)에 구분했다.
+
+기존 페이지의 실제 색 효과 픽셀·새 타깃 할당·컨텍스트 복구·경고를 전후 확인한다.
+자연 정밀도 경로는 half-float/SRGB8 모두 허용하고, 강제 SRGB8 경로는 실제
+감소 정밀도 안내와 복구 후 재보고를 단언한다. 소스 SDR 근사 안내 계약도 유지하며,
+실패 시 브라우저 오류·타깃 상태를 CI 로그와 JSON attachment에 남긴다.
+제품 코드·skip·retry 설정은 변경하지 않았다. 감사 스크립트는 float GPU용 수동 도구로 유지한다.
+
+최종 gate **9/9 PASS**, core161·web725·desktop72·scripts11(**969**),
+OSV167 취약점0, lint·tsc·build PASS. 전체 E2E **68/68 × 3회 연속 PASS**(retry0),
+32119 매회 lsof 확인. 브라우저 단계 **235.6초 → 160.6·162.3·161.3초**,
+기존 복구 테스트 **35.1초 → 두 경로 합계 2.7~2.8초**이다. 최초 SRGB8 픽셀의
+1코드 양자화 단언 실패도 보고서와 로그에 보존했다. Claude 리뷰와 후속 Linux CI는 남는다.
+[전체 gate](evaluations/2026-09-07-ci-color-verify-gate.md).
