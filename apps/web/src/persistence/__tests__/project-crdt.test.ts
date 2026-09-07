@@ -1,12 +1,15 @@
 import {
+  NestedTimelineError,
+  hydrateProjectTimelines,
   type ID,
   type MediaClip,
   type Project,
   type Track,
   createEmptyProject,
 } from "@movie-desk/core";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
+import * as projectIO from "../project-io";
 import { createProjectCrdt } from "../project-crdt";
 
 const asId = (value: string): ID => value as ID;
@@ -53,6 +56,25 @@ const exchangeConcurrentUpdates = (
 };
 
 describe("project CRDT", () => {
+  it("rethrows nested hydration failures instead of treating the document as absent", () => {
+    const base = createEmptyProject();
+    const doc = new Y.Doc();
+    const crdt = createProjectCrdt(doc);
+    crdt.write(base);
+    const stored = Y.encodeStateAsUpdate(doc);
+    // Exercise the real core guard at the future nested parser boundary.
+    const parser = vi
+      .spyOn(projectIO, "parseStoredProject")
+      .mockImplementationOnce(() => hydrateProjectTimelines(base));
+    try {
+      expect(() => crdt.read(base.id, base.timeline)).toThrow(NestedTimelineError);
+      expect(Y.encodeStateAsUpdate(doc)).toEqual(stored);
+    } finally {
+      parser.mockRestore();
+      doc.destroy();
+    }
+  });
+
   it("merges concurrent track additions and independent project fields", () => {
     const base = createEmptyProject();
     const leftDoc = new Y.Doc();

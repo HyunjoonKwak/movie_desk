@@ -1,5 +1,5 @@
 import { parseStoredProject } from "@/persistence/project-io";
-import { toLegacyProject, syncRootTimeline } from "@movie-desk/core";
+import { NestedTimelineError, toLegacyProject, syncRootTimeline } from "@movie-desk/core";
 import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
 import type * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
@@ -173,11 +173,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       // TypeScript types at runtime. Reuse the persistence boundary schema
       // before any stored state reaches the renderer or project store.
       return parseStoredProject(candidate);
-    } catch {
-      // Phase 0 candidate is strictly v1: nested hydration cannot fail here.
-      // Phase 1 MUST rethrow typed nested-validation/hydration failures instead
-      // of returning null: live-doc treats null as absent and flushes the store,
-      // which would overwrite the invalid stored document before recovery.
+    } catch (err) {
+      // Nested failures must stop hydration before live-doc can flush over them.
+      if (err instanceof NestedTimelineError) throw err;
       return null;
     }
   };

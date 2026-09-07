@@ -61,11 +61,15 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
     const fresh = createEmptyProject({ name: t("project.untitled") });
     recordNewFunnelProject(fresh.id);
     loadProject(fresh);
-    await upsertProject(fresh);
-    await setActiveProjectId(fresh.id);
-    setOpen(false);
-    onNewProject?.(fresh.id);
-    toast.success(t("project.created"));
+    try {
+      await upsertProject(fresh);
+      await setActiveProjectId(fresh.id);
+      setOpen(false);
+      onNewProject?.(fresh.id);
+      toast.success(t("project.created"));
+    } catch {
+      toast.error(t("project.saveFailed"));
+    }
   };
 
   const onOpen = async (id: string) => {

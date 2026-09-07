@@ -5,13 +5,18 @@ import { useProjectStore } from "@/stores/project-store";
 import { upsertProject } from "./project-library";
 import { useSaveStateStore } from "./save-state-store";
 
+let latestWrite = 0;
+
 // Both the debounce and cleanup flush handle failures, and later edits retry.
 export const startLibraryAutosave = (): (() => void) => {
   const persist = async (project: Project): Promise<void> => {
+    const write = ++latestWrite;
     try {
       await upsertProject(project);
+      if (write !== latestWrite) return;
       useSaveStateStore.getState().setLibraryError(false);
     } catch {
+      if (write !== latestWrite) return;
       useSaveStateStore.getState().setLibraryError(true);
       toast.error(t("project.saveFailed"), { id: "library-save-failed" });
     }

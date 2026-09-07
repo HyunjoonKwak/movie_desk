@@ -18,11 +18,15 @@ export const useSaveStateStore = create<SaveStore>((set) => ({
   lastSavedAt: null,
   libraryError: false,
   setLibraryError: (failed) =>
-    set((current) => ({
-      libraryError: failed,
-      state: failed ? "error" : "saved",
-      lastSavedAt: failed ? current.lastSavedAt : Date.now(),
-    })),
+    set((current) =>
+      current.libraryError === failed
+        ? current
+        : {
+            libraryError: failed,
+            state: failed ? "error" : "saved",
+            lastSavedAt: failed ? current.lastSavedAt : Date.now(),
+          },
+    ),
   setState: (state) => set((current) => ({ state: current.libraryError ? "error" : state })),
   markSaved: () =>
     set((current) => ({

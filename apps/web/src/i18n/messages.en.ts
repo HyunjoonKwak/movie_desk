@@ -956,5 +956,5 @@ export const en = {
     "color.lutUnsupported": "This LUT uses an unsupported color space. Choose sRGB, BT.709 encoded or linear Rec.709.",
     "color.encoderMismatch": "The encoder reported a color space other than limited-range BT.709. Export stopped during color verification.",
     "topbar.saveFailed": "Save failed",
-    "project.saveFailed": "Autosave failed and your changes are not yet saved. Edit again to retry, or export a project copy before closing.",
+    "project.saveFailed": "Could not save to the project library. Edit again to retry, or export a project copy before closing.",
 } as const;

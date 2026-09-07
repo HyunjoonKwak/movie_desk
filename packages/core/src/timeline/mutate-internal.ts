@@ -31,7 +31,9 @@ export const replaceTrack = (
 
 // A replacement carries its target through composition; plain legacy edits
 // still default to the root until their call sites migrate in Phase 1.
-export const recompute = (input: Project | TrackReplacement, explicit?: Timeline): Project => {
+export function recompute(input: TrackReplacement): Project;
+export function recompute(input: Project, explicit?: Timeline): Project;
+export function recompute(input: Project | TrackReplacement, explicit?: Timeline): Project {
   const project = "project" in input ? input.project : input;
   const timeline =
     "project" in input ? findTimeline(project, input.timelineId) : (explicit ?? project.timeline);
@@ -40,7 +42,7 @@ export const recompute = (input: Project | TrackReplacement, explicit?: Timeline
     { ...project, updatedAt: Date.now() },
     { ...timeline, duration: computeDuration(timeline) },
   );
-};
+}
 
 // Returns a copy of `o` with key `k` stripped. Required by
 // `exactOptionalPropertyTypes` so callers don't assign `undefined`.

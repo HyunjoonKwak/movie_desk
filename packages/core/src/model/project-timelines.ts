@@ -9,10 +9,17 @@ export type LegacyProject = Omit<Project, "timelines" | "rootTimelineId" | "time
 /** Stable across JSON/CRDT reloads while the project ID stays unchanged. */
 export const rootTimelineIdForProject = (projectId: ID): ID => `${projectId}:root` as ID;
 
+export class NestedTimelineError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NestedTimelineError";
+  }
+}
+
 /** Load only the v1 shape. Never silently discard future nested persistence data. */
 export const hydrateProjectTimelines = (input: LegacyProject): Project => {
   if ("timelines" in input || "rootTimelineId" in input)
-    throw new Error("Nested timeline persistence is not supported yet");
+    throw new NestedTimelineError("Nested timeline persistence is not supported yet");
   const timeline: Timeline = {
     ...input.timeline,
     id: input.timeline.id ?? rootTimelineIdForProject(input.id),
@@ -46,10 +53,13 @@ export const syncRootTimeline = (project: Project): Project => {
 
 /** Keep v1 writes lossless; Phase 1 + 7 will replace this boundary atomically. */
 export const toLegacyProject = (project: Project): LegacyProject => {
-  if (project.timelines.length !== 1)
-    throw new Error("Cannot persist nested timelines in v1");
-  const { timelines: _timelines, rootTimelineId: _root, timeline, ...rest } =
-    syncRootTimeline(project);
+  if (project.timelines.length !== 1) throw new Error("Cannot persist nested timelines in v1");
+  const {
+    timelines: _timelines,
+    rootTimelineId: _root,
+    timeline,
+    ...rest
+  } = syncRootTimeline(project);
   const { id: _id, ...legacyTimeline } = timeline;
   return { ...rest, timeline: legacyTimeline };
 };

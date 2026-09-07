@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, Cloud, Download, Film, Loader2, Redo2, Undo2 } from "lucide-react";
+import { AlertTriangle, Check, Cloud, Download, Film, Loader2, Redo2, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
 import { useSaveStateStore } from "@/persistence/save-state-store";
@@ -177,11 +177,18 @@ function SaveBadge({ state, lastSavedAt }: { state: string; lastSavedAt: number 
         : state === "saved" && lastSavedAt
           ? `${t("topbar.saved")} • ${timeAgo(lastSavedAt, t)}`
           : t("topbar.localFirst");
-  const Icon = state === "saving" ? Loader2 : state === "saved" ? Check : Cloud;
+  const Icon =
+    state === "error"
+      ? AlertTriangle
+      : state === "saving"
+        ? Loader2
+        : state === "saved"
+          ? Check
+          : Cloud;
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-3xs ${state === "error" ? "border-drop/25 bg-drop/[0.06] text-drop" : "border-ok/25 bg-ok/[0.06] text-ok"}`}
-      title={state}
+      title={label}
     >
       <Icon className={state === "saving" ? "size-3 animate-spin" : "size-3"} />
       {label}

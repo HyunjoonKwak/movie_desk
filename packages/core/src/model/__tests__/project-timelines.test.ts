@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  NestedTimelineError,
   addClip,
   addMarker,
   createEmptyProject,
@@ -73,6 +74,10 @@ describe("Phase 0 timeline model", () => {
     assertRoot(replaced.project);
     expect(replaced.project.timeline).toBe(project.timeline);
     expect(findTimeline(replaced.project, child.id)?.tracks[0]).toBe(track);
+    void (() => {
+      // @ts-expect-error A composed replacement already owns its timeline target.
+      recompute(replaced, project.timeline);
+    });
     const next = recompute(replaced);
     assertRoot(next);
     expect(next.timeline).toBe(project.timeline);
@@ -167,10 +172,12 @@ describe("Phase 0 timeline model", () => {
     expect(reloaded.rootTimelineId).toBe(project.rootTimelineId);
     expect(reloaded).toEqual(project);
     expect(project.timeline.duration).toBe(777); // no recompute on load
-    expect(() => hydrateProjectTimelines({ ...legacy, timelines: [] } as typeof legacy)).toThrow();
+    expect(() => hydrateProjectTimelines({ ...legacy, timelines: [] } as typeof legacy)).toThrow(
+      NestedTimelineError,
+    );
     expect(() =>
       hydrateProjectTimelines({ ...legacy, rootTimelineId: "missing" } as typeof legacy),
-    ).toThrow();
+    ).toThrow(NestedTimelineError);
     expect(() => syncRootTimeline({ ...project, rootTimelineId: newId() })).toThrow();
   });
 });
