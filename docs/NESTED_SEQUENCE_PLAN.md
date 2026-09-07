@@ -8,6 +8,86 @@ README의 "2~3일 MVP" 견적을 코드 조사로 재검증한 결과다. **그 
 
 ---
 
+## 2026-09-07 재검증 — 견적이 더 커졌다
+
+이 계획은 2026-07-30 코드 기준이다. 그 뒤 B'3 오디오 버스와 B'4 컬러 관리가 렌더러와
+core를 크게 바꿨으므로, B'5 착수 전에 전 항목을 현재 main(`cd8b653`)으로 다시 확인했다.
+**결론: 세 장애물은 모두 그대로이고, Phase 0과 Phase 3의 비용은 오히려 올라갔다.**
+
+### 결합도는 30~40% 늘었다
+
+| 대상 | 2026-07-30 | 2026-09-07 |
+| --- | --- | --- |
+| `apps/web/src` | 119개 / 39파일 | **157개 / 51파일** |
+| `packages/core/src` | 57개 / 9파일 | **82개 / 14파일** |
+
+Phase 0의 수정 표면은 176개가 아니라 **239개**다(비테스트 기준).
+세는 방법: `grep -rno 'project\.timeline\|timeline\.tracks' <경로> --include='*.ts' --include='*.tsx' | grep -v '__tests__'`.
+가장 무거운 곳은 `timeline/mutate-edit.ts`(25) · `mutate-core.ts`(19) ·
+`hooks/use-keyboard-shortcuts.ts`(17) · `stores/project-store.ts`(12) · `autoedit/apply.ts`(11) ·
+`timeline/multicam.ts`(7) · `preview/use-audio-playback.ts`(7) · `preview/audio-engine.ts`(7).
+계획 작성 시 없던 신규 결합으로 `audio-routing/edits.ts`(5)와 `routing.ts`(1)가 생겼고,
+`routing.ts:30`은 solo를 단일 타임라인 전제로 계산한다.
+항목 4의 `mutate-internal.ts` 공통 관문은 유효하나 같은 파일의 `replaceTrack`도
+두 번째 관문이다 — 원안이 놓쳤다.
+
+### Phase 3(컴포지터 재진입)에 장애물 세 개가 추가됐다
+
+원안의 PingPong 단일 인스턴스·managed 키잉·`canBypass` 문제는 그대로이고, 그 위에:
+
+- **ScratchPool이 전역 무효화한다.** `scratch-pool.ts`의 `ensureSize()`가 모든 슬롯을
+  `drawingBuffer` 크기에 묶고 불일치 시 전부 `dispose()`한다. 자식 렌더가 다른 해상도로
+  들어오면 aliasing이 아니라 **부모가 사용 중인 텍스처의 해제**가 일어난다.
+- **managed 승격이 프레임 중간에 일어난다.** `compositor.ts`의 `uploadVisualSource`가 알파
+  소스를 만나면 managed로 올리고 씬 FBO를 불투명 검정으로 다시 clear한다. 자식 렌더 중
+  발생하면 부모의 중간 합성 결과가 지워진다.
+- **`sourceTargets`가 해상도 키 in-place 슬롯이다.** 코드 주석이 전제를 명시한다 —
+  "각 `uploadVisualSource` 결과를 다음 업로드 전에 소비한다". 재귀는 이 전제를 정면으로 깬다.
+
+또한 `bt709-pipeline.ts`의 export 캡처가 바인딩된 FBO에서 `readPixels`를 하므로,
+자식 렌더가 바인딩을 복원하지 않으면 내보내기가 잘못된 버퍼를 캡처한다.
+바이트 예산(`target-budget.ts`)은 **한 프레임 워킹셋 기준**이라 중첩 시 상호 축출이 일어난다.
+풀링이 생겼다고 재귀가 쉬워지지는 않았다 — 키가 `(index)`뿐이라
+`(depth, size)` 키로 바꾸는 것은 파라미터화가 아니라 재작성이다.
+
+### 영속화에 신규 위험이 생겼다
+
+"zod와 CRDT를 같은 커밋에" 철칙은 유효하고 오히려 강해졌다. `project-crdt.ts`의 `candidate`
+리터럴은 여전히 프로젝트를 손으로 재조립하므로 `timelines`가 빠지면 무조건 소실된다.
+
+**신규 위험:** B'4b가 넣은 `project-export.ts`의 `.catch(undefined)` 복구(무효 블록을 버리고
+프로젝트를 여는 동작)를 중첩 스키마에 그대로 쓰면, `live-doc.ts`가 로드 직후 문서에
+되쓰므로 **서브 시퀀스가 즉시·불가역적으로 삭제된다**. 원안의 "read()가 못 내보내면 throw"
+규칙을 **"`timelines` 필드에 `.catch()` 금지"까지 확장**해야 한다.
+반대로 `collections`는 미지 kind를 관대하게 통과시키는 유니온이라 클립 유니온의 닫힌 정책과
+상반된다 — Phase 1이 어느 쪽을 따를지 명시해야 한다.
+
+### 사이클 방어는 여전히 0건
+
+전수 검색 결과 방문 집합·깊이 캡·그래프가 하나도 없다. 오디오 버스의 미지 id 폴백은
+"막지 말고 죽지 않게"라는 철학적 선례일 뿐 깊이-1 조회라 재사용할 코드가 아니다.
+
+### Phase별 판정과 수정된 순위
+
+| Phase | 판정 |
+| --- | --- |
+| 0 모델 기반 | **재작성** — 범위 +30~40%, `replaceTrack` 관문 누락, audio-routing이 신규 소비자 |
+| 1 클립 kind + 영속성 | 유효 — collections의 관대 정책과의 충돌만 명시 |
+| 2 사이클 방어 | 유효, 변경 없음 |
+| 3 컴포지터 재진입 | **재작성, 비용 상승** — 위 세 장애물 + FBO 바인딩 복원 |
+| 4 재귀 렌더링 | 소폭 재작성 — retain 확장 대상이 늘었다 |
+| 5 오디오 | **순서 전제 파손** — 믹서가 생성자에서 클립을 평탄화하고 라우팅을 확정하므로, "서브 시퀀스 내부 트랙이 부모 버스로 접히는가"라는 시맨틱을 **Phase 0보다 먼저** 정해야 한다 |
+| 6 편집 시맨틱 + UI | 유효 |
+| 7 영속화 스키마 | 유효 — 되쓰기 위험 추가 |
+
+**노력 순위(큰 것부터): 3 → 0 → 7+1(원자적 단일 커밋) → 5 → 6 → 2 → 4.**
+
+**단일 최대 위험:** `project-crdt.ts`의 `candidate`가 `timelines`를 내보내게 만드는 작업.
+로드 직후 되쓰기 때문에 이 한 지점의 누락은 화면 깨짐이 아니라 IndexedDB의 즉각적·불가역적
+서브 시퀀스 소실이며, `.catch()` 복구 경로는 그 소실을 사용자에게 알리지도 않는다.
+
+---
+
 ## 왜 견적이 깨지는가 — 세 가지 구조적 장애물
 
 ### 1. `Timeline`에 id가 없다
