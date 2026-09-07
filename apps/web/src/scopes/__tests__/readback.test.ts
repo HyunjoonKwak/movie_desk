@@ -34,7 +34,7 @@ it("waits for a GPU fence without blocking, preserves GL bindings, and frees res
     COLOR_ATTACHMENT0: 13,
     STREAM_READ: 14,
     COLOR_BUFFER_BIT: 15,
-    LINEAR: 16,
+    NEAREST: 16,
     RGBA: 17,
     UNSIGNED_BYTE: 18,
     SYNC_GPU_COMMANDS_COMPLETE: 19,
@@ -65,6 +65,11 @@ it("waits for a GPU fence without blocking, preserves GL bindings, and frees res
   const done = vi.fn();
   const failed = vi.fn();
   reader.capture(done, failed);
+  const reentered = vi.fn();
+  reader.capture(done, reentered);
+  expect(reentered).toHaveBeenCalledOnce();
+  expect(gl.blitFramebuffer).toHaveBeenCalledOnce();
+  expect(gl.blitFramebuffer).toHaveBeenCalledWith(0, 0, 1920, 1080, 0, 0, 256, 144, 15, 16);
   expect(gl.bufferData).toHaveBeenCalledWith(7, 256 * 144 * 4, 14);
   expect(gl.readPixels).toHaveBeenCalledWith(0, 0, 256, 144, 17, 18, 0);
   expect(gl.bindFramebuffer).toHaveBeenCalledWith(5, "read");

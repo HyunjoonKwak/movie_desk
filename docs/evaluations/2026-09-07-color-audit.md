@@ -88,31 +88,36 @@ B’4b work; blindly relabeling bytes would be incorrect.
 
 Pure computations moved to `src/scopes/compute.ts`. Histograms include RGB and
 encoded BT.709 luma, waveform includes luma and RGB parade, vectorscope uses
-BT.709 Cb/Cr, and any-channel near-black (≤1) / near-white (≥254) counts are shown.
-Counts describe the downsampled output only; resampling can hide tiny clipped areas.
+BT.709 Cb/Cr, and any-channel near-black (≤1) / near-white (≥254) counts and sample percentages are shown.
+NEAREST point sampling preserves source code values without interpolation. Counts
+describe the sampled output only; tiny clipped areas between sample locations can
+be missed, and percentages are not full-frame area estimates.
 Displays identify full-range 0–255 and approximate IRE. HDR is not calibrated.
 
 The viewport publishes immediately after successful rendering, before a
 non-preserved WebGL drawing buffer can be discarded. A GPU framebuffer blit
-reduces the output to at most 256×144 with preserved aspect (portrait 1080×1920
+uses NEAREST to reduce the output to at most 256×144 with preserved aspect (portrait 1080×1920
 becomes 81×144). RGBA8 pixel-pack-buffer readback is fenced, then polled at rAF
 with zero wait timeout; CPU copy occurs only once signaled. All modified GL
 bindings are restored. One worker owns calculations and painting; transfer lists
-move the small pixel buffer and result ImageBitmap, and bitmaprenderer presents
+move the small pixel buffer and result ImageBitmap; the worker returns the pixel
+buffer for the next capture and reuses one scratch canvas, and bitmaprenderer presents
 it. The scopes-only readback attachment does not change the compositing pipeline.
 
 There is one in-flight job and at most one capture per rAF. Under GPU/worker
 backpressure intermediate frames coalesce; a skipped paused frame requests a
 fresh render when free. This can produce fewer scope updates than video frames.
-Mode changes and unmount unsubscribe, terminate the worker, cancel fence polling
-and free GPU resources. Obsolete subscription results are discarded. There is
-no recurring work with scopes closed, and failures have an unavailable state.
+Mode changes update a ref and request a redraw without restarting the worker.
+Unmount unsubscribes, terminates the worker, cancels fence polling and frees GPU
+resources. Context loss clears the reader and restore requests a fresh capture;
+generation checks discard obsolete GPU and worker results. A panel failure
+retries once before showing unavailable. There is no recurring work with scopes closed.
 A mobile Scopes drawer provides 390px access. First-allocation/driver/context-loss
 latencies are not a real-time guarantee; steady-state costs are measured below.
 
 ## Validation and performance
 
-Pure calculation and scheduling/readback tests: 8 PASS. Product E2E covers all
+Pure calculation and scheduling/readback tests: 11 PASS. Product E2E covers all
 five modes, nonzero white-patch counts and 390px panel bounds. Web lint and
 TypeScript PASS. Full gate and measured 1080p before/after results follow. B’4a changes no rendering
 math; its baseline is scopes closed versus enabled with the same cached still
@@ -122,25 +127,40 @@ not a universal ≤1ms guarantee.
 
 ### Before/after scope evidence
 
-- `node scripts/color/scopes-baseline.mjs` loads the actual `1ba350b` arithmetic
+- `node scripts/color/scopes-baseline.mjs` loads a checked-in copy of the `1ba350b` arithmetic
+  (`scripts/color/scopes-baseline.fixture.ts`, independent of git history)
   and current kernels. [Kernel results](2026-09-07-color-scopes-kernels.json):
   three kernels per iteration, 200 samples after 20 warmups, Node CPU baseline
-  240×135 p50/p95 **0.320/0.471ms**, current 256×144 **0.370/0.874ms**.
+  240×135 p50/p95 **0.311/0.324ms**, current 256×144 **0.385/0.404ms**.
   This is not an algorithm speedup claim: the sample is 13.8% larger, and current
   application work is moved off the main thread. Browser worker costs below are
   the selected histogram plus drawing and clipping, not the three-kernel sum.
-- BT.709 red target is **(113,64)** in the 256-grid. Old BT.601-style arithmetic
-  placed it at **(106,64)**, a 7-pixel horizontal discrepancy against the chosen
-  BT.709 reference. The new pure test fixes the expected coordinate and neutral
+- BT.709 red target is **(99,0)** in the 256-grid. Old BT.601-style arithmetic
+  placed it at **(106,64)**, both a coefficient discrepancy and a half-scale display. Round 2 maps
+  Cb/Cr ±0.5 to the full grid extent, clamps boundary primaries, and scales
+  the graticule to match. The new pure test fixes the expected coordinate and neutral
   center (128,128); the UI also draws six full-amplitude primary/secondary targets.
 - `node scripts/color/frame-sync.mjs` exercises a visible, non-preserved GL canvas
   with five paused white frames. The old 100ms+rAF sampling schedule reads black
-  in **5/5** trials (RGB error **255** per channel, delay **102–104.5ms**).
+  in **5/5** trials (RGB error **255** per channel, delay **102.8–107.1ms**).
   The repository’s new immediate PBO reader returns white in **5/5**, RGB error
   **0**. [Frame lifetime results](2026-09-07-color-scopes-frame-sync.json).
   This isolates framebuffer lifetime; it is not a claim about every decoder’s
   timestamps. The product E2E separately verifies nonzero white-patch counts
   after a paused render and after every mode change.
+
+### Round 2 sparse clipping regression
+
+`node scripts/color/frame-sync.mjs` now also clears a 1920×1080 GL buffer to
+black and writes 576 isolated white texels at known sample centers (0.0278%
+of source pixels). NEAREST returns only codes **0 and 255**, with **576 / 36,864
+near-white samples (1.5625%)**; this intentionally sample-aligned fixture tests
+code preservation, not unbiased area estimation. A LINEAR regression would
+blend each white texel with surrounding black and fail the exact code/count
+assertions. The harness also verifies identity reuse of the returned CPU buffer.
+Unit regressions cover all 81 portrait waveform columns, context loss/restore
+with obsolete results rejected, and readback reentry. Product E2E injects a
+transient scope error and requires automatic recovery without changing mode.
 
 ### 1080p product measurement
 
@@ -154,15 +174,15 @@ PNG on the actual timeline; playback runs 130 rAF ticks per condition at a check
 | Measurement | scopes closed | scopes enabled |
 | --- | ---: | ---: |
 | Playback interval p50 | 16.665ms | 16.665ms |
-| Playback interval p95 | 17.870ms | 18.390ms |
-| Playback interval max | 18.580ms | 18.560ms |
-| Scope capture + fence polls + CPU copy p50 / p95 / max | none | 0.050 / 0.065 / 0.070ms |
+| Playback interval p95 | 18.510ms | 18.560ms |
+| Playback interval max | 18.650ms | 34.730ms |
+| Scope capture + fence polls + CPU copy p50 / p95 / max | none | 0.035 / 0.050 / 0.055ms |
 | Bitmap display submission p50 / p95 / max | none | 0.020 / 0.030 / 0.035ms |
-| Worker compute + scope paint p50 / p95 / max | none | 0.295 / 0.385 / 0.405ms |
+| Worker compute + scope paint p50 / p95 / max | none | 0.310 / 0.345 / 0.645ms |
 
-There were 65 scope responses over 130 playback rAF ticks: about 30 scope updates
+There were 63 scope responses over 130 playback rAF ticks: about 30 scope updates
 per second under the one-in-flight backpressure rule, with no more than one
-capture per rAF. Measured capture + display submission stays below 0.105ms (sum
+capture per rAF. Measured capture + display submission stays below 0.090ms (sum
 of separate maxima), meeting the 1ms budget for the instrumented scope work.
 React scheduling/commits, first allocation and arbitrary GPU driver stalls are
 not included; this is not a hard real-time guarantee for an entire editor frame.
@@ -181,8 +201,8 @@ PBO path avoids this synchronous full-frame snapshot cost.
 `COLOR_AUDIT=1 pnpm gate --report docs/evaluations/2026-09-07-color-gate.md`:
 **9/9 PASS** — frozen install, versions, lint, typecheck, unit tests, OSV audit,
 production build, Chromium installation and browser E2E. Unit counts: core
-**153**, web **650**, desktop **72**, scripts **11** = **886**. Chromium E2E:
+**153**, web **653**, desktop **72**, scripts **11** = **889**. Chromium E2E:
 **62 PASS** (including one new scopes journey). [Gate table](2026-09-07-color-gate.md).
-The two final offline comparison scripts were also checked by Biome after the
-full-gate lint phase. No dependency or lockfile changes, no exporter/audio edits,
+The offline frame lifetime/sparse clipping and kernel comparison harnesses also
+passed; the frozen baseline fixture removes the need for historical git objects. No dependency or lockfile changes, no exporter/audio edits,
 no push or main merge. B’4b remains a separate implementation/review round.

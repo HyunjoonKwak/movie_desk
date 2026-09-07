@@ -55,9 +55,39 @@ try {
           expectedRgb: [255, 255, 255],
         });
       }
+      canvas.width = 1920;
+      canvas.height = 1080;
+      gl.clearColor(0, 0, 0, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.SCISSOR_TEST);
+      gl.clearColor(1, 1, 1, 1);
+      // Isolated sampled texels (0.0278% of source), surrounded by black.
+      for (let y = 0; y < 144; y += 8)
+        for (let x = 0; x < 256; x += 8) {
+          gl.scissor(Math.floor((x + 0.5) * 7.5), Math.floor((y + 0.5) * 7.5), 1, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        }
+      gl.disable(gl.SCISSOR_TEST);
+      const sparse = await new Promise((resolve, reject) =>
+        reader.capture(resolve, () => reject(new Error("Sparse PBO failed"))),
+      );
+      const sparseClipping = arithmetic.clipping(sparse.pixels);
+      const codes = [...new Set(sparse.pixels.filter((_, i) => i % 4 !== 3))];
+      if (sparseClipping.high !== 576 || codes.some((code) => code !== 0 && code !== 255))
+        throw new Error(`NEAREST regression: ${JSON.stringify({ sparseClipping, codes })}`);
+      reader.recycle(sparse.pixels);
+      gl.clearColor(1, 1, 1, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      const reused = await new Promise((resolve, reject) =>
+        reader.capture(resolve, () => reject(new Error("Reuse PBO failed"))),
+      );
+      if (reused.pixels !== sparse.pixels) throw new Error("Readback buffer not reused");
       reader.dispose();
       return {
         rows,
+        sparseClipping,
+        sparseCodes: codes,
+        bufferReused: true,
         note: "Five paused white frames on a visible preserveDrawingBuffer:false canvas. Old 100ms+rAF drawImage schedule vs repository ScopeReadback captured immediately; no editor decode timing claim.",
       };
     },

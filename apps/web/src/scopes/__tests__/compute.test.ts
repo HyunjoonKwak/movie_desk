@@ -32,11 +32,17 @@ describe("display RGB scopes", () => {
   it("centers neutral patches and puts BT.709 red at expected Cb/Cr coordinates", () => {
     const grid = computeVectorscope(pixels);
     expect(grid[128 * 256 + 128]).toBe(72);
-    // red: Cb=-0.2126/1.8556, Cr=0.5 -> (113,64)
-    expect(grid[64 * 256 + 113]).toBe(24);
+    // red: Cb=-0.2126/1.8556, Cr=0.5 -> (99,0)
+    expect(grid[99]).toBe(24);
   });
   it("reports sampled any-channel near-clipping independently of alpha", () => {
-    expect(clipping(pixels)).toEqual({ low: 2, high: 2, samples: 4 });
+    expect(clipping(pixels)).toEqual({
+      low: 2,
+      high: 2,
+      samples: 4,
+      lowPercent: 50,
+      highPercent: 50,
+    });
   });
   it("bounds landscape and portrait work, without upscaling", () => {
     expect(sampleSize(1920, 1080)).toEqual({ width: 256, height: 144 });
@@ -44,4 +50,16 @@ describe("display RGB scopes", () => {
     expect(sampleSize(1, 1)).toEqual({ width: 1, height: 1 });
     expect(sampleSize(0, 0)).toEqual({ width: 1, height: 1 });
   });
+});
+
+it("fills every portrait waveform column", () => {
+  const { width, height } = sampleSize(1080, 1920);
+  const px = new Uint8ClampedArray(width * height * 4).fill(128);
+  const wave = computeLumaWaveform(px, width, height);
+  expect(wave.cols).toBe(81);
+  expect(Array.from(wave.map.slice(127 * 81, 128 * 81))).toEqual(Array(81).fill(255));
+});
+it("keeps full-amplitude blue and cyan at the grid boundary", () => {
+  const grid = computeVectorscope(new Uint8ClampedArray([0, 0, 255, 255, 0, 255, 255, 255]));
+  expect(grid.reduce((sum, value) => sum + value, 0)).toBe(48);
 });

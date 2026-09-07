@@ -2,6 +2,7 @@ import { sampleSize } from "./compute";
 
 export interface ScopePixels {
   pixels: Uint8ClampedArray;
+  generation?: number;
   width: number;
   height: number;
   captureMs: number;
@@ -19,6 +20,11 @@ export class ScopeReadback {
   private fence: WebGLSync | null = null;
   private raf = 0;
   private disposed = false;
+  private pixels: Uint8ClampedArray | null = null;
+
+  recycle(pixels: Uint8ClampedArray) {
+    if (!this.disposed && pixels.byteLength === this.width * this.height * 4) this.pixels = pixels;
+  }
 
   constructor(private readonly gl: WebGL2RenderingContext) {
     this.fbo = gl.createFramebuffer()!;
@@ -31,6 +37,10 @@ export class ScopeReadback {
   }
 
   capture(done: (data: ScopePixels) => void, failed: () => void) {
+    if (this.disposed || this.fence) {
+      failed();
+      return;
+    }
     const gl = this.gl;
     const start = performance.now();
     const size = sampleSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
@@ -67,7 +77,7 @@ export class ScopeReadback {
         this.width,
         this.height,
         gl.COLOR_BUFFER_BIT,
-        gl.LINEAR,
+        gl.NEAREST,
       );
       gl.bindFramebuffer(gl.READ_FRAMEBUFFER, this.fbo);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.buffer);
@@ -106,7 +116,11 @@ export class ScopeReadback {
       }
       const readStart = performance.now();
       const previous = gl.getParameter(gl.PIXEL_PACK_BUFFER_BINDING);
-      const pixels = new Uint8ClampedArray(this.width * this.height * 4);
+      const pixels =
+        this.pixels?.byteLength === this.width * this.height * 4
+          ? this.pixels
+          : new Uint8ClampedArray(this.width * this.height * 4);
+      this.pixels = null;
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, this.buffer);
       gl.getBufferSubData(gl.PIXEL_PACK_BUFFER, 0, pixels);
       gl.bindBuffer(gl.PIXEL_PACK_BUFFER, previous);

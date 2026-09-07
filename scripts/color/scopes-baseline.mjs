@@ -1,5 +1,4 @@
 // Compare checked-in baseline scope arithmetic with the current worker kernels.
-import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { performance } from "node:perf_hooks";
@@ -14,9 +13,7 @@ const compile = (source) => {
   new Function("exports", code)(exports);
   return exports;
 };
-const old = compile(
-  execFileSync("git", ["show", "1ba350b:apps/web/src/preview/scopes.ts"], { encoding: "utf8" }),
-);
+const old = compile(readFileSync(new URL("./scopes-baseline.fixture.ts", import.meta.url), "utf8"));
 const next = compile(
   readFileSync(new URL("../../apps/web/src/scopes/compute.ts", import.meta.url), "utf8"),
 );

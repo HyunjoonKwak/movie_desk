@@ -1,15 +1,22 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
 import { useT } from "@/i18n/use-t";
+import type { clipping } from "@/scopes/compute";
 import { releaseFrame, subscribeFrames } from "@/scopes/frames";
 import type { ScopeKind } from "@/scopes/paint";
+import { useEffect, useRef, useState } from "react";
 
 export function ScopesPanel() {
   const [kind, setKind] = useState<ScopeKind>("histogram");
-  const [stats, setStats] = useState<{ low: number; high: number; samples: number } | null>(null);
+  const [stats, setStats] = useState<ReturnType<typeof clipping> | null>(null);
   const [failed, setFailed] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const t = useT();
+  const kindRef = useRef(kind);
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    kindRef.current = kind;
+    window.dispatchEvent(new Event("scopes-redraw"));
+  }, [kind]);
   useEffect(() => {
     setStats(null);
     setFailed(false);
@@ -21,8 +28,21 @@ export function ScopesPanel() {
       return;
     }
     let lastStats = "";
+    let stopped = false;
+    let unsubscribe = () => {};
+    const fail = () => {
+      if (stopped) return;
+      stopped = true;
+      unsubscribe();
+      worker.terminate();
+      if (attempt === 0) setAttempt(1);
+      else setFailed(true);
+    };
     worker.onmessage = (event) => {
-      releaseFrame();
+      if (!releaseFrame(event.data.pixels, event.data.generation)) {
+        event.data.bitmap?.close();
+        return;
+      }
       if (event.data.error) {
         fail();
         return;
@@ -44,17 +64,9 @@ export function ScopesPanel() {
         lastStats = key;
       }
     };
-    worker.onerror = () => {
-      releaseFrame();
-      setFailed(true);
-    };
-    const unsubscribe = subscribeFrames((data) =>
-      worker.postMessage({ ...data, kind }, [data.pixels.buffer]),
+    unsubscribe = subscribeFrames((data) =>
+      worker.postMessage({ ...data, kind: kindRef.current }, [data.pixels.buffer]),
     );
-    const fail = () => {
-      unsubscribe();
-      setFailed(true);
-    };
     window.addEventListener("scopes-error", fail);
     worker.onerror = fail;
     return () => {
@@ -64,7 +76,7 @@ export function ScopesPanel() {
       worker.terminate();
       releaseFrame();
     };
-  }, [kind]);
+  }, [attempt]);
   return (
     <div className="flex h-full min-w-0 flex-col" data-testid="scopes-panel">
       <label className="flex items-center gap-2 p-2 text-xs">
@@ -123,7 +135,7 @@ export function ScopesPanel() {
         {failed
           ? t("scopes.unavailable")
           : stats
-            ? `${t("scopes.samples")}: ${stats.samples} · ${t("scopes.low")}: ${stats.low} · ${t("scopes.high")}: ${stats.high}`
+            ? `${t("scopes.samples")}: ${stats.samples} · ${t("scopes.low")}: ${stats.low} (${stats.lowPercent.toFixed(2)}%) · ${t("scopes.high")}: ${stats.high} (${stats.highPercent.toFixed(2)}%)`
             : t("scopes.waiting")}
       </p>
       <p className="px-2 text-2xs text-ink-3">{t("scopes.encoded")}</p>

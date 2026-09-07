@@ -1,10 +1,17 @@
 import {
   computeHistogram,
   computeLumaWaveform,
-  computeVectorscope,
   computeParade,
+  computeVectorscope,
 } from "./compute";
 export type ScopeKind = "histogram" | "luma" | "waveform" | "parade" | "vectorscope";
+let scratch: OffscreenCanvas | undefined;
+const scratchCanvas = (width: number, height: number) => {
+  scratch ??= new OffscreenCanvas(width, height);
+  if (scratch.width !== width) scratch.width = width;
+  if (scratch.height !== height) scratch.height = height;
+  return scratch;
+};
 export function paintScope(
   ctx: OffscreenCanvasRenderingContext2D,
   w: number,
@@ -44,7 +51,9 @@ export function paintScope(
 
   if (kind === "waveform" || kind === "parade") {
     const { map, cols } =
-      kind === "parade" ? computeParade(px, sw, sh) : computeLumaWaveform(px, sw, sh);
+      kind === "parade"
+        ? computeParade(px, sw, sh)
+        : computeLumaWaveform(px, sw, sh, Math.min(256, sw));
     const img = ctx.createImageData(cols, 256);
     for (let i = 0; i < cols * 256; i++) {
       const v = map[i]!;
@@ -54,9 +63,7 @@ export function paintScope(
       img.data[i * 4 + 2] = kind !== "parade" || channel === 2 ? v : 0;
       img.data[i * 4 + 3] = 255;
     }
-    const tmp = new OffscreenCanvas(1, 1);
-    tmp.width = cols;
-    tmp.height = 256;
+    const tmp = scratchCanvas(cols, 256);
     tmp.getContext("2d")!.putImageData(img, 0, 0);
     ctx.drawImage(tmp, 0, 0, w, h);
     return;
@@ -73,15 +80,13 @@ export function paintScope(
     img.data[i * 4 + 2] = v;
     img.data[i * 4 + 3] = 255;
   }
-  const tmp = new OffscreenCanvas(1, 1);
-  tmp.width = size;
-  tmp.height = size;
+  const tmp = scratchCanvas(size, size);
   tmp.getContext("2d")!.putImageData(img, 0, 0);
   const sq = Math.min(w, h);
   ctx.drawImage(tmp, (w - sq) / 2, (h - sq) / 2, sq, sq);
   ctx.strokeStyle = "rgba(255,255,255,0.25)";
   ctx.beginPath();
-  ctx.arc(w / 2, h / 2, sq / 4, 0, Math.PI * 2);
+  ctx.arc(w / 2, h / 2, sq / 2, 0, Math.PI * 2);
   ctx.stroke();
   ctx.font = "9px sans-serif";
   ctx.fillStyle = "rgba(255,255,255,0.65)";
@@ -94,9 +99,9 @@ export function paintScope(
     ["M", 1, 0, 1],
   ] as const) {
     const y = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const x = w / 2 + (((b - y) / 1.8556) * sq) / 2;
-    const v = h / 2 - (((r - y) / 1.5748) * sq) / 2;
+    const x = w / 2 + ((b - y) / 1.8556) * sq;
+    const v = h / 2 - ((r - y) / 1.5748) * sq;
     ctx.strokeRect(x - 2, v - 2, 4, 4);
-    ctx.fillText(label, x + 4, v);
+    ctx.fillText(label, Math.min(w - 10, Math.max(2, x + 4)), Math.min(h - 2, Math.max(10, v)));
   }
 }

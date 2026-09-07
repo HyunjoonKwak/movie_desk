@@ -1,8 +1,8 @@
 # Feature matrix: Movie Desk vs OpenCut vs CapCut vs Final Cut Pro
 
 This is a directional product comparison, not a benchmark or compatibility
-promise. The Movie Desk pitch/scope rows reflect the repository as of 2026-09-07;
-other rows retain the 2026-07-16 snapshot. Competitor columns were not re-audited.
+promise. The Movie Desk pitch row and combined color row reflect the repository
+as of 2026-09-07; other rows retain the 2026-07-16 snapshot. Competitor columns were not re-audited.
 
 Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 
@@ -17,7 +17,7 @@ Legend: ✅ shipped • 🟡 partial • ❌ missing • ⭐ differentiator
 | Frame-aware scrub and playback | ✅ | ✅ | ✅ | ✅ |
 | Keyframed transforms/effects/speed | ✅ | ✅ | ✅ | ✅ |
 | Pitch-preserving speed changes | ✅ | ✅ | ✅ | ✅ |
-| Color scopes, grading, 1D/3D LUTs | 🟡 | 🟡 | ✅ | ✅ SDR scopes, grading, 1D/3D LUTs |
+| Color scopes, grading, 1D/3D LUTs | 🟡 | 🟡 | ✅ | 🟡 SDR scopes verified; color management pending |
 | Multicam program editing | ❌ | ❌ | ✅ | ✅ ⭐ |
 
 ## Effects and graphics

@@ -1,7 +1,7 @@
 {
   "rows": [
     {
-      "oldDelayMs": 104.5,
+      "oldDelayMs": 107.09999999403954,
       "oldRgb": [
         0,
         0,
@@ -19,7 +19,7 @@
       ]
     },
     {
-      "oldDelayMs": 102,
+      "oldDelayMs": 102.80000001192093,
       "oldRgb": [
         0,
         0,
@@ -37,7 +37,7 @@
       ]
     },
     {
-      "oldDelayMs": 104.19999998807907,
+      "oldDelayMs": 103.40000000596046,
       "oldRgb": [
         0,
         0,
@@ -55,7 +55,7 @@
       ]
     },
     {
-      "oldDelayMs": 104,
+      "oldDelayMs": 103,
       "oldRgb": [
         0,
         0,
@@ -73,7 +73,7 @@
       ]
     },
     {
-      "oldDelayMs": 103.19999998807907,
+      "oldDelayMs": 102.80000001192093,
       "oldRgb": [
         0,
         0,
@@ -91,5 +91,17 @@
       ]
     }
   ],
+  "sparseClipping": {
+    "low": 36288,
+    "high": 576,
+    "samples": 36864,
+    "lowPercent": 98.4375,
+    "highPercent": 1.5625
+  },
+  "sparseCodes": [
+    255,
+    0
+  ],
+  "bufferReused": true,
   "note": "Five paused white frames on a visible preserveDrawingBuffer:false canvas. Old 100ms+rAF drawImage schedule vs repository ScopeReadback captured immediately; no editor decode timing claim."
 }

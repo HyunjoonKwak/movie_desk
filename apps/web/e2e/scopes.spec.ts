@@ -115,6 +115,10 @@ test("scopes show sampled values in every mode and at 390px", async ({ page }) =
     await panel.getByRole("combobox").selectOption(kind);
     await expect(panel.getByTestId("scope-values")).toContainText(/Samples: [1-9]/);
   }
+  // A transient readback failure retries once without a mode change.
+  await page.evaluate(() => window.dispatchEvent(new Event("scopes-error")));
+  await expect(panel.getByTestId("scope-values")).toContainText(/Near white ≥254: [1-9]/);
+  await expect(panel.getByTestId("scope-values")).toContainText("%");
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Scopes", exact: true }).click();
   await expect(panel.getByTestId("scope-values")).toContainText(/Samples: [1-9]/);

@@ -25,11 +25,11 @@ beforeEach(() => {
   });
 });
 afterEach(() => vi.unstubAllGlobals());
-const canvas = {
+const canvas = Object.assign(new EventTarget(), {
   width: 1920,
   height: 1080,
-  getContext: () => ({}),
-} as unknown as HTMLCanvasElement;
+  getContext: () => ({ isContextLost: () => false }),
+}) as unknown as HTMLCanvasElement;
 it("coalesces busy frames and requests the latest paused frame once", async () => {
   const frames = await import("../frames");
   const listener = vi.fn();
@@ -57,4 +57,23 @@ it("disposes pending GPU work and rejects late deliveries on unsubscribe", async
   expect(listener).not.toHaveBeenCalled();
   frames.captureScopes(canvas);
   expect(mock.capture).toHaveBeenCalledTimes(1);
+});
+
+it("recreates readback after context restore and ignores pre-loss delivery", async () => {
+  const frames = await import("../frames");
+  const listener = vi.fn();
+  const stop = frames.subscribeFrames(listener);
+  frames.captureScopes(canvas);
+  const staleGeneration = 1;
+  canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+  mock.capture.mock.calls[0]![0]({ pixels: new Uint8ClampedArray(4) });
+  expect(listener).not.toHaveBeenCalled();
+  raf.shift()!(0);
+  canvas.dispatchEvent(new Event("webglcontextrestored"));
+  frames.captureScopes(canvas);
+  expect(mock.capture).toHaveBeenCalledTimes(2);
+  expect(frames.releaseFrame(undefined, staleGeneration)).toBe(false);
+  mock.capture.mock.calls[1]![0]({ pixels: new Uint8ClampedArray(4) });
+  expect(listener).toHaveBeenCalledOnce();
+  stop();
 });
