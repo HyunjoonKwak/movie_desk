@@ -1,3 +1,4 @@
+import { sequenceEditReason } from "./sequence-graph";
 import { syncRootTimeline } from "../model/project-timelines";
 // Track and clip primitives: add/remove/update + linear move/trim + cross-
 // track move. All pure — they take a project and return a fresh one.
@@ -57,7 +58,7 @@ export const updateTrack = (project: Project, trackId: ID, patch: (t: Track) => 
 
 export const addClip = (project: Project, trackId: ID, clip: Clip): Project => {
   const track = project.timeline.tracks.find((t) => t.id === trackId);
-  if (!track) return project;
+  if (!track || sequenceEditReason(project, [clip])) return project;
   const snapped: Clip = {
     ...clip,
     start: snapMsToFrame(clip.start, project.framerate),
@@ -128,6 +129,8 @@ export const setZoom = (project: Project, zoom: number): Project =>
 // it on the destination, frame-snapping in the process. No-op when the clip
 // is already on the destination or either id is unknown.
 export const moveClipToTrack = (project: Project, clipId: ID, destTrackId: ID): Project => {
+  const clip = project.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
+  if (!clip || !project.timeline.tracks.some((t) => t.id === destTrackId) || sequenceEditReason(project, [clip])) return project;
   let moving: Clip | null = null;
   const stripped = project.timeline.tracks.map((t) => {
     const found = t.clips.find((c) => c.id === clipId);

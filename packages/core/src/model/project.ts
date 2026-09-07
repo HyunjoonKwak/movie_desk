@@ -1,3 +1,4 @@
+import type { Clip } from "./clip";
 import type { ID } from "../utils/id";
 import type { Fps, Ms } from "../utils/time";
 import type { MediaCollection } from "./collection";
@@ -32,6 +33,8 @@ export interface ProjectAudio {
 }
 
 export interface Project {
+  /** Unplaced clips retained by persistence; not playback edges. */
+  readonly preservedClips?: readonly { readonly timelineId: string; readonly clip: Clip }[];
   readonly audio?: ProjectAudio;
   readonly id: ID;
   readonly name: string;

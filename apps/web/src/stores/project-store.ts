@@ -86,7 +86,7 @@ import { type RelinkAssetPatch, createMediaActions } from "./actions/media-actio
 import { createMusicActions } from "./actions/music-actions";
 import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
 import { createTrackActions } from "./actions/track-actions";
-import { runWith } from "./store-helpers";
+import { rejectSequenceEdit, runWith } from "./store-helpers";
 import { useTimelineUiStore } from "./timeline-ui-store";
 
 interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
@@ -626,12 +626,17 @@ export const useProjectStore = create<ProjectStoreState>()(
     setTransitionOutFor: (clipId, transition) =>
       runWith(set, "Set transition out", (p) => setTransitionOut(p, clipId, transition)),
 
-    duplicateClipById: (clipId) => runWith(set, "Duplicate clip", (p) => duplicateClip(p, clipId)),
+    duplicateClipById: (clipId) => runWith(set, "Duplicate clip", (p) => {
+      const clip = p.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
+      return clip && rejectSequenceEdit(p, [clip]) ? p : duplicateClip(p, clipId);
+    }),
 
     // No history entry when nothing pastes (e.g. the source tracks are gone
     // after a project switch) — a phantom undo step would also clear redo.
     pasteClipsAt: (entries, atMs) =>
       set((s) => {
+        const eligible = entries.filter((e) => s.project.timeline.tracks.some((t) => t.id === e.trackId && !t.locked));
+        if (rejectSequenceEdit(s.project, eligible.map((e) => e.clip))) return {};
         const after = pasteClips(s.project, entries, atMs);
         if (after === s.project) return {};
         return {

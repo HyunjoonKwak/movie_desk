@@ -12,3 +12,4 @@ export * from "./speed";
 export * from "./text-anim";
 export * from "./inspect";
 export * from "./marquee";
+export * from "./sequence-graph";

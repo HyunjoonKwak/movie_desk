@@ -1,3 +1,4 @@
+import { sequenceEditReason } from "./sequence-graph";
 // Higher-level editing ops: ripple/roll/slide/slip trims, gap closing,
 // grouping, freeze/disable, audio detach, duplication, crossfade. Each one
 // composes the primitives in mutate-core / mutate-effect.
@@ -271,6 +272,8 @@ export const slipClip = (
 
 // Duplicate the clip immediately after its current position on the same track.
 export const duplicateClip = (project: Project, clipId: ID): Project => {
+  const clip = project.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
+  if (clip && sequenceEditReason(project, [clip])) return project;
   let inserted = false;
   const tracks = project.timeline.tracks.map((tr) => {
     const idx = tr.clips.findIndex((c) => c.id === clipId);
@@ -302,7 +305,8 @@ export const pasteClips = (
   entries: readonly ClipboardEntry[],
   atMs: Ms,
 ): Project => {
-  if (entries.length === 0) return project;
+  const eligible = entries.filter((e) => project.timeline.tracks.some((t) => t.id === e.trackId && !t.locked));
+  if (entries.length === 0 || sequenceEditReason(project, eligible.map((e) => e.clip))) return project;
   const minStart = entries.reduce((m, e) => Math.min(m, e.clip.start), Number.POSITIVE_INFINITY);
   let tracks = project.timeline.tracks;
   let pasted = false;

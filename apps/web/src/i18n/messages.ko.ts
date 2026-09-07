@@ -962,4 +962,7 @@ export const ko = {
     "color.encoderMismatch": "인코더가 제한 범위 BT.709가 아닌 색 공간을 보고했습니다. 색 검증 중 내보내기를 중단했습니다.",
     "topbar.saveFailed": "저장 실패",
     "project.saveFailed": "프로젝트 라이브러리에 저장하지 못했습니다. 다시 편집하여 재시도하거나, 닫기 전에 프로젝트 사본을 내보내세요.",
+    "inspect.missing-sequence": "시퀀스 대상이 없습니다. 클립은 보존되었습니다. 타임라인을 복원하거나 클립을 삭제하세요.",
+    "inspect.cyclic-sequence": "시퀀스가 순환 참조를 만듭니다. 사용하기 전에 순환 참조를 제거하세요.",
+    "inspect.depth-exceeded": "시퀀스 중첩이 안전 한도에 도달했습니다. 사용하기 전에 중첩을 줄이세요.",
 } as const;

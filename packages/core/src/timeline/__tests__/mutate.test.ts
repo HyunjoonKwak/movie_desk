@@ -45,7 +45,7 @@ describe("timeline mutate", () => {
     const p1 = addClip(p0, videoTrackId, clip);
 
     expect(p1.timeline.tracks[0]!.clips).toHaveLength(1);
-    expect(computeDuration(p1.timeline)).toBe(2000);
+    expect(computeDuration(p1)).toBe(2000);
   });
 
   it("moves a clip immutably", () => {

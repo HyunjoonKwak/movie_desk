@@ -1,3 +1,6 @@
+import { toast } from "sonner";
+import { sequenceEditReason, type Clip } from "@movie-desk/core";
+import { t } from "@/i18n/use-t";
 // Shared helpers for the project store's action slices. Each slice receives
 // the same `SetFn`/`GetFn` pair so it can compose against the single source
 // of truth without circular imports.
@@ -34,4 +37,12 @@ export const runWith = <S extends ProjectMutating>(
     if (r.project === s.project) return s;
     return { project: r.project, history: r.history } as Partial<S>;
   });
+};
+
+/** Same pure preflight as core; UI owns notification, core owns rejection. */
+export const rejectSequenceEdit = (project: Project, clips: readonly Clip[]): boolean => {
+  const reason = sequenceEditReason(project, clips);
+  if (!reason) return false;
+  toast.warning(t(`inspect.${reason}`));
+  return true;
 };

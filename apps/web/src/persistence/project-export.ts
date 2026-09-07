@@ -346,7 +346,7 @@ export const parseCurrentProject = (raw: unknown): Project => {
     return rememberRestoredProject(
       rememberAudioRecovery(raw, {
         ...parsed,
-        ...(nested.preservedClips ? { preservedClips: nested.preservedClips } : {}),
+        ...(nested.preservedClips ? { preservedClips: nested.preservedClips as unknown as NonNullable<Project["preservedClips"]> } : {}),
         timelines,
         rootTimelineId: root.id,
         timeline: root,

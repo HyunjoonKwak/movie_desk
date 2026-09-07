@@ -1,6 +1,6 @@
 import { addTrack, removeTrack, updateTrack, addClip, moveClipToTrack } from "@movie-desk/core";
 import type { Clip, ID, TrackKind } from "@movie-desk/core";
-import { runWith, type ProjectMutating, type SetFn } from "../store-helpers";
+import { rejectSequenceEdit, runWith, type ProjectMutating, type SetFn } from "../store-helpers";
 
 export interface TrackActions {
   addNewTrack: (kind: TrackKind) => void;
@@ -46,8 +46,11 @@ export const createTrackActions = <S extends ProjectMutating>(set: SetFn<S>): Tr
     ),
 
   addClipToTrack: (trackId, clip) =>
-    runWith(set, "Add clip", (p) => addClip(p, trackId, clip)),
+    runWith(set, "Add clip", (p) => rejectSequenceEdit(p, [clip]) ? p : addClip(p, trackId, clip)),
 
   moveClipToOtherTrack: (clipId, destTrackId) =>
-    runWith(set, "Move clip to track", (p) => moveClipToTrack(p, clipId, destTrackId)),
+    runWith(set, "Move clip to track", (p) => {
+      const clip = p.timeline.tracks.flatMap((t) => t.clips).find((c) => c.id === clipId);
+      return clip && rejectSequenceEdit(p, [clip]) ? p : moveClipToTrack(p, clipId, destTrackId);
+    }),
 });

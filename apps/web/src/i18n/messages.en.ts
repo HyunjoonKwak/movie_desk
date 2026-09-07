@@ -964,4 +964,7 @@ export const en = {
     "color.encoderMismatch": "The encoder reported a color space other than limited-range BT.709. Export stopped during color verification.",
     "topbar.saveFailed": "Save failed",
     "project.saveFailed": "Could not save to the project library. Edit again to retry, or export a project copy before closing.",
+    "inspect.missing-sequence": "Sequence target is missing. The clip has been retained; restore its timeline or remove the clip.",
+    "inspect.cyclic-sequence": "This sequence creates a cycle. Remove the circular reference before using it.",
+    "inspect.depth-exceeded": "Sequence nesting reaches the safety limit. Reduce nesting before using it.",
 } as const;

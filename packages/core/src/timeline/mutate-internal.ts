@@ -38,9 +38,11 @@ export function recompute(input: Project | TrackReplacement, explicit?: Timeline
   const timeline =
     "project" in input ? findTimeline(project, input.timelineId) : (explicit ?? project.timeline);
   if (!timeline) throw new Error("Missing recompute timeline");
+  const durationProject = timeline === project.timeline || findTimeline(project, timeline.id) === timeline
+    ? project : replaceTimeline(project, timeline);
   return replaceTimeline(
     { ...project, updatedAt: Date.now() },
-    { ...timeline, duration: computeDuration(timeline) },
+    { ...timeline, duration: computeDuration(durationProject, timeline.id) },
   );
 }
 
