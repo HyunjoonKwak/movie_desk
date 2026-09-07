@@ -9,7 +9,11 @@ import {
   sampleKeyframeTrack,
   sourceOffsetForRamp,
 } from "@movie-desk/core";
-import { combineInlineStateful } from "./audio-mixer-worker";
+import {
+  type MixerWorkerRequest,
+  type MixerWorkerResponse,
+  combineInlineStateful,
+} from "./audio-mixer-worker";
 import { denoise } from "./spectral-denoise";
 
 const dbToGain = (db: number): number => 10 ** (db / 20);
@@ -233,9 +237,11 @@ export interface AudioMixChunk {
   readonly sampleRate: number;
   readonly startSample: number;
   readonly limitedSamples?: number;
+  readonly audioPeaks?: MixerWorkerResponse["audioPeaks"];
 }
 
 export interface AudioMixOptions {
+  readonly encoderMasterGain?: number;
   readonly startMs?: number;
   readonly endMs?: number;
   readonly chunkDurationMs?: number;
@@ -298,6 +304,7 @@ export class ProjectAudioMixer {
       ),
     );
     let duckGain = 1;
+    let peakState: MixerWorkerResponse["peakState"];
     const pitchContinuations = new Map<MediaClip, StretchContinuation>();
 
     for (
@@ -418,15 +425,26 @@ export class ProjectAudioMixer {
           musicChannels,
           sampleRate: this.sampleRate,
           initialDuckGain: duckGain,
+          ...(options.encoderMasterGain === undefined
+            ? {}
+            : {
+                encoder: {
+                  masterGain: options.encoderMasterGain,
+                  final: chunkEndSample === absoluteEndSample,
+                  ...(peakState ? { peakState } : {}),
+                },
+              }),
           ...(this.ducking ? { ducking: this.ducking } : {}),
         },
         options.signal,
       );
       duckGain = combined.finalDuckGain;
+      peakState = combined.peakState;
       throwIfAborted(options.signal);
       yield {
         channels: combined.channels,
         limitedSamples: combined.limitedSamples,
+        ...(combined.audioPeaks ? { audioPeaks: combined.audioPeaks } : {}),
         sampleRate: this.sampleRate,
         startSample: chunkStartSample - absoluteStartSample,
       };
@@ -498,18 +516,12 @@ const abandonWorker = (): void => {
   mixerWorker = null;
 };
 
-interface CombineRequest {
-  voiceChannels: StereoChannels;
-  musicChannels: StereoChannels;
-  sampleRate: number;
-  initialDuckGain?: number;
-  ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
-}
+type CombineRequest = MixerWorkerRequest;
 
 const runCombineWorker = async (
   req: CombineRequest,
   signal?: AbortSignal,
-): Promise<{ channels: StereoChannels; finalDuckGain: number; limitedSamples: number }> => {
+): Promise<MixerWorkerResponse> => {
   const w = getWorker();
   if (!w) {
     // Tests / SSR / browsers without Worker / a worker given up on — run inline.
@@ -522,55 +534,42 @@ const runCombineWorker = async (
     voiceChannels: [req.voiceChannels[0].slice(), req.voiceChannels[1].slice()],
     musicChannels: [req.musicChannels[0].slice(), req.musicChannels[1].slice()],
   };
-  return new Promise<{ channels: StereoChannels; finalDuckGain: number; limitedSamples: number }>(
-    (resolve, reject) => {
-      const requestId = ++mixerRequestId;
-      const cleanup = () => {
-        clearTimeout(timer);
-        w.removeEventListener("message", onMessage);
-        w.removeEventListener("error", onError);
-        signal?.removeEventListener("abort", onAbort);
-      };
-      const onMessage = (
-        e: MessageEvent<{
-          requestId?: number;
-          channels: StereoChannels;
-          finalDuckGain: number;
-          limitedSamples: number;
-        }>,
-      ) => {
-        if (e.data.requestId !== requestId) return;
-        cleanup();
-        resolve({
-          channels: e.data.channels,
-          finalDuckGain: e.data.finalDuckGain,
-          limitedSamples: e.data.limitedSamples,
-        });
-      };
-      const onError = (err: ErrorEvent) => {
-        cleanup();
-        abandonWorker();
-        resolve(combineInlineStateful(retained));
-        void err;
-      };
-      const onAbort = () => {
-        cleanup();
-        reject(new DOMException("Audio mixing cancelled", "AbortError"));
-      };
-      const timer = setTimeout(() => {
-        cleanup();
-        abandonWorker();
-        resolve(combineInlineStateful(retained));
-      }, WORKER_REPLY_TIMEOUT_MS);
-      signal?.addEventListener("abort", onAbort, { once: true });
-      w.addEventListener("message", onMessage);
-      w.addEventListener("error", onError);
-      w.postMessage({ ...req, requestId }, [
-        req.voiceChannels[0].buffer,
-        req.voiceChannels[1].buffer,
-        req.musicChannels[0].buffer,
-        req.musicChannels[1].buffer,
-      ]);
-    },
-  );
+  return new Promise<MixerWorkerResponse>((resolve, reject) => {
+    const requestId = ++mixerRequestId;
+    const cleanup = () => {
+      clearTimeout(timer);
+      w.removeEventListener("message", onMessage);
+      w.removeEventListener("error", onError);
+      signal?.removeEventListener("abort", onAbort);
+    };
+    const onMessage = (e: MessageEvent<MixerWorkerResponse>) => {
+      if (e.data.requestId !== requestId) return;
+      cleanup();
+      resolve(e.data);
+    };
+    const onError = (err: ErrorEvent) => {
+      cleanup();
+      abandonWorker();
+      resolve(combineInlineStateful(retained));
+      void err;
+    };
+    const onAbort = () => {
+      cleanup();
+      reject(new DOMException("Audio mixing cancelled", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      cleanup();
+      abandonWorker();
+      resolve(combineInlineStateful(retained));
+    }, WORKER_REPLY_TIMEOUT_MS);
+    signal?.addEventListener("abort", onAbort, { once: true });
+    w.addEventListener("message", onMessage);
+    w.addEventListener("error", onError);
+    w.postMessage({ ...req, requestId }, [
+      req.voiceChannels[0].buffer,
+      req.voiceChannels[1].buffer,
+      req.musicChannels[0].buffer,
+      req.musicChannels[1].buffer,
+    ]);
+  });
 };

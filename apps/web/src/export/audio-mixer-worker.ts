@@ -1,3 +1,5 @@
+import { TruePeakMeter, type AudioPeakResult } from "@movie-desk/core";
+
 // Audio mixer worker — runs the bus-combine + sidechain-ducking + soft-limiter
 // pass off the main thread. The mixer's per-clip stage stays on main because
 // it depends on `OfflineAudioContext` (decode + biquad EQ) which is unavailable
@@ -13,6 +15,11 @@ export interface MixerWorkerRequest {
   readonly musicChannels: StereoChannels;
   readonly sampleRate: number;
   readonly initialDuckGain?: number;
+  readonly encoder?: {
+    readonly masterGain: number;
+    readonly final: boolean;
+    readonly peakState?: ReturnType<TruePeakMeter["checkpoint"]>;
+  };
   readonly ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
 }
 
@@ -21,7 +28,29 @@ export interface MixerWorkerResponse {
   readonly channels: StereoChannels;
   readonly finalDuckGain: number;
   readonly limitedSamples: number;
+  readonly peakState?: ReturnType<TruePeakMeter["checkpoint"]>;
+  readonly audioPeaks?: AudioPeakResult;
 }
+
+// Gain and clamp are rounded to Float32 before measurement and transfer.
+const prepareEncoderPcm = (channels: StereoChannels, encoder: MixerWorkerRequest["encoder"]) => {
+  if (!encoder) return {};
+  let clippedSamples = 0;
+  if (encoder.masterGain !== 1) {
+    for (const channel of channels) {
+      for (let i = 0; i < channel.length; i++) {
+        const normalized = channel[i]! * encoder.masterGain;
+        if (Math.abs(normalized) > 1) clippedSamples++;
+        channel[i] = Math.max(-1, Math.min(1, normalized));
+      }
+    }
+  }
+  const meter = new TruePeakMeter(2);
+  if (encoder.peakState) meter.restore(encoder.peakState);
+  meter.push(channels);
+  const audioPeaks = encoder.final ? meter.finish() : meter.result();
+  return { peakState: meter.checkpoint(), audioPeaks: { ...audioPeaks, clippedSamples } };
+};
 
 const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
   const { voiceChannels, musicChannels, ducking } = req;
@@ -63,7 +92,12 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
       accum[1][i]! *= gain;
     }
   }
-  return { channels: accum, finalDuckGain, limitedSamples };
+  return {
+    channels: accum,
+    finalDuckGain,
+    limitedSamples,
+    ...prepareEncoderPcm(accum, req.encoder),
+  };
 };
 
 // Worker entry. Guarded to a REAL worker scope: `"onmessage" in self` is also

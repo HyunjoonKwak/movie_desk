@@ -1,4 +1,4 @@
-import { TruePeakMeter, type AudioPeakResult } from "@movie-desk/core";
+import type { AudioPeakResult } from "@movie-desk/core";
 import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
@@ -248,30 +248,23 @@ export class WebCodecsExporter implements Exporter {
             };
             if (prerollSamples) encodePadding(0);
             const encoderChunkSize = 1024;
-            const peakMeter = new TruePeakMeter(2);
+            let peaks = { samplePeak: 0, truePeak: 0 };
             let limitedSamples = 0;
             let clippedSamples = 0;
-            for await (const chunk of mixer.chunks(mixOptions)) {
+            for await (const chunk of mixer.chunks({
+              ...mixOptions,
+              encoderMasterGain: masterGain,
+            })) {
               limitedSamples += chunk.limitedSamples ?? 0;
+              if (chunk.audioPeaks) {
+                peaks = chunk.audioPeaks;
+                clippedSamples += chunk.audioPeaks.clippedSamples;
+              }
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
               for (let i = 0; i < totalSamples; i += encoderChunkSize) {
                 if (this.cancelled) throw new ExportCancelledError();
                 const numberOfFrames = Math.min(encoderChunkSize, totalSamples - i);
                 const planar = packStereoPlanar(chunk.channels, i, numberOfFrames);
-                // At unity the mixer worker has already limited PCM to ±1;
-                // only normalization can introduce additional clipped samples.
-                if (masterGain !== 1) {
-                  for (let sample = 0; sample < planar.length; sample++) {
-                    const normalized = planar[sample]! * masterGain;
-                    if (Math.abs(normalized) > 1) clippedSamples++;
-                    planar[sample] = Math.max(-1, Math.min(1, normalized));
-                  }
-                }
-                // Measure exactly the post-normalization/clamp Float32 PCM sent to the encoder.
-                peakMeter.push([
-                  planar.subarray(0, numberOfFrames),
-                  planar.subarray(numberOfFrames),
-                ]);
                 const data = new AudioData({
                   format: "f32-planar",
                   sampleRate: chunk.sampleRate,
@@ -290,7 +283,7 @@ export class WebCodecsExporter implements Exporter {
               }
             }
             if (prerollSamples) encodePadding(prerollSamples + Math.round(exportDurationMs * 48));
-            const { samplePeak, truePeak } = peakMeter.finish();
+            const { samplePeak, truePeak } = peaks;
             audioPeaks = { samplePeak, truePeak, clippedSamples, limitedSamples };
             await audioEncoder.flush();
           } finally {

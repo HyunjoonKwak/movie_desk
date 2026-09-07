@@ -287,3 +287,78 @@ it("disposes pooled workers and retires in-flight workers after disposal", async
   disposePitchWorkers();
   expect(workers[1]!.terminate).toHaveBeenCalledOnce();
 });
+
+it.each([false, true])(
+  "cropped padded checkpoints match uninterrupted DSP (ramp: %s)",
+  async (ramp) => {
+    const starts: number[] = [];
+    vi.stubGlobal(
+      "Worker",
+      class {
+        onmessage = (_event: unknown) => {};
+        terminate() {}
+        postMessage(req: StretchRequest) {
+          starts.push(req.sourceStartSample ?? 0);
+          this.onmessage({ data: renderClipAudio(req) });
+        }
+      },
+    );
+    const sr = 48000;
+    const channels = [0.4, 0.2].map((amplitude) =>
+      Float32Array.from(
+        { length: 6 * sr },
+        (_, i) =>
+          amplitude *
+          (Math.sin((2 * Math.PI * 443 * i) / sr) + 0.2 * Math.sin((2 * Math.PI * 6011 * i) / sr)),
+      ),
+    );
+    const req: StretchRequest = {
+      ...request(6),
+      channels,
+      clip: {
+        ...clip,
+        trimIn: 500,
+        trimOut: 6000,
+        duration: 3000,
+        speed: 1.37,
+        keyframes: ramp
+          ? [
+              {
+                target: "speed",
+                keyframes: [
+                  { at: 0, value: 0.5, easing: "linear" },
+                  { at: 3000, value: 1.5, easing: "linear" },
+                ],
+              },
+            ]
+          : [],
+      },
+      outputSamples: 3 * sr,
+    };
+    const whole = renderClipAudio(req).channels;
+    const { renderPitchRangeInWorker } = await import("../pitch-renderer");
+    const padding = 4800;
+    let continuation: StretchRequest["continuation"];
+    for (let chunk = 0; chunk < 3; chunk++) {
+      const start = chunk * sr;
+      const paddedStart = Math.max(0, start - padding);
+      const end = Math.min(3 * sr, start + sr + padding);
+      const result = await renderPitchRangeInWorker({
+        ...req,
+        offsetMs: (paddedStart * 1000) / sr,
+        outputSamples: end - paddedStart,
+        checkpointSample: start + sr - padding,
+        ...(continuation ? { continuation } : {}),
+      });
+      continuation = result.continuation;
+      expect(continuation?.nextStartSample).toBe(start + sr - padding);
+      for (let c = 0; c < 2; c++) {
+        const actual = result.channels[c]!.subarray(start - paddedStart, start - paddedStart + sr);
+        const expected = whole[c]!.subarray(start, start + sr);
+        expect(actual.every((sample, i) => sample === expected[i])).toBe(true);
+      }
+      await renderPitchInWorker({ ...req, offsetMs: 250, outputSamples: 480 });
+    }
+    expect(starts.some((start) => start > sr)).toBe(true);
+  },
+);

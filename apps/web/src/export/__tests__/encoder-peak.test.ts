@@ -46,14 +46,33 @@ vi.mock("../audio-mixer", async (original) => ({
   ...(await original<typeof import("../audio-mixer")>()),
   ProjectAudioMixer: class {
     sampleRate = 48000;
-    async *chunks() {
-      for (let i = 0; i < 2; i++)
+    async *chunks(options: { encoderMasterGain?: number }) {
+      const { combineInlineStateful } = await import("../audio-mixer-worker");
+      let peakState: ReturnType<TruePeakMeter["checkpoint"]> | undefined;
+
+      for (let i = 0; i < 2; i++) {
+        const mixed = combineInlineStateful({
+          voiceChannels: [new Float32Array(1025).fill(0.5), new Float32Array(1025).fill(0.25)],
+          musicChannels: [new Float32Array(1025), new Float32Array(1025)],
+          sampleRate: 48000,
+          ...(options.encoderMasterGain === undefined
+            ? {}
+            : {
+                encoder: {
+                  masterGain: options.encoderMasterGain,
+                  final: i === 1,
+                  ...(peakState ? { peakState } : {}),
+                },
+              }),
+        });
+        peakState = mixed.peakState;
         yield {
-          channels: [new Float32Array(1025).fill(0.5), new Float32Array(1025).fill(0.25)],
+          ...mixed,
           startSample: i * 1025,
           sampleRate: 48000,
           limitedSamples: 3,
         };
+      }
     }
     dispose() {}
   },

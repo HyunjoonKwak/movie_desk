@@ -1,6 +1,6 @@
 "use client";
 
-import { pitchPlaybackKey } from "@/audio/pitch-renderer";
+import { disposePitchWorkers, pitchPlaybackKey } from "@/audio/pitch-renderer";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useProjectStore } from "@/stores/project-store";
 import { useEffect } from "react";
@@ -91,6 +91,7 @@ export function useAudioPlayback(): void {
 
     if (usePlaybackStore.getState().playing) start();
     return () => {
+      disposePitchWorkers();
       offPlayback();
       offPlayhead();
       offMedia();

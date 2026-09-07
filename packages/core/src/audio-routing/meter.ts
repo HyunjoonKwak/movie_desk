@@ -71,6 +71,25 @@ export class TruePeakMeter {
     this.rings = Array.from({ length: channelCount }, () => new Float64Array(TAPS));
   }
 
+  // Detached snapshots keep concurrent exports and worker retries independent.
+  checkpoint() {
+    return {
+      rings: this.rings.map((ring) => ring.slice()),
+      index: this.index,
+      samplePeak: this.samplePeak,
+      truePeak: this.truePeak,
+      clippedSamples: this.clippedSamples,
+    };
+  }
+
+  restore(state: ReturnType<TruePeakMeter["checkpoint"]>): void {
+    state.rings.forEach((ring, channel) => this.rings[channel]!.set(ring));
+    this.index = state.index;
+    this.samplePeak = state.samplePeak;
+    this.truePeak = state.truePeak;
+    this.clippedSamples = state.clippedSamples;
+  }
+
   push(channels: readonly Float32Array[], gain = 1): void {
     const length = Math.min(...channels.map((channel) => channel.length));
     for (let i = 0; i < length; i++) {

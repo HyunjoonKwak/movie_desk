@@ -1,0 +1,83 @@
+{
+  "browser": "149.0.7827.55",
+  "results": [
+    {
+      "seconds": 60,
+      "trial": 0,
+      "beforeMainMs": 204.90000000596046,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 242.10000002384186,
+      "maxTickGapMs": 9.800000011920929,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.43774473577731576,
+        "clippedSamples": 0
+      }
+    },
+    {
+      "seconds": 60,
+      "trial": 1,
+      "beforeMainMs": 205.7000000178814,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 229.40000000596046,
+      "maxTickGapMs": 6.300000011920929,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.43774473577731576,
+        "clippedSamples": 0
+      }
+    },
+    {
+      "seconds": 60,
+      "trial": 2,
+      "beforeMainMs": 202.2000000178814,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 253.80000001192093,
+      "maxTickGapMs": 6.299999982118607,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.43774473577731576,
+        "clippedSamples": 0
+      }
+    },
+    {
+      "seconds": 600,
+      "trial": 0,
+      "beforeMainMs": 2084.800000011921,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 2570.5,
+      "maxTickGapMs": 6.4000000059604645,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.417349086619457,
+        "clippedSamples": 0
+      }
+    },
+    {
+      "seconds": 600,
+      "trial": 1,
+      "beforeMainMs": 2474.800000011921,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 2546.4000000059605,
+      "maxTickGapMs": 6.9000000059604645,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.417349086619457,
+        "clippedSamples": 0
+      }
+    },
+    {
+      "seconds": 600,
+      "trial": 2,
+      "beforeMainMs": 2545.9000000059605,
+      "afterMainMs": 0,
+      "afterWorkerWallMs": 2531.800000011921,
+      "maxTickGapMs": 7.0999999940395355,
+      "peaks": {
+        "samplePeak": 0.4000000059604645,
+        "truePeak": 0.417349086619457,
+        "clippedSamples": 0
+      }
+    }
+  ]
+}

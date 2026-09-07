@@ -642,3 +642,27 @@ dispose를 component unmount에 연결하지 않는 이유를 감사 문서에 �
 [rebase 후 전체 gate](evaluations/2026-09-07-pitch-speed-followups-round3-gate.md)
 **9/9 PASS**, 단위 **875**(core153·web639·desktop72·scripts11), Chromium E2E
 **60/60 PASS**. gate 전후 `lsof -ti :32119`로 비점유를 확인했다.
+
+### 오디오 후속 정리 — B′2/B′3 리뷰 (2026-09-07)
+
+`origin/main 1ba350b` 기준 `codex/audio-cleanup`에서 트루피크 측정과
+마스터 게인·±1 클램프를 믹서 Worker로 이동했다. 인코더가 받는 Float32 PCM
+기준을 유지하며, generator 소유 FIR 체크포인트로 청크 경계·재시도·동시
+내보내기를 분리한다. 정규화 분석 패스에서는 피크 측정을 실행하지 않는다.
+`useAudioPlayback` cleanup에 `disposePitchWorkers`를 연결해 에디터 언마운트와
+React refresh에서 유휴 Worker를 정리하고 진행 중인 Worker는 반환 후 폐기한다.
+
+실제 DSP를 통과하는 잘린 소스 창 + 100ms 패딩 체크포인트 테스트 2개와
+unity/감쇠/증폭·클램프·청크 경계 피크 테스트 3개를 추가했다.
+Chromium 3회 중앙값 기준 메인 트루피크 연산은 60초 **204.9ms**, 10분
+**2474.8ms**에서 제거됐고, 반환값 bookkeeping은 타이머 해상도 미만이었다.
+Worker 경과 시간은 각각 **242.1ms / 2546.4ms**로, 총 내보내기 시간 단축을
+주장하는 수치는 아니다. 선택 항목인 `renderClipAudio` 함수 분리는 후속으로 남겼다.
+
+[감사·측정 설명](evaluations/2026-09-07-audio-cleanup-audit.md),
+[측정 원본](evaluations/2026-09-07-audio-cleanup-measurements.json),
+[전체 gate](evaluations/2026-09-07-audio-cleanup-gate.md) 참조.
+
+최종 `pnpm gate` **9/9 PASS**, 단위 **883**(core153·web647·desktop72·scripts11),
+Chromium E2E **61/61 PASS**. 포트 충돌 후 코디네이터의 우선 배정을 받아
+전체 gate를 재실행했고 전후 `lsof -ti :32119` 비점유를 확인했다.
