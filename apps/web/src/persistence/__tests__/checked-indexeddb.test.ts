@@ -1,7 +1,7 @@
 import "fake-indexeddb/auto";
 import { createEmptyProject } from "@movie-desk/core";
 import { expect, it, vi } from "vitest";
-import type { IndexeddbPersistence } from "y-indexeddb";
+import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
 import { installCheckedWriter } from "../checked-indexeddb";
 import { createProjectCrdt, discardMigrationBackup } from "../project-crdt";
@@ -168,6 +168,66 @@ it("does not acknowledge a transaction whose add request throws synchronously", 
   const reopened = new Y.Doc();
   for (const update of await updates(db)) Y.applyUpdate(reopened, update);
   expect(reopened.getMap("test").get("key")).toBe("survives retry");
+  db.close();
+  doc.destroy();
+  reopened.destroy();
+});
+
+it("uses exactly one real provider writer, compacts, hydrates and detaches on destroy", async () => {
+  const name = `real-provider:${crypto.randomUUID()}`;
+  const doc = new Y.Doc();
+  const persistence = new IndexeddbPersistence(name, doc);
+  const saved = vi.fn();
+  const failed = vi.fn();
+  installCheckedWriter(persistence, { saved, failed, cleanup: vi.fn() });
+  await persistence.whenSynced;
+  const db = persistence.db!;
+  const initial = (await updates(db)).length;
+  doc.getMap("test").set("key", "one writer");
+  await vi.waitFor(() => expect(saved).toHaveBeenCalledTimes(1));
+  expect(await updates(db)).toHaveLength(initial + 1);
+  // Crossing the provider's native debounce threshold must not schedule its writer.
+  for (let i = 1; i < 500; i++) doc.getMap("test").set("counter", i);
+  await vi.waitFor(() => expect(saved).toHaveBeenCalledTimes(500));
+  expect(await updates(db)).toHaveLength(1);
+  expect(persistence._storeTimeoutId).toBeNull();
+  const transactions = vi.spyOn(db, "transaction");
+  await persistence.destroy();
+  const count = transactions.mock.calls.length;
+  doc.getMap("test").set("after-destroy", true);
+  expect(transactions).toHaveBeenCalledTimes(count);
+  expect(failed).not.toHaveBeenCalled();
+  const reopened = new Y.Doc();
+  const next = new IndexeddbPersistence(name, reopened);
+  installCheckedWriter(next, { saved: vi.fn(), failed, cleanup: vi.fn() });
+  await next.whenSynced;
+  expect(reopened.getMap("test").toJSON()).toEqual({ key: "one writer", counter: 499 });
+  await next.destroy();
+  doc.destroy();
+  reopened.destroy();
+});
+
+it("backs off compaction after failure while checkpointing the missing edit", async () => {
+  const db = await open();
+  const doc = new Y.Doc();
+  const saved = vi.fn();
+  const failed = vi.fn();
+  installCheckedWriter(providerFor(db, doc), { saved, failed, cleanup: vi.fn() });
+  for (let i = 0; i < 499; i++) doc.getMap("test").set("counter", i);
+  await vi.waitFor(() => expect(saved).toHaveBeenCalledTimes(499));
+  const getAll = vi.spyOn(IDBObjectStore.prototype, "getAll").mockImplementationOnce(() => {
+    throw new DOMException("Quota exceeded", "QuotaExceededError");
+  });
+  doc.getMap("test").set("failed", "keep");
+  expect(failed).toHaveBeenCalledTimes(1);
+  doc.getMap("test").set("retry", "saved");
+  await vi.waitFor(() => expect(saved).toHaveBeenCalledTimes(500));
+  expect(getAll).toHaveBeenCalledTimes(1);
+  getAll.mockRestore();
+  const reopened = new Y.Doc();
+  for (const update of await updates(db)) Y.applyUpdate(reopened, update);
+  expect(reopened.getMap("test").get("failed")).toBe("keep");
+  expect(reopened.getMap("test").get("retry")).toBe("saved");
   db.close();
   doc.destroy();
   reopened.destroy();

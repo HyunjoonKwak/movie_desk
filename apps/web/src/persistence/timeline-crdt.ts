@@ -6,7 +6,7 @@ import {
   type Track,
 } from "@movie-desk/core";
 import type * as Y from "yjs";
-import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
+import { reconcileSequence, recoverEntityOrder, uniqueSequence } from "./crdt-sequence";
 
 type TimelineMeta = Omit<Timeline, "tracks">;
 type TrackMeta = Omit<Track, "clips">;
@@ -23,7 +23,7 @@ export const timelineTrackMapName = (timelineId: string): string =>
 export const timelineClipKey = (timelineId: string, clipId: string): string =>
   JSON.stringify([timelineId, clipId]);
 
-export const createTimelineCrdt = (doc: Y.Doc) => {
+export const createTimelineCrdt = (doc: Y.Doc, recovered: () => void = () => {}) => {
   const timelinesMap = doc.getMap<TimelineMeta>("timelines-v3");
   const timelineOrder = doc.getArray<string>("timeline-order-v3");
   const clipsMap = doc.getMap<Clip>("clips-v3");
@@ -73,7 +73,7 @@ export const createTimelineCrdt = (doc: Y.Doc) => {
   };
 
   const read = (rootTimelineId: unknown, localView: Timeline): readonly Timeline[] => {
-    const timelineIds = uniqueSequence(timelineOrder.toArray());
+    const timelineIds = recoverEntityOrder(timelineOrder.toArray(), timelinesMap, recovered);
     if (!timelineIds.length)
       throw new NestedTimelineError(
         "Missing timeline metadata or timeline order; original document is unchanged",
@@ -84,19 +84,29 @@ export const createTimelineCrdt = (doc: Y.Doc) => {
       if (!meta || meta.id !== timelineId)
         throw new NestedTimelineError(`Missing timeline: ${timelineId}`);
       const tracksMap = tracksFor(timelineId);
-      const trackIds = uniqueSequence(trackOrderFor(timelineId).toArray());
+      const trackIds = recoverEntityOrder(
+        trackOrderFor(timelineId).toArray(),
+        tracksMap,
+        recovered,
+      );
       const tracks = trackIds.map((trackId) => {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
           throw new NestedTimelineError(`Missing track: ${trackId}`);
-        const clips = uniqueSequence(clipOrderFor(timelineId, trackId).toArray()).map((clipId) => {
-          const key = timelineClipKey(timelineId, clipId);
-          const clip = clipsMap.get(key);
-          if (!clip || clip.id !== clipId || seenClips.has(key))
-            throw new NestedTimelineError(`Missing or repeated clip: ${key}`);
-          seenClips.add(key);
-          return clip;
-        });
+        const clips = uniqueSequence(clipOrderFor(timelineId, trackId).toArray()).flatMap(
+          (clipId) => {
+            const key = timelineClipKey(timelineId, clipId);
+            const clip = clipsMap.get(key);
+            if (clip === undefined) {
+              recovered();
+              return [];
+            }
+            if (clip.id !== clipId || seenClips.has(key))
+              throw new NestedTimelineError(`Missing or repeated clip: ${key}`);
+            seenClips.add(key);
+            return clip;
+          },
+        );
         return { ...track, clips };
       });
       const duration = tracks.reduce(

@@ -1,7 +1,7 @@
 import { t } from "@/i18n/use-t";
 import { reloadSpan } from "@/lib/reload-metrics";
 import { useProjectStore } from "@/stores/project-store";
-import { type LegacyProject, NestedTimelineError } from "@movie-desk/core";
+import { type LegacyProject, NestedTimelineError, newId } from "@movie-desk/core";
 import type { Clip, Project, Track } from "@movie-desk/core";
 import { toast } from "sonner";
 import { IndexeddbPersistence } from "y-indexeddb";
@@ -10,7 +10,12 @@ import { installCheckedWriter } from "./checked-indexeddb";
 import { allowProjectWrites, blockProjectWrites, isRestoredMaintenance } from "./hydration-state";
 import { createProjectCrdt, discardMigrationBackup } from "./project-crdt";
 import { parseStoredProject } from "./project-io";
-import { insertRecoveredProject } from "./project-library";
+import {
+  insertRecoveredProject,
+  loadStoredProject,
+  setActiveProjectId,
+  upsertProject,
+} from "./project-library";
 import { useSaveStateStore } from "./save-state-store";
 
 // The live document: the active project mirrored into a Yjs doc that
@@ -92,6 +97,27 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
   let disposed = false;
   let restored = false;
   let failed = false;
+  const recoverCopy = async (): Promise<void> => {
+    try {
+      const row = await loadStoredProject(projectId);
+      if (disposed || row.status !== "ok") {
+        if (!disposed) toast.error(t("persistence.noRecoveryRow"));
+        return;
+      }
+      const copy = {
+        ...row.project,
+        id: newId(),
+        name: `${row.project.name} (${t("snap.restore")})`,
+      };
+      await upsertProject(copy);
+      if (disposed) return;
+      await setActiveProjectId(copy.id);
+      useProjectStore.getState().loadProject(copy);
+      getLiveDoc();
+    } catch {
+      toast.error(t("project.saveFailed"));
+    }
+  };
   const fail = (error: unknown): void => {
     if (disposed) return;
     failed = true;
@@ -99,18 +125,38 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
     useSaveStateStore.getState().setDocumentError(true);
     toast.error(
       `${t("persistence.openFailed")}: ${error instanceof Error ? error.message : String(error)}`,
-      { id: `hydrate-failed:${projectId}` },
+      {
+        id: `hydrate-failed:${projectId}`,
+        action: {
+          label: t("persistence.recoverCopy"),
+          onClick: () => {
+            void recoverCopy();
+          },
+        },
+      },
     );
   };
 
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let retryDelay = 2000;
   let invalidEdit = false;
   const saveFailed = (_error: unknown): void => {
     if (disposed) return;
     useSaveStateStore.getState().setDocumentError(true);
     toast.error(t("project.saveFailed"), { id: `document-save-failed:${projectId}` });
+    if (!retryTimer && !invalidEdit && !failed) {
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        retryDelay = Math.min(retryDelay * 2, 30000);
+        if (!disposed && !failed) checkpoint();
+      }, retryDelay);
+    }
   };
   const saved = (): void => {
     if (disposed || failed || invalidEdit) return;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+    retryDelay = 2000;
     useSaveStateStore.getState().setDocumentError(false);
     useSaveStateStore.getState().markSaved();
   };
@@ -141,6 +187,7 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
   // Loads the stored document into the store. Runs when IndexedDB finishes
   // restoring; those transactions carry the provider's origin, not ours.
   // loadProject resets undo history, which is what a fresh open wants.
+  let recoveryNotified = false;
   const applyFromDoc = (): Project | null => {
     if (disposed) return null;
     const localProject = useProjectStore.getState().project;
@@ -158,6 +205,10 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
       readEnd();
     }
     if (!project) return null;
+    if (projectCrdt.takeRecovery() && !recoveryNotified) {
+      recoveryNotified = true;
+      toast.warning(t("persistence.orderRecovered"), { id: `order-recovery:${projectId}` });
+    }
     const end = reloadSpan("applyFromDoc");
     applyingFromDoc = true;
     try {
@@ -276,6 +327,7 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
         useProjectStore.getState().endPrecisionEdit();
       }
       unsubscribe();
+      if (retryTimer) clearTimeout(retryTimer);
       disposed = true;
       doc.off("afterTransaction", afterTransaction);
       persistence.destroy();

@@ -44,13 +44,19 @@ Validation or staging failure throws NestedTimelineError and changes no encoded
 source bytes. Unsupported or incomplete schemas also throw instead of returning
 null (null is reserved for an empty document).
 
-Order lists are authoritative in schemas 2 and 3. A concurrent delete versus
-move may leave a map value without an order reference; these unreachable values
-are ignored, and the next write removes them. Ordered missing/mismatched entries,
-repeated clip ownership, and invalid required metadata still fail validation.
-This preserves recovery from normal CRDT conflicts without silently dropping a
-clip that remains in a track's order. Two independent Y.Doc replicas reproduce
-this race for both schemas, then migrate/edit/reopen successfully.
+Entity maps own existence; order arrays own placement. In schemas 2 and 3,
+map-only timelines, tracks, media and collections are appended in sorted ID order
+to the read result, then their placement is persisted by the next edit. This
+preserves concurrent delete-versus-rename survivors instead of silently deleting
+their contents during the next write. A clip order reference with no map value
+is dropped: ordinary delete-versus-reorder can reinsert an array item without
+resetting the deleted map value. Both repairs set a consumable recovery flag;
+live hydration displays one recovery notice per open session. Mismatched IDs,
+missing ordered timeline/track/media metadata and repeated clip ownership still
+fail validation. Map-only clips have no remaining track ownership and retain the
+previous delete-versus-move behavior; assigning a new track would invent intent.
+Regression fixtures use independent replicas, actual sequence reconciliation,
+full project delete/rename writes, and an edit/save/reopen after each merge.
 
 The pre-migration encoded backup is embedded only up to 1 MiB; larger documents
 retain the original roots until schema 3 commits, without another full embedded
@@ -66,17 +72,29 @@ backup retry cleanup on next open.
 `checked-indexeddb.ts` replaces y-indexeddb's unobserved update listener while
 retaining its hydration/destroy protocol. It uses the dependency's declared
 `_storeUpdate`, `_dbref`, and `_dbsize` fields; changes to those fields on a
-future dependency upgrade require revalidation. Tests exercise transaction
+future dependency upgrade require revalidation. A real IndexeddbPersistence integration test verifies a single writer, 500-update
+compaction without a native debounce timer, hydration after reopening, and
+listener removal after destroy. Tests also exercise transaction
 aborts, synchronous quota errors, physical backup removal, and concurrent-tab
-preservation. Compaction also runs after 500 updates to bound the log.
+preservation. Compaction also runs after 500 updates to bound the log. A failed compaction
+resets its counter and forced-compaction flag; retries checkpoint missing edits
+without running a full merge on every following update.
 
 Hydration blocks both live and library writes until successful restoration.
-Failure keeps those writes blocked for that project session and displays the
-reason. Ordinary loads no longer immediately rewrite CRDT state. Successful
+Failure keeps the damaged source blocked and displays the reason with an
+action to open a fresh recovery copy from a validated library row. This leaves
+both the damaged CRDT and original library row intact, and the copy can be edited
+and saved under a new ID. A missing/unreadable library row receives an explicit
+message directing users to another project or a backup import. Ordinary loads no longer immediately rewrite CRDT state. Successful
 schema migration itself is the one intentional read-triggered CRDT mutation.
 Ordinary flush validation errors are caught inside the store listener, display
 a save failure, and retry on the next valid edit rather than blocking hydration.
 Saved acknowledges IndexedDB transaction completion, not a queued microtask.
+IDB failures retry full checkpoints while idle, starting at 2 seconds with
+exponential backoff capped at 30 seconds; success and disposal cancel the timer.
+Invalid edit validation is excluded from timer retry. Real live-doc plus provider
+tests cover repair notification, durable edits, idle quota recovery and the
+library recovery action.
 The current CRDT candidate always goes through the strict current parser; tests
 capture that candidate and assert its nested fields outside the injected parser,
 so an assertion cannot be swallowed by production error wrapping.

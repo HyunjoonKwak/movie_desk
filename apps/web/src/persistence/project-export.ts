@@ -346,6 +346,8 @@ const exportSchema = z.object({
 const recoveredAudio = new WeakSet<Project>();
 const rememberAudioRecovery = (raw: unknown, project: Project): Project => {
   // Called only after the load-bearing project shape has passed validation.
+  // Passthrough parsing preserves timeline and track array order, so indices
+  // identify the same entities before and after optional audio sanitization.
   const input = raw as Project;
   if (
     (input.audio !== undefined && project.audio === undefined) ||

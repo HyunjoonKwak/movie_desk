@@ -449,7 +449,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
 | B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·rebase·gate PASS, 통합 리뷰 대기 | 저장 경계 자기 치유·실패 안내, 게이트웨이 대상 합성, Phase 1 방어 주석. main4791476 기준 core161·web721·desktop72·scripts11(965), E2E66/66, gate9/9. 호출부 이관·중첩 영속화는 Phase 1+7. [2라운드 보고서](evaluations/2026-09-07-b5-phase0-round2-report.md) |
-| B'5 Phase 1+7 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·gate 완료, 재검토 대기 | gate9/9, core162·web770·desktop72·scripts11(1,015), 최종 E2E68/68 두 번 PASS. 삭제↔이동 병합 복구, 무효 편집 저장 오류 처리, 1MiB 백업 상한·커밋 후 폐기/압축, 후보 필드 테스트 보강. [2라운드 결과](evaluations/2026-09-07-b5-phase1-round2-report.md) · [결정](decisions/2026-09-07-nested-persistence.md) |
+| B'5 Phase 1+7 | Codex 구현 · Claude 감독/리뷰 | 3라운드 수정·gate 완료, 재검토 대기 | gate9/9, core162·web783·desktop72·scripts11(1,028), 최종 E2E68/68 두 번 PASS. 고아 엔터티 순서 복원·삭제 클립 참조 복구 알림, 손상 시 라이브러리 복구 사본, 실제 provider 통합 검증, 압축 실패 backoff·유휴 재시도. [3라운드 결과](evaluations/2026-09-07-b5-phase1-round3-report.md) · [결정](decisions/2026-09-07-nested-persistence.md) |
 | D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
@@ -909,3 +909,20 @@ A5 규모 저장 벤치(1,000자산/1,000클립, 각 300회)에서 `1481e25` 대
 2라운드 최종 검증: **pnpm gate 9/9 PASS**, 단위 **1,015개**(core162·web770·desktop72·scripts11),
 저장 관련 **150개**, 전체 E2E **68/68 두 번 PASS(2.7m·2.6m)**. 각 실행 전 32119 lsof 확인.
 기존 RC1 도그푸딩 기록지는 변경하지 않았다.
+
+
+### 2026-09-07 B′5 Phase 1+7 — 3라운드 리뷰 반영
+
+`4340422`의 순서 권위 정책을 수정했다. 순서 밖에 남은 타임라인·트랙·미디어·컬렉션은
+맵의 존재를 보존하고 끝에 복원하며, 실제 `reconcileSequence` 이동과 삭제가 충돌해
+실체 없는 클립 순서가 남으면 참조만 제거한다. 두 복구 모두 열림 세션당 1회 알린다.
+손상 검증 오류에는 원본을 보존하는 라이브러리 복구 사본 열기를 연결했다.
+실제 IndexeddbPersistence로 단일 writer·500회 압축·destroy 리스너 해제·재하이드레이션을
+검증하고, 압축 실패 카운터와 강제 압축 플래그를 초기화해 매 편집 전체 병합을 막았다.
+실제 live-doc + writer 통합 테스트는 복구 후 저장과 알림, 유휴 중 용량 오류 재시도,
+복구 사본의 저장 가능성과 손상 원본 보존을 검증한다. IDB 실패는 2초부터 30초 상한으로
+유휴 재시도하며, 오디오 복구의 배열 인덱스 대응 전제도 주석으로 남겼다.
+최종 검증: gate **9/9 PASS**, core **162**·web **783**·desktop **72**·scripts **11**
+= **1,028 테스트**(persistence **163**), 전체 E2E **68/68 두 번 PASS**(각 2.7분).
+두 번 모두 32119 포트의 미사용을 lsof로 확인했고 최종 소스는 동일하다. [3라운드 보고서](evaluations/2026-09-07-b5-phase1-round3-report.md) ·
+[결정](decisions/2026-09-07-nested-persistence.md).

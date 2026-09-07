@@ -6,7 +6,7 @@ import {
 import { NestedTimelineError } from "@movie-desk/core";
 import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
 import * as Y from "yjs";
-import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
+import { reconcileSequence, recoverEntityOrder, uniqueSequence } from "./crdt-sequence";
 import { createTimelineCrdt } from "./timeline-crdt";
 
 const PROJECT_CRDT_SCHEMA_VERSION = 3;
@@ -46,6 +46,7 @@ const syncEntityMap = <T>(map: Y.Map<T>, values: ReadonlyMap<string, T>): void =
 export interface ProjectCrdt {
   readonly clips: Y.Map<Clip>;
   isInitialized(): boolean;
+  takeRecovery(): boolean;
   write(project: Project): void;
   read(projectId: Project["id"], localView: Project["timeline"]): Project | null;
 }
@@ -62,7 +63,11 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const collectionsMap = doc.getMap<MediaCollection>(COLLECTIONS);
   const collectionOrder = doc.getArray<string>(COLLECTION_ORDER);
   const clipsMap = doc.getMap<Clip>(CLIPS_MAP_NAME);
-  const timelines = createTimelineCrdt(doc);
+  let recovered = false;
+  const recovery = () => {
+    recovered = true;
+  };
+  const timelines = createTimelineCrdt(doc, recovery);
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
 
   const write = (input: Project): void => {
@@ -113,13 +118,19 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
         version === 3 ? timelines.read(metaMap.get("rootTimelineId"), localView) : null;
 
       const tracks: Track[] = [];
-      for (const trackId of nested ? [] : uniqueSequence(trackOrder.toArray())) {
+      for (const trackId of nested
+        ? []
+        : recoverEntityOrder(trackOrder.toArray(), tracksMap, recovery)) {
         const track = tracksMap.get(trackId);
         if (!track || track.id !== trackId)
           throw new NestedTimelineError("Missing or mismatched legacy track");
-        const clips = uniqueSequence(clipOrderFor(trackId).toArray()).map((clipId) => {
+        const clips = uniqueSequence(clipOrderFor(trackId).toArray()).flatMap((clipId) => {
           const clip = clipsMap.get(clipId);
-          if (clip?.id !== clipId)
+          if (clip === undefined) {
+            recovery();
+            return [];
+          }
+          if (clip.id !== clipId)
             throw new NestedTimelineError("Missing or mismatched legacy clip");
           return clip;
         });
@@ -133,14 +144,13 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
           ),
         0,
       );
-      const mediaIds = uniqueSequence(mediaOrder.toArray());
-      const collectionIds = uniqueSequence(collectionOrder.toArray());
+      const mediaIds = recoverEntityOrder(mediaOrder.toArray(), mediaMap, recovery);
+      const collectionIds = recoverEntityOrder(collectionOrder.toArray(), collectionsMap, recovery);
       const mediaLibrary = mediaIds
         .map((assetId) => mediaMap.get(assetId))
         .filter((asset): asset is MediaAsset => asset !== undefined);
 
-      // Delete versus move can leave unreferenced map entries after a merge.
-      // Order is authoritative; migration rewrites only the reachable entities.
+      // Retain map-only entities; the next edit persists their recovered order.
       const name = metaMap.get("name");
       const createdAt = metaMap.get("createdAt");
       const framerate = metaMap.get("framerate");
@@ -218,6 +228,11 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
 
   return {
     clips: timelines.clips,
+    takeRecovery: () => {
+      const value = recovered;
+      recovered = false;
+      return value;
+    },
     isInitialized: () =>
       metaMap.size > 0 || tracksMap.size > 0 || doc.getMap("timelines-v3").size > 0,
     write,

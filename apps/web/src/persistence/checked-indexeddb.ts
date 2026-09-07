@@ -24,7 +24,10 @@ export const installCheckedWriter = (
       if (writeFailed) return;
       writeFailed = true;
       retryCheckpoint = true;
-      if (compact) compactNext = true;
+      // Back off for another full interval after failed compaction. Retrying
+      // durability needs a checkpoint, not an expensive merge on every edit.
+      writes = 0;
+      compactNext = false;
       callbacks.failed(error);
     };
     try {
