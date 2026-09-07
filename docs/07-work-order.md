@@ -448,6 +448,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
+| B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 구현·gate PASS, 통합 리뷰 대기 | 오디오 선행 결정 + ID/collection/root alias. core160·web718·desktop72·scripts11(961), E2E64/64, gate9/9. 중첩 기능·스키마는 후속 Phase 1+7 원자적 배치. [보고서](evaluations/2026-09-07-b5-phase0-report.md) |
 | D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
@@ -823,3 +824,21 @@ Chromium **66/66**(186.3초, retry0), OSV167 취약점0, tsc·lint·build PASS.
 첫 gate 후 보강한 샘플러 단언의 기준 시점 오류(분석은 패널 클릭 전 import 때 시작)를
 단독 검증에서 잡아 가져오기 전으로 수정했고 최종 전체 gate에서 재확인했다.
 최초 실패 이력은 위 보고서에 보존했다. Claude 리뷰·RC DMG 수동 체크리스트는 대기한다.
+
+2026-09-07 B'5 Phase 0 (`codex/b5-phase0`, 기준 `c072cd0`):
+[오디오 선행 결정](decisions/2026-09-07-nested-sequence-audio-routing.md)은 내부 믹스를
+스테레오로 접고 sequence volume envelope와 부모 트랙/버스를 적용하며 프로젝트 master는
+루트에서 한 번만 적용한다. Solo는 timeline별이며 부모·자식 게이트를 모두 통과해야 한다.
+`Timeline.id`, `Project.timelines/rootTimelineId`, `findTimeline`과 두 공통 관문
+`recompute`/`replaceTrack`을 구현했고, 관문 밖 마커·뷰·믹서·멀티캠·스토어 쓰기도
+루트 alias와 collection을 함께 갱신한다. JSON·CRDT 기존 필드 보존과 로드 직후 되쓰기,
+편집/undo/redo alias 동일성을 회귀 테스트로 고정했다.
+
+`project-io.ts` 어댑터가 기존 v1 codec을 감싸므로 동시 배치의 `project-export.ts`는
+수정하지 않았다. zod·CRDT 저장 스키마도 그대로이며 새 필드는 런타임에서만 파생한다.
+중첩 필드의 `.catch()` 복구는 금지하고 다중 timeline의 v1 저장은 변경 전에 실패시킨다.
+지정 grep 방식은 **239→247**(web157·core90), 단어 경계를 적용하면 **241**이다:
+원래 식이 새 `project.timelines` 6회도 단수 접근처럼 센다. 호출부 일괄 전환은 하지 않았다.
+`pnpm gate` **9/9 PASS**, core160·web718·desktop72·scripts11(**961**), E2E **64/64**,
+OSV167 취약점0이며 32119 사용 전 lsof와 다른 gate 프로세스가 없음을 확인했다.
+[gate 기록](evaluations/2026-09-07-b5-phase0-gate.md). Phase 1 이후 구현과 통합 리뷰가 남는다.

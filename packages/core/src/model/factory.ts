@@ -1,3 +1,4 @@
+import { hydrateProjectTimelines, syncRootTimeline } from "./project-timelines";
 import type { Project } from "./project";
 import type { Track } from "./track";
 import { newId } from "../utils/id";
@@ -24,8 +25,8 @@ export const createEmptyProject = (overrides?: Partial<Project>): Project => {
     locked: false,
     clips: [],
   };
-  return {
-    id: newId(),
+  const base = hydrateProjectTimelines({
+    id: overrides?.id ?? newId(),
     name: "Untitled",
     createdAt: now,
     updatedAt: now,
@@ -38,6 +39,23 @@ export const createEmptyProject = (overrides?: Partial<Project>): Project => {
       duration: 0,
     },
     mediaLibrary: [],
-    ...overrides,
-  };
+  });
+  if (overrides?.timelines) {
+    if (
+      new Set(overrides.timelines.map((timeline) => timeline.id)).size !==
+      overrides.timelines.length
+    )
+      throw new Error("Duplicate timeline ID in project overrides");
+    const rootTimelineId = overrides.rootTimelineId ?? overrides.timelines[0]?.id;
+    const timeline =
+      overrides.timeline?.id === rootTimelineId
+        ? overrides.timeline
+        : overrides.timelines.find((candidate) => candidate.id === rootTimelineId);
+    if (!timeline) throw new Error("Missing root timeline in project overrides");
+    return syncRootTimeline({ ...base, ...overrides, rootTimelineId: timeline.id, timeline });
+  }
+  const timeline = overrides?.timeline ?? base.timeline;
+  if (overrides?.rootTimelineId && overrides.rootTimelineId !== timeline.id)
+    throw new Error("Root timeline override does not match timeline");
+  return { ...base, ...overrides, timeline, timelines: [timeline], rootTimelineId: timeline.id };
 };

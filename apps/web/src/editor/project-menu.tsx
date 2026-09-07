@@ -7,7 +7,7 @@ import {
   ProjectVersionError,
   downloadProjectJson,
   parseProjectExport,
-} from "@/persistence/project-export";
+} from "@/persistence/project-io";
 import { withInlinePreviews } from "@/persistence/previews";
 import {
   deleteStoredProject,

@@ -1,4 +1,4 @@
-import { type ID, createEmptyProject } from "@movie-desk/core";
+import { type ID, createEmptyProject, toLegacyProject } from "@movie-desk/core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Snapshots are frozen project JSON in IndexedDB. Node has no IndexedDB, so
@@ -94,6 +94,9 @@ describe("snapshots", () => {
     const restored = await loadSnapshot(listed[1]?.id as string);
     expect(restored?.name).toBe("trip");
     expect(restored?.id).toBe(project.id);
+    expect(restored).toEqual(project);
+    expect(restored?.timelines[0]).toBe(restored?.timeline);
+    expect(JSON.parse(listed[1]!.json)).toEqual(toLegacyProject(project));
   });
 
   it("returns null for a damaged or unknown snapshot instead of throwing", async () => {
@@ -133,7 +136,7 @@ it("proposes oldest overflow without deleting and cleans only confirmed project 
       projectId: project.id,
       createdAt: i,
       label: String(i),
-      json: JSON.stringify(project),
+      json: JSON.stringify(toLegacyProject(project)),
     });
   }
   rows.set("other", { id: "other", projectId: "other", createdAt: 0, label: "other", json: "{}" });

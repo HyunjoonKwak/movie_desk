@@ -1,8 +1,10 @@
 "use client";
 
+import { hydrateProjectTimelines, syncRootTimeline } from "@movie-desk/core";
+
 import { toast } from "sonner";
 import { t } from "@/i18n/use-t";
-import { takeAudioRecovery } from "@/persistence/project-export";
+import { takeAudioRecovery } from "@/persistence/project-io";
 
 import { editMixer, type MixerEdit } from "@movie-desk/core";
 import { precisionSession, resumePrecision } from "./precision-session";
@@ -303,7 +305,10 @@ export const useProjectStore = create<ProjectStoreState>()(
       const end = reloadSpan("loadProject");
       nudgeSession = null;
       get().endPrecisionEdit(undefined, true);
-      set({ project: p, history: emptyHistory });
+      set({
+        project: "timelines" in p ? syncRootTimeline(p) : hydrateProjectTimelines(p),
+        history: emptyHistory,
+      });
       if (takeAudioRecovery(p))
         toast.warning(t("project.audioRecovered"), { id: `audio-recovery:${p.id}` });
       end();
@@ -382,14 +387,14 @@ export const useProjectStore = create<ProjectStoreState>()(
       if (cancel || (unchanged && !session.rebased)) {
         set({
           precisionEditing: false,
-          project: {
+          project: syncRootTimeline({
             ...session.before,
             timeline: {
               ...session.before.timeline,
               playhead: after.timeline.playhead,
               zoom: after.timeline.zoom,
             },
-          },
+          }),
         });
       } else {
         set({
@@ -443,11 +448,11 @@ export const useProjectStore = create<ProjectStoreState>()(
           : t,
       );
       set({
-        project: {
+        project: syncRootTimeline({
           ...before,
           updatedAt: Date.now(),
           timeline: { ...before.timeline, tracks },
-        },
+        }),
       });
     },
 

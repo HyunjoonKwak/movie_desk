@@ -3,8 +3,8 @@
 // project at a moment in time.
 
 import Dexie, { type Table } from "dexie";
-import type { Project } from "@movie-desk/core";
-import { parseStoredProject } from "./project-export";
+import { toLegacyProject, type Project } from "@movie-desk/core";
+import { parseStoredProject } from "./project-io";
 
 export interface ProjectSnapshot {
   id: string;
@@ -42,7 +42,7 @@ export const saveSnapshot = async (project: Project, label: string): Promise<voi
     projectId: project.id,
     label: label || new Date().toLocaleString(),
     createdAt: Date.now(),
-    json: JSON.stringify(project),
+    json: JSON.stringify(toLegacyProject(project)),
   });
 };
 

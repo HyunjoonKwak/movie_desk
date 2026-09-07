@@ -6,8 +6,8 @@
 
 import { reloadSpan, measureReload } from "@/lib/reload-metrics";
 import Dexie, { type Table } from "dexie";
-import type { Project } from "@movie-desk/core";
-import { parseStoredProject } from "./project-export";
+import { toLegacyProject, type Project } from "@movie-desk/core";
+import { parseStoredProject } from "./project-io";
 
 interface StoredProject {
   id: string;
@@ -48,7 +48,7 @@ export const upsertProject = async (p: Project): Promise<void> => {
     id: p.id,
     name: p.name,
     updatedAt: p.updatedAt,
-    json: JSON.stringify(p),
+    json: JSON.stringify(toLegacyProject(p)),
   });
 };
 

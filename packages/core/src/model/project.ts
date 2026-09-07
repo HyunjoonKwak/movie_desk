@@ -11,6 +11,7 @@ export interface Resolution {
 }
 
 export interface Timeline {
+  readonly id: ID;
   readonly tracks: readonly Track[];
   readonly playhead: Ms;
   readonly zoom: number; // pixels per ms
@@ -38,6 +39,9 @@ export interface Project {
   readonly updatedAt: number;
   readonly framerate: Fps;
   readonly resolution: Resolution;
+  readonly timelines: readonly Timeline[];
+  readonly rootTimelineId: ID;
+  /** Derived root alias; use replaceTimeline/syncRootTimeline at write boundaries. */
   readonly timeline: Timeline;
   readonly mediaLibrary: readonly MediaAsset[];
   readonly collections?: readonly MediaCollection[]; // optional; older projects have none

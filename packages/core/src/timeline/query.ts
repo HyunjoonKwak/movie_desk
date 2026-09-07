@@ -31,3 +31,6 @@ export const clipsAt = (timeline: Timeline, t: Ms): readonly Clip[] => {
 };
 
 export const visibleAt = (project: Project, t: Ms): readonly Clip[] => clipsAt(project.timeline, t);
+
+export const findTimeline = (project: Project, id: ID): Timeline | undefined =>
+  project.timelines.find((timeline) => timeline.id === id);

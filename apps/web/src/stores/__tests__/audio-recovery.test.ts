@@ -1,7 +1,7 @@
-import { createEmptyProject } from "@movie-desk/core";
+import { createEmptyProject, toLegacyProject } from "@movie-desk/core";
 import { expect, it, vi } from "vitest";
 import { toast } from "sonner";
-import { parseStoredProject } from "@/persistence/project-export";
+import { parseStoredProject } from "@/persistence/project-io";
 import { useLocaleStore } from "@/i18n/store";
 import { useProjectStore } from "../project-store";
 vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
@@ -11,7 +11,10 @@ it.each(["ko", "en"] as const)(
     vi.mocked(toast.warning).mockClear();
     useLocaleStore.setState({ locale });
     const base = createEmptyProject();
-    const project = parseStoredProject({ ...base, audio: { buses: [], master: { gainDb: 100 } } });
+    const project = parseStoredProject({
+      ...toLegacyProject(base),
+      audio: { buses: [], master: { gainDb: 100 } },
+    });
     expect(toast.warning).not.toHaveBeenCalled();
     useProjectStore.getState().loadProject(project);
     expect(useProjectStore.getState().project).toEqual(base);

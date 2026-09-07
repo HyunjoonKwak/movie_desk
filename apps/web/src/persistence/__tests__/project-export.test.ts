@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createEmptyProject, newId } from "@movie-desk/core";
+import { createEmptyProject, newId, toLegacyProject } from "@movie-desk/core";
 import {
   ProjectVersionError,
   parseProjectExport,
   parseStoredProject,
   toProjectExport,
-} from "../project-export";
+} from "../project-io";
 
 // The JSON export is the user's escape hatch for their work — a lossy or
 // crash-prone round-trip is silent data loss. These guard both directions.
@@ -114,14 +114,18 @@ describe("project-export", () => {
   });
 
   it("validates stored library projects and preserves timeline markers", () => {
+    const base = createEmptyProject();
     const project = createEmptyProject({
+      id: base.id,
       timeline: {
-        ...createEmptyProject().timeline,
+        ...base.timeline,
         markers: [{ id: newId(), at: 250, label: "Beat", color: "#ff0000" }],
       },
     });
 
-    expect(parseStoredProject(JSON.parse(JSON.stringify(project)))).toEqual(project);
+    expect(parseStoredProject(JSON.parse(JSON.stringify(toLegacyProject(project))))).toEqual(
+      project,
+    );
   });
 
   it("rejects malformed stored library projects before they reach the editor", () => {
@@ -181,21 +185,21 @@ describe("library marks and collections in the export", () => {
   it("drops a malformed rating and keeps a collection kind it does not know", () => {
     const project = withMarks();
     const badRating = {
-      ...project,
+      ...toLegacyProject(project),
       mediaLibrary: [{ ...project.mediaLibrary[0], rating: 7 }],
     };
     expect(parseStoredProject(badRating).mediaLibrary[0]).not.toHaveProperty("rating");
     // A newer build's collection, or odd filter values, must not make the
     // project unloadable; they pass through so the next save keeps them.
     const future = {
-      ...project,
+      ...toLegacyProject(project),
       collections: [
         { id: "f", name: "Future", kind: "album", cover: { assetId: "a" } },
         { id: "s", name: "Odd", kind: "smart", query: "", filters: { range: { from: 1 } } },
       ],
     };
     expect(parseStoredProject(future).collections).toEqual(future.collections);
-    const noKind = { ...project, collections: [{ id: "x", name: "?" }] };
+    const noKind = { ...toLegacyProject(project), collections: [{ id: "x", name: "?" }] };
     expect(() => parseStoredProject(noKind)).toThrow();
   });
 });

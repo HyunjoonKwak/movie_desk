@@ -1,5 +1,6 @@
 import { reloadSpan } from "@/lib/reload-metrics";
 import { useProjectStore } from "@/stores/project-store";
+import { hydrateProjectTimelines, type LegacyProject } from "@movie-desk/core";
 import type { Clip, Project, Track } from "@movie-desk/core";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
@@ -18,8 +19,8 @@ const LEGACY_KEY = "snapshot";
 const LOCAL_ORIGIN = { local: true };
 
 type TrackMeta = Omit<Track, "clips">;
-type LegacyStructure = Omit<Project, "id" | "timeline"> & {
-  timeline: Omit<Project["timeline"], "tracks"> & {
+type LegacyStructure = Omit<LegacyProject, "id" | "timeline"> & {
+  timeline: Omit<LegacyProject["timeline"], "tracks"> & {
     tracks: (TrackMeta & { clipIds: readonly string[] })[];
   };
 };
@@ -39,7 +40,7 @@ const legacyProject = (
       track.clips.reduce((trackMax, clip) => Math.max(trackMax, clip.start + clip.duration), max),
     0,
   );
-  return {
+  return hydrateProjectTimelines({
     ...structure,
     id: projectId,
     timeline: {
@@ -49,7 +50,7 @@ const legacyProject = (
       playhead: localView.playhead,
       zoom: localView.zoom,
     },
-  };
+  });
 };
 
 export interface LiveDoc {
@@ -159,10 +160,10 @@ export const getLiveDoc = (): LiveDoc => {
     }
 
     const current = useProjectStore.getState().project;
-    const oldSnapshot = doc.getMap<Project>(LEGACY_MAP).get(LEGACY_KEY);
+    const oldSnapshot = doc.getMap<LegacyProject>(LEGACY_MAP).get(LEGACY_KEY);
     const oldStructure = doc.getMap<LegacyStructure>(LEGACY_STRUCT).get(LEGACY_STRUCT_KEY);
     const seed = oldSnapshot
-      ? { ...oldSnapshot, id: projectId }
+      ? hydrateProjectTimelines({ ...oldSnapshot, id: projectId })
       : oldStructure
         ? legacyProject(projectId, oldStructure, clipsMap, current.timeline)
         : current;

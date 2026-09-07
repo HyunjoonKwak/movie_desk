@@ -1,8 +1,14 @@
-import { createEmptyProject, newId, type MediaClip } from "@movie-desk/core";
+import {
+  createEmptyProject,
+  newId,
+  syncRootTimeline,
+  toLegacyProject,
+  type MediaClip,
+} from "@movie-desk/core";
 import { expect, it } from "vitest";
 import * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";
-import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-export";
+import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-io";
 import { useProjectStore } from "@/stores/project-store";
 
 it.each([undefined, false, true])(
@@ -22,7 +28,7 @@ it.each([undefined, false, true])(
       keyframes: [],
       ...(value === undefined ? {} : { preservePitch: value }),
     };
-    const project = {
+    const project = syncRootTimeline({
       ...base,
       timeline: {
         ...base.timeline,
@@ -31,9 +37,9 @@ it.each([undefined, false, true])(
           i === 0 ? { ...track, clips: [clip] } : track,
         ),
       },
-    };
+    });
     const parsed = parseProjectExport(JSON.parse(JSON.stringify(toProjectExport(project)))).project;
-    const stored = parseStoredProject(JSON.parse(JSON.stringify(project)));
+    const stored = parseStoredProject(JSON.parse(JSON.stringify(toLegacyProject(project))));
     const doc = new Y.Doc();
     const crdt = createProjectCrdt(doc);
     crdt.write(project);

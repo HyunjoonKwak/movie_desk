@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "@movie-desk/core";
 import { useProjectStore } from "@/stores/project-store";
 import type { ID, MediaAsset } from "@movie-desk/core";
 import { Compositor } from "./compositor";
@@ -33,13 +34,19 @@ const runRenderBench = async (frames = 60): Promise<BenchResult> => {
     let virtual = 0;
     c.setPlayheadGetter(() => virtual);
     // Warm-up pass — compiles + uploads aren't paid in steady-state.
-    await c.renderFrame({ ...project, timeline: { ...project.timeline, playhead: 0 } }, getAsset);
+    await c.renderFrame(
+      syncRootTimeline({ ...project, timeline: { ...project.timeline, playhead: 0 } }),
+      getAsset,
+    );
 
     const samples: number[] = [];
     const t0 = performance.now();
     for (let i = 0; i < frames; i++) {
       virtual = (i / Math.max(1, frames - 1)) * dur;
-      const p = { ...project, timeline: { ...project.timeline, playhead: virtual } };
+      const p = syncRootTimeline({
+        ...project,
+        timeline: { ...project.timeline, playhead: virtual },
+      });
       const f0 = performance.now();
       await c.renderFrame(p, getAsset);
       samples.push(performance.now() - f0);

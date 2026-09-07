@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "@movie-desk/core";
 import {
   resolveTrackRoute,
   stereoPanMatrix,
@@ -53,7 +54,7 @@ export const estimatedLevels = (
       route.trackGain *
       Math.max(ll + lr, rl + rr) *
       playheadLevel(
-        { ...project, timeline: { ...project.timeline, tracks: [track] } },
+        syncRootTimeline({ ...project, timeline: { ...project.timeline, tracks: [track] } }),
         (id) => assets.get(id),
         (id) => assets.get(id)?.waveformPeaks ?? waveforms[id],
       );

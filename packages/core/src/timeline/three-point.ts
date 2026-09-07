@@ -16,12 +16,7 @@ import { splitClipAt } from "./split";
 // shift everything at or after it right by the incoming duration on EVERY
 // unlocked track (parallel audio/titles stay in sync, matching ripple
 // delete), and drop the clip into the opened gap.
-export const insertClipAt = (
-  project: Project,
-  trackId: ID,
-  clip: Clip,
-  atMs: Ms,
-): Project => {
+export const insertClipAt = (project: Project, trackId: ID, clip: Clip, atMs: Ms): Project => {
   const track = findTrack(project.timeline, trackId);
   if (!track) return project;
   const at = Math.max(0, snapMsToFrame(atMs, project.framerate));
@@ -43,12 +38,7 @@ export const insertClipAt = (
 // Overwrite (D): clear the window [at, at + duration) on the track — fully
 // covered clips are removed, partially covered ones are trimmed (media
 // clips keep their source offset) — then place the clip. Never ripples.
-export const overwriteClipAt = (
-  project: Project,
-  trackId: ID,
-  clip: Clip,
-  atMs: Ms,
-): Project => {
+export const overwriteClipAt = (project: Project, trackId: ID, clip: Clip, atMs: Ms): Project => {
   const track = findTrack(project.timeline, trackId);
   if (!track) return project;
   const at = Math.max(0, snapMsToFrame(atMs, project.framerate));
@@ -77,8 +67,5 @@ export const overwriteClipAt = (
   const clips = [...survivors, { ...clip, start: at, duration: dur }].sort(
     (a, b) => a.start - b.start,
   );
-  return recompute({
-    ...project,
-    timeline: replaceTrack(project.timeline, { ...track, clips }),
-  });
+  return recompute(replaceTrack(project, { ...track, clips }));
 };

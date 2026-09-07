@@ -1,4 +1,5 @@
-import { parseStoredProject } from "@/persistence/project-export";
+import { parseStoredProject } from "@/persistence/project-io";
+import { toLegacyProject, syncRootTimeline } from "@movie-desk/core";
 import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
 import type * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
@@ -57,6 +58,9 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
 
   const write = (project: Project): void => {
+    // Phase 0 guard only: the v2 document still has no nested timeline schema.
+    // Run before any Yjs mutation so unsupported children cannot be discarded.
+    toLegacyProject(syncRootTimeline(project));
     setJsonValue(metaMap, META_SCHEMA, PROJECT_CRDT_SCHEMA_VERSION);
     if (project.audio) setJsonValue(metaMap, "audio", project.audio);
     else metaMap.delete("audio");

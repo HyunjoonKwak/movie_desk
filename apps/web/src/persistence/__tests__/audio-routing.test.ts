@@ -1,4 +1,9 @@
-import { createEmptyProject, type Project } from "@movie-desk/core";
+import {
+  createEmptyProject,
+  syncRootTimeline,
+  toLegacyProject,
+  type Project,
+} from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import {
@@ -6,12 +11,12 @@ import {
   toProjectExport,
   parseStoredProject,
   takeAudioRecovery,
-} from "../project-export";
+} from "../project-io";
 import { createProjectCrdt } from "../project-crdt";
 
 const fixture = (): Project => {
   const p = createEmptyProject();
-  return {
+  return syncRootTimeline({
     ...p,
     audio: {
       buses: [{ id: "bus", name: "Music", gainDb: -3, muted: true }],
@@ -24,17 +29,17 @@ const fixture = (): Project => {
         audio: { gainDb: -6, pan: 0.5, busId: "bus" },
       })),
     },
-  };
+  });
 };
 
 describe("audio routing persistence", () => {
   it("round trips JSON and old projects without inserting defaults", () => {
     for (const p of [fixture(), createEmptyProject()])
-      expect(parseStoredProject(JSON.parse(JSON.stringify(p)))).toEqual(p);
+      expect(parseStoredProject(JSON.parse(JSON.stringify(toLegacyProject(p))))).toEqual(p);
   });
   it("preserves future fields on project, master, bus and track audio", () => {
     const p = fixture();
-    const future = {
+    const futureFields = {
       ...p,
       audio: {
         ...p.audio!,
@@ -47,7 +52,8 @@ describe("audio routing persistence", () => {
         tracks: p.timeline.tracks.map((t) => ({ ...t, audio: { ...t.audio, future: 4 } })),
       },
     };
-    expect(parseStoredProject(JSON.parse(JSON.stringify(future)))).toEqual(future);
+    const future = syncRootTimeline(futureFields);
+    expect(parseStoredProject(JSON.parse(JSON.stringify(toLegacyProject(future))))).toEqual(future);
     expect(parseProjectExport(JSON.parse(JSON.stringify(toProjectExport(future)))).project).toEqual(
       future,
     );
@@ -76,10 +82,13 @@ describe("audio routing persistence", () => {
     const p = fixture();
     const { audio: _audio, ...withoutAudio } = p;
     const invalid = [-61, 13, Number.NaN, Number.POSITIVE_INFINITY].map((gainDb) => ({
-      ...p,
+      ...toLegacyProject(p),
       audio: { ...p.audio, master: { gainDb } },
     }));
-    invalid.push({ ...p, audio: { ...p.audio!, buses: [...p.audio!.buses, ...p.audio!.buses] } });
+    invalid.push({
+      ...toLegacyProject(p),
+      audio: { ...p.audio!, buses: [...p.audio!.buses, ...p.audio!.buses] },
+    });
     for (const raw of invalid) {
       const parsed = parseStoredProject(raw);
       expect(parsed).toEqual(withoutAudio);
@@ -91,7 +100,7 @@ describe("audio routing persistence", () => {
       expect(takeAudioRecovery(exported)).toBe(true);
     }
     const badTrack = {
-      ...p,
+      ...toLegacyProject(p),
       timeline: {
         ...p.timeline,
         tracks: p.timeline.tracks.map((t, i) => (i === 0 ? { ...t, audio: { pan: 2 } } : t)),

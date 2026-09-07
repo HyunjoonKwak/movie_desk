@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "@movie-desk/core";
 import { addClip, addTrackAt, newId, type Project, type Track } from "@movie-desk/core";
 import type { SubtitleCue } from "./srt";
 
@@ -30,9 +31,7 @@ const ensureSubtitleTrack = (project: Project): { project: Project; track: Track
 export const listSubtitleClips = (project: Project) => {
   const track = project.timeline.tracks.find((t) => t.name === SUBS_TRACK_NAME);
   if (!track) return [];
-  return track.clips
-    .filter((c) => c.kind === "text")
-    .toSorted((a, b) => a.start - b.start);
+  return track.clips.filter((c) => c.kind === "text").toSorted((a, b) => a.start - b.start);
 };
 
 // Replace every subtitle clip with the supplied cues. Useful when importing
@@ -43,15 +42,13 @@ export const replaceSubtitlesFromCues = (
 ): Project => {
   let { project: next, track } = ensureSubtitleTrack(project);
   // Clear the existing subtitle clips by replacing the track's clip array.
-  next = {
+  next = syncRootTimeline({
     ...next,
     timeline: {
       ...next.timeline,
-      tracks: next.timeline.tracks.map((t) =>
-        t.id === track.id ? { ...t, clips: [] } : t,
-      ),
+      tracks: next.timeline.tracks.map((t) => (t.id === track.id ? { ...t, clips: [] } : t)),
     },
-  };
+  });
   // Re-grab the now-empty track reference.
   track = next.timeline.tracks.find((t) => t.id === track.id)!;
   for (const cue of cues) {

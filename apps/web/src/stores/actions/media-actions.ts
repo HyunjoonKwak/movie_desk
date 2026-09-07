@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "@movie-desk/core";
 import { withoutInlinePreviews } from "@/media/inline-previews";
 import type { ID, MediaAsset, Ms, SourceRotation } from "@movie-desk/core";
 
@@ -156,10 +157,10 @@ export const createMediaActions = <S extends ProjectMutating>(
         ...tr,
         clips: tr.clips.filter((c) => c.kind !== "media" || c.assetId !== assetId),
       }));
-      return {
+      return syncRootTimeline({
         ...p,
         mediaLibrary: p.mediaLibrary.filter((a) => a.id !== assetId),
         timeline: { ...p.timeline, tracks },
-      };
+      });
     }),
 });

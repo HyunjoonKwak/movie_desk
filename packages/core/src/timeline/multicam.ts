@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "../model/project-timelines";
 import { addClip, addTrack, removeClip } from "./mutate";
 import { splitClipAt } from "./split";
 import { isMediaClip, type MediaClip } from "../model/clip";
@@ -54,11 +55,7 @@ export const createMulticamProgram = (
 // Switch the active angle at `atMs`: split the covering program clip and
 // repoint the right-hand slice to the chosen angle's asset (respecting sync
 // offset). The program track is identified by name "Multicam".
-export const switchAngleAt = (
-  project: Project,
-  atMs: Ms,
-  angle: MulticamAngle,
-): Project => {
+export const switchAngleAt = (project: Project, atMs: Ms, angle: MulticamAngle): Project => {
   const track = project.timeline.tracks.find((t) => t.name === "Multicam");
   if (!track) return project;
   const covering = track.clips.find(
@@ -69,9 +66,9 @@ export const switchAngleAt = (
   let next = splitClipAt(project, covering.id, atMs);
   // After the split, find the right-hand slice (starts at atMs) on the track.
   const updatedTrack = next.timeline.tracks.find((t) => t.name === "Multicam");
-  const right = updatedTrack?.clips.find(
-    (c) => Math.abs(c.start - atMs) < 1 && isMediaClip(c),
-  ) as MediaClip | undefined;
+  const right = updatedTrack?.clips.find((c) => Math.abs(c.start - atMs) < 1 && isMediaClip(c)) as
+    | MediaClip
+    | undefined;
   if (!right) return next;
 
   // Repoint that slice to the new angle: same timeline position, new asset,
@@ -91,12 +88,14 @@ const repointClip = (
   const tracks = project.timeline.tracks.map((t) => ({
     ...t,
     clips: t.clips.map((c) =>
-      c.id === clipId && isMediaClip(c)
-        ? { ...c, assetId, trimIn, trimOut: trimIn + duration }
-        : c,
+      c.id === clipId && isMediaClip(c) ? { ...c, assetId, trimIn, trimOut: trimIn + duration } : c,
     ),
   }));
-  return { ...project, updatedAt: Date.now(), timeline: { ...project.timeline, tracks } };
+  return syncRootTimeline({
+    ...project,
+    updatedAt: Date.now(),
+    timeline: { ...project.timeline, tracks },
+  });
 };
 
 // Remove the entire multicam program track.
@@ -105,11 +104,11 @@ export const removeMulticamProgram = (project: Project): Project => {
   if (!track) return project;
   let next = project;
   for (const c of track.clips) next = removeClip(next, c.id);
-  return {
+  return syncRootTimeline({
     ...next,
     timeline: {
       ...next.timeline,
       tracks: next.timeline.tracks.filter((t) => t.name !== "Multicam"),
     },
-  };
+  });
 };

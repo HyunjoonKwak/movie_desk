@@ -157,11 +157,23 @@ Phase 0의 수정 표면은 176개가 아니라 **239개**다(비테스트 기�
 
 1. `model/project.ts:12` `Timeline`에 `readonly id: ID` 추가
 2. `Project`에 `readonly timelines: readonly Timeline[]` + `readonly rootTimelineId: ID` 추가.
-   **`timeline`은 파생 필드로 당분간 유지** — 176개 호출부의 폭발을 막는다
+   **`timeline`은 파생 필드로 당분간 유지** — 재검증 기준 239개 직접 접근을 일괄 교체하지 않는다
 3. `model/factory.ts:5-43` `createEmptyProject`가 root 타임라인을 시드
-4. `timeline/mutate-internal.ts:14-18` `recompute`를 타임라인 인지형으로
-   (18개 mutate 함수의 공통 관문이라 여기만 고치면 된다)
+4. `timeline/mutate-internal.ts`의 `recompute`와 `replaceTrack`을 타임라인 인지형으로.
+   `replaceTimeline`이 collection에서 root alias를 파생하고, 기존 root 직접 쓰기는
+   `syncRootTimeline`을 거친다. 플레이헤드·zoom·마커·split·멀티캠·믹서 및
+   web 스토어·자동편집·자막·렌더용 스냅샷도 관문 밖 쓰기이므로 함께 동기화한다.
 5. `query.ts`에 `findTimeline(project, id)` 추가
+
+2026-09-07 Phase 0 구현: [오디오 선행 결정](decisions/2026-09-07-nested-sequence-audio-routing.md)을
+먼저 고정한다. 루트 ID는 프로젝트 ID에서 안정적으로 파생하여 v1 로드마다 동일하다.
+`timelines`/`rootTimelineId` 및 신규 timeline ID는 런타임 전용이며 저장 스키마에 추가하지 않는다.
+기존 JSON/CRDT 로드는 루트 collection을 파생하고, v1 저장은 기존 단일 timeline 형태를 유지한다.
+`persistence/project-io.ts`가 변경하지 않은 v1 `project-export.ts` codec을 감싸며,
+프로젝트 메뉴·라이브 문서·라이브러리·스냅샷은 이 어댑터를 사용한다.
+라이브러리/스냅샷 writer도 런타임 전용 필드를 제외하고, CRDT writer는 변경 전에 단일 timeline을 검사한다.
+다중 timeline 저장과 중첩 필드가 들어온 구형 로드는 명시적 실패로 처리한다.
+Phase 1+7 원자적 스키마 변경 전에는 SequenceClip 생성·중첩 재생·비활성 timeline UI를 열지 않는다.
 
 ## Phase 1 — 클립 kind + 영속성 (원자적으로)
 

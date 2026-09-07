@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "../model/project-timelines";
 import type { Project } from "../model/project";
 import { isMediaClip, type Clip } from "../model/clip";
 import { clipEnd } from "../model/clip";
@@ -28,9 +29,10 @@ export const splitClipAt = (project: Project, clipId: ID, at: Ms): Project => {
       start: splitMs,
       duration: end - splitMs,
     };
-    const right: Clip = isMediaClip(rightBase) && isMediaClip(original)
-      ? { ...rightBase, trimIn: original.trimIn + (splitMs - original.start) }
-      : rightBase;
+    const right: Clip =
+      isMediaClip(rightBase) && isMediaClip(original)
+        ? { ...rightBase, trimIn: original.trimIn + (splitMs - original.start) }
+        : rightBase;
 
     const nextClips = [...track.clips];
     nextClips.splice(idx, 1, left, right);
@@ -38,5 +40,9 @@ export const splitClipAt = (project: Project, clipId: ID, at: Ms): Project => {
   });
 
   if (!touched) return project;
-  return { ...project, updatedAt: Date.now(), timeline: { ...project.timeline, tracks } };
+  return syncRootTimeline({
+    ...project,
+    updatedAt: Date.now(),
+    timeline: { ...project.timeline, tracks },
+  });
 };

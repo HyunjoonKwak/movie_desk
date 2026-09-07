@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "../model/project-timelines";
 import type { Project } from "../model/project";
 import type { AppliedCommand, Command } from "./types";
 
@@ -25,7 +26,7 @@ export const runCommand = (
   history: CommandHistory,
   command: Command,
 ): RunResult => {
-  const after = command.apply(project);
+  const after = syncRootTimeline(command.apply(project));
   const applied: AppliedCommand = {
     label: command.label,
     before: project,

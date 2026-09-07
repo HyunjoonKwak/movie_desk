@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "../model/project-timelines";
 // Track and clip primitives: add/remove/update + linear move/trim + cross-
 // track move. All pure — they take a project and return a fresh one.
 
@@ -43,11 +44,7 @@ export const removeTrack = (project: Project, trackId: ID): Project =>
     },
   });
 
-export const updateTrack = (
-  project: Project,
-  trackId: ID,
-  patch: (t: Track) => Track,
-): Project => {
+export const updateTrack = (project: Project, trackId: ID, patch: (t: Track) => Track): Project => {
   let touched = false;
   const tracks = project.timeline.tracks.map((t) => {
     if (t.id !== trackId) return t;
@@ -70,7 +67,7 @@ export const addClip = (project: Project, trackId: ID, clip: Clip): Project => {
     ...track,
     clips: [...track.clips, snapped].toSorted((a, b) => a.start - b.start),
   };
-  return recompute({ ...project, timeline: replaceTrack(project.timeline, updatedTrack) });
+  return recompute(replaceTrack(project, updatedTrack));
 };
 
 export const removeClip = (project: Project, clipId: ID): Project => {
@@ -84,11 +81,7 @@ export const removeClip = (project: Project, clipId: ID): Project => {
   return recompute({ ...project, timeline: { ...project.timeline, tracks } });
 };
 
-export const updateClip = (
-  project: Project,
-  clipId: ID,
-  patch: (c: Clip) => Clip,
-): Project => {
+export const updateClip = (project: Project, clipId: ID, patch: (c: Clip) => Clip): Project => {
   let touched = false;
   const tracks = project.timeline.tracks.map((t) => {
     const next = t.clips.map((c) => {
@@ -119,24 +112,22 @@ export const trimClipEnd = (project: Project, clipId: ID, newEnd: Ms): Project =
   updateClip(project, clipId, (c) => ({ ...c, duration: Math.max(1, newEnd - c.start) }));
 
 // Transient view state — no recompute, no history bookkeeping by the caller.
-export const setPlayhead = (project: Project, playhead: Ms): Project => ({
-  ...project,
-  timeline: { ...project.timeline, playhead: Math.max(0, playhead) },
-});
+export const setPlayhead = (project: Project, playhead: Ms): Project =>
+  syncRootTimeline({
+    ...project,
+    timeline: { ...project.timeline, playhead: Math.max(0, playhead) },
+  });
 
-export const setZoom = (project: Project, zoom: number): Project => ({
-  ...project,
-  timeline: { ...project.timeline, zoom: Math.max(0.001, zoom) },
-});
+export const setZoom = (project: Project, zoom: number): Project =>
+  syncRootTimeline({
+    ...project,
+    timeline: { ...project.timeline, zoom: Math.max(0.001, zoom) },
+  });
 
 // Move a clip to a different track. Removes it from the source track and adds
 // it on the destination, frame-snapping in the process. No-op when the clip
 // is already on the destination or either id is unknown.
-export const moveClipToTrack = (
-  project: Project,
-  clipId: ID,
-  destTrackId: ID,
-): Project => {
+export const moveClipToTrack = (project: Project, clipId: ID, destTrackId: ID): Project => {
   let moving: Clip | null = null;
   const stripped = project.timeline.tracks.map((t) => {
     const found = t.clips.find((c) => c.id === clipId);
@@ -146,9 +137,9 @@ export const moveClipToTrack = (
     return { ...t, clips: t.clips.filter((c) => c.id !== clipId) };
   });
   if (!moving) return project;
-  const projectAfterStrip: Project = {
+  const projectAfterStrip: Project = syncRootTimeline({
     ...project,
     timeline: { ...project.timeline, tracks: stripped },
-  };
+  });
   return addClip(projectAfterStrip, destTrackId, moving);
 };

@@ -1,6 +1,6 @@
-import { type ID, type MediaAsset, createEmptyProject } from "@movie-desk/core";
+import { type ID, type MediaAsset, createEmptyProject, toLegacyProject } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
-import { parseStoredProject } from "../project-export";
+import { parseStoredProject } from "../project-io";
 
 // Stored projects are validated before they reach the editor. `sourceRef` is
 // additive: old projects without it still load, a well-formed disk reference
@@ -17,7 +17,7 @@ const asset = (patch: Partial<MediaAsset>): MediaAsset => ({
 });
 
 const stored = (media: MediaAsset) =>
-  JSON.parse(JSON.stringify(createEmptyProject({ mediaLibrary: [media] })));
+  JSON.parse(JSON.stringify(toLegacyProject(createEmptyProject({ mediaLibrary: [media] }))));
 
 describe("stored project sourceRef", () => {
   it("loads assets that predate sourceRef", () => {

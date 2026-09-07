@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "@movie-desk/core";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
@@ -179,10 +180,10 @@ export class WebCodecsExporter implements Exporter {
       // render loop. Keep its chunk in the muxer: no duplicate frame or timestamp.
       virtualPlayheadMs = rangeStart;
       await compositor.renderFrame(
-        {
+        syncRootTimeline({
           ...project,
           timeline: { ...project.timeline, playhead: virtualPlayheadMs },
-        },
+        }),
         getAsset,
       );
       if (this.cancelled) throw new ExportCancelledError();
@@ -223,10 +224,10 @@ export class WebCodecsExporter implements Exporter {
         virtualPlayheadMs = rangeStart + framesToMs(f, preset.fps);
         // renderFrame keys off project.timeline.playhead for visibility, keyframes
         // and transitions, so advance it per frame (immutably) for the export.
-        const frameProject = {
+        const frameProject = syncRootTimeline({
           ...project,
           timeline: { ...project.timeline, playhead: virtualPlayheadMs },
-        };
+        });
         await compositor.renderFrame(frameProject, getAsset);
         if (colorOutputError) throw colorOutputError;
         pendingFrames.push({

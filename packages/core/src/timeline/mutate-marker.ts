@@ -1,3 +1,4 @@
+import { syncRootTimeline } from "../model/project-timelines";
 // Timeline markers: add / remove / update. Stored on the timeline rather
 // than on a track so they're independent of clip layout.
 
@@ -6,11 +7,12 @@ import type { Marker } from "../model/marker";
 import type { ID } from "../utils/id";
 import { newId } from "../utils/id";
 
-const withMarkers = (project: Project, markers: readonly Marker[]): Project => ({
-  ...project,
-  updatedAt: Date.now(),
-  timeline: { ...project.timeline, markers },
-});
+const withMarkers = (project: Project, markers: readonly Marker[]): Project =>
+  syncRootTimeline({
+    ...project,
+    updatedAt: Date.now(),
+    timeline: { ...project.timeline, markers },
+  });
 
 export const addMarker = (project: Project, marker: Omit<Marker, "id">): Project => {
   const m: Marker = { id: newId(), ...marker };
