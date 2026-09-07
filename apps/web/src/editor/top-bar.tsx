@@ -170,15 +170,17 @@ export function TopBar({ onNewProject }: { onNewProject?: (projectId: ID) => voi
 function SaveBadge({ state, lastSavedAt }: { state: string; lastSavedAt: number | null }) {
   const t = useT();
   const label =
-    state === "saving"
-      ? t("topbar.saving")
-      : state === "saved" && lastSavedAt
-        ? `${t("topbar.saved")} • ${timeAgo(lastSavedAt, t)}`
-        : t("topbar.localFirst");
+    state === "error"
+      ? t("topbar.saveFailed")
+      : state === "saving"
+        ? t("topbar.saving")
+        : state === "saved" && lastSavedAt
+          ? `${t("topbar.saved")} • ${timeAgo(lastSavedAt, t)}`
+          : t("topbar.localFirst");
   const Icon = state === "saving" ? Loader2 : state === "saved" ? Check : Cloud;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md border border-ok/25 bg-ok/[0.06] px-2 py-1 text-3xs text-ok"
+      className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-3xs ${state === "error" ? "border-drop/25 bg-drop/[0.06] text-drop" : "border-ok/25 bg-ok/[0.06] text-ok"}`}
       title={state}
     >
       <Icon className={state === "saving" ? "size-3 animate-spin" : "size-3"} />

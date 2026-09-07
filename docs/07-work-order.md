@@ -830,7 +830,8 @@ Chromium **66/66**(186.3초, retry0), OSV167 취약점0, tsc·lint·build PASS.
 스테레오로 접고 sequence volume envelope와 부모 트랙/버스를 적용하며 프로젝트 master는
 루트에서 한 번만 적용한다. Solo는 timeline별이며 부모·자식 게이트를 모두 통과해야 한다.
 `Timeline.id`, `Project.timelines/rootTimelineId`, `findTimeline`과 두 공통 관문
-`recompute`/`replaceTrack`을 구현했고, 관문 밖 마커·뷰·믹서·멀티캠·스토어 쓰기도
+`recompute`/`replaceTrack`의 대상 선택 시그니처를 준비했다. 기존 `recompute` 18곳과
+`replaceTrack` 2곳은 여전히 루트 기본값을 사용하며 호출부 이관은 Phase 1의 몫이다. 관문 밖 마커·뷰·믹서·멀티캠·스토어 쓰기도
 루트 alias와 collection을 함께 갱신한다. JSON·CRDT 기존 필드 보존과 로드 직후 되쓰기,
 편집/undo/redo alias 동일성을 회귀 테스트로 고정했다.
 

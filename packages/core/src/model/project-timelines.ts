@@ -6,7 +6,7 @@ export type LegacyProject = Omit<Project, "timelines" | "rootTimelineId" | "time
   readonly timeline: Omit<Timeline, "id"> & { readonly id?: ID };
 };
 
-/** Stable across JSON/CRDT reloads without adding a persisted ID field. */
+/** Stable across JSON/CRDT reloads while the project ID stays unchanged. */
 export const rootTimelineIdForProject = (projectId: ID): ID => `${projectId}:root` as ID;
 
 /** Load only the v1 shape. Never silently discard future nested persistence data. */
@@ -46,13 +46,10 @@ export const syncRootTimeline = (project: Project): Project => {
 
 /** Keep v1 writes lossless; Phase 1 + 7 will replace this boundary atomically. */
 export const toLegacyProject = (project: Project): LegacyProject => {
-  if (
-    project.timelines.length !== 1 ||
-    project.timelines[0] !== project.timeline ||
-    project.timeline.id !== project.rootTimelineId
-  )
-    throw new Error("Cannot persist nested or inconsistent timelines in v1");
-  const { timelines: _timelines, rootTimelineId: _root, timeline, ...rest } = project;
+  if (project.timelines.length !== 1)
+    throw new Error("Cannot persist nested timelines in v1");
+  const { timelines: _timelines, rootTimelineId: _root, timeline, ...rest } =
+    syncRootTimeline(project);
   const { id: _id, ...legacyTimeline } = timeline;
   return { ...rest, timeline: legacyTimeline };
 };

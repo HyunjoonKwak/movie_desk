@@ -16,8 +16,9 @@ recursive renderer/audio feature, sequence UI, schema version bump, push or merg
   evaluation plan must drive preview and export; current audio behavior is unchanged.
 - `Timeline.id`, `Project.timelines`, `rootTimelineId` and `findTimeline` are
   available. `timeline` is the root alias, published alongside collection changes.
-  `recompute` and `replaceTrack` accept an explicit timeline target; unrelated
-  timelines retain their identity. Root direct writes in markers, view state,
+  `recompute` and `replaceTrack` have target-selection signatures ready; all 18
+  production recompute calls and both replaceTrack calls still use the root default.
+  Call-site migration belongs to Phase 1; unrelated timelines retain their identity. Root direct writes in markers, view state,
   split, multicam, mixer, generated edits, subtitles, store and render snapshots
   use the same synchronization boundary. Commands normalize before recording undo.
 - `project-io.ts` wraps the unchanged v1 codec. Project consumers now use that

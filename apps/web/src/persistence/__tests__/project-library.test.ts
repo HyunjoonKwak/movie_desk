@@ -51,3 +51,20 @@ it("does not overwrite an existing library row with unsupported nested data", as
   await expect(upsertProject(nested)).rejects.toThrow();
   expect(rows.get(base.id)!.json).toBe(before);
 });
+
+it("self-heals a stale root collection and saves the latest alias without new wire keys", async () => {
+  const base = createEmptyProject();
+  const edited = { ...base, timeline: { ...base.timeline, playhead: 123, zoom: 0.5 } };
+  expect(edited.timelines[0]).not.toBe(edited.timeline);
+  await upsertProject(edited);
+  const raw = JSON.parse(rows.get(base.id)!.json);
+  expect(raw.timeline.playhead).toBe(123);
+  expect(raw.timeline.zoom).toBe(0.5);
+  expect(raw).not.toHaveProperty("timelines");
+  expect(raw).not.toHaveProperty("rootTimelineId");
+  expect(raw.timeline).not.toHaveProperty("id");
+  const loaded = await loadStoredProject(base.id);
+  if (loaded.status !== "ok") throw new Error("Expected saved edit");
+  expect(loaded.project.timeline).toBe(loaded.project.timelines[0]);
+  expect(loaded.project.timeline.playhead).toBe(123);
+});

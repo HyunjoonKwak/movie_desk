@@ -953,4 +953,6 @@ export const ko = {
     "color.exportApproximation": "브라우저 SDR 근사를 사용했거나 인코더가 색 메타데이터를 생략했습니다. BT.709 변환을 요청했지만 출력 색 정확도를 완전히 검증하지 못했습니다.",
     "color.lutUnsupported": "이 LUT의 색 공간은 지원하지 않습니다. sRGB, BT.709 인코딩 또는 선형 Rec.709를 선택하세요.",
     "color.encoderMismatch": "인코더가 제한 범위 BT.709가 아닌 색 공간을 보고했습니다. 색 검증 중 내보내기를 중단했습니다.",
+    "topbar.saveFailed": "저장 실패",
+    "project.saveFailed": "자동저장에 실패해 변경 내용이 아직 저장되지 않았습니다. 다시 편집하여 재시도하거나, 닫기 전에 프로젝트 사본을 내보내세요.",
 } as const;

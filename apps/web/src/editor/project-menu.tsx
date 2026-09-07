@@ -16,9 +16,10 @@ import {
   setActiveProjectId,
   upsertProject,
 } from "@/persistence/project-library";
+import { startLibraryAutosave } from "@/persistence/library-autosave";
 import { emptyTrash } from "@/persistence/trash";
 import { useProjectStore } from "@/stores/project-store";
-import { type ID, type Project, createEmptyProject } from "@movie-desk/core";
+import { type ID, createEmptyProject } from "@movie-desk/core";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Download, FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -38,48 +39,7 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
   const fileInputRef = useRef<HTMLInputElement>(null);
   const t = useT();
 
-  // Subscribe once and persist only content changes. ProjectMenu previously
-  // re-rendered and reset its save timer for every playback playhead tick.
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    let queued = useProjectStore.getState().project;
-    const schedule = (project: Project) => {
-      queued = project;
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(() => {
-        timer = null;
-        void upsertProject(queued);
-      }, 300);
-    };
-    schedule(queued);
-
-    const unsubscribe = useProjectStore.subscribe(
-      (state) => state.project,
-      (project, previous) => {
-        // Playhead, zoom, duration, and updatedAt are local/derived state. All
-        // editable shared content is covered by these referential boundaries.
-        const contentChanged =
-          project.id !== previous.id ||
-          project.name !== previous.name ||
-          project.createdAt !== previous.createdAt ||
-          project.framerate !== previous.framerate ||
-          project.resolution !== previous.resolution ||
-          project.mediaLibrary !== previous.mediaLibrary ||
-          project.audio !== previous.audio ||
-          project.timeline.tracks !== previous.timeline.tracks ||
-          project.timeline.markers !== previous.timeline.markers;
-        if (contentChanged) schedule(project);
-      },
-    );
-
-    return () => {
-      unsubscribe();
-      if (timer) {
-        clearTimeout(timer);
-        void upsertProject(queued);
-      }
-    };
-  }, []);
+  useEffect(() => startLibraryAutosave(), []);
 
   // The active pointer is identity-only and should update immediately on a
   // project switch, independently from the debounced snapshot write.

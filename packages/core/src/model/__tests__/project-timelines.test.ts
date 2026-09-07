@@ -70,10 +70,10 @@ describe("Phase 0 timeline model", () => {
     });
     const track = { ...child.tracks[0]!, clips: [clip()] };
     const replaced = replaceTrack(project, track, child.id);
-    assertRoot(replaced);
-    expect(replaced.timeline).toBe(project.timeline);
-    expect(findTimeline(replaced, child.id)?.tracks[0]).toBe(track);
-    const next = recompute(replaced, findTimeline(replaced, child.id)!);
+    assertRoot(replaced.project);
+    expect(replaced.project.timeline).toBe(project.timeline);
+    expect(findTimeline(replaced.project, child.id)?.tracks[0]).toBe(track);
+    const next = recompute(replaced);
     assertRoot(next);
     expect(next.timeline).toBe(project.timeline);
     expect(findTimeline(next, child.id)?.duration).toBe(2000);
@@ -84,6 +84,15 @@ describe("Phase 0 timeline model", () => {
     expect(() => replaceTrack(project, track, newId())).toThrow();
     expect(() => replaceTimeline(project, { ...child, id: newId() })).toThrow();
     expect(() => toLegacyProject(next)).toThrow();
+  });
+
+  it("self-heals a same-ID legacy alias at the serialization boundary", () => {
+    const base = createEmptyProject();
+    const edited = { ...base, timeline: { ...base.timeline, playhead: 321 } };
+    expect(toLegacyProject(edited).timeline.playhead).toBe(321);
+    expect(toLegacyProject(edited)).not.toHaveProperty("timelines");
+    expect(edited.timelines[0]).toBe(base.timeline); // immutable normalization
+    expect(() => toLegacyProject({ ...edited, rootTimelineId: newId() })).toThrow();
   });
 
   it("preserves alias identity through edits, transient view, mixer and undo/redo", () => {

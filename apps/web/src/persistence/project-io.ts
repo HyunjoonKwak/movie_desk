@@ -19,10 +19,9 @@ export { ProjectVersionError } from "./project-export";
 export type { ProjectExport } from "./project-export";
 
 const recoveredAudio = new WeakSet<Project>();
-const hydrate = (parsed: LegacyProject): Project => {
+const hydrate = (parsed: ReturnType<typeof parseV1Project>): Project => {
   const project = hydrateProjectTimelines(parsed);
-  // The v1 codec's public type predates the runtime-only timeline fields.
-  if (takeV1AudioRecovery(parsed as Project)) recoveredAudio.add(project);
+  if (takeV1AudioRecovery(parsed)) recoveredAudio.add(project);
   return project;
 };
 export const takeAudioRecovery = (project: Project): boolean => recoveredAudio.delete(project);

@@ -174,6 +174,10 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
       // before any stored state reaches the renderer or project store.
       return parseStoredProject(candidate);
     } catch {
+      // Phase 0 candidate is strictly v1: nested hydration cannot fail here.
+      // Phase 1 MUST rethrow typed nested-validation/hydration failures instead
+      // of returning null: live-doc treats null as absent and flushes the store,
+      // which would overwrite the invalid stored document before recovery.
       return null;
     }
   };
