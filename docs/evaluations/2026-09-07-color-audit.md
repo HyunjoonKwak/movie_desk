@@ -653,3 +653,17 @@ production packages with no known vulnerabilities. `lsof -nP -iTCP:32119
 -sTCP:LISTEN` showed no listener before each gate invocation (only an unrelated
 Time Machine mount warning); no existing server was stopped. Final diff whitespace
 and benchmark Biome checks pass. The B’3 race remains open despite this E2E pass.
+
+## B’4b round 4 — working-set correction and sampler follow-up
+
+The round 3 64/128 MiB limits and measurements above are historical. The source
+limit was too small for a 4K video plus 1080p title in one frame, and the image
+limit could not retain three 4K stills. Round 4 raises both caches to 192 MiB,
+with a 128 MiB per-source ceiling to leave space for a project-sized target;
+the combined per-Compositor cache bound is now 384 MiB. Oversized inputs are
+resampled with `LINEAR` and no mipmaps, which can cause aliasing as well as
+softness. [Round 4 audit](2026-09-07-color-linear-round4-review.md) records the
+simultaneous-source allocation/timing benchmark, revised memory arithmetic,
+and the full-suite sampler failure investigation with original surviving log
+and six before/after reproduction runs. The sampler issue remains open;
+passing reruns alone do not establish its cause or resolution.

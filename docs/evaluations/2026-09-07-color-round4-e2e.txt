@@ -1,0 +1,739 @@
+===== before run 1; source/image budgets 64/128 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:23189) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23221) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:23255) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:23295) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (4.4s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (5.0s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.6s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.7s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.6s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (25.8s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (1.2s)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.6s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.1s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (593ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (12.0s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.5s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.8s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.8s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (790ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.6s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.6s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (907ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.4s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.5s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (760ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.8s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (495ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (841ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.2s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (687ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (696ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (658ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (800ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (532ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (534ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (525ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 95.5499999821186,
+  requestedAt: 2799.9900000095367,
+  firstSoundMs: 84.69999998807907,
+  workerMs: 118.88499999046326,
+  dspMs: 107.2199999988079,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.33000001311302185
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.8s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1102.3149999976158,
+  requestedAt: 2796.7099999785423,
+  firstSoundMs: 96.64000001549721,
+  workerMs: 127.7000000178814,
+  dspMs: 109.26500001549721,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.08000001311302185
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.6s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.3s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.3s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.4s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (1.9s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.7s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.9s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.3s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.0s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (1.2s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.0s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.2s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.4s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.4s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.2s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.1s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (887ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (22.9s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (873ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.3s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (1.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (886ms)
+
+  64 passed (3.1m)
+
+
+===== before run 2; source/image budgets 64/128 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:29542) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:29545) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:29551) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:29591) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (3.9s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (5.4s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.4s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.2s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.3s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (25.5s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (777ms)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.6s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.1s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (573ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (12.2s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.6s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.5s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.5s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (746ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.6s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.6s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (937ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.5s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.5s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (777ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.9s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (470ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (825ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.2s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (718ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (722ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (685ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (854ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (538ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (530ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (529ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 94.96500000357628,
+  requestedAt: 2861.3799999952316,
+  firstSoundMs: 81.25999999046326,
+  workerMs: 114.07499998807907,
+  dspMs: 92.56499999761581,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.4000000059604645
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.8s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1091.5349999964237,
+  requestedAt: 2818.350000023842,
+  firstSoundMs: 81.55999997258186,
+  workerMs: 102.66500002145767,
+  dspMs: 90.91499999165535,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.10499998927116394
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.6s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.3s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.3s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.4s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (1.9s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.7s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.9s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.3s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.1s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (1.2s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.1s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.2s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.5s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.2s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.2s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.0s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (900ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (23.0s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (912ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.4s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (2.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (1.0s)
+
+  64 passed (3.0m)
+
+
+===== before run 3; source/image budgets 64/128 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:35338) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:35342) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:35350) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:35396) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (3.5s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (5.1s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.4s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.2s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.5s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (25.8s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (729ms)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.6s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.0s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (566ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (12.0s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.5s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.5s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.2s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (757ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.7s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.5s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (882ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.4s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.5s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (780ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.9s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (487ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (826ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.1s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (680ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (704ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (682ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (863ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (543ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (526ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (520ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 96.84000000357628,
+  requestedAt: 2902.354999989271,
+  firstSoundMs: 85.99500000476837,
+  workerMs: 121.68500000238419,
+  dspMs: 101.18999999761581,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.2750000059604645
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.8s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1078.5250000059605,
+  requestedAt: 2815.3050000071526,
+  firstSoundMs: 70.06999999284744,
+  workerMs: 117.22499999403954,
+  dspMs: 103.15000000596046,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.14000001549720764
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.6s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.3s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.2s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.4s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (1.9s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.8s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.9s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.3s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.0s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (1.3s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.0s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.2s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.5s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.2s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.3s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.1s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (912ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (22.9s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (888ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.3s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (1.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (842ms)
+
+  64 passed (3.0m)
+
+
+===== after run 1; source/image budgets 192/192 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+▶ browser e2e (pnpm test:e2e)
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:44303) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:44310) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:44319) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:44353) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (4.4s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (4.9s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.5s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.6s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.4s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (25.9s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (784ms)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.5s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.1s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (562ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (12.3s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.5s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.6s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.2s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (762ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.6s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.5s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (912ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.5s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.5s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (768ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.9s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (485ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (811ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.1s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (696ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (706ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (679ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (854ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (523ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (525ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (519ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 80.80000001192093,
+  requestedAt: 2855.3199999928474,
+  firstSoundMs: 69.89500001072884,
+  workerMs: 114.28500002622604,
+  dspMs: 100.51000002026558,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.3499999940395355
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.8s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1092.5249999761581,
+  requestedAt: 2848.3350000083447,
+  firstSoundMs: 84.5799999833107,
+  workerMs: 116,
+  dspMs: 99.47999998927116,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.1550000011920929
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.7s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.3s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.3s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.4s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (2.0s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.8s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.8s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.4s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.1s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (1.4s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.0s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.2s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.5s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.2s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.2s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.1s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (886ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (23.0s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (886ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.3s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (1.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (843ms)
+
+  64 passed (3.0m)
+
+Release gate: PASS
+
+| result | step | time | detail |
+| --- | --- | --- | --- |
+| ✅ pass | install (frozen lockfile) | 567ms |  |
+| ✅ pass | version policy | 202ms |  |
+| ✅ pass | lint | 1.2s |  |
+| ✅ pass | typecheck | 3.4s |  |
+| ✅ pass | unit tests | 10.7s |  |
+| ✅ pass | OSV audit (network) | 1.2s |  |
+| ✅ pass | web production build | 12.8s |  |
+| ✅ pass | playwright chromium | 775ms |  |
+| ✅ pass | browser e2e | 183.0s |  |
+
+
+===== after run 2; source/image budgets 192/192 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:50175) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:50177) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:50183) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:51020) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (5.0s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (5.0s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.4s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.2s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.4s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (26.3s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (771ms)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.6s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.0s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (694ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (12.9s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.5s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.5s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.5s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (759ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.6s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.5s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (897ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.5s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.6s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (811ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.9s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (541ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (855ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.2s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (677ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (686ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (695ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (875ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (588ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (514ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (533ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 86.05500000715256,
+  requestedAt: 2788.689999997616,
+  firstSoundMs: 79.50499999523163,
+  workerMs: 110.07499998807907,
+  dspMs: 94.54499998688698,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 3.4950000047683716
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.7s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1089.8500000238419,
+  requestedAt: 2848.7599999904633,
+  firstSoundMs: 82.9200000166893,
+  workerMs: 117.81499999761581,
+  dspMs: 99.12000000476837,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.09000000357627869
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.7s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.4s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.3s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.5s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (1.7s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.9s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.9s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.4s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.1s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (2.0s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.1s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.2s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.5s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.3s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.3s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.0s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (883ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (23.0s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (855ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.3s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (1.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (875ms)
+
+  64 passed (3.1m)
+
+
+===== after run 3; source/image budgets 192/192 MiB =====
+Port precheck: lsof -nP -iTCP:32119 -sTCP:LISTEN
+lsof: WARNING: can't stat() smbfs file system /Volumes/.timemachine/100.100.30.102/BF78CA2E-9B82-4B24-92E3-9C79244A1764/TimeMachine
+      Output information may be incomplete.
+      assuming "dev=36000014" from mount table
+
+
+> movie-desk@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color
+> pnpm --filter @movie-desk/web test:e2e
+
+
+> @movie-desk/web@0.4.0-rc.1 test:e2e /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b4-color/apps/web
+> playwright test
+
+[WebServer] (node:64297) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:64298) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+[WebServer] (node:64304) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+(node:64594) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [chromium] › e2e/audio-mixer.spec.ts:91:1 › track -6 dB halves export PCM RMS and one undo restores gain (4.0s)
+  ✓   2 [chromium] › e2e/audio-mixer.spec.ts:139:1 › bus mute exports silence and mixer strips scroll at 390 pixels (5.0s)
+  ✓   3 [chromium] › e2e/audio-mixer.spec.ts:169:1 › opens a project with invalid mixer settings and explains the recovery once (1.5s)
+  ✓   4 [chromium] › e2e/autoedit.spec.ts:26:1 › generates a rough cut on AUTO tracks and one undo removes it (2.2s)
+  ✓   5 [chromium] › e2e/color-management.spec.ts:50:1 › LUT space survives undo and matches BT.709 export pixels (2.3s)
+  ✓   6 [chromium] › e2e/color-management.spec.ts:215:1 › context restoration recreates color targets and reports approximation state (26.4s)
+  ✓   7 [chromium] › e2e/editor.spec.ts:42:1 › opens the editor from the landing page (768ms)
+  ✓   8 [chromium] › e2e/editor.spec.ts:51:1 › persists a newly named project across a reload (1.6s)
+  ✓   9 [chromium] › e2e/editor.spec.ts:76:1 › keeps populated panels contained at compact desktop width (1.1s)
+  ✓  10 [chromium] › e2e/export.spec.ts:22:1 › explains sharing presets and keeps the dialog inside a compact viewport (587ms)
+  ✓  11 [chromium] › e2e/export.spec.ts:43:1 › exports the timeline to a non-empty MP4 with the VP9 preset (11.9s)
+  ✓  12 [chromium] › e2e/export.spec.ts:69:1 › cancelling a running export reports a cancel and leaves the dialog usable (1.6s)
+  ✓  13 [chromium] › e2e/export.spec.ts:89:1 › restoring a snapshot brings the timeline back to the saved state (1.4s)
+  ✓  14 [chromium] › e2e/funnel.spec.ts:5:1 › local opt-in completion report, private JSON, disable and clear at 390px (13.3s)
+  ✓  15 [chromium] › e2e/media-import-failure.spec.ts:16:1 › keeps good files and explains a damaged file in the same import (746ms)
+  ✓  16 [chromium] › e2e/media-marks.spec.ts:21:1 › marks a selection, filters by the marks, and keeps them across a reload (2.7s)
+  ✓  17 [chromium] › e2e/media-marks.spec.ts:103:1 › manual collections filter by membership and smart collections re-apply a search (3.7s)
+  ✓  18 [chromium] › e2e/media-search.spec.ts:11:1 › free text and filters narrow the library and can be reset (883ms)
+  ✓  19 [chromium] › e2e/media-virtualization.spec.ts:14:1 › an active offscreen segment stays mounted without changing virtual height (1.5s)
+  ✓  20 [chromium] › e2e/media-virtualization.spec.ts:42:1 › a marquee after scrolling several segments selects exactly one row (1.6s)
+  ✓  21 [chromium] › e2e/media-virtualization.spec.ts:69:1 › group headers stay inside the fixed layout row at narrow panel widths (811ms)
+  ✓  22 [chromium] › e2e/missing-media.spec.ts:21:1 › an export with missing media is refused by name and the dialog stays usable (1.8s)
+  ✓  23 [chromium] › e2e/new-project-start.spec.ts:8:1 › offers three real starting paths for a fresh project (492ms)
+  ✓  24 [chromium] › e2e/new-project-start.spec.ts:23:1 › reload keeps an unanswered new project on the start screen (829ms)
+  ✓  25 [chromium] › e2e/new-project-start.spec.ts:41:1 › manual editing keeps the existing empty expert editor across reloads (1.1s)
+  ✓  26 [chromium] › e2e/new-project-start.spec.ts:59:1 › import and organize enters the existing organized media workspace (691ms)
+  ✓  27 [chromium] › e2e/new-project-start.spec.ts:68:1 › dropping media on the header enters the organized media workspace (730ms)
+  ✓  28 [chromium] › e2e/new-project-start.spec.ts:85:1 › guided draft opens the editable auto-edit workflow (663ms)
+  ✓  29 [chromium] › e2e/new-project-start.spec.ts:97:1 › creating another project shows the start choices again (886ms)
+  ✓  30 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the phone start layout inside the viewport (521ms)
+  ✓  31 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the compact start layout inside the viewport (530ms)
+  ✓  32 [chromium] › e2e/new-project-start.spec.ts:112:3 › keeps the desktop start layout inside the viewport (535ms)
+AAC boundary {
+  duration: 1.0013333333333334,
+  onset: 0.25154166666666666,
+  tailRms: 0.2501845044871312,
+  containerDuration: 1
+}
+  ✓  33 [chromium] › e2e/pitch-speed.spec.ts:91:1 › pitch toggle is one undo and exported duration matches the timeline (3.3s)
+B2 pitch benchmark {
+  meterDelayMs: 0,
+  meterReadyMs: 117.89000001549721,
+  requestedAt: 2837.199999988079,
+  firstSoundMs: 105.96000000834465,
+  workerMs: 129.67999997735023,
+  dspMs: 101.60999998450279,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.25999999046325684
+}
+  ✓  34 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 0ms) (3.8s)
+B2 pitch benchmark {
+  meterDelayMs: 1000,
+  meterReadyMs: 1076.9300000071526,
+  requestedAt: 2839.2999999821186,
+  firstSoundMs: 68.68500000238419,
+  workerMs: 120.93999999761581,
+  dspMs: 105.30500000715256,
+  workerCount: 1,
+  longestTaskMs: 0,
+  pitchMainSliceMs: 0.09999999403953552
+}
+  ✓  35 [chromium] › e2e/pitch-speed.spec.ts:187:3 › 60s stereo preview starts immediately and renders pitch in a worker (meter delay 1000ms) (4.6s)
+  ✓  36 [chromium] › e2e/precision-input.spec.ts:8:1 › typed duration updates timeline on commit and one undo restores it (1.3s)
+  ✓  37 [chromium] › e2e/precision-input.spec.ts:28:1 › invalid input and Escape do not edit; arrow session commits on blur (1.3s)
+  ✓  38 [chromium] › e2e/precision-input.spec.ts:59:1 › slider and scrub show live values, undo once and keep deletion shortcuts inside the field (1.6s)
+  ✓  39 [chromium] › e2e/precision-input.spec.ts:104:1 › clip selection preserves inspector sections and still images have no source trim UI (1.2s)
+  ✓  40 [chromium] › e2e/precision-input.spec.ts:126:1 › Escape aborts a slider until release and a return-to-origin scrub adds no undo (1.4s)
+  ✓  41 [chromium] › e2e/previews.spec.ts:42:1 › keeps thumbnails outside project persistence and restores them after reload (1.9s)
+  ✓  42 [chromium] › e2e/previews.spec.ts:68:1 › keeps waveforms outside project persistence and restores them on the timeline (1.8s)
+  ✓  43 [chromium] › e2e/previews.spec.ts:92:1 › regenerates a deleted thumbnail from the original (2.9s)
+  ✓  44 [chromium] › e2e/previews.spec.ts:126:1 › snapshot cleanup requires confirmation and keeps the latest twenty (1.4s)
+  ✓  45 [chromium] › e2e/recovery.spec.ts:92:1 › edits that were never explicitly saved survive an abrupt reload (2.0s)
+  ✓  46 [chromium] › e2e/recovery.spec.ts:111:1 › a damaged project file is refused and the open project is untouched (1.2s)
+  ✓  47 [chromium] › e2e/recovery.spec.ts:142:1 › a damaged saved project is reported and cannot replace the open project (1.2s)
+  ✓  48 [chromium] › e2e/recovery.spec.ts:161:1 › a damaged last-opened project falls back to a fresh project on load (1.1s)
+  ✓  49 [chromium] › e2e/relink-trash.spec.ts:36:1 › a missing original is relinked from a file of the same size (2.0s)
+  ✓  50 [chromium] › e2e/relink-trash.spec.ts:53:1 › a file of a different size is only relinked after the user insists (2.3s)
+  ✓  51 [chromium] › e2e/relink-trash.spec.ts:73:1 › removed media waits in the trash and can be restored (1.5s)
+  ✓  52 [chromium] › e2e/relink-trash.spec.ts:95:1 › a missing badge survives the preview checking only the clip under the playhead (2.2s)
+  ✓  53 [chromium] › e2e/relink-trash.spec.ts:113:1 › desktop same-size fingerprint mismatch waits for explicit relink confirmation (3.1s)
+  ✓  54 [chromium] › e2e/relink-trash.spec.ts:192:1 › desktop folder mismatch stays unchecked until the user selects that row (2.3s)
+  ✓  55 [chromium] › e2e/scopes.spec.ts:4:1 › scopes show sampled values in every mode and at 390px (5.2s)
+  ✓  56 [chromium] › e2e/state-guidance.spec.ts:4:1 › empty project explains the next step and imports through its hint (883ms)
+  ✓  57 [chromium] › e2e/state-guidance.spec.ts:71:1 › Korean hints wrap at the media minimum width and reset an empty search (23.0s)
+  ✓  58 [chromium] › e2e/storage-full.spec.ts:30:1 › a full disk fails one file with a storage message, keeps the rest and retries (875ms)
+  ✓  59 [chromium] › e2e/timeline-marquee.spec.ts:103:1 › marquee selects clips across tracks and leaves the rest alone (1.4s)
+  ✓  60 [chromium] › e2e/timeline-marquee.spec.ts:127:1 › scrubbing still works after a marquee drag (1.4s)
+  ✓  61 [chromium] › e2e/timeline-marquee.spec.ts:145:1 › a drag that starts on a clip never opens a marquee (1.4s)
+  ✓  62 [chromium] › e2e/timeline-marquee.spec.ts:159:1 › Escape abandons the band and leaves no state behind (1.4s)
+  ✓  63 [chromium] › e2e/timeline-marquee.spec.ts:181:1 › clicking empty track space clears the selection but scrubbing does not (1.3s)
+  ✓  64 [chromium] › e2e/webcodecs-sampler.spec.ts:25:1 › analysis decodes an MP4 through a real VideoDecoder (845ms)
+
+  64 passed (3.0m)

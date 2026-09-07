@@ -85,9 +85,13 @@ export class Compositor {
   private readonly colorWarnings = new Set<string>();
   private readonly videoTransferProbe: TransferProbe;
   usesColorApproximation = false;
-  // 192 MiB total: one 4K RGBA16F source plus two 4K stills (rounded budgets).
-  private static readonly SOURCE_TARGET_BYTES = 64 * 1024 * 1024;
-  private static readonly IMAGE_TARGET_BYTES = 128 * 1024 * 1024;
+  // Budget a frame working set, not a single upload: a <=128 MiB source
+  // plus a 4K project-sized graphic fits in 192 MiB without mutual eviction.
+  // The separate image budget holds three 4K RGBA16F stills simultaneously.
+  // These are per-compositor cache bounds, excluding scene/scratch/raw uploads.
+  private static readonly SOURCE_TARGET_BYTES = 192 * 1024 * 1024;
+  private static readonly IMAGE_TARGET_BYTES = 192 * 1024 * 1024;
+  private static readonly MAX_SOURCE_TARGET_BYTES = 128 * 1024 * 1024;
   private readonly sourceTargets = new BoundedResourceCache<
     string,
     ReturnType<typeof allocateTarget> & { bytes: number }
@@ -647,7 +651,9 @@ export class Compositor {
     const budget = immutableImage ? Compositor.IMAGE_TARGET_BYTES : Compositor.SOURCE_TARGET_BYTES;
     const bytesPerPixel = this.colorFormat!.precision === "half-float" ? 8 : 4;
     // Only oversized sources are resampled, preserving aspect and the selected precision.
-    const scale = Math.min(1, Math.sqrt(budget / (w * h * bytesPerPixel)));
+    // Keep room for a project-sized target even when one input is oversized.
+    const sourceBudget = Math.min(budget, Compositor.MAX_SOURCE_TARGET_BYTES);
+    const scale = Math.min(1, Math.sqrt(sourceBudget / (w * h * bytesPerPixel)));
     const targetWidth = Math.max(1, Math.floor(w * scale));
     const targetHeight = Math.max(1, Math.floor(h * scale));
     const bytes = targetWidth * targetHeight * bytesPerPixel;

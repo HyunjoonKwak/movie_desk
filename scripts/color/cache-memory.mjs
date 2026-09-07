@@ -13,8 +13,6 @@ const stubs = new Set([
   "apps/web/src/media/source/resolve-media-source.ts",
   "apps/web/src/renderer/frame-source.ts",
   "apps/web/src/renderer/webcodecs-decoder.ts",
-  "apps/web/src/renderer/shape-source.ts",
-  "apps/web/src/renderer/text-source.ts",
   "nanoid",
 ]);
 function modules(base) {
@@ -49,7 +47,8 @@ function modules(base) {
   return result;
 }
 
-const oldModules = modules("f4adad6");
+const baseline = process.argv[2] ?? "f4adad6";
+const oldModules = modules(baseline);
 const newModules = modules();
 const server = createServer((_, res) =>
   res.end("<!doctype html><title>Color cache benchmark</title>"),
@@ -71,6 +70,7 @@ try {
         async ({ label, implementation }) => {
           const sources = new Map();
           const luts = new Map();
+          const videoFrames = new Map();
           const stubModules = {
             "apps/web/src/ai/bg-remove.ts": {
               getSegmenter: () => {
@@ -93,10 +93,12 @@ try {
               },
             },
             "apps/web/src/renderer/webcodecs-decoder.ts": {
-              getFrameProvider: () => ({ retain() {}, has: () => true, framesFor: () => null }),
+              getFrameProvider: () => ({
+                retain() {},
+                has: () => true,
+                framesFor: (id) => videoFrames.get(id) ?? null,
+              }),
             },
-            "apps/web/src/renderer/shape-source.ts": {},
-            "apps/web/src/renderer/text-source.ts": {},
             nanoid: { nanoid: () => "fixture-id" },
           };
           function load(modules) {
@@ -121,6 +123,8 @@ try {
           canvas.height = 1080;
           const compositor = new Compositor(canvas);
           const gl = canvas.getContext("webgl2");
+          if (compositor.colorPrecision !== "half-float")
+            throw new Error("This byte-accounting benchmark requires RGBA16F support");
           const extension = gl.getExtension("WEBGL_debug_renderer_info");
           const renderer = extension
             ? gl.getParameter(extension.UNMASKED_RENDERER_WEBGL)
@@ -129,13 +133,42 @@ try {
           const sizes = new Map();
           let resident = 0;
           let peak = 0;
+          let targetAllocations = 0;
+          let targetAllocatedBytes = 0;
+          let textureDeletes = 0;
+          const liveFramebuffers = new Set();
+          let framebufferCreates = 0;
+          let framebufferDeletes = 0;
+          const createFramebuffer = gl.createFramebuffer.bind(gl);
+          gl.createFramebuffer = () => {
+            framebufferCreates++;
+            const fbo = createFramebuffer();
+            liveFramebuffers.add(fbo);
+            return fbo;
+          };
+          const deleteFramebuffer = gl.deleteFramebuffer.bind(gl);
+          gl.deleteFramebuffer = (fbo) => {
+            framebufferDeletes++;
+            liveFramebuffers.delete(fbo);
+            return deleteFramebuffer(fbo);
+          };
           const texImage2D = gl.texImage2D.bind(gl);
           gl.texImage2D = (...args) => {
             const texture = gl.getParameter(gl.TEXTURE_BINDING_2D);
             const source = args.at(-1);
-            const width = args.length === 9 ? args[3] : source.naturalWidth || source.width;
-            const height = args.length === 9 ? args[4] : source.naturalHeight || source.height;
+            const width =
+              args.length === 9
+                ? args[3]
+                : source.naturalWidth || source.displayWidth || source.width;
+            const height =
+              args.length === 9
+                ? args[4]
+                : source.naturalHeight || source.displayHeight || source.height;
             const bytes = width * height * (args[2] === gl.RGBA16F ? 8 : 4);
+            if (args.length === 9 && args[2] === gl.RGBA16F && source === null) {
+              targetAllocations++;
+              targetAllocatedBytes += bytes;
+            }
             resident += bytes - (sizes.get(texture) || 0);
             sizes.set(texture, bytes);
             peak = Math.max(peak, resident);
@@ -143,6 +176,7 @@ try {
           };
           const deleteTexture = gl.deleteTexture.bind(gl);
           gl.deleteTexture = (texture) => {
+            textureDeletes++;
             resident -= sizes.get(texture) || 0;
             sizes.delete(texture);
             return deleteTexture(texture);
@@ -201,7 +235,7 @@ try {
           const retainedTextureBytes = resident;
           const benchmarkPeak = peak;
           const cachedImageBytes = compositor.imageTargets.weight ?? null;
-          if (label === "after" && cachedImageBytes > 128 * 1024 * 1024)
+          if (label === "after" && cachedImageBytes > 192 * 1024 * 1024)
             throw new Error("Image budget exceeded");
           const elapsedMs = performance.now() - started;
           const stress = [];
@@ -224,8 +258,8 @@ try {
               if (Math.abs(pixel[0] - 128) > 1 || pixel[3] !== 255 || gl.getError() !== gl.NO_ERROR)
                 throw new Error("Oversize/resolution churn changed neutral pixels");
               if (
-                compositor.imageTargets.weight > 128 * 1024 * 1024 ||
-                compositor.sourceTargets.weight > 64 * 1024 * 1024
+                compositor.imageTargets.weight > 192 * 1024 * 1024 ||
+                compositor.sourceTargets.weight > 192 * 1024 * 1024
               )
                 throw new Error("Oversize/resolution churn exceeded budget");
               stress.push({
@@ -239,7 +273,150 @@ try {
               if (input instanceof ImageBitmap) input.close();
             }
           }
+          // Exercise the real text rasterizer and video upload path together.
+          // Decoding is excluded: timestamped VideoFrames are supplied by the
+          // provider stub, while all upload, transfer and composition is real GL.
+          const workingSets = [];
+          const mediaClip = (id) => ({
+            id,
+            kind: "media",
+            assetId: id,
+            start: 0,
+            duration: 1000,
+            trimIn: 0,
+            speed: 1,
+            keyframes: [],
+            effects: [],
+          });
+          photo.width = 3840;
+          photo.height = 2160;
+          ctx.fillStyle = "#808080";
+          ctx.fillRect(0, 0, photo.width, photo.height);
+          const small = document.createElement("canvas");
+          small.width = 1920;
+          small.height = 1080;
+          small.getContext("2d").drawImage(photo, 0, 0, 1920, 1080);
+          const bigFrame = new VideoFrame(photo, { timestamp: 0 });
+          const smallFrame = new VideoFrame(small, { timestamp: 0 });
+          videoFrames.set("video-4k", bigFrame);
+          videoFrames.set("video-1080", smallFrame);
+          const oversized = document.createElement("canvas");
+          oversized.width = 6000;
+          oversized.height = 4000;
+          oversized.getContext("2d").drawImage(photo, 0, 0, 6000, 4000);
+          const oversizedFrame = new VideoFrame(oversized, { timestamp: 0 });
+          videoFrames.set("video-oversized", oversizedFrame);
+          const oversizedAsset = {
+            id: "video-oversized",
+            kind: "video",
+            width: 6000,
+            height: 4000,
+          };
+          const stills = await Promise.all([0, 1, 2].map(() => createImageBitmap(photo)));
+          stills.forEach((bitmap, i) => sources.set(`still-${i}`, bitmap));
+          const videoAssets = [
+            { id: "video-4k", kind: "video", width: 3840, height: 2160 },
+            { id: "video-1080", kind: "video", width: 1920, height: 1080 },
+          ];
+          const stillAssets = stills.map((_, i) => ({
+            id: `still-${i}`,
+            kind: "image",
+            width: 3840,
+            height: 2160,
+          }));
+          const title = {
+            id: "title",
+            kind: "text",
+            text: "4K video + 1080p title",
+            font: "sans-serif",
+            size: 80,
+            color: "#ffffff",
+            shadow: false,
+            start: 0,
+            duration: 1000,
+            keyframes: [],
+            effects: [],
+          };
+          for (const [name, fixtureAssets, clips] of [
+            ["4k-video-1080p-title", videoAssets, [mediaClip("video-4k"), title]],
+            ["4k-video-1080p-video", videoAssets, videoAssets.map((a) => mediaClip(a.id))],
+            ["three-4k-stills", stillAssets, stillAssets.map((a) => mediaClip(a.id))],
+            [
+              "oversized-video-1080p-title",
+              [oversizedAsset],
+              [mediaClip(oversizedAsset.id), title],
+            ],
+          ]) {
+            compositor.sourceTargets.clear();
+            compositor.imageTargets.clear();
+            project.mediaLibrary = fixtureAssets;
+            project.timeline.tracks = [...clips].reverse().map((clip, i) => ({
+              id: `layer-${i}`,
+              kind: clip.kind === "text" ? "text" : "video",
+              clips: [clip],
+            }));
+            const render = async () => {
+              await compositor.renderFrame(project, (id) => fixtureAssets.find((a) => a.id === id));
+              gl.finish();
+              if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR)
+                throw new Error(`GPU failed during ${name}`);
+            };
+            for (let i = 0; i < 30; i++) await render();
+            const centerRow = new Uint8Array(1920 * 4);
+            gl.readPixels(0, 540, 1920, 1, gl.RGBA, gl.UNSIGNED_BYTE, centerRow);
+            const titleVisible =
+              clips.includes(title) && centerRow.some((v, i) => i % 4 === 0 && v > 200);
+            if (clips.includes(title) && !titleVisible) throw new Error(`Title missing in ${name}`);
+            const startAllocations = targetAllocations;
+            const startBytes = targetAllocatedBytes;
+            const startDeletes = textureDeletes;
+            const startFboCreates = framebufferCreates;
+            const startFboDeletes = framebufferDeletes;
+            const batches = [];
+            const frameTimes = [];
+            for (let batch = 0; batch < 3; batch++) {
+              const start = performance.now();
+              for (let frame = 0; frame < 60; frame++) {
+                const frameStart = performance.now();
+                await render();
+                frameTimes.push(performance.now() - frameStart);
+              }
+              batches.push((performance.now() - start) / 60);
+            }
+            frameTimes.sort((a, b) => a - b);
+            const row = {
+              name,
+              titleVisible,
+              frames: frameTimes.length,
+              warmupFrames: 30,
+              batchMeanFrameMs: batches,
+              meanFrameMs: frameTimes.reduce((a, b) => a + b, 0) / frameTimes.length,
+              medianFrameMs: frameTimes[Math.floor(frameTimes.length / 2)],
+              p95FrameMs: frameTimes[Math.floor(frameTimes.length * 0.95)],
+              targetAllocations: targetAllocations - startAllocations,
+              targetAllocatedBytes: targetAllocatedBytes - startBytes,
+              textureDeletes: textureDeletes - startDeletes,
+              framebufferCreates: framebufferCreates - startFboCreates,
+              framebufferDeletes: framebufferDeletes - startFboDeletes,
+              sourceCacheBytes: compositor.sourceTargets.weight ?? null,
+              imageCacheBytes: compositor.imageTargets.weight ?? null,
+            };
+            if (
+              label === "after" &&
+              (row.targetAllocations ||
+                row.textureDeletes ||
+                row.framebufferCreates ||
+                row.framebufferDeletes)
+            )
+              throw new Error(`Steady-state cache thrashing: ${JSON.stringify(row)}`);
+            workingSets.push(row);
+          }
+          oversizedFrame.close();
+          bigFrame.close();
+          smallFrame.close();
+          for (const bitmap of stills) bitmap.close();
           compositor.dispose();
+          if (liveFramebuffers.size !== 0) throw new Error(`FBO leak: ${liveFramebuffers.size}`);
           if (resident !== 0) throw new Error(`Texture leak: ${resident}`);
           return {
             label,
@@ -247,6 +424,11 @@ try {
             source: [3840, 2160],
             renderer,
             precision: compositor.colorPrecision,
+            budgets: {
+              sourceBytes: Compositor.SOURCE_TARGET_BYTES ?? null,
+              imageBytes: Compositor.IMAGE_TARGET_BYTES ?? null,
+              maxSingleTargetBytes: Compositor.MAX_SOURCE_TARGET_BYTES ?? null,
+            },
             elapsedMs,
             heapBefore,
             heapAfter,
@@ -254,7 +436,9 @@ try {
             peakTextureBytes: benchmarkPeak,
             cachedImageBytes,
             oversizedAndResolutionChurn: stress,
+            workingSets,
             textureBytesAfterDispose: resident,
+            framebuffersAfterDispose: liveFramebuffers.size,
           };
         },
         { label, implementation },
@@ -263,13 +447,13 @@ try {
     await page.close();
   }
   const report = {
-    baseline: "f4adad6",
+    baseline,
     metric:
-      "Instrumented WebGL requested texture bytes, excluding driver overhead, constructor probes and browser image/canvas backing; JS heap after explicit GC. Actual Compositor rendering 1000 distinct 4K ImageBitmaps in a 1000-asset library, sequentially released source decodes; no import/OPFS benchmark.",
+      "Instrumented WebGL requested texture bytes, excluding driver overhead, constructor probes and browser image/canvas backing; JS heap after explicit GC. Actual Compositor rendering 1000 distinct 4K ImageBitmaps in a 1000-asset library, sequentially released source decodes, followed by simultaneous-source warm steady-state workloads using real text rasterization and VideoFrame uploads (decode time excluded); no import/OPFS benchmark.",
     rows,
   };
   writeFileSync(
-    path.join(root, "docs/evaluations/2026-09-07-color-cache-memory.json"),
+    path.join(root, "docs/evaluations/2026-09-07-color-cache-memory-round4.json"),
     `${JSON.stringify(report, null, 2)}\n`,
   );
   // biome-ignore lint/suspicious/noConsole: CLI benchmark report.

@@ -195,6 +195,9 @@ export class WebCodecsExporter implements Exporter {
       }
       await encoder.flush();
       if (colorOutputError) throw colorOutputError;
+      // Approximation reporting is intentionally latched at preflight: later
+      // incomplete metadata does not relatch it; explicit conflicts still fail
+      // through colorOutputError in the encoder output callback.
       colorMetadataMissing = !colorOutputVerified;
 
       onProgress({ stage: "rendering", progress: 0 });

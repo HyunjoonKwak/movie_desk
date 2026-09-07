@@ -12,6 +12,7 @@ vi.mock("../bt709-frame", () => ({
     }
   },
   isBt709Output: () => true,
+  hasConflictingBt709Output: () => false,
 }));
 vi.mock("@/renderer/compositor", () => ({
   Compositor: class {

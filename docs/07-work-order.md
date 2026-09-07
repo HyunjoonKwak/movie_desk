@@ -767,3 +767,28 @@ GC 후 JS 힙 **2.511→2.539MB**이며 드라이버 전체 VRAM 측정은 아�
 최종 `pnpm gate` **9/9 PASS**: core155·web709·desktop72·scripts11, 총 **947**,
 Chromium **64/64**(185.9초), OSV 167 패키지 취약점 0건, tsc·biome·build 통과.
 [gate 표](evaluations/2026-09-07-color-linear-round3-gate.md).
+
+**B’4b/B’6 열린 항목 — 전체 스위트 마지막 분석 샘플러 간헐 실패:**
+`e2e/webcodecs-sampler.spec.ts:25`의 실제 VideoDecoder 분석 테스트가 리뷰 중
+전체 실행 3회 중 1회 실패(나머지 63개 통과, 3.1분)했고 단독 실행은 통과했다.
+Claude의 후속 전체 실행 2회도 64/64였지만 재실행 통과로 닫지 않는다.
+원래 상세 단언·error-context는 검증 worktree 삭제로 남아 있지 않아 디코더 실패,
+분석 완료 대기 실패, GPU 압력 중 하나로 단정할 수 없다. 분석 자체는 320×180
+VP9를 VideoDecoder → 160×90 Canvas2D로 읽어 Compositor 캐시를 직접 쓰지 않지만,
+앞선 63개 테스트가 공유 브라우저 GPU 프로세스에 남기는 간접 압력은 미확정이다.
+이번 라운드에서 예산 상향 전후 전체 스위트를 각 3회, worker 1·retry 0으로
+재현 시도하며 전체 로그와 실패 산출물을 보존한다. 다음 재현에서는 실패 단언,
+분석 단계, decoder configure/frame/error 및 context-lost·GPU 프로세스 자원 정보를
+동시에 수집해 B’4b 관련성부터 판정한다. [조사 및 반복 결과](evaluations/2026-09-07-color-linear-round4-review.md).
+
+B’4b 4라운드(`d94481c` 리뷰): 소스·이미지 캐시 각 **192MiB**, 단일 타깃
+**128MiB**, Compositor당 합계 **384MiB**로 한 프레임 작업 집합을 수용한다.
+실제 VideoFrame+텍스트 벤치에서 4K 영상+1080p 제목의 180프레임 타깃/FBO
+재할당 **360→0**, 평균 **13.21→7.16ms**; 영상 2개·4K 스틸 3장·초과 영상+
+제목도 워밍업 후 축출 0이다. 두 export 모의의 conflict helper, 벤치 기준 SHA
+인수화, aliasing 절충 설명, preflight 경고 래치 주석을 반영했다.
+`pnpm gate` **9/9 PASS**, core155·web709·desktop72·scripts11(**947**), tsc0·
+Biome clean·build PASS·OSV167 취약점0; 전체 E2E는 예산 상향 **전 3회 + 후
+3회 모두 64/64**(retry0, 32119 매회 lsof 확인)이다. 샘플러 간헐 실패는
+재현되지 않았으나 위 열린 항목을 유지하며, 원래 실패 요약과 새 6회 로그,
+메모리 증가 비용 및 산술은 [4라운드 감사](evaluations/2026-09-07-color-linear-round4-review.md)에 남겼다.
