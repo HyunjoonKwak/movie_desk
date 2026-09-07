@@ -1,3 +1,4 @@
+import { ProjectAudioMixer } from "@/export/audio-mixer";
 import { MixerAudioGraph, loadMeterWorklet } from "@/mixer/audio-graph";
 import {
   PitchCache,
@@ -11,6 +12,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
 import {
+  buildAudioSequencePlan,
   hasSpeedRamp,
   isMediaClip,
   sampleKeyframeTrack,
@@ -34,6 +36,7 @@ class AudioEngine {
   >();
   private readonly pitchFailed = new Set<string>();
   private readonly fades = new Map<AudioBufferSourceNode, GainNode>();
+  private nestedAbort = new AbortController();
   private ctx: AudioContext | null = null;
   private graph: MixerAudioGraph | null = null;
   private readonly clipTracks = new Map<string, string>();
@@ -155,6 +158,8 @@ class AudioEngine {
   }
 
   private stopSources(fadeSeconds = 0): void {
+    this.nestedAbort.abort();
+    this.nestedAbort = new AbortController();
     this.generation++;
     this.transportActive = false;
     if (this.refillTimer !== null) clearTimeout(this.refillTimer);
@@ -269,6 +274,68 @@ class AudioEngine {
           !!pitched,
         );
         if (clip.preservePitch && !pitched) void this.preparePitch(buffer, clip, key);
+      }
+    }
+
+    const plan = buildAudioSequencePlan(project);
+    for (const entry of plan.clips) {
+      const clip = entry.clip;
+      if (clip.kind !== "sequence") continue;
+      const start = Math.max(rangeStartMs, clip.start);
+      const end = Math.min(rangeEndMs, clip.start + clip.duration);
+      if (end <= start) continue;
+      // Render the folded source with the same evaluator as export. The live
+      // root graph still owns parent track/bus/master controls and smoothing.
+      const mixer = new ProjectAudioMixer(
+        project,
+        (id) => project.mediaLibrary.find((asset) => asset.id === id),
+        undefined,
+        {
+          ...plan,
+          clips: [
+            { ...entry, route: { trackGain: 1, busGain: 1, masterGain: 1, pan: 0, busId: null } },
+          ],
+        },
+        true,
+      );
+      const signal = this.nestedAbort.signal;
+      try {
+        for await (const chunk of mixer.chunks({
+          startMs: start,
+          endMs: end,
+          chunkDurationMs: 1000,
+          signal,
+        })) {
+          if (generation !== this.generation) return;
+          const buffer = this.getCtx().createBuffer(2, chunk.channels[0].length, chunk.sampleRate);
+          for (let c = 0; c < 2; c++)
+            buffer.copyToChannel(Float32Array.from(chunk.channels[c]!), c);
+          const segmentStart =
+            (Math.floor((start / 1000) * chunk.sampleRate) * 1000) / chunk.sampleRate +
+            (chunk.startSample * 1000) / chunk.sampleRate;
+          const segment: MediaClip = {
+            ...clip,
+            kind: "media",
+            assetId: clip.timelineId,
+            start: segmentStart,
+            duration: (buffer.length * 1000) / chunk.sampleRate,
+            trimIn: 0,
+            trimOut: (buffer.length * 1000) / chunk.sampleRate,
+            speed: 1,
+            volume: 1,
+            effects: [],
+            keyframes: [],
+          };
+          this.clipTracks.set(segment.id, entry.trackId);
+          this.scheduleClip(buffer, segment, start, end, rate, generation, true);
+        }
+      } catch (error) {
+        // A superseded play must not reject into the playback hook and stop
+        // its replacement transport. Current-generation failures still escape.
+        if (generation !== this.generation) return;
+        throw error;
+      } finally {
+        mixer.dispose();
       }
     }
   }

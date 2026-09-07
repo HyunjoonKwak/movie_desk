@@ -1,0 +1,1209 @@
+
+> movie-desk@0.4.0-rc.1 gate /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1
+> node scripts/release-gate.mjs "--report" "docs/evaluations/2026-09-08-b5-phase5-gate.md"
+
+
+▶ install (frozen lockfile) (pnpm install --frozen-lockfile)
+Scope: all 4 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+
+Done in 565ms
+
+▶ version policy (pnpm check:versions)
+
+> movie-desk@0.4.0-rc.1 check:versions /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1
+> node scripts/check-versions.mjs
+
+versions in sync: 0.4.0-rc.1
+
+▶ lint (pnpm lint)
+
+> movie-desk@0.4.0-rc.1 lint /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1
+> pnpm -r lint && biome check scripts
+
+Scope: 3 of 4 workspace projects
+apps/desktop lint$ biome lint src
+packages/core lint$ biome lint src
+apps/desktop lint: Checked 29 files in 26ms. No fixes applied.
+packages/core lint: Checked 75 files in 27ms. No fixes applied.
+apps/desktop lint: Done
+packages/core lint: Done
+apps/web lint$ biome lint src e2e scripts playwright.config.ts
+apps/web lint: scripts/download-whisper.mjs:68:5 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     66 │   if (!force && (await fileExists(dest))) {
+apps/web lint:     67 │     const size = (await stat(dest)).size;
+apps/web lint:   > 68 │     console.log(`  ✓ ${relPath} (cached, ${fmtMb(size)})`);
+apps/web lint:        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     69 │     return 0;
+apps/web lint:     70 │   }
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:      66  66 │     if (!force && (await fileExists(dest))) {
+apps/web lint:      67  67 │       const size = (await stat(dest)).size;
+apps/web lint:      68     │ - ····console.log(`··✓·${relPath}·(cached,·${fmtMb(size)})`);
+apps/web lint:      69  68 │       return 0;
+apps/web lint:      70  69 │     }
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:76:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     74 │   const buf = new Uint8Array(await res.arrayBuffer());
+apps/web lint:     75 │   await writeFile(dest, buf);
+apps/web lint:   > 76 │   console.log(`  ↓ ${relPath} (${fmtMb(buf.byteLength)})`);
+apps/web lint:        │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     77 │   return buf.byteLength;
+apps/web lint:     78 │ };
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:      74  74 │     const buf = new Uint8Array(await res.arrayBuffer());
+apps/web lint:      75  75 │     await writeFile(dest, buf);
+apps/web lint:      76     │ - ··console.log(`··↓·${relPath}·(${fmtMb(buf.byteLength)})`);
+apps/web lint:      77  76 │     return buf.byteLength;
+apps/web lint:      78  77 │   };
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:86:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     84 │   await copyFile(source, dest);
+apps/web lint:     85 │   const size = (await stat(dest)).size;
+apps/web lint:   > 86 │   console.log(`  → ort/${filename} (${fmtMb(size)})`);
+apps/web lint:        │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     87 │   return size;
+apps/web lint:     88 │ };
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:      84  84 │     await copyFile(source, dest);
+apps/web lint:      85  85 │     const size = (await stat(dest)).size;
+apps/web lint:      86     │ - ··console.log(`··→·ort/${filename}·(${fmtMb(size)})`);
+apps/web lint:      87  86 │     return size;
+apps/web lint:      88  87 │   };
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:91:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     90 │ const main = async () => {
+apps/web lint:   > 91 │   console.log(`Downloading ${REPO} (q8) → ${targetRoot}`);
+apps/web lint:        │   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     92 │   for (const repo of RETIRED_REPOS) {
+apps/web lint:     93 │     await rm(resolve(here, "..", "public", "whisper", repo), { recursive: true, force: true });
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:      89  89 │
+apps/web lint:      90  90 │   const main = async () => {
+apps/web lint:      91     │ - ··console.log(`Downloading·${REPO}·(q8)·→·${targetRoot}`);
+apps/web lint:      92  91 │     for (const repo of RETIRED_REPOS) {
+apps/web lint:      93  92 │       await rm(resolve(here, "..", "public", "whisper", repo), { recursive: true, force: true });
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:104:7 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     102 │       total += await download(f);
+apps/web lint:     103 │     } catch (err) {
+apps/web lint:   > 104 │       console.error(`  ✗ ${f}: ${err instanceof Error ? err.message : err}`);
+apps/web lint:         │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     105 │       exit(1);
+apps/web lint:     106 │     }
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     102 102 │         total += await download(f);
+apps/web lint:     103 103 │       } catch (err) {
+apps/web lint:     104     │ - ······console.error(`··✗·${f}:·${err·instanceof·Error·?·err.message·:·err}`);
+apps/web lint:     105 104 │         exit(1);
+apps/web lint:     106 105 │       }
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:113:7 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     111 │       runtimeTotal += await copyRuntime(filename);
+apps/web lint:     112 │     } catch (err) {
+apps/web lint:   > 113 │       console.error(`  ✗ ort/${filename}: ${err instanceof Error ? err.message : err}`);
+apps/web lint:         │       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     114 │       exit(1);
+apps/web lint:     115 │     }
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     111 111 │         runtimeTotal += await copyRuntime(filename);
+apps/web lint:     112 112 │       } catch (err) {
+apps/web lint:     113     │ - ······console.error(`··✗·ort/${filename}:·${err·instanceof·Error·?·err.message·:·err}`);
+apps/web lint:     114 113 │         exit(1);
+apps/web lint:     115 114 │       }
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:117:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     115 │     }
+apps/web lint:     116 │   }
+apps/web lint:   > 117 │   console.log(
+apps/web lint:         │   ^^^^^^^^^^^^
+apps/web lint:   > 118 │     `Done. ${fmtMb(total)} newly downloaded; ${fmtMb(runtimeTotal)} ONNX runtime bundled.`,
+apps/web lint:   > 119 │   );
+apps/web lint:         │   ^^
+apps/web lint:     120 │ };
+apps/web lint:     121 │
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     115 115 │       }
+apps/web lint:     116 116 │     }
+apps/web lint:     117     │ - ··console.log(
+apps/web lint:     118     │ - ····`Done.·${fmtMb(total)}·newly·downloaded;·${fmtMb(runtimeTotal)}·ONNX·runtime·bundled.`,
+apps/web lint:     119     │ - ··);
+apps/web lint:     120 117 │   };
+apps/web lint:     121 118 │
+apps/web lint:
+apps/web lint: scripts/download-whisper.mjs:123:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     122 │ main().catch((err) => {
+apps/web lint:   > 123 │   console.error(err);
+apps/web lint:         │   ^^^^^^^^^^^^^^^^^^^
+apps/web lint:     124 │   exit(1);
+apps/web lint:     125 │ });
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     121 121 │
+apps/web lint:     122 122 │   main().catch((err) => {
+apps/web lint:     123     │ - ··console.error(err);
+apps/web lint:     124 123 │     exit(1);
+apps/web lint:     125 124 │   });
+apps/web lint:
+apps/web lint: scripts/bench-library.mjs:26:5 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     24 │   const value = Number(arg(name, fallback));
+apps/web lint:     25 │   if (!Number.isInteger(value) || value < 0) {
+apps/web lint:   > 26 │     console.error(`--${name} must be a non-negative integer`);
+apps/web lint:        │     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     27 │     process.exit(2);
+apps/web lint:     28 │   }
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:      24  24 │     const value = Number(arg(name, fallback));
+apps/web lint:      25  25 │     if (!Number.isInteger(value) || value < 0) {
+apps/web lint:      26     │ - ····console.error(`--${name}·must·be·a·non-negative·integer`);
+apps/web lint:      27  26 │       process.exit(2);
+apps/web lint:      28  27 │     }
+apps/web lint:
+apps/web lint: scripts/bench-library.mjs:335:1 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     333 │   ["rename → Saved badge", ms(result.renameToSavedMs)],
+apps/web lint:     334 │ ];
+apps/web lint:   > 335 │ console.log("| metric | value |\n| --- | --- |");
+apps/web lint:         │ ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     336 │ for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+apps/web lint:     337 │ console.log(
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     333 333 │     ["rename → Saved badge", ms(result.renameToSavedMs)],
+apps/web lint:     334 334 │   ];
+apps/web lint:     335     │ - console.log("|·metric·|·value·|\n|·---·|·---·|");
+apps/web lint:     336 335 │   for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+apps/web lint:     337 336 │   console.log(
+apps/web lint:
+apps/web lint: scripts/bench-library.mjs:336:28 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     334 │ ];
+apps/web lint:     335 │ console.log("| metric | value |\n| --- | --- |");
+apps/web lint:   > 336 │ for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+apps/web lint:         │                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+apps/web lint:     337 │ console.log(
+apps/web lint:     338 │   "\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |",
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     336 │ for·(const·[k,·v]·of·rows)·console.log(`|·${k}·|·${v}·|`);
+apps/web lint:         │                            -------------------------------
+apps/web lint: scripts/bench-library.mjs:337:1 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     335 │ console.log("| metric | value |\n| --- | --- |");
+apps/web lint:     336 │ for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+apps/web lint:   > 337 │ console.log(
+apps/web lint:         │ ^^^^^^^^^^^^
+apps/web lint:   > 338 │   "\n| asset field | bytes | share of project JSON | assets |\n| --- | ---: | ---: | ---: |",
+apps/web lint:   > 339 │ );
+apps/web lint:         │ ^^
+apps/web lint:     340 │ const share = (bytes) =>
+apps/web lint:     341 │   result.libraryRowBytes > 0 ? `${((bytes / result.libraryRowBytes) * 100).toFixed(1)}%` : "n/a";
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     335 335 │   console.log("| metric | value |\n| --- | --- |");
+apps/web lint:     336 336 │   for (const [k, v] of rows) console.log(`| ${k} | ${v} |`);
+apps/web lint:     337     │ - console.log(
+apps/web lint:     338     │ - ··"\n|·asset·field·|·bytes·|·share·of·project·JSON·|·assets·|\n|·---·|·---:·|·---:·|·---:·|",
+apps/web lint:     339     │ - );
+apps/web lint:     340 337 │   const share = (bytes) =>
+apps/web lint:     341 338 │     result.libraryRowBytes > 0 ? `${((bytes / result.libraryRowBytes) * 100).toFixed(1)}%` : "n/a";
+apps/web lint:
+apps/web lint: scripts/bench-library.mjs:345:3 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     343 │   (a, b) => b[1].bytes - a[1].bytes,
+apps/web lint:     344 │ )) {
+apps/web lint:   > 345 │   console.log(
+apps/web lint:         │   ^^^^^^^^^^^^
+apps/web lint:   > 346 │     ["", field, value.bytes.toLocaleString("en-US"), share(value.bytes), value.assets, ""]
+apps/web lint:   > 347 │       .join(" | ")
+apps/web lint:   > 348 │       .trim(),
+apps/web lint:   > 349 │   );
+apps/web lint:         │   ^^
+apps/web lint:     350 │ }
+apps/web lint:     351 │ console.log(
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     343 343 │     (a, b) => b[1].bytes - a[1].bytes,
+apps/web lint:     344 344 │   )) {
+apps/web lint:     345     │ - ··console.log(
+apps/web lint:     346     │ - ····["",·field,·value.bytes.toLocaleString("en-US"),·share(value.bytes),·value.assets,·""]
+apps/web lint:     347     │ - ······.join("·|·")
+apps/web lint:     348     │ - ······.trim(),
+apps/web lint:     349     │ - ··);
+apps/web lint:     350 345 │   }
+apps/web lint:     351 346 │   console.log(
+apps/web lint:
+apps/web lint: scripts/bench-library.mjs:351:1 lint/suspicious/noConsole  FIXABLE  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apps/web lint:   ! Don't use console.
+apps/web lint:
+apps/web lint:     349 │   );
+apps/web lint:     350 │ }
+apps/web lint:   > 351 │ console.log(
+apps/web lint:         │ ^^^^^^^^^^^^
+apps/web lint:   > 352 │   [
+apps/web lint:          ...
+apps/web lint:   > 361 │     .trim(),
+apps/web lint:   > 362 │ );
+apps/web lint:         │ ^^
+apps/web lint:     363 │ if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);
+apps/web lint:     364 │
+apps/web lint:
+apps/web lint:   i The use of console is often reserved for debugging.
+apps/web lint:
+apps/web lint:   i Unsafe fix: Remove console.
+apps/web lint:
+apps/web lint:     349 349 │     );
+apps/web lint:     350 350 │   }
+apps/web lint:     351     │ - console.log(
+apps/web lint:     352     │ - ··[
+apps/web lint:     353     │ - ····"",
+apps/web lint:     354     │ - ····"other·project·data/structure",
+apps/web lint:     355     │ - ····result.libraryOtherProjectBytes.toLocaleString("en-US"),
+apps/web lint:     356     │ - ····share(result.libraryOtherProjectBytes),
+apps/web lint:     357     │ - ····"—",
+apps/web lint:     358     │ - ····"",
+apps/web lint:     359     │ - ··]
+apps/web lint:     360     │ - ····.join("·|·")
+apps/web lint:     361     │ - ····.trim(),
+apps/web lint:     362     │ - );
+apps/web lint:     363 351 │   if (OUT) writeFileSync(OUT, `${JSON.stringify(result, null, 2)}\n`);
+apps/web lint:     364 352 │
+apps/web lint:
+apps/web lint: Checked 539 files in 77ms. No fixes applied.
+apps/web lint: Found 14 warnings.
+apps/web lint: Done
+Checked 26 files in 15ms. No fixes applied.
+
+▶ typecheck (pnpm typecheck)
+
+> movie-desk@0.4.0-rc.1 typecheck /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1
+> pnpm -r typecheck
+
+Scope: 3 of 4 workspace projects
+packages/core typecheck$ tsc --noEmit
+packages/core typecheck: Done
+apps/web typecheck$ tsc --noEmit
+apps/web typecheck: Done
+
+▶ unit tests (pnpm test)
+
+> movie-desk@0.4.0-rc.1 test /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1
+> pnpm -r test && node --test scripts/*.test.mjs
+
+Scope: 3 of 4 workspace projects
+apps/desktop test$ node --test src/*.test.cjs
+packages/core test$ vitest run
+apps/desktop test: TAP version 13
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: WAL snapshot restores source identity and user metadata with explicit consent
+apps/desktop test: ok 1 - WAL snapshot restores source identity and user metadata with explicit consent
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 100.392208
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: corrupt snapshot never replaces catalog; failed backup leaves good snapshots intact
+apps/desktop test: ok 2 - corrupt snapshot never replaces catalog; failed backup leaves good snapshots intact
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 35.482959
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: unchanged catalogs skip snapshots; source status only writes transitions
+apps/desktop test: ok 3 - unchanged catalogs skip snapshots; source status only writes transitions
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 55.687292
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: retention keeps at most seven snapshots across recent, hourly and daily generations
+apps/desktop test: ok 4 - retention keeps at most seven snapshots across recent, hourly and daily generations
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.852709
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76850) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: successful snapshot removes obsolete generations from disk
+apps/desktop test: ok 5 - successful snapshot removes obsolete generations from disk
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 42.197833
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: MediaCatalog
+apps/desktop test:     # Subtest: opens WAL schema version 2 in its worker
+apps/desktop test:     ok 1 - opens WAL schema version 2 in its worker
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 36.193875
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: refuses to overwrite a catalog created by a newer app
+apps/desktop test:     ok 2 - refuses to overwrite a catalog created by a newer app
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 22.39725
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test:     # Subtest: stores source roots and produces an asset with its root snapshot
+apps/desktop test:     ok 3 - stores source roots and produces an asset with its root snapshot
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 20.497625
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test:     # Subtest: honors root case sensitivity when enforcing path identity
+apps/desktop test:     ok 4 - honors root case sensitivity when enforcing path identity
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 19.975292
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test:     # Subtest: keeps user metadata separate from rebuildable media facts
+apps/desktop test:     ok 5 - keeps user metadata separate from rebuildable media facts
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 19.539292
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..5
+apps/desktop test: ok 6 - MediaCatalog
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 119.56225
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: normalizeRelativePath
+apps/desktop test:     # Subtest: normalizes Unicode to NFC and rejects traversal
+apps/desktop test:     ok 1 - normalizes Unicode to NFC and rejects traversal
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.360375
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..1
+apps/desktop test: ok 7 - normalizeRelativePath
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.472417
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # (node:76851) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: migrates a populated v1 catalog idempotently without losing identity or metadata
+apps/desktop test: ok 8 - migrates a populated v1 catalog idempotently without losing identity or metadata
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 53.07525
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+packages/core test:  RUN  v2.1.9 /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1/packages/core
+packages/core test:  ✓ src/model/__tests__/media-source.test.ts (12 tests) 4ms
+packages/core test:  ✓ src/audio-routing/__tests__/routing.test.ts (5 tests) 4ms
+packages/core test:  ✓ src/timeline/__tests__/collide.test.ts (14 tests) 5ms
+packages/core test:  ✓ src/timeline/__tests__/mutate.test.ts (13 tests) 10ms
+packages/core test:  ✓ src/timeline/__tests__/paste.test.ts (7 tests) 14ms
+packages/core test:  ✓ src/timeline/__tests__/three-point.test.ts (9 tests) 11ms
+packages/core test:  ✓ src/timeline/__tests__/text-anim.test.ts (7 tests) 3ms
+packages/core test:  ✓ src/timeline/__tests__/ripple-across-tracks.test.ts (4 tests) 4ms
+packages/core test:  ✓ src/timeline/__tests__/sequence-graph.test.ts (9 tests) 201ms
+packages/core test:  ✓ src/timeline/__tests__/marquee.test.ts (10 tests) 7ms
+packages/core test:  ✓ src/model/__tests__/project-timelines.test.ts (6 tests) 5ms
+packages/core test:  ✓ src/audio-routing/__tests__/meter.test.ts (6 tests) 55ms
+packages/core test:  ✓ src/timeline/__tests__/keyframes.test.ts (7 tests) 38ms
+packages/core test:  ✓ src/model/__tests__/blend.test.ts (6 tests) 6ms
+packages/core test:  ✓ src/timeline/__tests__/keyframe-mutate.test.ts (3 tests) 4ms
+packages/core test:  ✓ src/timeline/__tests__/edit-points.test.ts (4 tests) 2ms
+packages/core test:  ✓ src/utils/__tests__/time.test.ts (18 tests) 7ms
+packages/core test:  ✓ src/timeline/__tests__/multicam.test.ts (3 tests) 5ms
+packages/core test:  ✓ src/timeline/__tests__/snap.test.ts (3 tests) 2ms
+packages/core test:  ✓ src/timeline/__tests__/inspect.test.ts (3 tests) 2ms
+packages/core test:  ✓ src/model/__tests__/media-rotation.test.ts (2 tests) 2ms
+packages/core test:  ✓ src/model/__tests__/sequence-clip.test.ts (1 test) 1ms
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: same-size different bytes require confirmation, and original bytes and metadata survive
+apps/desktop test: ok 9 - same-size different bytes require confirmation, and original bytes and metadata survive
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 40.901958
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: identical renamed file connects without mismatch confirmation and token is single-use
+apps/desktop test: ok 10 - identical renamed file connects without mismatch confirmation and token is single-use
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 26.4855
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: candidate changed after preview is refused even after confirmation
+apps/desktop test: ok 11 - candidate changed after preview is refused even after confirmation
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 21.561625
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: folder matches exact relative paths, skips unavailable and rejects symlink escape
+apps/desktop test: ok 12 - folder matches exact relative paths, skips unavailable and rejects symlink escape
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 23.212792
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: fingerprint comparison does not infer identity from size or inode
+apps/desktop test: ok 13 - fingerprint comparison does not infer identity from size or inode
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.122917
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: folder relink preserves nested relative structure for the next reconnection
+apps/desktop test: ok 14 - folder relink preserves nested relative structure for the next reconnection
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 27.062292
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: tokens expire after fifteen minutes and catalog edits invalidate preview
+apps/desktop test: ok 15 - tokens expire after fifteen minutes and catalog edits invalidate preview
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 23.246875
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: identical full fingerprint relink preserves the stored quick fingerprint
+apps/desktop test: ok 16 - identical full fingerprint relink preserves the stored quick fingerprint
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 20.041417
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: folder preview resolves volume once, skips full hashing and supports cancellation
+apps/desktop test: ok 17 - folder preview resolves volume once, skips full hashing and supports cancellation
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 26.712833
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # (node:76852) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test: # Subtest: pending capacity is bounded and cancellation releases sender capabilities
+apps/desktop test: ok 18 - pending capacity is bounded and cancellation releases sender capabilities
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 1378.154791
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: desktop HEIC importer
+apps/desktop test:     # Subtest: registers the untouched original and returns metadata plus a bounded thumbnail
+apps/desktop test:     ok 1 - registers the untouched original and returns metadata plus a bounded thumbnail
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 12.691791
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: caches a 4096px editing source and keeps a stable root and asset identity
+apps/desktop test:     ok 2 - caches a 4096px editing source and keeps a stable root and asset identity
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 9.233833
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: rejects paths that are not HEIC/HEIF before invoking native tools
+apps/desktop test:     ok 3 - rejects paths that are not HEIC/HEIF before invoking native tools
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1.064666
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test: # (node:76853) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+apps/desktop test: # (Use `node --trace-warnings ...` to show where the warning was created)
+apps/desktop test:     # Subtest: imports a generated HEIC through the real helper and catalog on macOS
+apps/desktop test:     ok 4 - imports a generated HEIC through the real helper and catalog on macOS
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1261.626625
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..4
+apps/desktop test: ok 19 - desktop HEIC importer
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 1285.525209
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: helper protocol
+apps/desktop test:     # Subtest: parses Spotlight metadata without treating null fields as values
+apps/desktop test:     ok 1 - parses Spotlight metadata without treating null fields as values
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.499041
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: requires an exact protocol version and known command
+apps/desktop test:     ok 2 - requires an exact protocol version and known command
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.240084
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: round-trips quick and full fingerprints through the JSON-lines sidecar
+apps/desktop test:     ok 3 - round-trips quick and full fingerprints through the JSON-lines sidecar
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 38.583917
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: returns structured errors without terminating the sidecar
+apps/desktop test:     ok 4 - returns structured errors without terminating the sidecar
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 33.390583
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: creates and inspects a bounded sips preview on macOS
+apps/desktop test:     ok 5 - creates and inspects a bounded sips preview on macOS
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 116.100958
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: decodes a real HEIC fixture through ImageIO without changing the original
+apps/desktop test:     ok 6 - decodes a real HEIC fixture through ImageIO without changing the original
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 363.988208
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: resolves a nested macOS path to a stable volume UUID and relative path
+apps/desktop test:     ok 7 - resolves a nested macOS path to a stable volume UUID and relative path
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 524.374042
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..7
+apps/desktop test: ok 20 - helper protocol
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 1077.931042
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: parseByteRange
+apps/desktop test:     # Subtest: accepts full, open-ended, bounded, and suffix ranges
+apps/desktop test:     ok 1 - accepts full, open-ended, bounded, and suffix ranges
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.678458
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: rejects multiple and unsatisfiable ranges
+apps/desktop test:     ok 2 - rejects multiple and unsatisfiable ranges
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.142083
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..2
+apps/desktop test: ok 21 - parseByteRange
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 1.200916
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: media protocol
+apps/desktop test:     # Subtest: streams GET ranges and exposes correct HTTP metadata
+apps/desktop test:     ok 1 - streams GET ranges and exposes correct HTTP metadata
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 23.718708
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: supports HEAD without opening a response body
+apps/desktop test:     ok 2 - supports HEAD without opening a response body
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 3.048167
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: returns 416 for an invalid single range
+apps/desktop test:     ok 3 - returns 416 for an invalid single range
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 3.142834
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: invalidates released leases and never accepts a path as an asset id
+apps/desktop test:     ok 4 - invalidates released leases and never accepts a path as an asset id
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1.19575
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: accepts every path-safe leading character used by core nanoid values
+apps/desktop test:     ok 5 - accepts every path-safe leading character used by core nanoid values
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.163584
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: refuses to stream a source that changed after cataloging
+apps/desktop test:     ok 6 - refuses to stream a source that changed after cataloging
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 2.378541
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: reuses the resolved source snapshot for every range in one lease
+apps/desktop test:     ok 7 - reuses the resolved source snapshot for every range in one lease
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 4.798375
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..7
+apps/desktop test: ok 22 - media protocol
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 39.236416
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: isAllowedYoutubeUrl accepts YouTube hosts only
+apps/desktop test: ok 23 - isAllowedYoutubeUrl accepts YouTube hosts only
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.878958
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: extractJsonAfter slices a balanced object with strings containing braces
+apps/desktop test: ok 24 - extractJsonAfter slices a balanced object with strings containing braces
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.531459
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: extracts structured music rows from ytInitialData
+apps/desktop test: ok 25 - extracts structured music rows from ytInitialData
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.118083
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: extracts the description from ytInitialPlayerResponse
+apps/desktop test: ok 26 - extracts the description from ytInitialPlayerResponse
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.205583
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: creditsTextFromWatchHtml combines rows and description, null when empty
+apps/desktop test: ok 27 - creditsTextFromWatchHtml combines rows and description, null when empty
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.082084
+apps/desktop test:   type: 'test'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: resolveAssetSource
+apps/desktop test:     # Subtest: implements all six source states without silently substituting media
+apps/desktop test:     ok 1 - implements all six source states without silently substituting media
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 14.714625
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: rejects a symlink that escapes the registered root
+apps/desktop test:     ok 2 - rejects a symlink that escapes the registered root
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 4.162083
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..2
+apps/desktop test: ok 28 - resolveAssetSource
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 19.446125
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: source reference helpers
+apps/desktop test:     # Subtest: keeps absolute paths out of the asset-relative path
+apps/desktop test:     ok 1 - keeps absolute paths out of the asset-relative path
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 2.933792
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..1
+apps/desktop test: ok 29 - source reference helpers
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 3.135666
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: compareVersions
+apps/desktop test:     # Subtest: orders plain semver
+apps/desktop test:     ok 1 - orders plain semver
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.383125
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: tolerates v prefix and prerelease suffixes
+apps/desktop test:     ok 2 - tolerates v prefix and prerelease suffixes
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.0895
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: ranks a release candidate below the stable it precedes
+apps/desktop test:     ok 3 - ranks a release candidate below the stable it precedes
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1.048708
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..3
+apps/desktop test: ok 30 - compareVersions
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 1.928084
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: pickDmgAsset
+apps/desktop test:     # Subtest: picks the arm64 dmg on arm64
+apps/desktop test:     ok 1 - picks the arm64 dmg on arm64
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.134459
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: picks the plain dmg on x64, never a blockmap
+apps/desktop test:     ok 2 - picks the plain dmg on x64, never a blockmap
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.084375
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: returns null when no dmg exists
+apps/desktop test:     ok 3 - returns null when no dmg exists
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.039333
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..3
+apps/desktop test: ok 31 - pickDmgAsset
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.339583
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: evaluateRelease
+apps/desktop test:     # Subtest: reports an update with the arch-matching download
+apps/desktop test:     ok 1 - reports an update with the arch-matching download
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.151041
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: reports current when already on the latest (or newer)
+apps/desktop test:     ok 2 - reports current when already on the latest (or newer)
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.109875
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: offers the stable release to a release-candidate install
+apps/desktop test:     ok 3 - offers the stable release to a release-candidate install
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.112083
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: falls back to the release page when assets are missing
+apps/desktop test:     ok 4 - falls back to the release page when assets are missing
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.124625
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: errors on a malformed payload
+apps/desktop test:     ok 5 - errors on a malformed payload
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.035833
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..5
+apps/desktop test: ok 32 - evaluateRelease
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.721583
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: chooseUserData
+apps/desktop test:     # Subtest: adopts the legacy folder only when it is a directory holding Movie Desk storage
+apps/desktop test:     ok 1 - adopts the legacy folder only when it is a directory holding Movie Desk storage
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.257958
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: keeps a recorded decision regardless of what the folders hold now
+apps/desktop test:     ok 2 - keeps a recorded decision regardless of what the folders hold now
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.079833
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..2
+apps/desktop test: ok 33 - chooseUserData
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.723167
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: adoptLegacyUserData
+apps/desktop test:     # Subtest: moves userData and sessionData to the legacy folder and records the decision
+apps/desktop test:     ok 1 - moves userData and sessionData to the legacy folder and records the decision
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 2.647042
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: still adopts when a previous launch already created the new folder with window state
+apps/desktop test:     ok 2 - still adopts when a previous launch already created the new folder with window state
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1.768083
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: ignores a cut_editor folder that is not Movie Desk's, or is a file
+apps/desktop test:     ok 3 - ignores a cut_editor folder that is not Movie Desk's, or is a file
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 1.686292
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: honours a recorded decision on later launches
+apps/desktop test:     ok 4 - honours a recorded decision on later launches
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.516459
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: never throws: a setPath failure keeps the default folder
+apps/desktop test:     ok 5 - never throws: a setPath failure keeps the default folder
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.584709
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..5
+apps/desktop test: ok 34 - adoptLegacyUserData
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 7.705875
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: hasOurStorage
+apps/desktop test:     # Subtest: looks for the app://cut-editor IndexedDB directory
+apps/desktop test:     ok 1 - looks for the app://cut-editor IndexedDB directory
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 0.656625
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..1
+apps/desktop test: ok 35 - hasOurStorage
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 0.727125
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: # Subtest: VolumeRootResolver
+apps/desktop test:     # Subtest: uses volume UUID instead of a stale absolute path and caches the mount briefly
+apps/desktop test:     ok 1 - uses volume UUID instead of a stale absolute path and caches the mount briefly
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 4.964542
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: does not fall back to a lookalike path when the identified volume is offline
+apps/desktop test:     ok 2 - does not fall back to a lookalike path when the identified volume is offline
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 2.096208
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     # Subtest: rejects a volume-relative path that escapes its volume
+apps/desktop test:     ok 3 - rejects a volume-relative path that escapes its volume
+apps/desktop test:       ---
+apps/desktop test:       duration_ms: 2.105
+apps/desktop test:       type: 'test'
+apps/desktop test:       ...
+apps/desktop test:     1..3
+apps/desktop test: ok 36 - VolumeRootResolver
+apps/desktop test:   ---
+apps/desktop test:   duration_ms: 9.662458
+apps/desktop test:   type: 'suite'
+apps/desktop test:   ...
+apps/desktop test: 1..36
+apps/desktop test: # tests 72
+apps/desktop test: # suites 15
+apps/desktop test: # pass 72
+apps/desktop test: # fail 0
+apps/desktop test: # cancelled 0
+apps/desktop test: # skipped 0
+apps/desktop test: # todo 0
+apps/desktop test: # duration_ms 1635.786042
+apps/desktop test: Done
+packages/core test:  ✓ src/audio/__tests__/time-stretch.test.ts (19 tests) 2085ms
+packages/core test:  Test Files  23 passed (23)
+packages/core test:       Tests  171 passed (171)
+packages/core test:    Start at  06:56:52
+packages/core test:    Duration  2.49s (transform 613ms, setup 0ms, collect 1.81s, tests 2.48s, environment 3ms, prepare 1.78s)
+packages/core test: Done
+apps/web test$ vitest run
+apps/web test:  RUN  v2.1.9 /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1/apps/web
+apps/web test:  ✓ src/media/__tests__/search.test.ts (11 tests) 4ms
+apps/web test:  ✓ src/media/__tests__/import-batch.test.ts (7 tests) 5ms
+apps/web test:  ✓ src/autoedit/__tests__/assembler.test.ts (17 tests) 7ms
+apps/web test:  ✓ src/persistence/__tests__/merge-recovery.test.ts (13 tests) 56ms
+apps/web test:  ✓ src/persistence/__tests__/crdt-migration.test.ts (15 tests) 63ms
+apps/web test:  ✓ src/stores/__tests__/precision-actions.test.ts (17 tests) 9ms
+apps/web test:  ✓ src/export/__tests__/aac-fallback.test.ts (3 tests) 67ms
+apps/web test:  ✓ src/persistence/__tests__/project-crdt.test.ts (7 tests) 29ms
+apps/web test:  ✓ src/export/__tests__/audio-sequence.test.ts (14 tests | 1 skipped) 418ms
+apps/web test:  ✓ src/persistence/__tests__/previews.test.ts (12 tests) 280ms
+apps/web test:  ✓ src/stores/__tests__/overlay-create.test.ts (13 tests) 7ms
+apps/web test:  ✓ src/stores/__tests__/preview-store.test.ts (10 tests) 427ms
+apps/web test:  ✓ src/media/__tests__/source-health.test.ts (8 tests) 33ms
+apps/web test:  ✓ src/persistence/__tests__/live-doc-restore.test.ts (9 tests) 57ms
+apps/web test:  ✓ src/persistence/__tests__/project-export.test.ts (14 tests) 12ms
+apps/web test:  ✓ src/persistence/__tests__/checked-indexeddb.test.ts (7 tests) 680ms
+apps/web test:  ✓ src/media/__tests__/disk-media-source.test.ts (7 tests) 6ms
+apps/web test:  ✓ src/media/__tests__/relink.test.ts (11 tests) 6ms
+apps/web test:  ✓ src/persistence/__tests__/snapshots.test.ts (7 tests) 19ms
+apps/web test:  ✓ src/renderer/__tests__/frame-delivery.test.ts (8 tests) 5ms
+apps/web test:  ✓ src/export/__tests__/preflight.test.ts (9 tests) 4ms
+apps/web test:  ✓ src/media/mux/__tests__/mp4-writer.test.ts (3 tests) 25ms
+apps/web test:  ✓ src/persistence/__tests__/library-autosave.test.ts (8 tests) 22ms
+apps/web test:  ✓ src/media/__tests__/regenerate-previews.test.ts (11 tests) 70ms
+apps/web test:  ✓ src/mixer/__tests__/audio-graph.test.ts (4 tests) 6ms
+apps/web test:  ✓ src/stores/__tests__/edit-actions.test.ts (12 tests) 9ms
+apps/web test:  ✓ src/stores/__tests__/place-asset.test.ts (8 tests) 6ms
+apps/web test:  ✓ src/export/__tests__/exporter-cleanup.test.ts (9 tests) 8ms
+apps/web test:  ✓ src/lib/funnel/__tests__/collector.test.ts (7 tests) 35ms
+apps/web test:  ✓ src/persistence/__tests__/trash.test.ts (5 tests) 10ms
+apps/web test:  ✓ src/renderer/__tests__/blend-modes.test.ts (15 tests) 3ms
+apps/web test:  ✓ src/persistence/__tests__/phase0-timelines.test.ts (3 tests) 19ms
+apps/web test:  ✓ src/persistence/__tests__/clip-ownership-recovery.test.ts (6 tests) 48ms
+apps/web test:  ✓ src/music/__tests__/recommend.test.ts (9 tests) 3ms
+apps/web test:  ✓ src/persistence/__tests__/audio-routing.test.ts (6 tests) 30ms
+apps/web test:  ✓ src/renderer/__tests__/mp4-demux.test.ts (5 tests) 12ms
+apps/web test:  ✓ src/persistence/__tests__/funnel-log.test.ts (6 tests) 276ms
+apps/web test:  ✓ src/audio/__tests__/pitch-worker-lifecycle.test.ts (15 tests) 1813ms
+apps/web test:  ✓ src/export/__tests__/encoder-peak.test.ts (1 test) 16ms
+apps/web test:  ✓ src/autoedit/__tests__/music-cache.test.ts (6 tests) 22ms
+apps/web test:  ✓ src/music/__tests__/id3.test.ts (8 tests) 33ms
+apps/web test:  ✓ src/autoedit/__tests__/quality.test.ts (10 tests) 9ms
+apps/web test:  ✓ src/export/__tests__/audio-stereo.test.ts (7 tests) 16ms
+apps/web test:  ✓ src/stores/__tests__/music-actions.test.ts (6 tests) 3ms
+apps/web test: PRECISION_1000_ASSET_BENCH [{"gated":false,"assets":1000,"clips":1000,"frames":60,"p50Ms":9.823875000000044,"p95Ms":18.304874999999925,"commitMs":0.00016600000003563764,"flushes":60},{"gated":true,"assets":1000,"clips":1000,"frames":60,"p50Ms":0.03741700000000492,"p95Ms":0.03900000000021464,"commitMs":8.028792000000067,"flushes":1}]
+apps/web test:  ✓ src/persistence/__tests__/precision-flush.test.ts (6 tests) 853ms
+apps/web test:    ✓ measures 60 preview frames with 1000 assets and clips, including actual Yjs writes 841ms
+apps/web test:  ✓ src/audio/__tests__/pitch-preview-jobs.test.ts (1 test) 170ms
+apps/web test:  ✓ src/media/__tests__/folder-import.test.ts (5 tests) 9ms
+apps/web test:  ✓ src/preview/__tests__/audio-sequence-playback.test.ts (1 test) 60ms
+apps/web test:  ✓ src/media/__tests__/organize.test.ts (8 tests) 15ms
+apps/web test:  ✓ src/lib/funnel/__tests__/episodes.test.ts (6 tests) 8ms
+apps/web test:  ✓ src/persistence/__tests__/project-library.test.ts (5 tests) 15ms
+apps/web test:  ✓ src/autoedit/__tests__/story.test.ts (8 tests) 4ms
+apps/web test:  ✓ src/autoedit/__tests__/scenarios.test.ts (4 tests) 7ms
+apps/web test:  ✓ src/export/__tests__/bt709-pipeline.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/media/__tests__/thumbnail.test.ts (4 tests) 2ms
+apps/web test:  ✓ src/media/__tests__/media-source.test.ts (6 tests) 3ms
+apps/web test:  ✓ src/media/__tests__/desktop-relink.test.ts (4 tests) 4ms
+apps/web test:  ✓ src/music/__tests__/credits-parser.test.ts (10 tests) 6ms
+apps/web test:  ✓ src/renderer/__tests__/linear-decoder.test.ts (4 tests) 13ms
+apps/web test:  ✓ src/persistence/__tests__/nested-roundtrip.test.ts (5 tests) 13ms
+apps/web test:  ✓ src/media/__tests__/audio-variant.test.ts (6 tests) 27ms
+apps/web test:  ✓ src/export/__tests__/target-capture.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/scopes/__tests__/readback.test.ts (1 test) 3ms
+apps/web test:  ✓ src/components/__tests__/state-guidance.test.ts (12 tests) 25ms
+apps/web test:  ✓ src/renderer/__tests__/frame-sampler-webcodecs.test.ts (2 tests) 3ms
+apps/web test:  ✓ src/preview/__tests__/meter-startup.test.ts (2 tests) 176ms
+apps/web test:  ✓ src/lib/funnel/__tests__/compute.test.ts (5 tests) 9ms
+apps/web test:  ✓ src/autoedit/__tests__/metadata.test.ts (10 tests) 6ms
+apps/web test:  ✓ src/renderer/__tests__/resource-leases.test.ts (4 tests) 5ms
+apps/web test:  ✓ src/stores/__tests__/media-actions-noop.test.ts (4 tests) 3ms
+apps/web test:  ✓ src/persistence/__tests__/sequence-safety.test.ts (2 tests) 33ms
+apps/web test:  ✓ src/music/__tests__/tempo.test.ts (7 tests) 6ms
+apps/web test:  ✓ src/renderer/__tests__/mp4-decoder.test.ts (5 tests) 2ms
+apps/web test:  ✓ src/stores/__tests__/library-marks.test.ts (4 tests) 6ms
+apps/web test:  ✓ src/persistence/__tests__/crdt-sequence.test.ts (3 tests) 6ms
+apps/web test:  ✓ src/scopes/__tests__/frames.test.ts (3 tests) 18ms
+apps/web test:  ✓ src/mixer/__tests__/meter-worklet.test.ts (4 tests) 455ms
+apps/web test:  ✓ src/audio/__tests__/pitch-invalidation.test.ts (1 test) 196ms
+apps/web test:  ✓ src/renderer/__tests__/frame-sampler.test.ts (7 tests) 5ms
+apps/web test:  ✓ src/persistence/__tests__/project-export-source-ref.test.ts (5 tests) 9ms
+apps/web test:  ✓ src/renderer/__tests__/video-frame-cache.test.ts (7 tests) 4ms
+apps/web test:  ✓ src/music/__tests__/file-store.test.ts (7 tests) 4ms
+apps/web test:  ✓ src/renderer/__tests__/retry-backoff.test.ts (4 tests) 1ms
+apps/web test:  ❯ src/mixer/__tests__/meter-fallback.test.ts (1 test | 1 failed) 10ms
+apps/web test:    × shows a nonzero waveform estimate during playback when the worklet is unavailable 9ms
+apps/web test:      → expected -60 to be greater than -60
+apps/web test:  ✓ src/scopes/__tests__/compute.test.ts (7 tests) 4ms
+apps/web test:  ✓ src/autoedit/__tests__/analysis-store.test.ts (1 test) 106ms
+apps/web test:  ✓ src/export/__tests__/pitch-mixer.test.ts (8 tests) 2555ms
+apps/web test:    ✓ keeps padded audio-gain export continuous at 30s (0.5x) 869ms
+apps/web test:    ✓ keeps padded audio-gain export continuous at 30s (1.37x) 843ms
+apps/web test:    ✓ keeps padded audio-gain export continuous at 30s (2x) 754ms
+apps/web test:  ✓ src/stores/__tests__/track-layering.test.ts (2 tests) 5ms
+apps/web test:  ✓ src/renderer/__tests__/webcodecs-decoder.test.ts (3 tests) 5ms
+apps/web test:  ❯ src/mixer/__tests__/estimated-levels.test.ts (1 test | 1 failed) 4ms
+apps/web test:    × shares asset maps across playhead changes and all strip estimates per frame 4ms
+apps/web test:      → expected +0 to be close to 0.2505936168136361, received difference is 0.2505936168136361, but expected 0.005
+apps/web test:  ✓ src/export/__tests__/loudness.test.ts (5 tests) 48ms
+apps/web test:  ✓ src/renderer/__tests__/frame-source-pool.test.ts (2 tests) 2ms
+apps/web test:  ✓ src/media/__tests__/audio-track-remux.test.ts (3 tests) 25ms
+apps/web test:  ✓ src/media/__tests__/virtual-layout.test.ts (4 tests) 5ms
+apps/web test:  ✓ src/autoedit/__tests__/reframe.test.ts (4 tests) 4ms
+apps/web test:  ✓ src/audio/__tests__/pitch-renderer.test.ts (3 tests) 5ms
+apps/web test:  ✓ src/renderer/__tests__/bounded-resource-cache.test.ts (5 tests) 3ms
+apps/web test:  ✓ src/persistence/__tests__/live-doc-indexeddb.test.ts (4 tests) 2705ms
+apps/web test:    ✓ retries a real writer quota failure while idle and reopens the failed edit 2135ms
+apps/web test:  ✓ src/renderer/__tests__/frame-source.test.ts (3 tests) 5ms
+apps/web test:  ✓ src/persistence/__tests__/media-gc-race.test.ts (2 tests) 4ms
+apps/web test:  ✓ src/persistence/__tests__/opfs.test.ts (3 tests) 6ms
+apps/web test:  ✓ src/media/__tests__/desktop-heic-import.test.ts (3 tests) 6ms
+apps/web test:  ✓ src/persistence/__tests__/funnel-retention.test.ts (9 tests) 6ms
+apps/web test:  ✓ src/persistence/__tests__/media-gc-music.test.ts (2 tests) 2ms
+apps/web test:  ✓ src/stores/__tests__/timeline-alias.test.ts (2 tests) 2ms
+apps/web test:  ✓ src/export/__tests__/worker-peak.test.ts (3 tests) 150ms
+apps/web test:  ✓ src/i18n/__tests__/messages.test.ts (5 tests) 5ms
+apps/web test:  ✓ src/persistence/__tests__/pitch-roundtrip.test.ts (3 tests) 8ms
+apps/web test:  ✓ src/renderer/__tests__/color.test.ts (4 tests) 34ms
+apps/web test:  ✓ src/components/__tests__/precision-input-utils.test.ts (18 tests) 3ms
+apps/web test:  ✓ src/export/__tests__/spectral-denoise.test.ts (2 tests) 20ms
+apps/web test:  ✓ src/persistence/__tests__/media-gc-corruption.test.ts (1 test) 4ms
+apps/web test:  ✓ src/stores/__tests__/collections.test.ts (2 tests) 5ms
+apps/web test:  ✓ src/export/__tests__/mixer-worker-timeout.test.ts (1 test) 32ms
+apps/web test:  ✓ src/stores/__tests__/mixer-actions.test.ts (2 tests) 5ms
+apps/web test:  ✓ src/effects/lut/__tests__/parse-cube.test.ts (4 tests) 5ms
+apps/web test:  ✓ src/export/__tests__/bt709-frame.test.ts (4 tests) 2ms
+apps/web test:  ✓ src/editor/__tests__/chapter-export.test.ts (5 tests) 7ms
+apps/web test:  ✓ src/media/__tests__/container-info.test.ts (3 tests) 13ms
+apps/web test:  ✓ src/music/__tests__/openverse.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/stores/__tests__/sequence-rejection.test.ts (4 tests) 3ms
+apps/web test:  ✓ src/renderer/__tests__/input-color.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/stores/__tests__/audio-recovery.test.ts (2 tests) 5ms
+apps/web test:  ✓ src/persistence/__tests__/timeline-crdt.test.ts (2 tests) 9ms
+apps/web test:  ✓ src/ai/__tests__/model-policy.test.ts (5 tests) 3ms
+apps/web test:  ✓ src/editor/__tests__/new-project-start-state.test.ts (2 tests) 2ms
+apps/web test:  ✓ src/stores/__tests__/music-library-store.test.ts (2 tests) 4ms
+apps/web test:  ✓ src/export/__tests__/audio-routing.test.ts (2 tests) 1451ms
+apps/web test:    ✓ exports track, bus, master and volume replacement; bus mute=false 639ms
+apps/web test:    ✓ exports track, bus, master and volume replacement; bus mute=true 811ms
+apps/web test:  ✓ src/export/__tests__/noise-gate.test.ts (2 tests) 20ms
+apps/web test:  ✓ src/preview/__tests__/volume-curve.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/autoedit/__tests__/modes.test.ts (2 tests) 1ms
+apps/web test:  ✓ src/export/__tests__/presets.test.ts (3 tests) 4ms
+apps/web test:  ✓ src/autoedit/__tests__/reasons.test.ts (2 tests) 3ms
+apps/web test:  ✓ src/components/__tests__/state-hint.test.ts (3 tests) 11ms
+apps/web test:  ✓ src/music/__tests__/context-tags.test.ts (3 tests) 2ms
+apps/web test:  ✓ src/persistence/__tests__/opfs-write.test.ts (1 test) 13ms
+apps/web test:  ✓ src/renderer/__tests__/managed-shader.test.ts (26 tests) 9ms
+apps/web test:  ✓ src/persistence/__tests__/recovered-library.test.ts (1 test) 22ms
+apps/web test:  ✓ src/renderer/__tests__/source-rotation.test.ts (3 tests) 2ms
+apps/web test:  ✓ src/export/__tests__/audio-speed-ramp.test.ts (2 tests) 3ms
+apps/web test:  ✓ src/export/__tests__/aac-support.test.ts (3 tests) 5ms
+apps/web test:  ✓ src/persistence/__tests__/current-project-schema.test.ts (3 tests) 7ms
+apps/web test:  ✓ src/media/__tests__/import-errors.test.ts (10 tests) 4ms
+apps/web test:  ✓ src/persistence/__tests__/media-gc-audio.test.ts (1 test) 6ms
+apps/web test:  ✓ src/media/__tests__/tags.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/editor/__tests__/blend-groups.test.ts (3 tests) 6ms
+apps/web test:  ✓ src/subtitles/__tests__/srt.test.ts (3 tests) 3ms
+apps/web test:  ✓ src/media/__tests__/probe.test.ts (2 tests) 3ms
+apps/web test:  ✓ src/music/__tests__/youtube-meta.test.ts (2 tests) 3ms
+apps/web test:  ✓ src/media/__tests__/smart-filters.test.ts (2 tests) 24ms
+apps/web test:  ✓ src/renderer/__tests__/target-budget.test.ts (2 tests) 1ms
+apps/web test:  ✓ src/lib/__tests__/reload-metrics.test.ts (1 test) 2ms
+apps/web test:  ✓ src/persistence/__tests__/media-gc.test.ts (2 tests) 2ms
+apps/web test:  ✓ src/persistence/__tests__/live-doc.test.ts (2 tests) 1ms
+apps/web test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+apps/web test:  FAIL  src/mixer/__tests__/estimated-levels.test.ts > shares asset maps across playhead changes and all strip estimates per frame
+apps/web test: AssertionError: expected +0 to be close to 0.2505936168136361, received difference is 0.2505936168136361, but expected 0.005
+apps/web test:  ❯ src/mixer/__tests__/estimated-levels.test.ts:53:54
+apps/web test:      51|   expect(estimatedLevels({ ...p }, waveforms)).toBe(first);
+apps/web test:      52|   expect(estimatedLevels({ ...p, id: "other" as ID }, waveforms)).not.…
+apps/web test:      53|   expect(first[`track:${p.timeline.tracks[0]!.id}`]).toBeCloseTo(0.5 *…
+apps/web test:        |                                                      ^
+apps/web test:      54|   expect(first["bus:b"]).toBeCloseTo(0.5 * 10 ** (-12 / 20));
+apps/web test:      55|   expect(first.master).toBeCloseTo(0.5 * 10 ** (-18 / 20));
+apps/web test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+apps/web test:  FAIL  src/mixer/__tests__/meter-fallback.test.ts > shows a nonzero waveform estimate during playback when the worklet is unavailable
+apps/web test: AssertionError: expected -60 to be greater than -60
+apps/web test:  ❯ src/mixer/__tests__/meter-fallback.test.ts:71:63
+apps/web test:      69|   const markup = renderToStaticMarkup(createElement(MixerMeter, { id: …
+apps/web test:      70|   expect(markup).toContain('aria-label="mixer.estimated master"');
+apps/web test:      71|   expect(Number(markup.match(/aria-valuenow="([^"]+)"/)![1])).toBeGrea…
+apps/web test:        |                                                               ^
+apps/web test:      72|   state.project = { ...state.project, timeline: { ...state.project.tim…
+apps/web test:      73|   const moved = renderToStaticMarkup(createElement(MixerMeter, { id: "…
+apps/web test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+apps/web test:  Test Files  2 failed | 152 passed (154)
+apps/web test:       Tests  2 failed | 823 passed | 1 skipped (826)
+apps/web test:    Start at  06:56:55
+apps/web test:    Duration  6.71s (transform 2.32s, setup 0ms, collect 16.91s, tests 14.33s, environment 20ms, prepare 7.84s)
+apps/web test: Failed
+/Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1/apps/web:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @movie-desk/web@0.4.0-rc.1 test: `vitest run`
+Exit status 1
+ ELIFECYCLE  Test failed. See above for more details.
+
+Release gate: FAIL
+
+| result | step | time | detail |
+| --- | --- | --- | --- |
+| ✅ pass | install (frozen lockfile) | 591ms |  |
+| ✅ pass | version policy | 211ms |  |
+| ✅ pass | lint | 1.2s |  |
+| ✅ pass | typecheck | 2.6s |  |
+| ❌ fail | unit tests | 10.9s | exit code 1 |
+| ⏭ skipped | OSV audit (network) | 0ms |  |
+| ⏭ skipped | web production build | 0ms |  |
+| ⏭ skipped | playwright chromium | 0ms |  |
+| ⏭ skipped | browser e2e | 0ms |  |
+ ELIFECYCLE  Command failed with exit code 1.

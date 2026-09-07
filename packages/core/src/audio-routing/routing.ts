@@ -1,4 +1,4 @@
-import type { Project } from "../model/project";
+import type { Project, Timeline } from "../model/project";
 import type { Track } from "../model/track";
 
 export const dbToLinear = (db: number): number => 10 ** (db / 20);
@@ -26,18 +26,23 @@ export interface TrackRoute {
   readonly masterGain: number;
 }
 
-// Phase 0: root-only solo and project-wide bus settings. Phase 5 must resolve
-// each sequence in its own timeline scope and apply master gain only at root.
-// See docs/decisions/2026-09-07-nested-sequence-audio-routing.md.
-export const resolveTrackRoute = (project: Project, track: Track): TrackRoute => {
-  const solo = project.timeline.tracks.some((candidate) => candidate.solo);
-  const bus = project.audio?.buses.find((candidate) => candidate.id === track.audio?.busId);
+// Sequence routes use local solo and omit project bus/master below root.
+export const resolveTrackRoute = (
+  project: Project,
+  track: Track,
+  timeline: Timeline = project.timeline,
+  includeProjectOutput = true,
+): TrackRoute => {
+  const solo = timeline.tracks.some((candidate) => candidate.solo);
+  const bus = includeProjectOutput
+    ? project.audio?.buses.find((candidate) => candidate.id === track.audio?.busId)
+    : undefined;
   return {
     trackGain: track.muted || (solo && !track.solo) ? 0 : gain(track.audio?.gainDb),
     pan: Number.isFinite(track.audio?.pan) ? Math.max(-1, Math.min(1, track.audio?.pan ?? 0)) : 0,
     busId: bus?.id ?? null,
     busGain: bus?.muted ? 0 : gain(bus?.gainDb),
-    masterGain: gain(project.audio?.master.gainDb),
+    masterGain: includeProjectOutput ? gain(project.audio?.master.gainDb) : 1,
   };
 };
 

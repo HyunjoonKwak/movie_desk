@@ -3,8 +3,24 @@
 import { disposePitchWorkers, pitchPlaybackKey } from "@/audio/pitch-renderer";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useProjectStore } from "@/stores/project-store";
+import type { Project } from "@movie-desk/core";
 import { useEffect } from "react";
 import { getAudioEngine } from "./audio-engine";
+
+// Nested renders bake child controls into PCM; child edits must invalidate it.
+const playbackKey = (project: Project): string =>
+  JSON.stringify([
+    pitchPlaybackKey(project.timeline.tracks),
+    project.timeline.tracks.flatMap((track) =>
+      track.clips.filter((clip) => clip.kind === "sequence"),
+    ),
+    project.timelines
+      .filter((timeline) => timeline.id !== project.timeline.id)
+      .map((timeline) => [timeline.id, timeline.duration, timeline.tracks]),
+    project.timeline.tracks.some((track) => track.clips.some((clip) => clip.kind === "sequence"))
+      ? project.audio?.buses
+      : undefined,
+  ]);
 
 // Bridges the playback store to the audio engine: start monitoring from the
 // current playhead when play begins (or the rate changes), stop on pause.
@@ -14,11 +30,11 @@ import { getAudioEngine } from "./audio-engine";
 export function useAudioPlayback(): void {
   useEffect(() => {
     const engine = getAudioEngine();
-    let scheduledKey = pitchPlaybackKey(useProjectStore.getState().project.timeline.tracks);
+    let scheduledKey = playbackKey(useProjectStore.getState().project);
     const start = () => {
       const playback = usePlaybackStore.getState();
       const project = useProjectStore.getState().project;
-      scheduledKey = pitchPlaybackKey(project.timeline.tracks);
+      scheduledKey = playbackKey(project);
       void engine.play(project, project.timeline.playhead, playback.rate).catch(() => {
         // Autoplay policy or decode failure: stay silent without leaving a
         // half-scheduled transport behind.
@@ -70,7 +86,7 @@ export function useAudioPlayback(): void {
     const rescheduleEdit = () => {
       const state = useProjectStore.getState();
       if (state.precisionEditing) return;
-      const key = pitchPlaybackKey(state.project.timeline.tracks);
+      const key = playbackKey(state.project);
       if (key === scheduledKey) return;
       scheduledKey = key;
       if (usePlaybackStore.getState().playing) start();
@@ -81,8 +97,10 @@ export function useAudioPlayback(): void {
       { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] },
     );
     const offClips = useProjectStore.subscribe(
-      (state) => state.project.timeline.tracks,
+      (state) =>
+        [state.project.timeline.tracks, state.project.timelines, state.project.audio] as const,
       rescheduleEdit,
+      { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2] },
     );
     const offPrecision = useProjectStore.subscribe(
       (state) => state.precisionEditing,

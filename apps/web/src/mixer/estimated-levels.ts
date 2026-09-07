@@ -5,7 +5,7 @@ import {
   type MediaAsset,
   type Project,
 } from "@movie-desk/core";
-import { playheadLevel } from "@/preview/playhead-level";
+import { playheadStereoLevel } from "@/preview/playhead-level";
 
 type Waveforms = Readonly<Record<string, readonly number[]>>;
 const assetMaps = new WeakMap<Project["mediaLibrary"], ReadonlyMap<string, MediaAsset>>();
@@ -21,6 +21,7 @@ let cached:
   | {
       projectId: Project["id"];
       tracks: Project["timeline"]["tracks"];
+      timelines: Project["timelines"];
       media: Project["mediaLibrary"];
       audio: Project["audio"];
       playhead: number;
@@ -39,6 +40,7 @@ export const estimatedLevels = (
     cached &&
     cached.projectId === project.id &&
     cached.tracks === tracks &&
+    cached.timelines === project.timelines &&
     cached.media === project.mediaLibrary &&
     cached.audio === project.audio &&
     cached.playhead === playhead &&
@@ -50,14 +52,13 @@ export const estimatedLevels = (
   for (const track of tracks) {
     const route = resolveTrackRoute(project, track);
     const [ll, lr, rl, rr] = stereoPanMatrix(route.pan);
-    const peak =
-      route.trackGain *
-      Math.max(ll + lr, rl + rr) *
-      playheadLevel(
-        syncRootTimeline({ ...project, timeline: { ...project.timeline, tracks: [track] } }),
-        (id) => assets.get(id),
-        (id) => assets.get(id)?.waveformPeaks ?? waveforms[id],
-      );
+    const [left, right] = playheadStereoLevel(
+      syncRootTimeline({ ...project, timeline: { ...project.timeline, tracks: [track] } }),
+      (id) => assets.get(id),
+      (id) => assets.get(id)?.waveformPeaks ?? waveforms[id],
+      true,
+    );
+    const peak = route.trackGain * Math.max(left * ll + right * lr, left * rl + right * rr);
     levels[`track:${track.id}`] = peak;
     const busPeak = peak * route.busGain;
     if (route.busId)
@@ -67,6 +68,7 @@ export const estimatedLevels = (
   cached = {
     projectId: project.id,
     tracks,
+    timelines: project.timelines,
     playhead,
     media: project.mediaLibrary,
     audio: project.audio,

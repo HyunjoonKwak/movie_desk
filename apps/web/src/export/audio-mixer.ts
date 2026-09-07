@@ -1,11 +1,17 @@
-import { resolveTrackRoute, routeStereo, type TrackRoute } from "@movie-desk/core";
+import {
+  buildAudioSequencePlan,
+  sequenceAudioTime,
+  routeStereo,
+  type AudioPlanClip,
+  type AudioSequencePlan,
+} from "@movie-desk/core";
 import { renderPitchRangeInWorker } from "@/audio/pitch-renderer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { ID, MediaAsset, Project, StretchContinuation } from "@movie-desk/core";
 import {
   type EffectInstance,
   type MediaClip,
-  isMediaClip,
+  type SequenceClip,
   sampleKeyframeTrack,
   sourceOffsetForRamp,
 } from "@movie-desk/core";
@@ -25,7 +31,7 @@ export const resampleClipAudio = (
   source: Float32Array,
   sourceSampleRate: number,
   outputSampleRate: number,
-  clip: MediaClip,
+  clip: MediaClip | SequenceClip,
 ): Float32Array => {
   return resampleClipAudioRange(
     source,
@@ -41,20 +47,48 @@ export const resampleClipAudioRange = (
   source: Float32Array,
   sourceSampleRate: number,
   outputSampleRate: number,
-  clip: MediaClip,
+  clip: MediaClip | SequenceClip,
   clipOffsetMs: number,
   outputSamples: number,
+  sourceStartSample = 0,
 ): Float32Array => {
   const output = new Float32Array(outputSamples);
+  if (clip.kind === "sequence") {
+    const ramp = clip.keyframes.find(
+      (track) => track.target === "speed" && track.keyframes.length >= 2,
+    );
+    let gridMs = Math.floor(clipOffsetMs / 10) * 10;
+    let integral = sourceOffsetForRamp(clip, gridMs);
+    const rateAt = (at: number) =>
+      ramp ? Math.max(0.05, sampleKeyframeTrack(ramp, at) ?? clip.speed) : clip.speed;
+    let rate = rateAt(gridMs);
+    for (let i = 0; i < output.length; i++) {
+      const relMs = clipOffsetMs + (i * 1000) / outputSampleRate;
+      while (relMs >= gridMs + 10) {
+        integral += rate * 10;
+        gridMs += 10;
+        rate = rateAt(gridMs);
+      }
+      const sourceMs =
+        clip.trimIn + (ramp ? integral + (relMs - gridMs) * rate : relMs * clip.speed);
+      const cursor = (sourceMs * sourceSampleRate) / 1000 - sourceStartSample;
+      const index = Math.floor(cursor);
+      if (index < 0 || index >= source.length) continue;
+      const a = source[index]!;
+      output[i] = a + ((source[index + 1] ?? 0) - a) * (cursor - index);
+    }
+    return output;
+  }
   const speedTrack = clip.keyframes.find((track) => track.target === "speed");
   let sourceCursor =
     ((clip.trimIn + sourceOffsetForRamp(clip, clipOffsetMs)) / 1000) * sourceSampleRate;
 
   for (let i = 0; i < output.length; i++) {
-    const sourceIndex = Math.floor(sourceCursor);
+    const sourceIndex = Math.floor(sourceCursor) - sourceStartSample;
     if (sourceIndex >= 0 && sourceIndex < source.length) {
       const a = source[sourceIndex] ?? 0;
-      output[i] = a + ((source[sourceIndex + 1] ?? a) - a) * (sourceCursor - sourceIndex);
+      output[i] =
+        a + ((source[sourceIndex + 1] ?? a) - a) * (sourceCursor - sourceStartSample - sourceIndex);
     }
 
     const relMs = clipOffsetMs + (i / outputSampleRate) * 1000;
@@ -241,17 +275,13 @@ export interface AudioMixChunk {
 }
 
 export interface AudioMixOptions {
+  /** Exact internal PCM range; avoids ms/sample round-trip off-by-one errors. */
+  readonly rangeSamples?: readonly [number, number];
   readonly encoderMasterGain?: number;
   readonly startMs?: number;
   readonly endMs?: number;
   readonly chunkDurationMs?: number;
   readonly signal?: AbortSignal;
-}
-
-interface PreparedClip {
-  readonly route: TrackRoute;
-  readonly clip: MediaClip;
-  readonly bus: "voice" | "music";
 }
 
 const throwIfAborted = (signal?: AbortSignal): void => {
@@ -268,7 +298,18 @@ export class ProjectAudioMixer {
   private static readonly DEFAULT_CHUNK_MS = 30_000;
   private static readonly EFFECT_PADDING_MS = 500;
   private static readonly MAX_DECODED_ASSETS = 2;
-  private readonly clips: PreparedClip[];
+  private readonly clips: readonly AudioPlanClip[];
+  private readonly children = new Map<
+    AudioPlanClip,
+    {
+      mixer: ProjectAudioMixer;
+      iterator?: AsyncGenerator<AudioMixChunk>;
+      origin: number;
+      through: number;
+      requestedStart: number;
+      chunks: AudioMixChunk[];
+    }
+  >();
   private routingScratch: StereoChannels = [new Float32Array(0), new Float32Array(0)];
   private readonly buffers = new Map<string, AudioBuffer | null>();
   private decodeContext: OfflineAudioContext | null = null;
@@ -277,16 +318,10 @@ export class ProjectAudioMixer {
     private readonly project: Project,
     private readonly getAsset: (id: ID) => MediaAsset | undefined,
     private readonly ducking?: DuckingOptions,
+    sequencePlan: AudioSequencePlan = buildAudioSequencePlan(project),
+    private readonly internal = false,
   ) {
-    const soloing = project.timeline.tracks.some((track) => track.solo);
-    this.clips = project.timeline.tracks.flatMap((track) => {
-      if (track.muted || (soloing && !track.solo)) return [];
-      const bus = track.kind === "audio" ? "music" : "voice";
-      const route = resolveTrackRoute(project, track);
-      return track.clips
-        .filter((clip): clip is MediaClip => isMediaClip(clip) && !clip.disabled)
-        .map((clip) => ({ clip, bus, route }));
-    });
+    this.clips = sequencePlan.clips;
   }
 
   async *chunks(options: AudioMixOptions = {}): AsyncGenerator<AudioMixChunk> {
@@ -295,8 +330,10 @@ export class ProjectAudioMixer {
       rangeStartMs,
       Math.min(this.project.timeline.duration, options.endMs ?? this.project.timeline.duration),
     );
-    const absoluteStartSample = Math.floor((rangeStartMs / 1000) * this.sampleRate);
-    const absoluteEndSample = Math.ceil((rangeEndMs / 1000) * this.sampleRate);
+    const absoluteStartSample =
+      options.rangeSamples?.[0] ?? Math.floor((rangeStartMs / 1000) * this.sampleRate);
+    const absoluteEndSample =
+      options.rangeSamples?.[1] ?? Math.ceil((rangeEndMs / 1000) * this.sampleRate);
     const chunkSamples = Math.max(
       1,
       Math.floor(
@@ -305,7 +342,7 @@ export class ProjectAudioMixer {
     );
     let duckGain = 1;
     let peakState: MixerWorkerResponse["peakState"];
-    const pitchContinuations = new Map<MediaClip, StretchContinuation>();
+    const pitchContinuations = new Map<MediaClip | SequenceClip, StretchContinuation>();
 
     for (
       let chunkStartSample = absoluteStartSample;
@@ -318,18 +355,16 @@ export class ProjectAudioMixer {
       const voiceChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
       const musicChannels: StereoChannels = [new Float32Array(length), new Float32Array(length)];
 
-      for (const { clip, bus, route } of this.clips) {
-        const clipStartSample = Math.floor((clip.start / 1000) * this.sampleRate);
+      for (const entry of this.clips) {
+        const { clip, bus, route } = entry;
+        const clipStartSample = (clip.kind === "sequence" ? Math.ceil : Math.floor)(
+          (clip.start / 1000) * this.sampleRate,
+        );
         const clipEndSample = Math.ceil(((clip.start + clip.duration) / 1000) * this.sampleRate);
         const overlapStart = Math.max(chunkStartSample, clipStartSample);
         const overlapEnd = Math.min(chunkEndSample, clipEndSample);
         if (overlapEnd <= overlapStart) continue;
         throwIfAborted(options.signal);
-
-        const asset = this.getAsset(clip.assetId);
-        if (!asset || (asset.kind !== "video" && asset.kind !== "audio")) continue;
-        const decoded = await this.bufferFor(asset, options.signal);
-        if (!decoded) continue;
 
         const effectPaddingSamples = clip.effects.length
           ? Math.floor((ProjectAudioMixer.EFFECT_PADDING_MS / 1000) * this.sampleRate)
@@ -337,27 +372,70 @@ export class ProjectAudioMixer {
         const processStart = Math.max(clipStartSample, overlapStart - effectPaddingSamples);
         const processEnd = Math.min(clipEndSample, overlapEnd + effectPaddingSamples);
         const outputSamples = processEnd - processStart;
-        const clipOffsetMs = ((processStart - clipStartSample) / this.sampleRate) * 1000;
-        const [leftSource, rightSource] = decodedStereoChannels(decoded);
-        const sources = decoded.numberOfChannels > 1 ? [leftSource, rightSource] : [leftSource];
+        const clipOffsetMs =
+          clip.kind === "sequence"
+            ? (processStart * 1000) / this.sampleRate - clip.start
+            : ((processStart - clipStartSample) / this.sampleRate) * 1000;
+        let sources: Float32Array[];
+        let sourceSampleRate = this.sampleRate;
+        let sourceStartSample = 0;
+        if (clip.kind === "sequence") {
+          if (!entry.child) continue;
+          // Only retain the child source window needed by this parent range.
+          // Child B2 processing owns its own bounded pre-roll.
+          const first = sequenceAudioTime(clip, clip.start + clipOffsetMs);
+          const last = sequenceAudioTime(
+            clip,
+            clip.start + clipOffsetMs + (outputSamples * 1000) / this.sampleRate,
+          );
+          sourceStartSample = Math.max(
+            0,
+            Math.floor(((Math.min(first, last) - 1000 / this.sampleRate) * this.sampleRate) / 1000),
+          );
+          const endSample = Math.max(
+            sourceStartSample,
+            Math.min(
+              Math.ceil((entry.child.timeline.duration * this.sampleRate) / 1000),
+              Math.ceil(
+                ((Math.max(first, last) + 1000 / this.sampleRate) * this.sampleRate) / 1000,
+              ),
+            ),
+          );
+          sources = await this.sequenceRange(entry, sourceStartSample, endSample, options.signal);
+        } else {
+          const asset = this.getAsset(clip.assetId);
+          if (!asset || (asset.kind !== "video" && asset.kind !== "audio")) continue;
+          const decoded = await this.bufferFor(asset, options.signal);
+          if (!decoded) continue;
+          sourceSampleRate = decoded.sampleRate;
+          const [left, right] = decodedStereoChannels(decoded);
+          sources = decoded.numberOfChannels > 1 ? [left, right] : [left];
+        }
         let rendered: Float32Array[];
         const fallback = () =>
           sources.map((source) =>
             resampleClipAudioRange(
               source,
-              decoded.sampleRate,
+              sourceSampleRate,
               this.sampleRate,
               clip,
               clipOffsetMs,
               outputSamples,
+              sourceStartSample,
             ),
           );
-        if (clip.preservePitch === true && clip.speed > 0 && !this.pitchFallback) {
+        if (
+          clip.kind === "media" &&
+          clip.preservePitch === true &&
+          clip.speed > 0 &&
+          !this.pitchFallback
+        ) {
           try {
             const result = await renderPitchRangeInWorker(
               {
                 channels: sources,
-                sourceSampleRate: decoded.sampleRate,
+                sourceSampleRate,
+                sourceStartSample,
                 outputSampleRate: this.sampleRate,
                 clip,
                 offsetMs: clipOffsetMs,
@@ -419,6 +497,19 @@ export class ProjectAudioMixer {
         }
       }
 
+      if (this.internal) {
+        // No child limiter, normalization, ducking or additional master.
+        for (let c = 0; c < 2; c++)
+          for (let i = 0; i < length; i++)
+            voiceChannels[c]![i] = (voiceChannels[c]![i] ?? 0) + (musicChannels[c]![i] ?? 0);
+        yield {
+          channels: voiceChannels,
+          sampleRate: this.sampleRate,
+          startSample: chunkStartSample - absoluteStartSample,
+        };
+        continue;
+      }
+
       const combined = await runCombineWorker(
         {
           voiceChannels,
@@ -451,7 +542,75 @@ export class ProjectAudioMixer {
     }
   }
 
+  private async sequenceRange(
+    entry: AudioPlanClip,
+    start: number,
+    end: number,
+    signal?: AbortSignal,
+  ): Promise<StereoChannels> {
+    let state = this.children.get(entry);
+    if (!state) {
+      state = {
+        mixer: new ProjectAudioMixer(
+          { ...this.project, timeline: entry.child!.timeline },
+          this.getAsset,
+          undefined,
+          entry.child!,
+          true,
+        ),
+        origin: start,
+        through: start,
+        requestedStart: start,
+        chunks: [],
+      };
+      this.children.set(entry, state);
+    }
+    // Forward windows share one child stream so B2 checkpoints survive parent
+    // chunk boundaries. Keep overlapping chunks for interpolation/effect padding.
+    if (!state.iterator || start < state.requestedStart) {
+      await state.iterator?.return(undefined);
+      state.origin = start;
+      state.through = start;
+      state.chunks = [];
+      state.iterator = state.mixer.chunks({
+        rangeSamples: [start, Math.ceil((entry.child!.timeline.duration * this.sampleRate) / 1000)],
+        chunkDurationMs: 1000,
+        ...(signal ? { signal } : {}),
+      });
+    }
+    state.requestedStart = start;
+    state.chunks = state.chunks.filter(
+      (chunk) => chunk.startSample + chunk.channels[0].length > start,
+    );
+    while (state.through < end) {
+      throwIfAborted(signal);
+      const next = await state.iterator.next();
+      if (next.done) break;
+      const chunk = { ...next.value, startSample: state.origin + next.value.startSample };
+      state.chunks.push(chunk);
+      state.through = chunk.startSample + chunk.channels[0].length;
+    }
+    const output: StereoChannels = [new Float32Array(end - start), new Float32Array(end - start)];
+    for (const chunk of state.chunks) {
+      const lower = Math.max(start, chunk.startSample);
+      const upper = Math.min(end, chunk.startSample + chunk.channels[0].length);
+      if (upper <= lower) continue;
+      for (let c = 0; c < 2; c++)
+        output[c]!.set(
+          chunk.channels[c]!.subarray(lower - chunk.startSample, upper - chunk.startSample),
+          lower - start,
+        );
+    }
+    this.pitchFallback ||= state.mixer.pitchFallback;
+    return output;
+  }
+
   dispose(): void {
+    for (const child of this.children.values()) {
+      void child.iterator?.return(undefined);
+      child.mixer.dispose();
+    }
+    this.children.clear();
     this.buffers.clear();
     this.routingScratch = [new Float32Array(0), new Float32Array(0)];
     this.decodeContext = null;

@@ -1,0 +1,15 @@
+
+ RUN  v2.1.9 /Users/specialrisk_mac/orca/workspaces/movie_desk/codex-b5-phase1/apps/web
+
+ ✓ src/mixer/__tests__/estimated-levels.test.ts (1 test) 3ms
+ ✓ src/preview/__tests__/audio-sequence-playback.test.ts (3 tests) 68ms
+ ✓ src/mixer/__tests__/meter-fallback.test.ts (1 test) 7ms
+ ✓ src/export/__tests__/audio-sequence.test.ts (16 tests | 1 skipped) 331ms
+
+ Test Files  4 passed (4)
+      Tests  20 passed | 1 skipped (21)
+   Start at  07:05:05
+   Duration  720ms (transform 233ms, setup 0ms, collect 765ms, tests 409ms, environment 0ms, prepare 203ms)
+
+
+Hard process timeout: 60 seconds; exit code: 0

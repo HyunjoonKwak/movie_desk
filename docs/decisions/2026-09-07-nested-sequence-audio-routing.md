@@ -1,6 +1,10 @@
 # B′5 nested sequence audio routing — 2026-09-07
 
-Status: prerequisite decision for Phase 0; audio implementation remains Phase 5.
+Status: historical Phase 0 prerequisite. Phase 5 implementation and its updated
+bus policy are recorded in [the Phase 5 decision](2026-09-08-sequence-audio.md).
+The scoped child-bus multiplication proposed below is superseded: only the root
+containing track applies the project bus and master; child tracks apply local
+controls. Other boundary/automation/solo principles remain applicable.
 
 ## Sequence boundary
 
