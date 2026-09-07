@@ -60,6 +60,11 @@ export interface AudioPeakResult {
   readonly clippedSamples: number;
 }
 
+export interface TruePeakCheckpoint extends AudioPeakResult {
+  readonly rings: readonly Float64Array[];
+  readonly index: number;
+}
+
 export class TruePeakMeter {
   private readonly rings: Float64Array[];
   private index = 0;
@@ -72,7 +77,7 @@ export class TruePeakMeter {
   }
 
   // Detached snapshots keep concurrent exports and worker retries independent.
-  checkpoint() {
+  checkpoint(): TruePeakCheckpoint {
     return {
       rings: this.rings.map((ring) => ring.slice()),
       index: this.index,
@@ -82,7 +87,13 @@ export class TruePeakMeter {
     };
   }
 
-  restore(state: ReturnType<TruePeakMeter["checkpoint"]>): void {
+  restore(state: TruePeakCheckpoint): void {
+    if (
+      state.rings.length !== this.rings.length ||
+      state.rings.some((ring) => ring.length !== TAPS)
+    ) {
+      throw new Error("TruePeakCheckpoint channel count or ring length mismatch");
+    }
     state.rings.forEach((ring, channel) => this.rings[channel]!.set(ring));
     this.index = state.index;
     this.samplePeak = state.samplePeak;

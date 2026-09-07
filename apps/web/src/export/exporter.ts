@@ -1,10 +1,10 @@
-import type { AudioPeakResult } from "@movie-desk/core";
-import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
 import { useRangeStore } from "@/stores/range-store";
+import type { AudioPeakResult } from "@movie-desk/core";
 import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
+import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
 import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
@@ -258,7 +258,7 @@ export class WebCodecsExporter implements Exporter {
               limitedSamples += chunk.limitedSamples ?? 0;
               if (chunk.audioPeaks) {
                 peaks = chunk.audioPeaks;
-                clippedSamples += chunk.audioPeaks.clippedSamples;
+                clippedSamples = chunk.audioPeaks.clippedSamples;
               }
               const totalSamples = Math.min(chunk.channels[0].length, chunk.channels[1].length);
               for (let i = 0; i < totalSamples; i += encoderChunkSize) {

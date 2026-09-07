@@ -1,4 +1,5 @@
 // Offline Chromium benchmark: old main-thread meter versus actual mixer worker.
+// Run from the repository root: node scripts/audio-cleanup-benchmark.mjs
 import { createRequire } from "node:module";
 import { resolve } from "node:path";
 const require = createRequire(resolve("apps/web/package.json"));
@@ -53,8 +54,24 @@ try {
           const count = Math.min(30 * 48000, n - at);
           const voiceChannels = channels.map((c) => c.slice(at, at + count));
           const musicChannels = channels.map(() => new Float32Array(count));
-          const result = await new Promise((resolve) => {
-            worker.onmessage = (e) => resolve(e.data);
+          const result = await new Promise((resolve, reject) => {
+            const cleanup = () => {
+              clearTimeout(timeout);
+              worker.onmessage = null;
+              worker.onerror = null;
+            };
+            const timeout = setTimeout(() => {
+              cleanup();
+              reject(new Error("Mixer worker timed out after 30 seconds"));
+            }, 30_000);
+            worker.onerror = (event) => {
+              cleanup();
+              reject(new Error(event.message || "Mixer worker failed"));
+            };
+            worker.onmessage = (e) => {
+              cleanup();
+              resolve(e.data);
+            };
             worker.postMessage(
               {
                 voiceChannels,

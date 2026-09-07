@@ -666,3 +666,16 @@ Worker 경과 시간은 각각 **242.1ms / 2546.4ms**로, 총 내보내기 시�
 최종 `pnpm gate` **9/9 PASS**, 단위 **883**(core153·web647·desktop72·scripts11),
 Chromium E2E **61/61 PASS**. 포트 충돌 후 코디네이터의 우선 배정을 받아
 전체 gate를 재실행했고 전후 `lsof -ti :32119` 비점유를 확인했다.
+
+후속: 크롭 구간별 기준 채널 선택 차이로 미리보기와 내보내기가 서로 다른 채널을
+기준으로 삼아 스플라이스 지점이 달라질 수 있으므로 기준 채널 선택 정책을 별도 검토한다.
+
+### 오디오 정리 2라운드 (2026-09-07)
+
+피크·클리핑을 모두 누적 진단값으로 통일하고 게인 적용을 반환 전 명시적 호출로
+분리했다. `TruePeakCheckpoint` 타입과 복원 가드, 벤치마크 오류·타임아웃 처리도
+추가했다. 기존 완료 패널 클리핑 4100·리미팅 6 회귀 검증과 벤치마크 6회 측정
+동일성을 확인했다. [항목별 결과](evaluations/2026-09-07-audio-cleanup-round2-review.md),
+[전체 gate](evaluations/2026-09-07-audio-cleanup-round2-gate.md) **9/9 PASS**,
+단위 **885**(core155·web647·desktop72·scripts11), Chromium E2E **61/61 PASS**.
+gate 전후 `lsof`에서 32119 리스너가 없음을 확인했다.

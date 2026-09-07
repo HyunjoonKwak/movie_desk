@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { measureSignal, PeakHold, TruePeakMeter } from "../meter";
+import { PeakHold, TruePeakMeter, measureSignal } from "../meter";
 
 describe("audio metering", () => {
   it("measures silence, a sine, overlapping and cancelled tracks", () => {
@@ -55,4 +55,12 @@ describe("audio metering", () => {
     silent.push([new Float32Array(100), new Float32Array(100)]);
     expect(silent.finish()).toEqual({ clippedSamples: 0, samplePeak: 0, truePeak: 0 });
   });
+});
+
+it.each([1, 3])("rejects a %s-channel checkpoint before changing stereo state", (channels) => {
+  const meter = new TruePeakMeter(2);
+  meter.push([Float32Array.of(0.2), Float32Array.of(0.3)]);
+  const before = meter.checkpoint();
+  expect(() => meter.restore(new TruePeakMeter(channels).checkpoint())).toThrow("mismatch");
+  expect(meter.checkpoint()).toEqual(before);
 });

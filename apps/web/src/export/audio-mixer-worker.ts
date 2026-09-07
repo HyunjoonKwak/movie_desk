@@ -1,4 +1,4 @@
-import { TruePeakMeter, type AudioPeakResult } from "@movie-desk/core";
+import { type AudioPeakResult, type TruePeakCheckpoint, TruePeakMeter } from "@movie-desk/core";
 
 // Audio mixer worker — runs the bus-combine + sidechain-ducking + soft-limiter
 // pass off the main thread. The mixer's per-clip stage stays on main because
@@ -18,7 +18,7 @@ export interface MixerWorkerRequest {
   readonly encoder?: {
     readonly masterGain: number;
     readonly final: boolean;
-    readonly peakState?: ReturnType<TruePeakMeter["checkpoint"]>;
+    readonly peakState?: TruePeakCheckpoint;
   };
   readonly ducking?: { enabled: boolean; amountDb: number; thresholdDb: number };
 }
@@ -28,12 +28,16 @@ export interface MixerWorkerResponse {
   readonly channels: StereoChannels;
   readonly finalDuckGain: number;
   readonly limitedSamples: number;
-  readonly peakState?: ReturnType<TruePeakMeter["checkpoint"]>;
+  readonly peakState?: TruePeakCheckpoint;
   readonly audioPeaks?: AudioPeakResult;
 }
 
-// Gain and clamp are rounded to Float32 before measurement and transfer.
-const prepareEncoderPcm = (channels: StereoChannels, encoder: MixerWorkerRequest["encoder"]) => {
+// Mutates only the locally owned mix buffer; gain and clamp round to Float32
+// before measurement and transfer. Caller-owned buses/checkpoints stay unchanged.
+const applyEncoderGainAndMeter = (
+  channels: StereoChannels,
+  encoder: MixerWorkerRequest["encoder"],
+) => {
   if (!encoder) return {};
   let clippedSamples = 0;
   if (encoder.masterGain !== 1) {
@@ -49,7 +53,13 @@ const prepareEncoderPcm = (channels: StereoChannels, encoder: MixerWorkerRequest
   if (encoder.peakState) meter.restore(encoder.peakState);
   meter.push(channels);
   const audioPeaks = encoder.final ? meter.finish() : meter.result();
-  return { peakState: meter.checkpoint(), audioPeaks: { ...audioPeaks, clippedSamples } };
+  // Every diagnostic is cumulative, including pre-clamp overloads. The meter
+  // sees clamped PCM, so preserve overloads explicitly in its detached checkpoint.
+  const cumulativeClippedSamples = (encoder.peakState?.clippedSamples ?? 0) + clippedSamples;
+  return {
+    peakState: { ...meter.checkpoint(), clippedSamples: cumulativeClippedSamples },
+    audioPeaks: { ...audioPeaks, clippedSamples: cumulativeClippedSamples },
+  };
 };
 
 const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
@@ -92,11 +102,12 @@ const combine = (req: MixerWorkerRequest): MixerWorkerResponse => {
       accum[1][i]! *= gain;
     }
   }
+  const encoderResult = applyEncoderGainAndMeter(accum, req.encoder);
   return {
     channels: accum,
     finalDuckGain,
     limitedSamples,
-    ...prepareEncoderPcm(accum, req.encoder),
+    ...encoderResult,
   };
 };
 

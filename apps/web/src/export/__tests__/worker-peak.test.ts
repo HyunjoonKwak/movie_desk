@@ -1,6 +1,6 @@
 import { TruePeakMeter } from "@movie-desk/core";
 import { expect, it } from "vitest";
-import { combineInlineStateful, type MixerWorkerResponse } from "../audio-mixer-worker";
+import { type MixerWorkerResponse, combineInlineStateful } from "../audio-mixer-worker";
 
 it.each([1, 0.3, 4])(
   "measures exact encoder PCM across arbitrary chunks (gain %s)",
@@ -11,10 +11,10 @@ it.each([1, 0.3, 4])(
     const expected = new TruePeakMeter(2);
     let state: MixerWorkerResponse["peakState"];
     let final: MixerWorkerResponse | undefined;
-    let clipped = 0;
     let expectedClipped = 0;
     for (let start = 0; start < source[0].length; start += 997) {
       const voiceChannels = source.map((c) => c.slice(start, start + 997)) as typeof source;
+      const voiceSnapshot = structuredClone(voiceChannels);
       const raw = combineInlineStateful({
         voiceChannels,
         musicChannels: voiceChannels.map((c) => new Float32Array(c.length)) as typeof source,
@@ -40,14 +40,15 @@ it.each([1, 0.3, 4])(
         },
       });
       expect(final.channels).toEqual(normalized);
+      expect(voiceChannels).toEqual(voiceSnapshot);
       expect(state).toEqual(snapshot);
       state = final.peakState;
-      clipped += final.audioPeaks!.clippedSamples;
+      expect(final.audioPeaks!.clippedSamples).toBe(expectedClipped);
+      expect(state!.clippedSamples).toBe(expectedClipped);
     }
-    expect(clipped).toBe(expectedClipped);
     expect(final!.audioPeaks).toEqual({
       ...expected.finish(),
-      clippedSamples: final!.audioPeaks!.clippedSamples,
+      clippedSamples: expectedClipped,
     });
   },
 );
