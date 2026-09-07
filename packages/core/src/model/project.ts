@@ -1,8 +1,8 @@
 import type { ID } from "../utils/id";
-import type { Ms, Fps } from "../utils/time";
+import type { Fps, Ms } from "../utils/time";
 import type { MediaCollection } from "./collection";
-import type { MediaAsset } from "./media";
 import type { Marker } from "./marker";
+import type { MediaAsset } from "./media";
 import type { Track } from "./track";
 
 export interface Resolution {
@@ -47,4 +47,4 @@ export interface Project {
   readonly collections?: readonly MediaCollection[]; // optional; older projects have none
 }
 
-export const PROJECT_VERSION = 1 as const;
+export const PROJECT_VERSION = 2 as const;

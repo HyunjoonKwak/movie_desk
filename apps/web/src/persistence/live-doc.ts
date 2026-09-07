@@ -1,10 +1,14 @@
+import { t } from "@/i18n/use-t";
 import { reloadSpan } from "@/lib/reload-metrics";
 import { useProjectStore } from "@/stores/project-store";
-import { hydrateProjectTimelines, type LegacyProject } from "@movie-desk/core";
+import { type LegacyProject, NestedTimelineError } from "@movie-desk/core";
 import type { Clip, Project, Track } from "@movie-desk/core";
+import { toast } from "sonner";
 import { IndexeddbPersistence } from "y-indexeddb";
 import * as Y from "yjs";
+import { allowProjectWrites, blockProjectWrites, isRestoredMaintenance } from "./hydration-state";
 import { createProjectCrdt } from "./project-crdt";
+import { parseStoredProject } from "./project-io";
 import { useSaveStateStore } from "./save-state-store";
 
 // The live document: the active project mirrored into a Yjs doc that
@@ -33,14 +37,19 @@ const legacyProject = (
 ): Project => {
   const tracks = structure.timeline.tracks.map(({ clipIds, ...track }) => ({
     ...track,
-    clips: clipIds.map((id) => clipsMap.get(id)).filter((clip): clip is Clip => clip !== undefined),
+    clips: clipIds.map((id) => {
+      const clip = clipsMap.get(id);
+      if (!clip || clip.id !== id)
+        throw new NestedTimelineError("Missing legacy clip; original document is unchanged");
+      return clip;
+    }),
   }));
   const duration = tracks.reduce(
     (max, track) =>
       track.clips.reduce((trackMax, clip) => Math.max(trackMax, clip.start + clip.duration), max),
     0,
   );
-  return hydrateProjectTimelines({
+  return parseStoredProject({
     ...structure,
     id: projectId,
     timeline: {
@@ -73,15 +82,28 @@ export const getLiveDoc = (): LiveDoc => {
   const doc = new Y.Doc();
   const persistence = new IndexeddbPersistence(projectPersistenceName(projectId), doc);
   const projectCrdt = createProjectCrdt(doc);
-  const clipsMap = projectCrdt.clips;
+  const clipsMap = doc.getMap<Clip>("clips");
+  blockProjectWrites(projectId);
+  useSaveStateStore.getState().setDocumentError(false);
 
   let applyingFromDoc = false;
   let disposed = false;
   let restored = false;
+  let failed = false;
+  const fail = (error: unknown): void => {
+    if (disposed) return;
+    failed = true;
+    blockProjectWrites(projectId);
+    useSaveStateStore.getState().setDocumentError(true);
+    toast.error(
+      `${t("persistence.openFailed")}: ${error instanceof Error ? error.message : String(error)}`,
+      { id: `hydrate-failed:${projectId}` },
+    );
+  };
 
   const flush = (): void => {
     const project = useProjectStore.getState().project;
-    if (disposed || project.id !== projectId) return;
+    if (disposed || !restored || failed || project.id !== projectId) return;
     doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
     queueMicrotask(() => useSaveStateStore.getState().markSaved());
   };
@@ -94,14 +116,22 @@ export const getLiveDoc = (): LiveDoc => {
     const localProject = useProjectStore.getState().project;
     if (localProject.id !== projectId) return null;
     const readEnd = reloadSpan("yjs-read-validate");
-    const project = projectCrdt.read(projectId, localProject.timeline);
-    readEnd();
+    let project: Project | null;
+    applyingFromDoc = true;
+    try {
+      project = projectCrdt.read(projectId, localProject.timeline);
+    } catch (error) {
+      fail(error);
+      return null;
+    } finally {
+      applyingFromDoc = false;
+      readEnd();
+    }
     if (!project) return null;
     const end = reloadSpan("applyFromDoc");
     applyingFromDoc = true;
     try {
       useProjectStore.getState().loadProject(project);
-      doc.transact(() => projectCrdt.write(project), LOCAL_ORIGIN);
     } finally {
       applyingFromDoc = false;
       end();
@@ -114,8 +144,11 @@ export const getLiveDoc = (): LiveDoc => {
     (state) => ({ project: state.project, editing: state.precisionEditing }),
     ({ project, editing }, old) => {
       const previous = old.project;
-      if (applyingFromDoc || project.id !== projectId) return;
+      if (applyingFromDoc || failed || isRestoredMaintenance(project) || project.id !== projectId)
+        return;
       if (
+        project.timelines === previous.timelines &&
+        project.rootTimelineId === previous.rootTimelineId &&
         project.timeline.tracks === previous.timeline.tracks &&
         project.mediaLibrary === previous.mediaLibrary &&
         project.collections === previous.collections &&
@@ -141,6 +174,7 @@ export const getLiveDoc = (): LiveDoc => {
       transaction.origin === LOCAL_ORIGIN ||
       disposed ||
       !restored ||
+      failed ||
       applyingFromDoc ||
       transaction.changed.size === 0
     )
@@ -148,33 +182,38 @@ export const getLiveDoc = (): LiveDoc => {
     applyFromDoc();
   };
   doc.on("afterTransaction", afterTransaction);
-  persistence.on("synced", () => useSaveStateStore.getState().markSaved());
-
-  void persistence.whenSynced.then(() => {
-    loaded();
-    if (disposed) return;
-    restored = true;
-    if (projectCrdt.isInitialized()) {
-      applyFromDoc();
-      return;
-    }
-
-    const current = useProjectStore.getState().project;
-    const oldSnapshot = doc.getMap<LegacyProject>(LEGACY_MAP).get(LEGACY_KEY);
-    const oldStructure = doc.getMap<LegacyStructure>(LEGACY_STRUCT).get(LEGACY_STRUCT_KEY);
-    const seed = oldSnapshot
-      ? hydrateProjectTimelines({ ...oldSnapshot, id: projectId })
-      : oldStructure
-        ? legacyProject(projectId, oldStructure, clipsMap, current.timeline)
-        : current;
-
-    doc.transact(() => {
-      projectCrdt.write(seed);
-      doc.getMap<Project>(LEGACY_MAP).delete(LEGACY_KEY);
-      doc.getMap<LegacyStructure>(LEGACY_STRUCT).delete(LEGACY_STRUCT_KEY);
-    }, LOCAL_ORIGIN);
-    applyFromDoc();
+  persistence.on("synced", () => {
+    if (restored && !failed) useSaveStateStore.getState().markSaved();
   });
+
+  void persistence.whenSynced
+    .then(() => {
+      loaded();
+      if (disposed) return;
+      restored = true;
+      if (projectCrdt.isInitialized()) {
+        applyFromDoc();
+        if (!failed) allowProjectWrites(projectId);
+        return;
+      }
+
+      const current = useProjectStore.getState().project;
+      const oldSnapshot = doc.getMap<LegacyProject>(LEGACY_MAP).get(LEGACY_KEY);
+      const oldStructure = doc.getMap<LegacyStructure>(LEGACY_STRUCT).get(LEGACY_STRUCT_KEY);
+      const seed = oldSnapshot
+        ? parseStoredProject({ ...oldSnapshot, id: projectId })
+        : oldStructure
+          ? legacyProject(projectId, oldStructure, clipsMap, current.timeline)
+          : current;
+
+      doc.transact(() => {
+        projectCrdt.write(seed);
+        // Retain legacy roots as recovery evidence.
+      }, LOCAL_ORIGIN);
+      if (oldSnapshot || oldStructure) applyFromDoc();
+      if (!failed) allowProjectWrites(projectId);
+    })
+    .catch(fail);
 
   live = {
     projectId,

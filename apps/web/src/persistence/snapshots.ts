@@ -2,9 +2,9 @@
 // independent of the live Yjs doc. Each snapshot is a frozen JSON of the
 // project at a moment in time.
 
+import type { Project } from "@movie-desk/core";
 import Dexie, { type Table } from "dexie";
-import { toLegacyProject, type Project } from "@movie-desk/core";
-import { parseStoredProject } from "./project-io";
+import { parseStoredProject, prepareStoredProject } from "./project-io";
 
 export interface ProjectSnapshot {
   id: string;
@@ -42,7 +42,7 @@ export const saveSnapshot = async (project: Project, label: string): Promise<voi
     projectId: project.id,
     label: label || new Date().toLocaleString(),
     createdAt: Date.now(),
-    json: JSON.stringify(toLegacyProject(project)),
+    json: JSON.stringify(prepareStoredProject(project)),
   });
 };
 

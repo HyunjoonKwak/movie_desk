@@ -3,6 +3,7 @@
 import { t } from "@/i18n/use-t";
 import { usePreviewStore } from "@/stores/preview-store";
 import { useProjectStore } from "@/stores/project-store";
+import { createEmptyProject, type ID } from "@movie-desk/core";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { disposeLiveDoc, getLiveDoc } from "./live-doc";
@@ -32,8 +33,12 @@ export const useLocalPersistence = (): boolean => {
         if (cancelled) return;
         if (activeResult?.status === "ok") {
           useProjectStore.getState().loadProject(activeResult.project);
+        } else if (activeId && activeResult?.status === "missing") {
+          // The live Yjs write can finish before the library debounce. Preserve
+          // the active identity so an abrupt reload can still recover that doc.
+          useProjectStore.getState().loadProject(createEmptyProject({ id: activeId as ID }));
         } else if (activeResult?.status === "corrupt") {
-          toast.error(t("project.activeCorrupt"));
+          toast.error(`${t("project.activeCorrupt")}: ${activeResult.reason}`);
         }
 
         getLiveDoc();

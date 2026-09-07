@@ -1,10 +1,15 @@
-import { parseStoredProject } from "@/persistence/project-io";
-import { NestedTimelineError, toLegacyProject, syncRootTimeline } from "@movie-desk/core";
+import {
+  parseCurrentProject,
+  parseStoredProject,
+  prepareStoredProject,
+} from "@/persistence/project-io";
+import { NestedTimelineError } from "@movie-desk/core";
 import type { Clip, MediaAsset, MediaCollection, Project, Track } from "@movie-desk/core";
-import type * as Y from "yjs";
+import * as Y from "yjs";
 import { reconcileSequence, uniqueSequence } from "./crdt-sequence";
+import { createTimelineCrdt } from "./timeline-crdt";
 
-const PROJECT_CRDT_SCHEMA_VERSION = 2;
+const PROJECT_CRDT_SCHEMA_VERSION = 3;
 const CLIPS_MAP_NAME = "clips";
 
 const META = "project-meta";
@@ -55,134 +60,172 @@ export const createProjectCrdt = (doc: Y.Doc): ProjectCrdt => {
   const collectionsMap = doc.getMap<MediaCollection>(COLLECTIONS);
   const collectionOrder = doc.getArray<string>(COLLECTION_ORDER);
   const clipsMap = doc.getMap<Clip>(CLIPS_MAP_NAME);
+  const timelines = createTimelineCrdt(doc);
   const clipOrderFor = (trackId: string) => doc.getArray<string>(`${CLIP_ORDER_PREFIX}${trackId}`);
 
-  const write = (project: Project): void => {
-    // Phase 0 guard only: the v2 document still has no nested timeline schema.
-    // Run before any Yjs mutation so unsupported children cannot be discarded.
-    toLegacyProject(syncRootTimeline(project));
-    setJsonValue(metaMap, META_SCHEMA, PROJECT_CRDT_SCHEMA_VERSION);
-    if (project.audio) setJsonValue(metaMap, "audio", project.audio);
-    else metaMap.delete("audio");
-    setJsonValue(metaMap, "name", project.name);
-    setJsonValue(metaMap, "createdAt", project.createdAt);
-    setJsonValue(metaMap, "framerate", project.framerate);
-    setJsonValue(metaMap, "resolution", project.resolution);
-    // Schema-compat shim: `magnetic` left the model (it never drove behavior)
-    // but documents written by older builds require a boolean here.
-    setJsonValue(metaMap, "magnetic", true);
-    setJsonValue(metaMap, "markers", project.timeline.markers ?? []);
-    const nextCollections = new Map((project.collections ?? []).map((c) => [c.id, c]));
-    syncEntityMap(collectionsMap, nextCollections);
-    reconcileSequence(
-      collectionOrder,
-      (project.collections ?? []).map((c) => c.id),
-    );
-
-    const nextMedia = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
-    syncEntityMap(mediaMap, nextMedia);
-    reconcileSequence(
-      mediaOrder,
-      project.mediaLibrary.map((asset) => asset.id),
-    );
-
-    const nextTracks = new Map<string, TrackMeta>();
-    const nextClips = new Map<string, Clip>();
-    for (const track of project.timeline.tracks) {
-      const { clips, ...trackMeta } = track;
-      nextTracks.set(track.id, trackMeta);
+  const write = (input: Project): void => {
+    const project = jsonClone(prepareStoredProject(input));
+    doc.transact(() => {
+      timelines.write(project);
+      setJsonValue(metaMap, "rootTimelineId", project.rootTimelineId);
+      setJsonValue(metaMap, META_SCHEMA, PROJECT_CRDT_SCHEMA_VERSION);
+      if (project.audio) setJsonValue(metaMap, "audio", project.audio);
+      else metaMap.delete("audio");
+      setJsonValue(metaMap, "name", project.name);
+      setJsonValue(metaMap, "createdAt", project.createdAt);
+      setJsonValue(metaMap, "framerate", project.framerate);
+      setJsonValue(metaMap, "resolution", project.resolution);
+      // Schema-compat shim: `magnetic` left the model (it never drove behavior)
+      // but documents written by older builds require a boolean here.
+      setJsonValue(metaMap, "magnetic", true);
+      setJsonValue(metaMap, "markers", project.timeline.markers ?? []);
+      const nextCollections = new Map((project.collections ?? []).map((c) => [c.id, c]));
+      syncEntityMap(collectionsMap, nextCollections);
       reconcileSequence(
-        clipOrderFor(track.id),
-        clips.map((clip) => clip.id),
+        collectionOrder,
+        (project.collections ?? []).map((c) => c.id),
       );
-      for (const clip of clips) nextClips.set(clip.id, clip);
-    }
 
-    for (const trackId of tracksMap.keys()) {
-      if (!nextTracks.has(trackId)) reconcileSequence(clipOrderFor(trackId), []);
-    }
-    syncEntityMap(tracksMap, nextTracks);
-    reconcileSequence(
-      trackOrder,
-      project.timeline.tracks.map((track) => track.id),
-    );
-    syncEntityMap(clipsMap, nextClips);
+      const nextMedia = new Map(project.mediaLibrary.map((asset) => [asset.id, asset]));
+      syncEntityMap(mediaMap, nextMedia);
+      reconcileSequence(
+        mediaOrder,
+        project.mediaLibrary.map((asset) => asset.id),
+      );
+    });
   };
 
   const read = (projectId: Project["id"], localView: Project["timeline"]): Project | null => {
-    if (metaMap.get(META_SCHEMA) !== PROJECT_CRDT_SCHEMA_VERSION) return null;
-
-    const tracks: Track[] = [];
-    for (const trackId of uniqueSequence(trackOrder.toArray())) {
-      const track = tracksMap.get(trackId);
-      if (!track) continue;
-      const clips = uniqueSequence(clipOrderFor(trackId).toArray())
-        .map((clipId) => clipsMap.get(clipId))
-        .filter((clip): clip is Clip => clip !== undefined);
-      tracks.push({ ...track, clips });
-    }
-    const duration = tracks.reduce(
-      (max, track) =>
-        track.clips.reduce((trackMax, clip) => Math.max(trackMax, clip.start + clip.duration), max),
-      0,
-    );
-    const mediaLibrary = uniqueSequence(mediaOrder.toArray())
-      .map((assetId) => mediaMap.get(assetId))
-      .filter((asset): asset is MediaAsset => asset !== undefined);
-
-    const name = metaMap.get("name");
-    const createdAt = metaMap.get("createdAt");
-    const framerate = metaMap.get("framerate");
-    const resolution = metaMap.get("resolution");
-    const markers = metaMap.get("markers");
-    // Optional: documents written before A3 have no collections.
-    const collections = uniqueSequence(collectionOrder.toArray())
-      .map((collectionId) => collectionsMap.get(collectionId))
-      .filter((collection): collection is MediaCollection => collection !== undefined);
-    if (
-      typeof name !== "string" ||
-      typeof createdAt !== "number" ||
-      typeof framerate !== "number" ||
-      !resolution ||
-      typeof resolution !== "object" ||
-      !Array.isArray(markers)
-    ) {
+    const version = metaMap.get(META_SCHEMA);
+    if (version === undefined) {
+      if (metaMap.size || tracksMap.size || clipsMap.size || doc.getMap("timelines-v3").size)
+        throw new NestedTimelineError(
+          "Missing CRDT schema version; original document is unchanged",
+        );
       return null;
     }
-
-    const candidate = {
-      id: projectId,
-      name,
-      createdAt,
-      updatedAt: Date.now(),
-      framerate,
-      resolution: resolution as Project["resolution"],
-      mediaLibrary,
-      ...(metaMap.has("audio") ? { audio: metaMap.get("audio") } : {}),
-      ...(collections.length > 0 ? { collections } : {}),
-      timeline: {
-        tracks,
-        playhead: localView.playhead,
-        zoom: localView.zoom,
-        duration,
-        markers: markers as NonNullable<Project["timeline"]["markers"]>,
-      },
-    };
+    if (version !== 2 && version !== PROJECT_CRDT_SCHEMA_VERSION)
+      throw new NestedTimelineError("Unsupported CRDT schema; original document is unchanged");
     try {
-      // Yjs values are read back from IndexedDB and do not retain their
-      // TypeScript types at runtime. Reuse the persistence boundary schema
-      // before any stored state reaches the renderer or project store.
-      return parseStoredProject(candidate);
-    } catch (err) {
-      // Nested failures must stop hydration before live-doc can flush over them.
-      if (err instanceof NestedTimelineError) throw err;
-      return null;
+      const nested =
+        version === 3 ? timelines.read(metaMap.get("rootTimelineId"), localView) : null;
+
+      const tracks: Track[] = [];
+      for (const trackId of nested ? [] : uniqueSequence(trackOrder.toArray())) {
+        const track = tracksMap.get(trackId);
+        if (!track || track.id !== trackId)
+          throw new NestedTimelineError("Missing or mismatched legacy track");
+        const clips = uniqueSequence(clipOrderFor(trackId).toArray())
+          .map((clipId) => {
+            const clip = clipsMap.get(clipId);
+            if (clip?.id !== clipId)
+              throw new NestedTimelineError("Missing or mismatched legacy clip");
+            return clip;
+          })
+          .map((clip) => {
+            if (!clip) throw new NestedTimelineError("Missing legacy clip");
+            return clip;
+          });
+        tracks.push({ ...track, clips });
+      }
+      const duration = tracks.reduce(
+        (max, track) =>
+          track.clips.reduce(
+            (trackMax, clip) => Math.max(trackMax, clip.start + clip.duration),
+            max,
+          ),
+        0,
+      );
+      const mediaLibrary = uniqueSequence(mediaOrder.toArray())
+        .map((assetId) => mediaMap.get(assetId))
+        .filter((asset): asset is MediaAsset => asset !== undefined);
+
+      if (!nested) {
+        if (
+          tracksMap.size !== tracks.length ||
+          clipsMap.size !== tracks.flatMap((track) => track.clips).length
+        )
+          throw new NestedTimelineError("Unordered legacy tracks or clips");
+      }
+      const name = metaMap.get("name");
+      const createdAt = metaMap.get("createdAt");
+      const framerate = metaMap.get("framerate");
+      const resolution = metaMap.get("resolution");
+      const markers = metaMap.get("markers");
+      // Optional: documents written before A3 have no collections.
+      const collections = uniqueSequence(collectionOrder.toArray())
+        .map((collectionId) => collectionsMap.get(collectionId))
+        .filter((collection): collection is MediaCollection => collection !== undefined);
+      if (
+        mediaLibrary.length !== mediaMap.size ||
+        mediaLibrary.length !== uniqueSequence(mediaOrder.toArray()).length ||
+        collections.length !== collectionsMap.size ||
+        collections.length !== uniqueSequence(collectionOrder.toArray()).length ||
+        mediaLibrary.some((asset, i) => asset.id !== uniqueSequence(mediaOrder.toArray())[i]) ||
+        collections.some((item, i) => item.id !== uniqueSequence(collectionOrder.toArray())[i])
+      )
+        throw new NestedTimelineError("Incomplete media or collection order");
+      if (
+        typeof name !== "string" ||
+        typeof createdAt !== "number" ||
+        typeof framerate !== "number" ||
+        !resolution ||
+        typeof resolution !== "object" ||
+        !Array.isArray(markers)
+      ) {
+        throw new NestedTimelineError("Invalid CRDT project metadata");
+      }
+
+      const candidate = {
+        id: projectId,
+        name,
+        createdAt,
+        updatedAt: Date.now(),
+        framerate,
+        resolution: resolution as Project["resolution"],
+        mediaLibrary,
+        ...(metaMap.has("audio") ? { audio: metaMap.get("audio") } : {}),
+        ...(collections.length > 0 ? { collections } : {}),
+        ...(nested ? { timelines: nested, rootTimelineId: metaMap.get("rootTimelineId") } : {}),
+        timeline: nested
+          ? nested.find((timeline) => timeline.id === metaMap.get("rootTimelineId"))
+          : {
+              tracks,
+              playhead: localView.playhead,
+              zoom: localView.zoom,
+              duration,
+              markers: markers as NonNullable<Project["timeline"]["markers"]>,
+            },
+      };
+      if (nested) return parseCurrentProject(candidate);
+      const project = parseStoredProject(candidate);
+      // Yjs transactions do not roll back exceptions. Stage and fully validate on
+      // an isolated document, then apply one update to the original.
+      const backup = Y.encodeStateAsUpdate(doc);
+      const staged = new Y.Doc();
+      try {
+        Y.applyUpdate(staged, backup);
+        const next = createProjectCrdt(staged);
+        next.write(project);
+        next.read(projectId, localView);
+        staged.getMap("migration-backup-v2").set("update", backup);
+        Y.applyUpdate(doc, Y.encodeStateAsUpdate(staged, Y.encodeStateVector(doc)));
+      } finally {
+        staged.destroy();
+      }
+      return project;
+    } catch (error) {
+      if (error instanceof NestedTimelineError) throw error;
+      throw new NestedTimelineError(
+        `Cannot open CRDT project; original data is unchanged: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
   return {
-    clips: clipsMap,
-    isInitialized: () => metaMap.get(META_SCHEMA) === PROJECT_CRDT_SCHEMA_VERSION,
+    clips: timelines.clips,
+    isInitialized: () =>
+      metaMap.size > 0 || tracksMap.size > 0 || doc.getMap("timelines-v3").size > 0,
     write,
     read,
   };

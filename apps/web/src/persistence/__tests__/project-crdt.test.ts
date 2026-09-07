@@ -1,16 +1,18 @@
 import {
-  NestedTimelineError,
-  hydrateProjectTimelines,
   type ID,
   type MediaClip,
+  NestedTimelineError,
   type Project,
   type Track,
   createEmptyProject,
+  hydrateProjectTimelines,
 } from "@movie-desk/core";
 import { describe, expect, it, vi } from "vitest";
 import * as Y from "yjs";
-import * as projectIO from "../project-io";
 import { createProjectCrdt } from "../project-crdt";
+import * as projectIO from "../project-io";
+
+import { timelineTrackMapName } from "../timeline-crdt";
 
 const asId = (value: string): ID => value as ID;
 
@@ -64,7 +66,7 @@ describe("project CRDT", () => {
     const stored = Y.encodeStateAsUpdate(doc);
     // Exercise the real core guard at the future nested parser boundary.
     const parser = vi
-      .spyOn(projectIO, "parseStoredProject")
+      .spyOn(projectIO, "parseCurrentProject")
       .mockImplementationOnce(() => hydrateProjectTimelines(base));
     try {
       expect(() => crdt.read(base.id, base.timeline)).toThrow(NestedTimelineError);
@@ -163,13 +165,13 @@ describe("project CRDT", () => {
     const crdt = createProjectCrdt(doc);
     crdt.write(base);
 
-    doc.getMap("tracks-v2").set(firstTrack.id, {
+    doc.getMap(timelineTrackMapName(base.rootTimelineId)).set(firstTrack.id, {
       ...firstTrack,
       clips: undefined,
       height: -1,
     });
 
-    expect(crdt.read(base.id, base.timeline)).toBeNull();
+    expect(() => crdt.read(base.id, base.timeline)).toThrow(NestedTimelineError);
   });
 });
 

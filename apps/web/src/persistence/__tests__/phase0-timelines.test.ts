@@ -1,16 +1,16 @@
 import {
+  type MediaClip,
+  type Project,
   addClip,
   createEmptyProject,
   findTimeline,
   newId,
   toLegacyProject,
-  type Project,
-  type MediaClip,
 } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
-import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-io";
 import { createProjectCrdt } from "../project-crdt";
+import { parseProjectExport, parseStoredProject, toProjectExport } from "../project-io";
 
 const legacy = () => ({
   id: newId(),
@@ -64,7 +64,7 @@ const assertRoot = (project: Project) => {
   expect(project.timeline.id).toBe(project.rootTimelineId);
 };
 
-describe("Phase 0 persistence boundaries", () => {
+describe("Legacy migration persistence boundaries", () => {
   it("opens/saves existing JSON without changing any existing field", () => {
     const raw = legacy();
     const project = parseStoredProject(raw);
@@ -80,12 +80,12 @@ describe("Phase 0 persistence boundaries", () => {
     const opened = parseProjectExport(envelope);
     assertRoot(opened.project);
     const exported = JSON.parse(JSON.stringify(toProjectExport(opened.project)));
-    expect(exported.project).toEqual(envelope.project);
-    expect(exported.version).toBe(envelope.version);
+    expect(exported.project).toEqual(opened.project);
+    expect(exported.version).toBe(2);
     assertRoot(parseProjectExport(exported).project);
   });
 
-  it("derives the same root after CRDT read and immediate write, keeping schema/data unchanged", () => {
+  it("derives the same root after v3 read and immediate rewrite", () => {
     const project = parseStoredProject(legacy());
     const doc = new Y.Doc();
     const crdt = createProjectCrdt(doc);
@@ -98,9 +98,9 @@ describe("Phase 0 persistence boundaries", () => {
     expect(loaded.audio).toEqual(project.audio);
     crdt.write(loaded); // mirrors live-doc's immediate rewrite
     expect(JSON.parse(JSON.stringify(doc.toJSON()))).toEqual(before);
-    expect(doc.getMap("project-meta").get("schemaVersion")).toBe(2);
+    expect(doc.getMap("project-meta").get("schemaVersion")).toBe(3);
     expect(doc.getMap("project-meta").has("timelines")).toBe(false);
-    expect(doc.getMap("project-meta").has("rootTimelineId")).toBe(false);
+    expect(doc.getMap("project-meta").has("rootTimelineId")).toBe(true);
     const media: MediaClip = {
       ...(project.timeline.tracks[0]!.clips[0] as MediaClip),
       id: newId(),
@@ -115,7 +115,7 @@ describe("Phase 0 persistence boundaries", () => {
     doc.destroy();
   });
 
-  it("rejects nested input and unsupported writes instead of losing children", () => {
+  it("rejects incomplete nested input and supports complete nested writes", () => {
     const raw = legacy();
     for (const extra of [{ timelines: [] }, { timelines: null }, { rootTimelineId: "missing" }]) {
       expect(() => parseStoredProject({ ...raw, ...extra })).toThrow();
@@ -133,13 +133,12 @@ describe("Phase 0 persistence boundaries", () => {
       timelines: [base.timeline, { ...base.timeline, id: newId() }],
       rootTimelineId: base.rootTimelineId,
     });
-    expect(() => toProjectExport(nested)).toThrow();
+    expect(toProjectExport(nested).project.timelines).toHaveLength(2);
     const doc = new Y.Doc();
     const crdt = createProjectCrdt(doc);
     crdt.write(base);
-    const before = JSON.parse(JSON.stringify(doc.toJSON()));
-    expect(() => crdt.write(nested)).toThrow();
-    expect(JSON.parse(JSON.stringify(doc.toJSON()))).toEqual(before);
+    crdt.write(nested);
+    expect(crdt.read(nested.id, nested.timeline)?.timelines).toHaveLength(2);
     doc.destroy();
   });
 });

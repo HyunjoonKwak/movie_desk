@@ -1,14 +1,14 @@
 "use client";
 
-import { FunnelControls } from "@/lib/funnel/report-dialog";
-import { recordNewFunnelProject } from "./new-project-start-state";
 import { useT } from "@/i18n/use-t";
+import { FunnelControls } from "@/lib/funnel/report-dialog";
+import { startLibraryAutosave } from "@/persistence/library-autosave";
+import { withInlinePreviews } from "@/persistence/previews";
 import {
   ProjectVersionError,
   downloadProjectJson,
   parseProjectExport,
 } from "@/persistence/project-io";
-import { withInlinePreviews } from "@/persistence/previews";
 import {
   deleteStoredProject,
   listProjectsLibrary,
@@ -16,7 +16,6 @@ import {
   setActiveProjectId,
   upsertProject,
 } from "@/persistence/project-library";
-import { startLibraryAutosave } from "@/persistence/library-autosave";
 import { emptyTrash } from "@/persistence/trash";
 import { useProjectStore } from "@/stores/project-store";
 import { type ID, createEmptyProject } from "@movie-desk/core";
@@ -24,6 +23,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Download, FilePlus, FolderOpen, Trash2, Upload, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import { recordNewFunnelProject } from "./new-project-start-state";
 
 interface StoredRow {
   id: string;
@@ -75,7 +75,7 @@ export function ProjectMenu({ onNewProject }: { onNewProject?: (projectId: ID) =
   const onOpen = async (id: string) => {
     const result = await loadStoredProject(id);
     if (result.status === "corrupt") {
-      toast.error(t("project.corrupt"));
+      toast.error(`${t("project.corrupt")}: ${result.reason}`);
       return;
     }
     if (result.status === "missing") {

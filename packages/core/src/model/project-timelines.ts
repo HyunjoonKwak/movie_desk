@@ -1,7 +1,7 @@
 import type { ID } from "../utils/id";
 import type { Project, Timeline } from "./project";
 
-/** Single-timeline v1 wire shape. Timeline identity is session-derived in Phase 0. */
+/** Single-timeline v1 wire shape, retained for read migration and legacy fixtures. */
 export type LegacyProject = Omit<Project, "timelines" | "rootTimelineId" | "timeline"> & {
   readonly timeline: Omit<Timeline, "id"> & { readonly id?: ID };
 };
@@ -19,7 +19,7 @@ export class NestedTimelineError extends Error {
 /** Load only the v1 shape. Never silently discard future nested persistence data. */
 export const hydrateProjectTimelines = (input: LegacyProject): Project => {
   if ("timelines" in input || "rootTimelineId" in input)
-    throw new NestedTimelineError("Nested timeline persistence is not supported yet");
+    throw new NestedTimelineError("Legacy hydration received nested fields; use the current persistence parser");
   const timeline: Timeline = {
     ...input.timeline,
     id: input.timeline.id ?? rootTimelineIdForProject(input.id),
@@ -51,7 +51,7 @@ export const syncRootTimeline = (project: Project): Project => {
   return replaceTimeline(project, project.timeline);
 };
 
-/** Keep v1 writes lossless; Phase 1 + 7 will replace this boundary atomically. */
+/** Legacy fixture/export adapter; production persistence writes the current schema. */
 export const toLegacyProject = (project: Project): LegacyProject => {
   if (project.timelines.length !== 1) throw new Error("Cannot persist nested timelines in v1");
   const {

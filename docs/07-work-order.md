@@ -449,6 +449,7 @@ WebGPU, 렌더 워커, 백그라운드 렌더 큐, 모바일 네이티브 셸, �
 | 배치 | 담당 | 상태 | 비고 |
 | --- | --- | --- | --- |
 | B'5 Phase 0 | Codex 구현 · Claude 감독/리뷰 | 2라운드 수정·rebase·gate PASS, 통합 리뷰 대기 | 저장 경계 자기 치유·실패 안내, 게이트웨이 대상 합성, Phase 1 방어 주석. main4791476 기준 core161·web721·desktop72·scripts11(965), E2E66/66, gate9/9. 호출부 이관·중첩 영속화는 Phase 1+7. [2라운드 보고서](evaluations/2026-09-07-b5-phase0-round2-report.md) |
+| B'5 Phase 1+7 | Codex 구현 · Claude 감독/리뷰 | 구현·gate 완료, Claude 검토 대기 | gate9/9, core162·web756·desktop72·scripts11(1,001), E2E68/68 두 번 PASS. JSON v2·CRDT v3 동시 연결, 읽기 시점 v1 변환, 원자적 v2 CRDT 마이그레이션과 전체 원본 백업, 자식/충돌 ID 왕복·실패 원본 보존. [결정](decisions/2026-09-07-nested-persistence.md) |
 | D1~D4 | 사용자 | 전부 결정 | D1 계약: `docs/decisions/2026-09-03-local-media-storage.md` + `.review.md` (양측 승인, 2026-09-03). D2: desktop 매니페스트 canonical |
 | B1 CI 복구 | Claude | 완료 | postcss 8.5.23, nanoid 3.3.18/5.1.16 · audit 0건 |
 | B2 정책·포맷 | Claude | 완료, main 통합 | `claude/b2-version-policy` · check-versions 스크립트+테스트, CI 단계, 루트 scripts는 `biome check` 게이트, knip stores 1건. 전면 포맷은 아래 규칙 |
@@ -875,3 +876,15 @@ OSV167 취약점0, lint·tsc·build PASS. 전체 E2E **68/68 × 3회 연속 PASS
 기존 복구 테스트 **35.1초 → 두 경로 합계 2.7~2.8초**이다. 최초 SRGB8 픽셀의
 1코드 양자화 단언 실패도 보고서와 로그에 보존했다. Claude 리뷰와 후속 Linux CI는 남는다.
 [전체 gate](evaluations/2026-09-07-ci-color-verify-gate.md).
+
+
+2026-09-07 B'5 Phase 1+7: JSON v2와 CRDT v3를 같은 커밋으로 완성했다.
+v1 라이브러리·snapshot은 형태 기반 인메모리 변환만 하며 열기나 썸네일 정리로
+원본 행을 덮어쓰지 않는다. v2 CRDT는 별도 문서에서 검증 후 원자 적용하며 레거시
+루트와 전체 이전 encoded update를 보존한다. 후보 필드 누락, 비활성 자식·충돌 ID 왕복,
+마이그레이션 실패 원본 보존, hydration 전/실패 후 flush 차단을 검증했다.
+최종 gate **9/9 PASS**, 단위 **1,001개**, 전체 E2E **68/68 두 번 PASS**.
+실패했던 이전 실행은 성공 횟수에서 제외했다. Claude 검토 요청은 응답 대기로,
+검토 완료·main 통합을 주장하지 않는다.
+[보고서](evaluations/2026-09-07-b5-phase1-report.md) ·
+[gate](evaluations/2026-09-07-b5-phase1-gate.md).

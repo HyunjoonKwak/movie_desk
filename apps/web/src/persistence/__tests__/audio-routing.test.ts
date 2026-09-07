@@ -1,18 +1,18 @@
 import {
+  type Project,
   createEmptyProject,
   syncRootTimeline,
   toLegacyProject,
-  type Project,
 } from "@movie-desk/core";
 import { describe, expect, it } from "vitest";
 import * as Y from "yjs";
+import { createProjectCrdt } from "../project-crdt";
 import {
   parseProjectExport,
-  toProjectExport,
   parseStoredProject,
   takeAudioRecovery,
+  toProjectExport,
 } from "../project-io";
-import { createProjectCrdt } from "../project-crdt";
 
 const fixture = (): Project => {
   const p = createEmptyProject();
@@ -95,7 +95,11 @@ describe("audio routing persistence", () => {
       expect("audio" in parsed).toBe(false);
       expect(takeAudioRecovery(parsed)).toBe(true);
       expect(takeAudioRecovery(parsed)).toBe(false);
-      const exported = parseProjectExport({ ...toProjectExport(p), project: raw }).project;
+      const exported = parseProjectExport({
+        ...toProjectExport(p),
+        version: 1,
+        project: raw,
+      }).project;
       expect(exported).toEqual(withoutAudio);
       expect(takeAudioRecovery(exported)).toBe(true);
     }

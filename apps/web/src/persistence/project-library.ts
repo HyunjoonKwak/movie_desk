@@ -4,10 +4,10 @@
 // canonical state for the *active* project; this store is for the "open
 // previous projects" experience.
 
-import { reloadSpan, measureReload } from "@/lib/reload-metrics";
+import { measureReload, reloadSpan } from "@/lib/reload-metrics";
+import type { Project } from "@movie-desk/core";
 import Dexie, { type Table } from "dexie";
-import { toLegacyProject, type Project } from "@movie-desk/core";
-import { parseStoredProject } from "./project-io";
+import { parseStoredProject, prepareStoredProject } from "./project-io";
 
 interface StoredProject {
   id: string;
@@ -48,14 +48,14 @@ export const upsertProject = async (p: Project): Promise<void> => {
     id: p.id,
     name: p.name,
     updatedAt: p.updatedAt,
-    json: JSON.stringify(toLegacyProject(p)),
+    json: JSON.stringify(prepareStoredProject(p)),
   });
 };
 
 type StoredProjectLoadResult =
   | { readonly status: "ok"; readonly project: Project }
   | { readonly status: "missing" }
-  | { readonly status: "corrupt"; readonly raw: string };
+  | { readonly status: "corrupt"; readonly raw: string; readonly reason: string };
 
 export const loadStoredProject = async (id: string): Promise<StoredProjectLoadResult> => {
   const end = reloadSpan("library-read");
@@ -65,10 +65,14 @@ export const loadStoredProject = async (id: string): Promise<StoredProjectLoadRe
   try {
     const json = measureReload("json", () => JSON.parse(row.json));
     return { status: "ok", project: measureReload("zod", () => parseStoredProject(json)) };
-  } catch {
+  } catch (error) {
     // Keep the raw JSON so callers (e.g. media GC) can salvage OPFS references
     // and users can still export/recover or delete it from the project menu.
-    return { status: "corrupt", raw: row.json };
+    return {
+      status: "corrupt",
+      raw: row.json,
+      reason: error instanceof Error ? error.message : String(error),
+    };
   }
 };
 

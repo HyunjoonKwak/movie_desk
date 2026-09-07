@@ -1,15 +1,18 @@
-import type { Project } from "@movie-desk/core";
-import { toast } from "sonner";
 import { t } from "@/i18n/use-t";
 import { useProjectStore } from "@/stores/project-store";
+import type { Project } from "@movie-desk/core";
+import { toast } from "sonner";
 import { upsertProject } from "./project-library";
 import { useSaveStateStore } from "./save-state-store";
+
+import { isRestoredProject, projectWritesBlocked } from "./hydration-state";
 
 let latestWrite = 0;
 
 // Both the debounce and cleanup flush handle failures, and later edits retry.
 export const startLibraryAutosave = (): (() => void) => {
   const persist = async (project: Project): Promise<void> => {
+    if (isRestoredProject(project) || projectWritesBlocked(project.id)) return;
     const write = ++latestWrite;
     try {
       await upsertProject(project);
@@ -36,8 +39,8 @@ export const startLibraryAutosave = (): (() => void) => {
   const unsubscribe = useProjectStore.subscribe(
     (state) => state.project,
     (project, previous) => {
-      // Playhead, zoom, duration, and updatedAt are local/derived state. All
-      // editable shared content is covered by these referential boundaries.
+      // Include the full timeline collection: inactive child edits do not
+      // replace the root alias. updatedAt alone does not schedule a write.
       const contentChanged =
         project.id !== previous.id ||
         project.name !== previous.name ||
@@ -45,6 +48,9 @@ export const startLibraryAutosave = (): (() => void) => {
         project.framerate !== previous.framerate ||
         project.resolution !== previous.resolution ||
         project.mediaLibrary !== previous.mediaLibrary ||
+        project.collections !== previous.collections ||
+        project.timelines !== previous.timelines ||
+        project.rootTimelineId !== previous.rootTimelineId ||
         project.audio !== previous.audio ||
         project.timeline.tracks !== previous.timeline.tracks ||
         project.timeline.markers !== previous.timeline.markers;

@@ -1,8 +1,8 @@
+import { useProjectStore } from "@/stores/project-store";
 import { createEmptyProject } from "@movie-desk/core";
 import { afterEach, expect, it, vi } from "vitest";
 import type * as Y from "yjs";
 import { createProjectCrdt } from "../project-crdt";
-import { useProjectStore } from "@/stores/project-store";
 
 const provider = vi.hoisted(() => ({ doc: null as Y.Doc | null, sync: () => {} }));
 vi.mock("y-indexeddb", () => ({
@@ -44,4 +44,93 @@ it("applies one fully restored document and continues applying later remote edit
   doc.transact(() => crdt.write({ ...project, name: "remote edit" }));
   expect(useProjectStore.getState().project.name).toBe("remote edit");
   expect(load).toHaveBeenCalledTimes(2);
+});
+
+it("blocks pre-sync edits and failed hydration writes while preserving the original document", async () => {
+  const Y = await import("yjs");
+  const { legacyCrdt } = await import("./fixtures/legacy-crdt");
+  const { useSaveStateStore } = await import("../save-state-store");
+  const project = createEmptyProject();
+  useProjectStore.getState().loadProject(project);
+  getLiveDoc();
+  const legacy = legacyCrdt(project);
+  legacy.getMap("project-meta").set("framerate", -1);
+  Y.applyUpdate(provider.doc!, Y.encodeStateAsUpdate(legacy));
+  const before = Y.encodeStateAsUpdate(provider.doc!);
+  useProjectStore.getState().renameProject("Before sync");
+  expect(Y.encodeStateAsUpdate(provider.doc!)).toEqual(before);
+  provider.sync();
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(useSaveStateStore.getState().state).toBe("error");
+  useSaveStateStore.getState().markSaved();
+  useSaveStateStore.getState().setLibraryError(false);
+  expect(useSaveStateStore.getState().state).toBe("error");
+  useProjectStore.getState().renameProject("After failed sync");
+  expect(useSaveStateStore.getState().state).toBe("error");
+  expect(Y.encodeStateAsUpdate(provider.doc!)).toEqual(before);
+  legacy.destroy();
+});
+
+it("hydrates nested state and flushes child-only edits through the live store", async () => {
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const { replaceTimeline } = await import("@movie-desk/core");
+  const p = nestedProject();
+  useProjectStore.getState().loadProject(p);
+  getLiveDoc();
+  createProjectCrdt(provider.doc!).write(p);
+  provider.sync();
+  await Promise.resolve();
+  const loaded = useProjectStore.getState().project;
+  expect(loaded.timelines).toEqual(p.timelines);
+  const child = loaded.timelines[1]!;
+  const edited = replaceTimeline(loaded, { ...child, zoom: 0.5 });
+  useProjectStore.setState({ project: edited });
+  expect(createProjectCrdt(provider.doc!).read(p.id, p.timeline)?.timelines).toEqual(
+    edited.timelines,
+  );
+});
+
+it("keeps a freshly seeded project eligible for its initial library save", async () => {
+  const { isRestoredProject } = await import("../hydration-state");
+  const p = createEmptyProject();
+  useProjectStore.getState().loadProject(p);
+  getLiveDoc();
+  provider.sync();
+  await Promise.resolve();
+  expect(useProjectStore.getState().project).toBe(p);
+  expect(isRestoredProject(useProjectStore.getState().project)).toBe(false);
+  expect(createProjectCrdt(provider.doc!).read(p.id, p.timeline)?.rootTimelineId).toBe(
+    p.rootTimelineId,
+  );
+});
+
+it("keeps preview maintenance after hydration out of the persisted CRDT until a user edit", async () => {
+  const Y = await import("yjs");
+  const p = createEmptyProject({
+    mediaLibrary: [
+      {
+        id: "asset" as import("@movie-desk/core").ID,
+        name: "Picture",
+        kind: "image",
+        mime: "image/png",
+        durationMs: 0,
+        opfsPath: "picture.png",
+        importedAt: 0,
+        thumbDataUrl: "data:image/png;base64,AA==",
+      },
+    ],
+  });
+  useProjectStore.getState().loadProject(p);
+  getLiveDoc();
+  createProjectCrdt(provider.doc!).write(p);
+  provider.sync();
+  await Promise.resolve();
+  const before = Y.encodeStateAsUpdate(provider.doc!);
+  useProjectStore.getState().dropInlinePreviews([p.mediaLibrary[0]!.id]);
+  expect(Y.encodeStateAsUpdate(provider.doc!)).toEqual(before);
+  useProjectStore.getState().renameProject("Actual edit");
+  const reloaded = createProjectCrdt(provider.doc!).read(p.id, p.timeline)!;
+  expect(reloaded.name).toBe("Actual edit");
+  expect(reloaded.mediaLibrary[0]).not.toHaveProperty("thumbDataUrl");
 });

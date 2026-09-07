@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { createEmptyProject, newId, toLegacyProject } from "@movie-desk/core";
+import { describe, expect, it } from "vitest";
 import {
   ProjectVersionError,
   parseProjectExport,
@@ -81,7 +81,7 @@ describe("project-export", () => {
     "rejects %s files with structured version details",
     (direction) => {
       const env = toProjectExport(createEmptyProject());
-      const fileVersion = env.version + (direction === "older" ? -1 : 1);
+      const fileVersion = direction === "older" ? 0 : env.version + 1;
       let error: unknown;
       try {
         parseProjectExport({ ...env, version: fileVersion });

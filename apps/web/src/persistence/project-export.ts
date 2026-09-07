@@ -1,6 +1,13 @@
 import type { Project } from "@movie-desk/core";
-import { PROJECT_VERSION, isSafeRelativePath } from "@movie-desk/core";
+import {
+  NestedTimelineError,
+  PROJECT_VERSION,
+  hydrateProjectTimelines,
+  isSafeRelativePath,
+  syncRootTimeline,
+} from "@movie-desk/core";
 import { z } from "zod";
+import { rememberRestoredProject } from "./hydration-state";
 
 // JSON envelope so we can evolve the on-disk format independently of the
 // in-memory Project type.
@@ -82,6 +89,16 @@ const clipSchema = z.discriminatedUnion("kind", [
     })
     .passthrough(),
   z.object({ ...clipBase, kind: z.literal("adjustment") }).passthrough(),
+  z
+    .object({
+      ...clipBase,
+      kind: z.literal("sequence"),
+      timelineId: z.string().min(1),
+      trimIn: nonNegative,
+      trimOut: nonNegative,
+      volume: nonNegative.optional(),
+    })
+    .passthrough(),
 ]);
 
 const gainDbSchema = finite.min(-60).max(12);
@@ -226,6 +243,19 @@ const markerSchema = z
   })
   .passthrough();
 
+const timelineSchema = z
+  .object({
+    id: z.string().min(1),
+    tracks: z.array(trackSchema),
+    playhead: nonNegative,
+    zoom: positive,
+    duration: nonNegative,
+    markers: z.array(markerSchema).optional(),
+    magnetic: z.boolean().optional(),
+  })
+  .passthrough()
+  .transform(({ magnetic: _legacy, ...rest }) => rest);
+
 const projectSchema = z
   .object({
     id: z.string(),
@@ -239,8 +269,7 @@ const projectSchema = z
         tracks: z.array(trackSchema),
         playhead: nonNegative,
         zoom: positive,
-        // Legacy field — accepted from pre-removal exports (and re-added on
-        // export as a wire-compat shim) but stripped from the runtime model.
+        // Legacy field accepted on input and stripped from the runtime model.
         magnetic: z.boolean().optional(),
         duration: nonNegative,
         markers: z.array(markerSchema).optional(),
@@ -256,11 +285,61 @@ const projectSchema = z
     audio === undefined ? rest : { ...rest, audio },
   ) as unknown as z.ZodType<Project>;
 
+// Current-wire parser is deliberately distinct from legacy shape inference.
+// CRDT schema 3 must use this entrypoint: omitting both new fields in its
+// candidate must fail, even if the remaining object resembles a v1 project.
+const currentProjectSchema = z
+  .object({
+    timelines: z.array(timelineSchema).nonempty(),
+    rootTimelineId: z.string().min(1),
+  })
+  .passthrough();
+
+const sameJson = (left: unknown, right: unknown): boolean => {
+  if (left === right) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+  const a = left as Record<string, unknown>;
+  const b = right as Record<string, unknown>;
+  const keys = Object.keys(a).filter((key) => a[key] !== undefined);
+  return (
+    keys.length === Object.keys(b).filter((key) => b[key] !== undefined).length &&
+    keys.every((key) => Object.hasOwn(b, key) && sameJson(a[key], b[key]))
+  );
+};
+
+export const parseCurrentProject = (raw: unknown): Project => {
+  try {
+    const nested = currentProjectSchema.parse(raw);
+    const parsed = projectSchema.parse(nested);
+    const timelines = nested.timelines as unknown as Project["timelines"];
+    const ids = new Set(timelines.map((timeline) => timeline.id));
+    if (ids.size !== timelines.length) throw new Error("Duplicate timeline ID");
+    for (const timeline of timelines) {
+      if (new Set(timeline.tracks.map((track) => track.id)).size !== timeline.tracks.length)
+        throw new Error(`Duplicate track ID in timeline ${timeline.id}`);
+      const clips = timeline.tracks.flatMap((track) => track.clips);
+      if (new Set(clips.map((clip) => clip.id)).size !== clips.length)
+        throw new Error(`Duplicate clip ID in timeline ${timeline.id}`);
+    }
+    const root = timelines.find((timeline) => timeline.id === nested.rootTimelineId);
+    if (!root) throw new Error("Missing root timeline");
+    if (!sameJson(parsed.timeline, root))
+      throw new Error("Root timeline alias disagrees with timelines");
+    return rememberRestoredProject(
+      rememberAudioRecovery(raw, { ...parsed, timelines, rootTimelineId: root.id, timeline: root }),
+    );
+  } catch (error) {
+    throw new NestedTimelineError(
+      `Cannot open nested project; original data is unchanged: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+};
+
 const exportSchema = z.object({
   schema: z.literal("cut_editor-project"),
   version: z.number().int(),
   exportedAt: z.number().int(),
-  project: projectSchema,
+  project: z.unknown(),
 });
 
 // Recovery metadata is session-only: it never enters JSON, Yjs or the project model.
@@ -278,16 +357,22 @@ const rememberAudioRecovery = (raw: unknown, project: Project): Project => {
   return project;
 };
 export const takeAudioRecovery = (project: Project): boolean => recoveredAudio.delete(project);
-export const parseStoredProject = (raw: unknown): Project =>
-  rememberAudioRecovery(raw, projectSchema.parse(raw));
+export const parseStoredProject = (raw: unknown): Project => {
+  if (raw && typeof raw === "object" && ("timelines" in raw || "rootTimelineId" in raw))
+    return parseCurrentProject(raw);
+  const legacy = projectSchema.parse(raw);
+  return rememberAudioRecovery(raw, parseCurrentProject(hydrateProjectTimelines(legacy)));
+};
+
+export const prepareStoredProject = (project: Project): Project =>
+  parseCurrentProject(syncRootTimeline(project));
 
 export const toProjectExport = (project: Project): ProjectExport => ({
   schema: "cut_editor-project",
   version: PROJECT_VERSION,
   exportedAt: Date.now(),
-  // Wire-compat shim (mirrors the CRDT one): `magnetic` left the model but
-  // older builds' schemas still require the boolean to import the file.
-  project: { ...project, timeline: { ...project.timeline, magnetic: true } } as Project,
+  // Normalize legacy root-alias writers, then validate every timeline before saving.
+  project: prepareStoredProject(project),
 });
 
 // Machine-readable rejection; project-menu translates direction and versions.
@@ -305,17 +390,18 @@ export class ProjectVersionError extends Error {
 export const parseProjectExport = (raw: unknown): ProjectExport => {
   const env = exportSchema.parse(raw);
   // Refuse a file written by a newer app version rather than silently importing
-  // a format we don't understand. Older versions would migrate here; v1 is
-  // currently the only version.
-  if (env.version !== PROJECT_VERSION) {
+  // a format we do not understand. Version 1 uses read-only shape migration.
+  if (env.version !== 1 && env.version !== PROJECT_VERSION) {
     throw new ProjectVersionError(
       env.version < PROJECT_VERSION ? "older" : "newer",
       env.version,
       PROJECT_VERSION,
     );
   }
-  rememberAudioRecovery((raw as ProjectExport).project, env.project);
-  return env;
+  return {
+    ...env,
+    project: env.version === 1 ? parseStoredProject(env.project) : parseCurrentProject(env.project),
+  };
 };
 
 export const downloadProjectJson = (project: Project): void => {

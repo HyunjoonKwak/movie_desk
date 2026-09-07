@@ -181,7 +181,17 @@ export interface AdjustmentClip extends ClipBase {
   readonly kind: "adjustment";
 }
 
-export type Clip = MediaClip | TextClip | ShapeClip | AdjustmentClip;
+export interface SequenceClip extends ClipBase {
+  readonly kind: "sequence";
+  readonly timelineId: ID;
+  readonly trimIn: Ms;
+  readonly trimOut: Ms;
+  readonly volume?: number;
+}
+
+export type Clip = MediaClip | TextClip | ShapeClip | AdjustmentClip | SequenceClip;
+
+export const isSequenceClip = (c: Clip): c is SequenceClip => c.kind === "sequence";
 
 export const isMediaClip = (c: Clip): c is MediaClip => c.kind === "media";
 export const isTextClip = (c: Clip): c is TextClip => c.kind === "text";

@@ -5,16 +5,16 @@ const cases = [
   {
     locale: "en",
     menu: "Projects",
-    older: "This project file uses an older format (v0) this app (v1) cannot open.",
+    older: "This project file uses an older format (v0) this app (v2) cannot open.",
     newer:
-      "This project file needs a newer Movie Desk (file v2, this app v1). Update the app and try again.",
+      "This project file needs a newer Movie Desk (file v3, this app v2). Update the app and try again.",
   },
   {
     locale: "ko",
     menu: "프로젝트",
-    older: "이 프로젝트 파일은 오래된 형식(v0)이라 이 앱(v1)에서 열 수 없습니다.",
+    older: "이 프로젝트 파일은 오래된 형식(v0)이라 이 앱(v2)에서 열 수 없습니다.",
     newer:
-      "이 프로젝트 파일은 더 새로운 Movie Desk가 필요합니다(파일 v2, 현재 앱 v1). 앱을 업데이트한 뒤 다시 시도하세요.",
+      "이 프로젝트 파일은 더 새로운 Movie Desk가 필요합니다(파일 v3, 현재 앱 v2). 앱을 업데이트한 뒤 다시 시도하세요.",
   },
 ];
 
@@ -39,7 +39,7 @@ for (const entry of cases) {
         buffer: Buffer.from(
           JSON.stringify({
             schema: "cut_editor-project",
-            version: PROJECT_VERSION + (direction === "older" ? -1 : 1),
+            version: direction === "older" ? 0 : PROJECT_VERSION + 1,
             exportedAt: Date.now(),
             project: createEmptyProject({ name: "Do not load" }),
           }),

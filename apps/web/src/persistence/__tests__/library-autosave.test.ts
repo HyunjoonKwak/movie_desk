@@ -1,7 +1,7 @@
-import { createEmptyProject } from "@movie-desk/core";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { toast } from "sonner";
 import { useProjectStore } from "@/stores/project-store";
+import { createEmptyProject, replaceTimeline } from "@movie-desk/core";
+import { toast } from "sonner";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { startLibraryAutosave } from "../library-autosave";
 import { upsertProject } from "../project-library";
 import { useSaveStateStore } from "../save-state-store";
@@ -102,4 +102,64 @@ it("ignores failures from writes older than the latest successful write", async 
   await vi.advanceTimersByTimeAsync(0);
   expect(useSaveStateStore.getState().libraryError).toBe(false);
   expect(toast.error).not.toHaveBeenCalled();
+});
+
+it("flushes an inactive child edit even when the root reference is unchanged", async () => {
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const project = nestedProject();
+  useProjectStore.getState().loadProject(project);
+  vi.mocked(upsertProject).mockResolvedValue(undefined);
+  dispose = startLibraryAutosave();
+  await vi.advanceTimersByTimeAsync(300);
+  const child = project.timelines[1]!;
+  const edited = replaceTimeline(project, { ...child, markers: [] });
+  expect(edited.timeline).toBe(project.timeline);
+  useProjectStore.setState({ project: edited });
+  await vi.advanceTimersByTimeAsync(300);
+  expect(upsertProject).toHaveBeenCalledTimes(2);
+  expect(vi.mocked(upsertProject).mock.calls[1]?.[0].timelines).toEqual(edited.timelines);
+});
+
+it("does not rewrite an in-memory legacy migration until a real edit", async () => {
+  const { toLegacyProject } = await import("@movie-desk/core");
+  const { parseStoredProject } = await import("../project-io");
+  const project = parseStoredProject(toLegacyProject(createEmptyProject()));
+  useProjectStore.getState().loadProject(project);
+  vi.mocked(upsertProject).mockResolvedValue(undefined);
+  dispose = startLibraryAutosave();
+  await vi.advanceTimersByTimeAsync(300);
+  expect(upsertProject).not.toHaveBeenCalled();
+  useProjectStore.getState().renameProject("Actual edit");
+  await vi.advanceTimersByTimeAsync(300);
+  expect(upsertProject).toHaveBeenCalledTimes(1);
+});
+
+it("keeps restored rows read-only during inline-preview maintenance", async () => {
+  const { parseStoredProject } = await import("../project-io");
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const fixture = nestedProject();
+  const restored = parseStoredProject({
+    ...fixture,
+    mediaLibrary: [
+      {
+        id: "asset",
+        name: "Picture",
+        kind: "image",
+        mime: "image/png",
+        durationMs: 0,
+        opfsPath: "picture.png",
+        importedAt: 0,
+        thumbDataUrl: "data:image/png;base64,AA==",
+      },
+    ],
+  });
+  useProjectStore.getState().loadProject(restored);
+  vi.mocked(upsertProject).mockResolvedValue(undefined);
+  dispose = startLibraryAutosave();
+  useProjectStore.getState().dropInlinePreviews([restored.mediaLibrary[0]!.id]);
+  await vi.advanceTimersByTimeAsync(300);
+  expect(upsertProject).not.toHaveBeenCalled();
+  useProjectStore.getState().renameProject("Actual edit after maintenance");
+  await vi.advanceTimersByTimeAsync(300);
+  expect(upsertProject).toHaveBeenCalledTimes(1);
 });

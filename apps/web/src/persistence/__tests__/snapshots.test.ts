@@ -69,12 +69,12 @@ vi.mock("dexie", () => {
 
 import {
   cleanupSnapshots,
-  forEachSnapshotJson,
-  snapshotCleanupCandidates,
   deleteSnapshot,
+  forEachSnapshotJson,
   listSnapshots,
   loadSnapshot,
   saveSnapshot,
+  snapshotCleanupCandidates,
 } from "../snapshots";
 
 beforeEach(() => {
@@ -96,7 +96,7 @@ describe("snapshots", () => {
     expect(restored?.id).toBe(project.id);
     expect(restored).toEqual(project);
     expect(restored?.timelines[0]).toBe(restored?.timeline);
-    expect(JSON.parse(listed[1]!.json)).toEqual(toLegacyProject(project));
+    expect(JSON.parse(listed[1]!.json)).toEqual(project);
   });
 
   it("returns null for a damaged or unknown snapshot instead of throwing", async () => {
@@ -151,4 +151,46 @@ it("proposes oldest overflow without deleting and cleans only confirmed project 
   expect(retained).toHaveLength(21);
   expect(snapshotCleanupCandidates(await listSnapshots(project.id))).toEqual([]);
   expect(() => snapshotCleanupCandidates([], 0)).toThrow(RangeError);
+});
+
+it("round-trips nested snapshots and preserves every child", async () => {
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const p = nestedProject();
+  await saveSnapshot(p, "Nested");
+  const rows = await listSnapshots(p.id);
+  expect(await loadSnapshot(rows[0]!.id)).toEqual(p);
+});
+
+it("opens legacy snapshots in memory, then saves and reopens edited current snapshots", async () => {
+  const p = createEmptyProject({ name: "Legacy snapshot" });
+  const row = {
+    id: "legacy",
+    projectId: p.id,
+    label: "Old",
+    createdAt: 0,
+    json: JSON.stringify(toLegacyProject(p)),
+  };
+  rows.set(row.id, row);
+  const loaded = await loadSnapshot(row.id);
+  expect(loaded).toEqual(p);
+  expect(rows.get(row.id)).toBe(row);
+  await saveSnapshot({ ...loaded!, name: "Edited" }, "Edited");
+  const latest = (await listSnapshots(p.id))[0]!;
+  expect(await loadSnapshot(latest.id)).toEqual({ ...p, name: "Edited" });
+  expect(rows.get(row.id)).toBe(row);
+});
+
+it("preserves a failed nested snapshot migration exactly", async () => {
+  const { nestedProject } = await import("./fixtures/nested-project");
+  const p = nestedProject();
+  const row = {
+    id: "bad-nested",
+    projectId: p.id,
+    label: "Keep me",
+    createdAt: 0,
+    json: JSON.stringify({ ...p, rootTimelineId: "missing" }),
+  };
+  rows.set(row.id, row);
+  expect(await loadSnapshot(row.id)).toBeNull();
+  expect(rows.get(row.id)).toBe(row);
 });

@@ -177,6 +177,12 @@ Phase 1+7 원자적 스키마 변경 전에는 SequenceClip 생성·중첩 재�
 
 ## Phase 1 — 클립 kind + 영속성 (원자적으로)
 
+2026-09-07 구현·검증 완료 (gate9/9, 단위1,001, E2E68/68 두 번 PASS; Claude 검토 대기): 항목 6–9를 Phase 7과 같은 변경으로 구현했다.
+SequenceClip의 닫힌 다섯 번째 variant, 모든 timeline의 필수 검증, JSON v2와
+버전 없는 라이브러리·snapshot의 읽기 시점 형태 기반 인메모리 마이그레이션을 연결했다.
+원본 행은 열기만으로 덮어쓰지 않으며, 부분 nested 필드는 v1로 간주하지 않는다.
+[결정과 복구 정책](decisions/2026-09-07-nested-persistence.md).
+
 6. `clip.ts:138` 유니온에 `SequenceClip { kind:"sequence"; timelineId: ID; trimIn; trimOut; volume? }` + `isSequenceClip`
 7. **`project-export.ts:44-83` zod `discriminatedUnion`에 5번째 variant 추가.**
    이 유니온은 **닫혀 있어** 미지의 `kind`가 오면 파싱이 통째로 실패하고
@@ -244,6 +250,13 @@ Phase 1+7 원자적 스키마 변경 전에는 SequenceClip 생성·중첩 재�
     text/overlay 트랙에만 놓인다), `:152-158` 색상, `:185` 라벨
 
 ## Phase 7 — 영속화 문서 스키마 (Phase 1과 같은 커밋)
+
+2026-09-07 구현·검증 완료 (gate9/9, 단위1,001, E2E68/68 두 번 PASS; Claude 검토 대기): 항목 29–33을 연결했다. CRDT v3는 timeline별
+metadata/track/clip-order와 JSON tuple clip key를 사용한다. v2는 별도 Y.Doc에서
+완전 검증 후 한 update로 원자 적용하며 레거시 루트와 이전 전체 encoded update를 보관한다.
+candidate의 필드 누락은 strict parser가 throw하고 hydration 실패 뒤 live/library flush를 막는다.
+비활성 자식 변경도 live-doc와 library-autosave 참조 비교에 포함된다.
+JSON·library·snapshot·CRDT·실제 live-doc 경계 왕복 및 후보 필드 누락/실패 원본 보존 회귀를 추가했다.
 
 (2026-09-02: 실시간 협업은 제거됐고 `yjs-bridge.ts`는 `persistence/live-doc.ts`로
 옮겨졌다. 아래 줄 번호는 옮기기 전 기준이다.)

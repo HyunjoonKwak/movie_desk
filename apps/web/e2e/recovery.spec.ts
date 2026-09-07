@@ -150,7 +150,7 @@ test("a damaged saved project is reported and cannot replace the open project", 
   await page.getByRole("button", { name: "Projects" }).click();
   await page.getByRole("dialog").getByText("Broken project", { exact: true }).click();
   await expect(
-    page.getByText("This saved project is damaged and could not be opened", { exact: true }),
+    page.getByText(/^This saved project is damaged and could not be opened:/),
   ).toBeVisible();
 
   await page.keyboard.press("Escape");
@@ -173,7 +173,7 @@ test("a damaged last-opened project falls back to a fresh project on load", asyn
   await page.reload();
 
   await expect(
-    page.getByText("The last project is damaged. Opened a new project instead", { exact: true }),
+    page.getByText(/^The last project is damaged. Opened a new project instead:/),
   ).toBeVisible();
   // The editor stays usable: a fresh import still lands in the media bin.
   await importMediaFiles(page, { name: "pix.png", mimeType: "image/png", buffer: PNG });

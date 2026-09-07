@@ -1,3 +1,4 @@
+import { inheritRestoredProject } from "@/persistence/hydration-state";
 import { syncRootTimeline } from "@movie-desk/core";
 import { withoutInlinePreviews } from "@/media/inline-previews";
 import type { ID, MediaAsset, Ms, SourceRotation } from "@movie-desk/core";
@@ -81,9 +82,8 @@ export const createMediaActions = <S extends ProjectMutating>(
 
   dropInlinePreviews: (assetIds) =>
     set((s) => {
-      // Opening a legacy project intentionally causes one persistence save:
-      // this maintenance write makes all later edits small, but stays outside
-      // undo history because the visible preview itself did not change.
+      // Cache maintenance during restoration must not rewrite the original
+      // project row. A later user edit persists the compact representation.
       const ids = new Set(assetIds);
       let changed = false;
       const mediaLibrary = s.project.mediaLibrary.map((asset) => {
@@ -92,7 +92,7 @@ export const createMediaActions = <S extends ProjectMutating>(
         if (next !== asset) changed = true;
         return next;
       });
-      return changed ? ({ project: { ...s.project, mediaLibrary } } as unknown as Partial<S>) : {};
+      return changed ? ({ project: inheritRestoredProject(s.project, { ...s.project, mediaLibrary }) } as unknown as Partial<S>) : {};
     }),
 
   setAssetUseRange: (assetId, range) =>
