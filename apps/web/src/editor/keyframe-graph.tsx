@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Clip, ID, EasingFn, BezierHandles } from "@movie-desk/core";
 import { sampleKeyframeTrack, formatTimecode } from "@movie-desk/core";
 import { Copy, ClipboardPaste } from "lucide-react";
-import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead } from "@/stores/editor-store";
 import { useKeyframeClipboard } from "@/stores/keyframe-clipboard-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { getEffect } from "@/effects/registry";

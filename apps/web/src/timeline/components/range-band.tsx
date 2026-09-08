@@ -1,6 +1,6 @@
 "use client";
 
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { useRangeStore } from "@/stores/range-store";
 
 // Visualizes the export work area (in/out points) as a tinted band over the

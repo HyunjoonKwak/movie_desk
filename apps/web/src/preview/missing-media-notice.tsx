@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useT } from "@/i18n/use-t";
 import { useSourceHealthStore } from "@/media/source-health-store";
 import { isSourceMissing } from "@/media/source/probe-source";
-import { selectPlayhead, useProjectStore } from "@/stores/project-store";
+import { selectPlayhead, useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { type MediaAsset, clipsAt } from "@movie-desk/core";
 
 import { StateHint } from "@/components/state-hint";

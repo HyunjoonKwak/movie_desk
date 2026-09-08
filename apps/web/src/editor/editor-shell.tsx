@@ -20,7 +20,7 @@ import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
 import { useProjectStore } from "@/stores/project-store";
-import { TimelinePanel } from "@/timeline/components/timeline-panel";
+import { TimelineWorkspace } from "@/timeline/components/timeline-workspace";
 import { FolderOpen, Sliders, AudioLines, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -204,7 +204,7 @@ export function EditorShell() {
         </Panel>
         <ResizeHandle orientation="horizontal" />
         <Panel defaultSize={38} minSize={15} className="overflow-hidden border-t border-line">
-          <TimelinePanel />
+          <TimelineWorkspace />
         </Panel>
       </PanelGroup>
     </div>
@@ -251,7 +251,7 @@ function MobileShell({
         <TransportBar />
       </section>
       <section className="h-56 overflow-hidden border-t border-line">
-        <TimelinePanel />
+        <TimelineWorkspace />
       </section>
       <nav className="flex h-12 items-center justify-around border-t border-line bg-panel-1">
         <button

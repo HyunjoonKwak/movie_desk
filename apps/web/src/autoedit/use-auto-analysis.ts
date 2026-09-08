@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { setAnalysisAssetLookup, useAnalysisStore } from "./analysis-store";
 
 // ① 가져오기 — 분석 동시 시작. Watches the media library and feeds every new

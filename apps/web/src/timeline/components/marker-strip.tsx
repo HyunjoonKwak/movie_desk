@@ -1,7 +1,7 @@
 "use client";
 
 import { formatTimecode } from "@movie-desk/core";
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 
 // Marker pins drawn beneath the ruler. Click a pin to jump there; alt-click
 // (or the context menu) to remove it.

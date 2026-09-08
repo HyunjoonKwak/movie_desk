@@ -1,3 +1,4 @@
+import type { ID } from "@movie-desk/core";
 import { create } from "zustand";
 
 // Transient timeline interaction state — never persisted, never in undo
@@ -7,6 +8,8 @@ import { create } from "zustand";
 // dragover, hence the store). `snapEnabled` is the FCP `N` toggle for
 // edge magnetism — frame snapping stays on regardless.
 interface TimelineUiState {
+  readonly activeTimelineId: ID | null;
+  setActiveTimelineId: (id: ID | null) => void;
   readonly snapMs: number | null;
   readonly dragAssetId: string | null;
   readonly snapEnabled: boolean;
@@ -16,6 +19,8 @@ interface TimelineUiState {
 }
 
 export const useTimelineUiStore = create<TimelineUiState>((set) => ({
+  activeTimelineId: null,
+  setActiveTimelineId: (activeTimelineId) => set({ activeTimelineId, snapMs: null }),
   snapMs: null,
   dragAssetId: null,
   snapEnabled: true,

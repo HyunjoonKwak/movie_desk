@@ -1,6 +1,6 @@
 "use client";
 
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { TRACK_HEADER_W } from "../constants";
 

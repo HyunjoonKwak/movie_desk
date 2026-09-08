@@ -1,6 +1,6 @@
 "use client";
 
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { TRACK_HEADER_W, clampZoom } from "./constants";
 
 // Fit the whole timeline into the visible scroll viewport (FCP Shift+Z).

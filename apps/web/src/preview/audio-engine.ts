@@ -8,7 +8,7 @@ import {
   renderPitchInWorker,
 } from "@/audio/pitch-renderer";
 import { setPitchState } from "@/audio/pitch-state";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { audioBlobFor } from "@/media/audio/audio-variant";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
 import {

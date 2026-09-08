@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import { clipIdsInMarquee, type ID } from "@movie-desk/core";
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useRangeStore } from "@/stores/range-store";
 import { usePinchZoom } from "@/hooks/use-pinch-zoom";
@@ -21,10 +21,10 @@ import { TRACK_HEADER_W, clampZoom } from "../constants";
 import { TIMELINE_HINT_KEYS, timelineGuidance } from "@/timeline/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
-export function TimelinePanel() {
+export function TimelinePanel({ timelineId }: { timelineId: ID }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const tracks = useProjectStore((s) => s.project.timeline.tracks);
-  const duration = useProjectStore((s) => s.project.timeline.duration);
+  const tracks = useProjectStore((s) => (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline).tracks);
+  const duration = useProjectStore((s) => (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline).duration);
   const zoom = useProjectStore(selectZoom);
   const setZoom = useProjectStore((s) => s.setZoomLevel);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);

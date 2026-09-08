@@ -4,7 +4,7 @@ import { useMemo, useRef } from "react";
 import { Download, FileText, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { isTextClip, formatTimecode } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useT } from "@/i18n/use-t";
 import { parseSrt, parseVtt, toSrt, toVtt, type SubtitleCue } from "./srt";
 import {
@@ -45,7 +45,7 @@ export function SubtitlePanel() {
         return;
       }
       const next = replaceSubtitlesFromCues(useProjectStore.getState().project, cues);
-      useProjectStore.setState({ project: next });
+      useProjectStore.getState().applyGenerated("Import subtitles", () => next);
       toast.success(t("subs.imported", { n: cues.length }));
     } catch (err) {
       toast.error(`${t("subs.importFailed")}: ${err instanceof Error ? err.message : err}`);

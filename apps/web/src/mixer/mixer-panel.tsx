@@ -5,7 +5,7 @@ import { PrecisionInput } from "@/components/precision-input";
 import { PrecisionSlider } from "@/components/precision-slider";
 import { StateHint } from "@/components/state-hint";
 import { useT } from "@/i18n/use-t";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { MixerMeter } from "./mixer-meter";
 
 function GainControl({

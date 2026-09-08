@@ -7,7 +7,7 @@ import { listEffects } from "@/effects/registry";
 import type { EffectDefinition } from "@/effects/types";
 import type { MessageKey } from "@/i18n/messages";
 import { type Translate, useT } from "@/i18n/use-t";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import type { Clip, ID } from "@movie-desk/core";
 import { newId } from "@movie-desk/core";
 import { GripVertical, Plus, Trash2, Upload } from "lucide-react";

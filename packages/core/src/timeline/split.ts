@@ -1,6 +1,6 @@
 import { syncRootTimeline } from "../model/project-timelines";
 import type { Project } from "../model/project";
-import { isMediaClip, type Clip } from "../model/clip";
+import { hasSourceTrim, type Clip } from "../model/clip";
 import { clipEnd } from "../model/clip";
 import type { ID } from "../utils/id";
 import { newId } from "../utils/id";
@@ -30,7 +30,7 @@ export const splitClipAt = (project: Project, clipId: ID, at: Ms): Project => {
       duration: end - splitMs,
     };
     const right: Clip =
-      isMediaClip(rightBase) && isMediaClip(original)
+      hasSourceTrim(rightBase) && hasSourceTrim(original)
         ? { ...rightBase, trimIn: original.trimIn + (splitMs - original.start) }
         : rightBase;
 

@@ -1,3 +1,4 @@
+import { activeTimelineView, editActiveTimeline } from "../active-timeline";
 import {
   addClip,
   addTrack,
@@ -24,7 +25,7 @@ export const createMusicActions = <S extends ProjectMutating>(set: SetFn<S>): Mu
   addMusicBed: (assetId) => {
     let placed = false;
     set((s) => {
-      const p = s.project;
+      const p = activeTimelineView(s.project);
       const asset = p.mediaLibrary.find((a) => a.id === assetId);
       if (!asset || asset.kind !== "audio") return {} as Partial<S>;
       const inMs = asset.useInMs ?? 0;
@@ -76,7 +77,7 @@ export const createMusicActions = <S extends ProjectMutating>(set: SetFn<S>): Mu
         keyframes: [fade],
         label: asset.name,
       };
-      const after = addClip(proj, track.id, bed);
+      const after = editActiveTimeline(s.project, () => addClip(proj, track.id, bed));
       placed = true;
       return {
         project: after,

@@ -1,3 +1,4 @@
+import { editActiveTimeline } from "./active-timeline";
 import { toast } from "sonner";
 import { sequenceEditReason, type Clip } from "@movie-desk/core";
 import { t } from "@/i18n/use-t";
@@ -27,7 +28,7 @@ export const runWith = <S extends ProjectMutating>(
   fn: (p: Project) => Project,
 ): void => {
   set((s) => {
-    const after = fn(s.project);
+    const after = editActiveTimeline(s.project, fn);
     if (after === s.project) return s;
     const history = checkpointPrecision(s.project, s.history);
     const r = runCommand(s.project, history, { label, apply: () => after });

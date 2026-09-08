@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { useMediaImport } from "@/media/hooks";
 import { collectDroppedMediaFiles } from "@/media/folder-import";
 import { useImportFailureStore } from "@/media/import-failure-store";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { t } from "@/i18n/use-t";
 
 // Window-level drag-and-drop guard. Without it, dropping a file outside a

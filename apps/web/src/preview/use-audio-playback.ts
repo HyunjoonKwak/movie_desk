@@ -2,7 +2,7 @@
 
 import { disposePitchWorkers, pitchPlaybackKey } from "@/audio/pitch-renderer";
 import { usePlaybackStore } from "@/stores/playback-store";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import type { Project } from "@movie-desk/core";
 import { useEffect } from "react";
 import { getAudioEngine } from "./audio-engine";

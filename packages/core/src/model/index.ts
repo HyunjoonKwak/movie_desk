@@ -11,3 +11,4 @@ export * from "./transition";
 export * from "./factory";
 export * from "./marker";
 export * from "./project-timelines";
+export * from "./project-view";

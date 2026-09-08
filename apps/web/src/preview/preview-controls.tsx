@@ -1,7 +1,7 @@
 "use client";
 
 import { Grid3x3, Crop } from "lucide-react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useViewStore } from "@/stores/view-store";
 import { useT } from "@/i18n/use-t";
 

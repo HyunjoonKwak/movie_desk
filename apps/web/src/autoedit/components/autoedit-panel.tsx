@@ -15,7 +15,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ID } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { useProjectStore as useCanonicalProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { saveSnapshot } from "@/persistence/snapshots";
@@ -243,7 +244,7 @@ export function AutoEditPanel() {
     setConfirmRerun(false);
     try {
       if (isRerun && manualEdited) {
-        await saveSnapshot(project, t("auto.snapshotName"));
+        await saveSnapshot(useCanonicalProjectStore.getState().project, t("auto.snapshotName"));
       }
       const analyses = doneAnalyses(useAnalysisStore.getState().entries);
       const result = await generate(useProjectStore.getState().project, analyses, {

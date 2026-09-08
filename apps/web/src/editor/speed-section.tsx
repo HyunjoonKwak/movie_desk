@@ -5,7 +5,7 @@ import { pitchCacheKey } from "@/audio/pitch-renderer";
 import { Diamond, Gauge, Snowflake } from "lucide-react";
 import type { Clip, ID } from "@movie-desk/core";
 import { hasSpeedRamp, isMediaClip, pitchHasUnsupportedRange } from "@movie-desk/core";
-import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead } from "@/stores/editor-store";
 import { StateHint } from "@/components/state-hint";
 import { InspectorSection } from "@/components/inspector-section";
 import { PrecisionInput } from "@/components/precision-input";

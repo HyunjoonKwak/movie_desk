@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Search } from "lucide-react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useT } from "@/i18n/use-t";

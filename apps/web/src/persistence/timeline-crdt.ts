@@ -1,4 +1,5 @@
 import {
+  assertCanonicalProject,
   type Clip,
   NestedTimelineError,
   type Project,
@@ -44,6 +45,7 @@ export const createTimelineCrdt = (
     doc.getArray<string>(`timeline-clip-order-v3:${JSON.stringify([timelineId, trackId])}`);
 
   const write = (project: Project): void => {
+    assertCanonicalProject(project);
     const nextTimelines = new Map<string, TimelineMeta>();
     const nextClips = new Map<string, Clip>(
       preservedClips(project).map(({ timelineId, clip }) => [

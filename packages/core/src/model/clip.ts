@@ -193,6 +193,9 @@ export type Clip = MediaClip | TextClip | ShapeClip | AdjustmentClip | SequenceC
 
 export const isSequenceClip = (c: Clip): c is SequenceClip => c.kind === "sequence";
 
+// Source-window edits apply to both file-backed media and nested timelines.
+export const hasSourceTrim = (c: Clip): c is MediaClip | SequenceClip => "trimIn" in c;
+
 export const isMediaClip = (c: Clip): c is MediaClip => c.kind === "media";
 export const isTextClip = (c: Clip): c is TextClip => c.kind === "text";
 export const isShapeClip = (c: Clip): c is ShapeClip => c.kind === "shape";

@@ -1,6 +1,6 @@
 import type { ID, MediaAsset } from "@movie-desk/core";
 import { Compositor } from "@/renderer/compositor";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 
 export interface WhiteBalanceResult {
   temperature: number;

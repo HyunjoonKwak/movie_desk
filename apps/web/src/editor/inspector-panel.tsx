@@ -2,8 +2,8 @@
 
 import { useMemo } from "react";
 import { Sliders } from "lucide-react";
-import { formatTimecode, findClip, isMediaClip, isTextClip, isShapeClip } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { formatTimecode, findClip, isMediaClip, hasSourceTrim, isTextClip, isShapeClip } from "@movie-desk/core";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { EffectsSection } from "./effects-section";
 import { TextSection } from "./text-section";
@@ -118,11 +118,11 @@ export function InspectorPanel() {
             {isShapeClip(clip) && <ShapeSection clip={clip} />}
             <TransformSection clipId={clip.id} clip={clip} />
             <MaskSection clipId={clip.id} clip={clip} />
-            {isMediaClip(clip) && (
+            {hasSourceTrim(clip) && (
               <>
                 <SpeedSection clipId={clip.id} clip={clip} />
                 <SlipSection clip={clip} />
-                <AudioSection clip={clip} />
+                {isMediaClip(clip) && <AudioSection clip={clip} />}
               </>
             )}
             <TransitionSection clipId={clip.id} clip={clip} />

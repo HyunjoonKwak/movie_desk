@@ -1,3 +1,4 @@
+import { editActiveTimeline } from "../active-timeline";
 import {
   addClip,
   addTrackAt,
@@ -107,7 +108,7 @@ export const createPlaceAssetActions = <S extends ProjectMutating>(
   // locked) — a phantom undo step would also clear the redo stack.
   placeAsset: (asset, mode) =>
     set((s) => {
-      const after = applyPlace(s.project, asset, mode);
+      const after = editActiveTimeline(s.project, (p) => applyPlace(p, asset, mode));
       if (after === s.project) return {} as Partial<S>;
       return {
         project: after,

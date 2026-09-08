@@ -1,15 +1,15 @@
 "use client";
 
 import { MoveHorizontal } from "lucide-react";
-import type { MediaClip, SpatialFit } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import type { MediaClip, SequenceClip, SpatialFit } from "@movie-desk/core";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { PrecisionInput } from "@/components/precision-input";
 import { PrecisionSlider } from "@/components/precision-slider";
 import { useT } from "@/i18n/use-t";
 
 interface Props {
-  clip: MediaClip;
+  clip: MediaClip | SequenceClip;
 }
 
 const FITS: readonly SpatialFit[] = ["stretch", "fill", "fit"];
@@ -23,15 +23,18 @@ export function SlipSection({ clip }: Props) {
   const previewSlip = useProjectStore((s) => s.previewSlipClipTo);
   const slip = useProjectStore((s) => s.slipClipBy);
   const setFit = useProjectStore((s) => s.setClipFit);
-  const asset = useProjectStore((s) => s.project.mediaLibrary.find((a) => a.id === clip.assetId));
+  const asset = useProjectStore((s) => clip.kind === "media" ? s.project.mediaLibrary.find((a) => a.id === clip.assetId) : undefined);
+  const sourceDuration = useProjectStore((s) => clip.kind === "sequence"
+    ? s.project.timelines.find((timeline) => timeline.id === clip.timelineId)?.duration
+    : asset?.durationMs);
   const t = useT();
 
   const span = clip.trimOut - clip.trimIn;
-  const max = Math.max(0, (asset?.durationMs ?? span) - span);
+  const max = Math.max(0, (sourceDuration ?? span) - span);
 
   return (
     <InspectorSection title={t("slip.title")} icon={<MoveHorizontal className="size-3" />}>
-      <div className="flex items-center justify-between gap-2">
+      {clip.kind === "media" && <div className="flex items-center justify-between gap-2">
         <span className="text-2xs text-ink-3">{t("fit.title")}</span>
         <select
           value={clip.fit ?? "stretch"}
@@ -44,7 +47,7 @@ export function SlipSection({ clip }: Props) {
             </option>
           ))}
         </select>
-      </div>
+      </div>}
       {asset?.kind !== "image" && (
         <>
           <div className="flex items-center justify-between text-2xs text-ink-3">
@@ -67,7 +70,7 @@ export function SlipSection({ clip }: Props) {
               fps={fps}
               value={clip.trimOut}
               min={clip.trimIn + 1000 / fps}
-              max={asset?.durationMs ?? clip.trimOut}
+              max={sourceDuration ?? clip.trimOut}
               onChange={(v) => setSourceTrim(clip.id, "out", v)}
             />
           </div>

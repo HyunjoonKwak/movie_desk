@@ -965,4 +965,7 @@ export const ko = {
     "inspect.missing-sequence": "시퀀스 대상이 없습니다. 클립은 보존되었습니다. 타임라인을 복원하거나 클립을 삭제하세요.",
     "inspect.cyclic-sequence": "시퀀스가 순환 참조를 만듭니다. 사용하기 전에 순환 참조를 제거하세요.",
     "inspect.depth-exceeded": "시퀀스 중첩이 안전 한도에 도달했습니다. 사용하기 전에 중첩을 줄이세요.",
+    "timeline.tabs": "타임라인",
+    "timeline.root": "메인 타임라인",
+    "timeline.unnamed": "이름 없는 타임라인",
 } as const;

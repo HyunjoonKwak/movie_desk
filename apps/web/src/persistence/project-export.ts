@@ -1,5 +1,6 @@
 import type { Project } from "@movie-desk/core";
 import {
+  assertCanonicalProject,
   NestedTimelineError,
   PROJECT_VERSION,
   hydrateProjectTimelines,
@@ -311,6 +312,7 @@ const sameJson = (left: unknown, right: unknown): boolean => {
 };
 
 export const parseCurrentProject = (raw: unknown): Project => {
+  assertCanonicalProject(raw);
   try {
     const nested = currentProjectSchema.parse(raw);
     const parsed = projectSchema.parse(nested);
@@ -387,6 +389,7 @@ const rememberAudioRecovery = (raw: unknown, project: Project): Project => {
 };
 export const takeAudioRecovery = (project: Project): boolean => recoveredAudio.delete(project);
 export const parseStoredProject = (raw: unknown): Project => {
+  assertCanonicalProject(raw);
   if (raw && typeof raw === "object" && ("timelines" in raw || "rootTimelineId" in raw))
     return parseCurrentProject(raw);
   const result = projectSchema.safeParse(raw);

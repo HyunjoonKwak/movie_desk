@@ -3,7 +3,7 @@
 import { Diamond } from "lucide-react";
 import type { Clip, ID, BlendMode } from "@movie-desk/core";
 import { clipTransform } from "@movie-desk/core";
-import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead } from "@/stores/editor-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { PrecisionInput } from "@/components/precision-input";
 import { PrecisionSlider } from "@/components/precision-slider";

@@ -2,7 +2,7 @@
 
 import type { TextClip, TextAnimation, TextAlign } from "@movie-desk/core";
 import { AlignLeft, AlignCenter, AlignRight } from "lucide-react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 import { FONT_OPTIONS, FONT_WEIGHTS } from "./fonts";

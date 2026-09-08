@@ -1,7 +1,7 @@
 "use client";
 
 import type { ShapeClip, ID, ShapeKind } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 

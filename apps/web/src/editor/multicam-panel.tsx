@@ -5,7 +5,7 @@ import { Clapperboard } from "lucide-react";
 import { toast } from "sonner";
 import type { MulticamAngle } from "@movie-desk/core";
 import { useAssetThumbs } from "@/stores/preview-store";
-import { useProjectStore, selectPlayhead } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead } from "@/stores/editor-store";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 

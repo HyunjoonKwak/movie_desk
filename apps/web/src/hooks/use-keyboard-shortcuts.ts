@@ -2,7 +2,7 @@
 
 import { type ClipboardEntry, nextEditPoint, prevEditPoint } from "@movie-desk/core";
 import { useEffect } from "react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useViewStore } from "@/stores/view-store";

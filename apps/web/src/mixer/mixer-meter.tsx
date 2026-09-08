@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo } from "react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { requestWaveforms, retainWaveform, usePreviewStore } from "@/stores/preview-store";
 import { estimatedLevels } from "./estimated-levels";

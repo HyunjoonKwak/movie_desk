@@ -5,7 +5,7 @@ import { sequenceEditReason } from "./sequence-graph";
 
 import type { Project } from "../model/project";
 import type { Clip } from "../model/clip";
-import { clipEnd } from "../model/clip";
+import { clipEnd, hasSourceTrim } from "../model/clip";
 import type { ID } from "../utils/id";
 import { newId } from "../utils/id";
 import type { Ms } from "../utils/time";
@@ -207,11 +207,11 @@ export const rollEdit = (project: Project, clipId: ID, deltaMs: Ms): Project => 
     let d = deltaMs;
     if (cur.duration + d < 1) d = 1 - cur.duration;
     if (next.duration - d < 1) d = next.duration - 1;
-    if (next.kind === "media" && next.trimIn + d < 0) d = -next.trimIn;
+    if (hasSourceTrim(next) && next.trimIn + d < 0) d = -next.trimIn;
     if (d === 0) return t;
     const newCur: Clip = { ...cur, duration: cur.duration + d };
     const newNext: Clip =
-      next.kind === "media"
+      hasSourceTrim(next)
         ? { ...next, start: next.start + d, duration: next.duration - d, trimIn: next.trimIn + d }
         : { ...next, start: next.start + d, duration: next.duration - d };
     const clips = sorted.map((c) => (c.id === cur.id ? newCur : c.id === next.id ? newNext : c));
@@ -237,12 +237,12 @@ export const slideClip = (project: Project, clipId: ID, deltaMs: Ms): Project =>
     let d = deltaMs;
     if (prev.duration + d < 1) d = 1 - prev.duration;
     if (next.duration - d < 1) d = next.duration - 1;
-    if (next.kind === "media" && next.trimIn + d < 0) d = -next.trimIn;
+    if (hasSourceTrim(next) && next.trimIn + d < 0) d = -next.trimIn;
     if (d === 0) return t;
     const newPrev: Clip = { ...prev, duration: prev.duration + d };
     const newCur: Clip = { ...cur, start: cur.start + d };
     const newNext: Clip =
-      next.kind === "media"
+      hasSourceTrim(next)
         ? { ...next, start: next.start + d, duration: next.duration - d, trimIn: next.trimIn + d }
         : { ...next, start: next.start + d, duration: next.duration - d };
     const clips = sorted.map((c) =>
@@ -253,7 +253,7 @@ export const slideClip = (project: Project, clipId: ID, deltaMs: Ms): Project =>
   return recompute({ ...project, timeline: { ...project.timeline, tracks } });
 };
 
-// Slip a media clip: shift its source window (trimIn/trimOut) by `deltaMs`
+// Slip a source-trimmed clip: shift its source window (trimIn/trimOut) by `deltaMs`
 // while keeping the clip's timeline position and duration fixed. The window
 // is clamped to [0, maxSourceMs] so it never runs past the asset bounds.
 export const slipClip = (
@@ -263,7 +263,7 @@ export const slipClip = (
   maxSourceMs = Number.POSITIVE_INFINITY,
 ): Project =>
   updateClip(project, clipId, (c) => {
-    if (c.kind !== "media") return c;
+    if (!hasSourceTrim(c)) return c;
     const span = c.trimOut - c.trimIn;
     const maxIn = Number.isFinite(maxSourceMs) ? Math.max(0, maxSourceMs - span) : Number.POSITIVE_INFINITY;
     const inMs = Math.max(0, Math.min(c.trimIn + deltaMs, maxIn));

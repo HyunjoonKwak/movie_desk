@@ -1,4 +1,4 @@
-import { type Clip, clipEnd, isMediaClip } from "../model/clip";
+import { type Clip, clipEnd, hasSourceTrim } from "../model/clip";
 import type { Project } from "../model/project";
 import type { ID } from "../utils/id";
 import { newId } from "../utils/id";
@@ -59,7 +59,7 @@ export const overwriteClipAt = (project: Project, trackId: ID, clip: Clip, atMs:
         duration: cEnd - end,
       };
       pieces.push(
-        isMediaClip(c) && isMediaClip(base) ? { ...base, trimIn: c.trimIn + offset } : base,
+        hasSourceTrim(c) && hasSourceTrim(base) ? { ...base, trimIn: c.trimIn + offset } : base,
       );
     }
     return pieces;

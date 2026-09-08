@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Crosshair, Loader2, ScissorsSquare, Scissors, Scan, Sparkles, Type, Music, Droplet } from "lucide-react";
 import { toast } from "sonner";
 import { isMediaClip, type ID } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { readMediaFile } from "@/persistence/opfs";
@@ -69,7 +69,7 @@ export function AiPanel() {
         }
         const before = useProjectStore.getState().project;
         const after = removeSilentRangesFromClip(before, id, ranges);
-        useProjectStore.setState({ project: after });
+        useProjectStore.getState().applyGenerated("Apply AI edit", () => after);
         toast.success(tFn("ai.silence.removed", { n: ranges.length }), { id: toastId });
       } catch (err) {
         toast.error(tFn("ai.silence.failed", { msg: errMsg(err) }), { id: toastId });
@@ -101,7 +101,7 @@ export function AiPanel() {
           return;
         }
         const after = subtitlesToClips(useProjectStore.getState().project, clip, subs);
-        useProjectStore.setState({ project: after });
+        useProjectStore.getState().applyGenerated("Apply AI edit", () => after);
         toast.success(tFn("ai.subtitles.added", { n: subs.length }), { id: toastId });
       } catch (err) {
         toast.error(tFn("ai.subtitles.failed", { msg: errMsg(err) }), { id: toastId });
@@ -130,7 +130,7 @@ export function AiPanel() {
           return;
         }
         const after = applySceneCuts(useProjectStore.getState().project, id, clip, scenes);
-        useProjectStore.setState({ project: after });
+        useProjectStore.getState().applyGenerated("Apply AI edit", () => after);
         toast.success(tFn("ai.scene.found", { n: scenes.length }), { id: toastId });
       } catch (err) {
         toast.error(tFn("ai.scene.failed", { msg: errMsg(err) }), { id: toastId });
@@ -146,7 +146,7 @@ export function AiPanel() {
       setRunning("bgrm");
       try {
         const after = addBackgroundRemovalEffect(useProjectStore.getState().project, id);
-        useProjectStore.setState({ project: after });
+        useProjectStore.getState().applyGenerated("Apply AI edit", () => after);
         toast.success(tFn("ai.bgrm.added"));
       } catch (err) {
         toast.error(tFn("ai.bgrm.failed", { msg: errMsg(err) }));
@@ -186,7 +186,7 @@ export function AiPanel() {
           return;
         }
         const after = applyMotionTrack(useProjectStore.getState().project, clip, points);
-        useProjectStore.setState({ project: after });
+        useProjectStore.getState().applyGenerated("Apply AI edit", () => after);
         toast.success(tFn("ai.track.done", { n: points.length }), { id: toastId });
       } catch (err) {
         toast.error(tFn("ai.track.failed", { msg: errMsg(err) }), { id: toastId });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useProjectStore, selectPlayhead, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead, selectZoom } from "@/stores/editor-store";
 import { TRACK_HEADER_W } from "../constants";
 
 export function Playhead({ containerWidth }: { containerWidth: number }) {

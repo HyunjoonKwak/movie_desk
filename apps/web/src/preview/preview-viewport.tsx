@@ -3,7 +3,7 @@
 import { Compositor } from "@/renderer/compositor";
 import { captureScopes } from "@/scopes/frames";
 import { usePlaybackStore } from "@/stores/playback-store";
-import { selectPlayhead, useProjectStore } from "@/stores/project-store";
+import { selectPlayhead, useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { type ID, clipTransform, isMediaClip } from "@movie-desk/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for

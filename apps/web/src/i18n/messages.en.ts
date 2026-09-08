@@ -967,4 +967,7 @@ export const en = {
     "inspect.missing-sequence": "Sequence target is missing. The clip has been retained; restore its timeline or remove the clip.",
     "inspect.cyclic-sequence": "This sequence creates a cycle. Remove the circular reference before using it.",
     "inspect.depth-exceeded": "Sequence nesting reaches the safety limit. Reduce nesting before using it.",
+    "timeline.tabs": "Timelines",
+    "timeline.root": "Main timeline",
+    "timeline.unnamed": "Unnamed timeline",
 } as const;

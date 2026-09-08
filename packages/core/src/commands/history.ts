@@ -1,3 +1,4 @@
+import { assertCanonicalProject } from "../model/project-view";
 import { syncRootTimeline } from "../model/project-timelines";
 import type { Project } from "../model/project";
 import type { AppliedCommand, Command } from "./types";
@@ -26,7 +27,9 @@ export const runCommand = (
   history: CommandHistory,
   command: Command,
 ): RunResult => {
+  assertCanonicalProject(project);
   const after = syncRootTimeline(command.apply(project));
+  assertCanonicalProject(after);
   const applied: AppliedCommand = {
     label: command.label,
     before: project,
@@ -52,6 +55,8 @@ export const recordApplied = (
   history: CommandHistory,
   label: string,
 ): CommandHistory => {
+  assertCanonicalProject(before);
+  assertCanonicalProject(after);
   const applied: AppliedCommand = { label, before, after, at: Date.now() };
   const nextPast = [...history.past, applied];
   const trimmed = nextPast.length > MAX_HISTORY ? nextPast.slice(-MAX_HISTORY) : nextPast;

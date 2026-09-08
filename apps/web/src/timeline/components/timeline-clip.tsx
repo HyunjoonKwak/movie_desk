@@ -9,7 +9,7 @@ import {
   useAssetWaveform,
   usePreviewVisibility,
 } from "@/stores/preview-store";
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { cn } from "@/lib/cn";

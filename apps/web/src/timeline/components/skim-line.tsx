@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatTimecode } from "@movie-desk/core";
-import { useProjectStore, selectZoom } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { TRACK_HEADER_W } from "../constants";
 
 // FCP-style skimmer: hovering the timeline (no buttons pressed) shows a

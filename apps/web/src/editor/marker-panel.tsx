@@ -2,7 +2,7 @@
 
 import { formatTimecode } from "@movie-desk/core";
 import { Plus, Trash2, Download, MapPin } from "lucide-react";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useT } from "@/i18n/use-t";
 
 import { chapterExportLines } from "./chapter-export";

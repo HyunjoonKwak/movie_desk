@@ -1,5 +1,7 @@
 "use client";
 
+import { activeTimelineView, editActiveTimeline } from "./active-timeline";
+
 import { hydrateProjectTimelines, syncRootTimeline } from "@movie-desk/core";
 
 import { toast } from "sonner";
@@ -11,6 +13,8 @@ import { precisionSession, resumePrecision } from "./precision-session";
 import { reloadSpan } from "@/lib/reload-metrics";
 
 import {
+  assertCanonicalProject,
+  hasSourceTrim,
   type AppliedCommand,
   type BezierHandles,
   type BlendMode,
@@ -257,7 +261,11 @@ let nudgeSession: { key: string; at: number; entry: AppliedCommand } | null = nu
 
 const applySlip = (project: Project, clipId: ID, deltaMs: Ms): Project => {
   const clip = findClip(project.timeline, clipId);
-  if (!clip || clip.kind !== "media") return project;
+  if (!clip || !hasSourceTrim(clip)) return project;
+  if (clip.kind === "sequence") {
+    const source = project.timelines.find((timeline) => timeline.id === clip.timelineId);
+    return source ? slipClip(project, clipId, deltaMs, source.duration) : project;
+  }
   const asset = project.mediaLibrary.find((a) => a.id === clip.assetId);
   if (asset?.kind === "image") return project;
   return slipClip(project, clipId, deltaMs, asset?.durationMs ?? Number.POSITIVE_INFINITY);
@@ -302,8 +310,10 @@ export const useProjectStore = create<ProjectStoreState>()(
     precisionEditing: false,
 
     loadProject: (p) => {
+      assertCanonicalProject(p);
       const end = reloadSpan("loadProject");
       nudgeSession = null;
+      useTimelineUiStore.getState().setActiveTimelineId(null);
       get().endPrecisionEdit(undefined, true);
       set({
         project: "timelines" in p ? syncRootTimeline(p) : hydrateProjectTimelines(p),
@@ -343,7 +353,7 @@ export const useProjectStore = create<ProjectStoreState>()(
         }[edit.kind],
         (p) => editMixer(p, edit),
       ),
-    previewMixer: (edit) => set((s) => ({ project: editMixer(s.project, edit) })),
+    previewMixer: (edit) => set((s) => ({ project: editActiveTimeline(s.project, (p) => editMixer(p, edit)) })),
     ...createMarkerActions(set),
     ...createKeyframeActions(set),
     ...createEffectActions(set),
@@ -387,14 +397,15 @@ export const useProjectStore = create<ProjectStoreState>()(
       if (cancel || (unchanged && !session.rebased)) {
         set({
           precisionEditing: false,
-          project: syncRootTimeline({
-            ...session.before,
-            timeline: {
-              ...session.before.timeline,
-              playhead: after.timeline.playhead,
-              zoom: after.timeline.zoom,
-            },
-          }),
+          project: (() => {
+            const timelines = session.before.timelines.map((timeline) => {
+              const current = after.timelines.find((item) => item.id === timeline.id);
+              return !current || (current.playhead === timeline.playhead && current.zoom === timeline.zoom)
+                ? timeline
+                : { ...timeline, playhead: current.playhead, zoom: current.zoom };
+            });
+            return { ...session.before, timelines, timeline: timelines.find((item) => item.id === session.before.rootTimelineId)! };
+          })(),
         });
       } else {
         set({
@@ -406,16 +417,16 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     previewClipSpeed: (clipId, speed) =>
       set((s) => ({
-        project: updateClip(s.project, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) })),
+        project: editActiveTimeline(s.project, (p) => updateClip(p, clipId, (c) => ({ ...c, speed: Math.max(0.1, speed) }))),
       })),
     previewSlipClipTo: (clipId, sourceIn) =>
       set((s) => {
-        const clip = findClip(s.project.timeline, clipId);
-        if (!clip || clip.kind !== "media") return s;
-        return { project: applySlip(s.project, clipId, sourceIn - clip.trimIn) };
+        const clip = findClip(activeTimelineView(s.project).timeline, clipId);
+        if (!clip || !hasSourceTrim(clip)) return s;
+        return { project: editActiveTimeline(s.project, (p) => applySlip(p, clipId, sourceIn - clip.trimIn)) };
       }),
     previewKeyframe: (clipId, target, atMs, value) =>
-      set((s) => ({ project: upsertClipKeyframe(s.project, clipId, target, atMs, value) })),
+      set((s) => ({ project: editActiveTimeline(s.project, (p) => upsertClipKeyframe(p, clipId, target, atMs, value)) })),
 
     // Drag session: all pointer-move updates are computed from the project
     // captured at drag start (idempotent magnetics, no per-pixel history)
@@ -425,8 +436,9 @@ export const useProjectStore = create<ProjectStoreState>()(
     },
 
     dragClipTo: (clipId, targetStartMs) => {
-      const before = clipDragBefore;
-      if (!before) return;
+      const snapshot = clipDragBefore;
+      if (!snapshot) return;
+      const before = activeTimelineView(snapshot);
       const clip = findClip(before.timeline, clipId);
       if (!clip) return;
       const target = Math.max(0, targetStartMs);
@@ -439,7 +451,7 @@ export const useProjectStore = create<ProjectStoreState>()(
       const framed = snapMsToFrame(snapped, before.framerate);
       if (clip.groupId) {
         // Rigid group move from the snapshot; groups don't push neighbours.
-        set({ project: moveClipOrGroup(before, clipId, framed - clip.start) });
+        set({ project: editActiveTimeline(snapshot, (p) => moveClipOrGroup(p, clipId, framed - clip.start)) });
         return;
       }
       const tracks = before.timeline.tracks.map((t) =>
@@ -448,11 +460,11 @@ export const useProjectStore = create<ProjectStoreState>()(
           : t,
       );
       set({
-        project: syncRootTimeline({
-          ...before,
+        project: editActiveTimeline(snapshot, (p) => syncRootTimeline({
+          ...p,
           updatedAt: Date.now(),
-          timeline: { ...before.timeline, tracks },
-        }),
+          timeline: { ...p.timeline, tracks },
+        })),
       });
     },
 
@@ -473,7 +485,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     nudgeClipsBy: (clipIds, deltaMs) => {
       if (clipIds.length === 0 || deltaMs === 0) return;
       set((s) => {
-        const after = applyNudge(s.project, clipIds, deltaMs);
+        const after = editActiveTimeline(s.project, (p) => applyNudge(p, clipIds, deltaMs));
         if (after === s.project) return {};
         const key = [...clipIds].sort().join("|");
         const now = Date.now();
@@ -530,13 +542,16 @@ export const useProjectStore = create<ProjectStoreState>()(
     setSourceTrim: (clipId, edge, ms) =>
       runWith(set, "Set source trim", (p) => {
         const c = findClip(p.timeline, clipId);
-        if (!c || c.kind !== "media" || !Number.isFinite(ms)) return p;
+        if (!c || !hasSourceTrim(c) || !Number.isFinite(ms)) return p;
         const at = snapMsToFrame(ms, p.framerate);
         const trimIn = edge === "in" ? at : c.trimIn;
         const trimOut = edge === "out" ? at : c.trimOut;
-        const asset = p.mediaLibrary.find((a) => a.id === c.assetId);
-        if (asset?.kind === "image") return p;
-        if (trimIn < 0 || trimOut <= trimIn || trimOut > (asset?.durationMs ?? c.trimOut) + 1e-9)
+        const asset = c.kind === "media" ? p.mediaLibrary.find((a) => a.id === c.assetId) : undefined;
+        const sourceDuration = c.kind === "sequence"
+          ? p.timelines.find((timeline) => timeline.id === c.timelineId)?.duration
+          : asset?.durationMs;
+        if (asset?.kind === "image" || (c.kind === "sequence" && sourceDuration === undefined)) return p;
+        if (trimIn < 0 || trimOut <= trimIn || trimOut > (sourceDuration ?? c.trimOut) + 1e-9)
           return p;
         if (trimIn === c.trimIn && trimOut === c.trimOut) return p;
         return updateClip(p, clipId, (clip) => ({
@@ -595,7 +610,7 @@ export const useProjectStore = create<ProjectStoreState>()(
     // track in a single undoable command. No-op (and no history entry)
     // when the playhead isn't over any clip.
     splitAllAt: (at) => {
-      const hit = get().project.timeline.tracks.some((t) =>
+      const hit = activeTimelineView(get().project).timeline.tracks.some((t) =>
         t.clips.some((c) => at > c.start && at < c.start + c.duration),
       );
       if (!hit) return;
@@ -609,7 +624,7 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     setTransform: (clipId, patch) =>
       // Skip history entry for smooth slider drags.
-      set((s) => ({ project: setClipTransform(s.project, clipId, patch) })),
+      set((s) => ({ project: editActiveTimeline(s.project, (p) => setClipTransform(p, clipId, patch)) })),
 
     setMask: (clipId, mask) => runWith(set, "Set mask", (p) => setClipMask(p, clipId, mask)),
 
@@ -635,9 +650,9 @@ export const useProjectStore = create<ProjectStoreState>()(
     // after a project switch) — a phantom undo step would also clear redo.
     pasteClipsAt: (entries, atMs) =>
       set((s) => {
-        const eligible = entries.filter((e) => s.project.timeline.tracks.some((t) => t.id === e.trackId && !t.locked));
-        if (rejectSequenceEdit(s.project, eligible.map((e) => e.clip))) return {};
-        const after = pasteClips(s.project, entries, atMs);
+        const eligible = entries.filter((e) => activeTimelineView(s.project).timeline.tracks.some((t) => t.id === e.trackId && !t.locked));
+        if (rejectSequenceEdit(activeTimelineView(s.project), eligible.map((e) => e.clip))) return {};
+        const after = editActiveTimeline(s.project, (p) => pasteClips(p, entries, atMs));
         if (after === s.project) return {};
         return {
           project: after,
@@ -662,14 +677,14 @@ export const useProjectStore = create<ProjectStoreState>()(
     setClipVolume: (clipId, volume) =>
       // No history entry for smooth slider drags.
       set((s) => ({
-        project: updateClip(s.project, clipId, (c) =>
+        project: editActiveTimeline(s.project, (p) => updateClip(p, clipId, (c) =>
           c.kind === "media" ? { ...c, volume: Math.max(0, Math.min(4, volume)) } : c,
-        ),
+        )),
       })),
 
     // Playhead and zoom are transient — no history entry to avoid bloat.
-    setPlayheadMs: (ms) => set((s) => ({ project: setPlayhead(s.project, ms) })),
-    setZoomLevel: (zoom) => set((s) => ({ project: setZoom(s.project, zoom) })),
+    setPlayheadMs: (ms) => set((s) => ({ project: editActiveTimeline(s.project, (p) => setPlayhead(p, ms)) })),
+    setZoomLevel: (zoom) => set((s) => ({ project: editActiveTimeline(s.project, (p) => setZoom(p, zoom)) })),
 
     undo: () =>
       set((s) => {

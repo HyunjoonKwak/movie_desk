@@ -2,7 +2,7 @@
 
 import { Pause, Play, SkipBack, SkipForward, Scissors, Camera } from "lucide-react";
 import { formatTimecode } from "@movie-desk/core";
-import { useProjectStore, selectPlayhead, selectDuration } from "@/stores/project-store";
+import { useEditorStore as useProjectStore, selectPlayhead, selectDuration } from "@/stores/editor-store";
 import { usePlaybackStore } from "@/stores/playback-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { toast } from "sonner";

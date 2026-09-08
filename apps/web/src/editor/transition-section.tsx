@@ -1,7 +1,7 @@
 "use client";
 
 import type { Clip, ID, Transition, TransitionType } from "@movie-desk/core";
-import { useProjectStore } from "@/stores/project-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { InspectorSection } from "@/components/inspector-section";
 import { useT } from "@/i18n/use-t";
 

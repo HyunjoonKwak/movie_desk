@@ -1,3 +1,4 @@
+import { editActiveTimeline } from "../active-timeline";
 import { listEffects } from "@/effects/registry";
 import {
   addEffectToClip,
@@ -46,7 +47,7 @@ export const createEffectActions = <S extends ProjectMutating>(set: SetFn<S>): E
       );
     } else {
       set(
-        (s) => ({ project: setEffectParam(s.project, clipId, effectId, key, value) }) as Partial<S>,
+        (s) => ({ project: editActiveTimeline(s.project, (p) => setEffectParam(p, clipId, effectId, key, value)) }) as Partial<S>,
       );
     }
   },
