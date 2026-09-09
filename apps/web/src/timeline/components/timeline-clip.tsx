@@ -2,7 +2,7 @@
 
 import { useMemo, useRef } from "react";
 import type { Clip } from "@movie-desk/core";
-import { isMediaClip, isAdjustmentClip } from "@movie-desk/core";
+import { isMediaClip, isAdjustmentClip, isSequenceClip } from "@movie-desk/core";
 import {
   useAssetFilmstrip,
   useAssetThumb,
@@ -121,10 +121,13 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
       const destTrackId = trackEl?.dataset.track;
       const destKind = trackEl?.dataset.trackKind;
       const isMediaClipNow = isMediaClip(clip);
+      // A compound carries picture and sound, so it belongs on the same tracks
+      // as media rather than being pushed onto text/overlay like a graphic.
+      const isTimeBased = isMediaClipNow || isSequenceClip(clip);
       const compatible =
         !destKind ||
-        (isMediaClipNow && (destKind === "video" || destKind === "audio")) ||
-        (!isMediaClipNow && destKind === "text") ||
+        (isTimeBased && (destKind === "video" || destKind === "audio")) ||
+        (!isTimeBased && destKind === "text") ||
         destKind === "overlay";
       if (destTrackId && compatible) {
         moveToTrack(clip.id, destTrackId as Parameters<typeof moveToTrack>[1]);
@@ -137,6 +140,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
   const width = Math.max(2, clip.duration * zoom);
   const isMedia = isMediaClip(clip);
   const isAdjustment = isAdjustmentClip(clip);
+  const isSequence = isSequenceClip(clip);
   const showWaveform = isMediaClip(clip) && !!waveform?.length && width > 20;
 
   // Filmstrip: map the clip's trimmed source range across its timeline width.
@@ -203,7 +207,9 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
           />
         )}
         <div className="pointer-events-none relative flex h-full items-center px-2">
-          <span className="truncate text-ink-1">{clip.label ?? asset?.name ?? clip.kind}</span>
+          <span className={`truncate ${isSequence ? "text-violet-200" : "text-ink-1"}`}>
+            {clip.label ?? asset?.name ?? clip.kind}
+          </span>
         </div>
         <div
           className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"

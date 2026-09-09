@@ -90,10 +90,12 @@ import { type RelinkAssetPatch, createMediaActions } from "./actions/media-actio
 import { createMusicActions } from "./actions/music-actions";
 import { type PlaceMode, createPlaceAssetActions } from "./actions/place-asset-actions";
 import { createTrackActions } from "./actions/track-actions";
+import { createCompoundActions, type CompoundActions } from "./actions/compound-actions";
+import { createPreservedActions, type PreservedActions } from "./actions/preserved-actions";
 import { rejectSequenceEdit, runWith } from "./store-helpers";
 import { useTimelineUiStore } from "./timeline-ui-store";
 
-interface ProjectStoreState extends LibraryMarkActions, CollectionActions {
+interface ProjectStoreState extends LibraryMarkActions, CollectionActions, CompoundActions, PreservedActions {
   project: Project;
   history: CommandHistory;
 
@@ -341,6 +343,8 @@ export const useProjectStore = create<ProjectStoreState>()(
     ...createMusicActions(set),
     ...createPlaceAssetActions(set),
     ...createTrackActions(set),
+    ...createCompoundActions(set),
+    ...createPreservedActions(set),
     updateMixer: (edit) =>
       runWith(
         set,

@@ -58,6 +58,19 @@ export function CommandPalette() {
         },
       },
       {
+        id: "makeCompound",
+        label: t("compound.make"),
+        run: () => ps().makeCompound(),
+      },
+      {
+        id: "unpackCompound",
+        label: t("compound.unpack"),
+        run: () => {
+          const id = sel();
+          if (id) ps().unpackCompound(id);
+        },
+      },
+      {
         id: "delete",
         label: t("cmd.deleteClip"),
         hint: "Del",
