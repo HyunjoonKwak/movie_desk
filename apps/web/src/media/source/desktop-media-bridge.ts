@@ -23,6 +23,8 @@ export interface DesktopMediaBridge {
   consolidateRoot?: (rootId: string) => Promise<unknown>;
   /** Rename a location; an empty name clears the override. */
   renameRoot?: (rootId: string, displayName: string) => Promise<boolean>;
+  /** Asset ids under one location, for relinking it as a whole. */
+  assetIdsForRoot?: (rootId: string) => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

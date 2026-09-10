@@ -1004,4 +1004,7 @@ export const ko = {
     "roots.offline": "연결 안 됨",
     "roots.offlineHint": "{name} 이(가) 연결되지 않았습니다. 드라이브를 연결하면 재생과 내보내기가 복구됩니다.",
     "roots.rename": "이 위치의 이름 바꾸기",
+    "roots.reconnect": "폴더를 찾아 다시 연결",
+    "roots.reconnecting": "연결하는 중…",
+    "roots.reconnectFailed": "다시 연결하지 못했습니다",
 } as const;

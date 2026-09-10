@@ -65,5 +65,7 @@ contextBridge.exposeInMainWorld("cutDesktop", {
       ipcRenderer.invoke("movie-desk:media-consolidate-root", rootId),
     renameRoot: async (rootId, displayName) =>
       ipcRenderer.invoke("movie-desk:media-rename-root", rootId, displayName),
+    assetIdsForRoot: async (rootId) =>
+      ipcRenderer.invoke("movie-desk:media-root-assets", rootId),
   },
 });

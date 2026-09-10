@@ -48,3 +48,14 @@ export const renameSourceRoot = async (rootId: string, displayName: string): Pro
   if (!bridge?.renameRoot) return false;
   return Boolean(await bridge.renameRoot(rootId, displayName));
 };
+
+/**
+ * Asset ids under one location, so a disconnected location can hand them to
+ * the relink flow the media bin already uses.
+ */
+export const assetIdsForRoot = async (rootId: string): Promise<readonly string[]> => {
+  const bridge = readDesktopMediaBridge();
+  if (!bridge?.assetIdsForRoot) return [];
+  const parsed = z.array(z.string().min(1)).safeParse(await bridge.assetIdsForRoot(rootId));
+  return parsed.success ? parsed.data : [];
+};

@@ -5,11 +5,14 @@ import { toast } from "sonner";
 import { HardDrive, Network, Usb } from "lucide-react";
 import { useT } from "@/i18n/use-t";
 import {
+  assetIdsForRoot,
   readSourceRoots,
   renameSourceRoot,
   rootDisplayName,
   type SourceRoot,
 } from "../source-roots";
+import { chooseDesktopRelink } from "../desktop-relink";
+import { useRelinkRequestStore } from "../relink-request-store";
 import { canConsolidate, consolidateRoot, ConsolidateError } from "../consolidate";
 
 const ICONS = {
@@ -44,6 +47,26 @@ export function SourceRootsPanel() {
   const renameInput = useRef<HTMLInputElement | null>(null);
   const t = useT();
   const gatherable = canConsolidate();
+
+  // Telling someone a drive is missing without offering the fix leaves them to
+  // hunt for it. The media bin already owns this flow; this hands it the whole
+  // location instead of one card at a time.
+  const reconnect = async (root: SourceRoot) => {
+    setBusyRoot(root.id);
+    try {
+      const ids = await assetIdsForRoot(root.id);
+      if (!ids.length) return;
+      const rows = await chooseDesktopRelink(ids, true);
+      if (!rows.length) return;
+      useRelinkRequestStore.getState().request(rows);
+    } catch (error) {
+      toast.error(
+        `${t("roots.reconnectFailed")}: ${error instanceof Error ? error.message : error}`,
+      );
+    } finally {
+      setBusyRoot(null);
+    }
+  };
 
   const gather = async (root: SourceRoot) => {
     setBusyRoot(root.id);
@@ -152,6 +175,15 @@ export function SourceRootsPanel() {
               {root.state === "offline" && (
                 <div className="mt-1 text-amber-200/80">
                   {t("roots.offlineHint", { name: rootDisplayName(root) })}
+                  <button
+                    type="button"
+                    className="mt-1.5 block rounded bg-amber-500/20 px-2 py-1 text-amber-100 disabled:opacity-50"
+                    disabled={busyRoot !== null}
+                    onClick={() => void reconnect(root)}
+                    data-testid="roots-reconnect"
+                  >
+                    {busyRoot === root.id ? t("roots.reconnecting") : t("roots.reconnect")}
+                  </button>
                 </div>
               )}
               <div className="mt-1 truncate text-ink-3" title={root.displayPath}>

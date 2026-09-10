@@ -1006,4 +1006,7 @@ export const en = {
     "roots.offline": "Not connected",
     "roots.offlineHint": "{name} is not connected. Reconnect the drive and playback and export recover.",
     "roots.rename": "Rename this location",
+    "roots.reconnect": "Find the folder and reconnect",
+    "roots.reconnecting": "Reconnecting…",
+    "roots.reconnectFailed": "Could not reconnect",
 } as const;

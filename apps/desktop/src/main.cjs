@@ -479,6 +479,13 @@ ipcMain.handle("movie-desk:media-source-roots", async (event) => {
   }));
 });
 
+ipcMain.handle("movie-desk:media-root-assets", async (event, rootId) => {
+  requireTrustedIpc(event);
+  if (!mediaCatalog) return [];
+  if (typeof rootId !== "string") throw new Error("Invalid root");
+  return mediaCatalog.assetIdsForRoot(rootId);
+});
+
 ipcMain.handle("movie-desk:media-rename-root", async (event, rootId, displayName) => {
   requireTrustedIpc(event);
   if (!mediaCatalog) return false;

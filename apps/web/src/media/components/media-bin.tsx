@@ -88,6 +88,7 @@ import { MEDIA_HINT_KEYS, mediaGuidance } from "@/media/state-guidance";
 import { StateHint } from "@/components/state-hint";
 
 import { type DesktopRelinkCandidate, chooseDesktopRelink, commitDesktopRelink, matchDesktopRelinkRows } from "@/media/desktop-relink";
+import { useRelinkRequestStore } from "@/media/relink-request-store";
 import { DesktopRelinkDialog } from "./desktop-relink-dialog";
 
 const KIND_FILTERS: ReadonlyArray<MediaKind | "all"> = ["all", "video", "audio", "image"];
@@ -109,6 +110,14 @@ export function MediaBin() {
   const folderRecovery = useRef<RecoveryEpisode | null>(null);
   const cancelFolderRecovery = useRef<(() => void) | null>(null);
   const [relinkRows, setRelinkRows] = useState<DesktopRelinkCandidate[] | null>(null);
+  // A disconnected location is found in the locations panel; the dialog lives
+  // here, so take whatever that panel picked.
+  const requestedRelink = useRelinkRequestStore((s) => s.rows);
+  useEffect(() => {
+    if (!requestedRelink) return;
+    setRelinkRows([...requestedRelink]);
+    useRelinkRequestStore.getState().clear();
+  }, [requestedRelink]);
   const [relinking, setRelinking] = useState<MediaAsset | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
