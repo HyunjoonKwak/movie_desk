@@ -57,5 +57,9 @@ contextBridge.exposeInMainWorld("cutDesktop", {
     // The folders this library references, so the user can see where their
     // originals actually are.
     sourceRoots: async () => ipcRenderer.invoke("movie-desk:media-source-roots"),
+    // Gather originals into a folder the user picks natively. Copies and
+    // verifies before re-pointing; never deletes an original.
+    consolidate: async (assetIds) =>
+      ipcRenderer.invoke("movie-desk:media-consolidate", assetIds),
   },
 });

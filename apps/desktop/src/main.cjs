@@ -13,7 +13,9 @@ const { createCatalogSnapshot, listCatalogSnapshots, restoreCatalogSnapshot } = 
 const { MediaCatalog } = require("./catalog.cjs");
 const { MediaHelperClient } = require("./helper-client.cjs");
 const { createDesktopImageImporter, isHeicMime } = require("./image-import.cjs");
-const { createReferenceImporter } = require("./reference-import.cjs");
+const { createReferenceImporter, registerRootForFile } = require("./reference-import.cjs");
+const { createConsolidator } = require("./consolidate.cjs");
+let consolidator;
 const { toDiskSourceRef } = require("./source-resolver.cjs");
 let referenceImporter;
 const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
@@ -287,6 +289,13 @@ const initializeMediaInfrastructure = async () => {
       helper: mediaHelper,
       toDiskSourceRef,
     });
+    consolidator = createConsolidator({
+      catalog: mediaCatalog,
+      helper: mediaHelper,
+      resolveSource: (asset) => resolveCatalogSource(asset),
+      registerRootFor: (filePath) =>
+        registerRootForFile({ catalog: mediaCatalog, helper: mediaHelper }, filePath),
+    });
   }
   installMediaProtocol(protocol, {
     catalog: { getAsset: (assetId) => mediaCatalog?.getAsset(assetId) ?? null },
@@ -339,6 +348,7 @@ const restoreCatalog = async (win) => {
     desktopRelinker = undefined;
     imageImporter = undefined;
     referenceImporter = undefined;
+    consolidator = undefined;
     mediaLeases.releaseAll();
     if (previous) await previous.close();
     try {
@@ -411,6 +421,26 @@ ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
     };
   }
   return { ...mediaLeases.acquire(asset.id, { asset, resolved }), state: resolved.state };
+});
+
+// The destination is chosen through a native folder picker so the renderer
+// never names a path itself.
+ipcMain.handle("movie-desk:media-consolidate", async (event, assetIds) => {
+  requireTrustedIpc(event);
+  if (!consolidator) {
+    return { ok: false, error: { code: "CATALOG_UNAVAILABLE", message: "The local media catalog is unavailable." } };
+  }
+  const chosen = await dialog.showOpenDialog({
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (chosen.canceled || !chosen.filePaths[0]) return { ok: false, error: { code: "CANCELLED", message: "No destination was chosen." } };
+  try {
+    const result = await consolidator.consolidate(assetIds, chosen.filePaths[0]);
+    return { ok: true, result };
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code : "CONSOLIDATE_FAILED";
+    return { ok: false, error: { code, message: "Movie Desk could not gather these files." } };
+  }
 });
 
 ipcMain.handle("movie-desk:media-source-roots", async (event) => {

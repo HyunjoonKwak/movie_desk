@@ -18,6 +18,8 @@ export interface DesktopMediaBridge {
   importFile?: (file: File) => Promise<unknown>;
   /** The folders this library references. */
   sourceRoots?: () => Promise<unknown>;
+  /** Gather originals into a folder the user picks. */
+  consolidate?: (assetIds: string[]) => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

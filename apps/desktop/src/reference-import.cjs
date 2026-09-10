@@ -82,6 +82,28 @@ const positiveIntegerOrUndefined = (value) =>
   Number.isSafeInteger(value) && value > 0 ? value : undefined;
 const finiteOrUndefined = (value) => (Number.isFinite(value) ? Number(value) : undefined);
 
+/**
+ * Register the folder a file sits in and return its root id. Shared with
+ * consolidation, which needs a root for the destination it just copied into.
+ */
+const registerRootForFile = async ({ catalog, helper }, filePath) => {
+  const volume = await helper.request("volume-resolve", { path: filePath });
+  const directory = path.dirname(filePath);
+  const rootRelativePath = path.dirname(volume.volumeRelativePath ?? "");
+  const rootId = stableRootId(volume.volumeUuid, directory, rootRelativePath);
+  await catalog.registerRoot({
+    id: rootId,
+    kind: rootKind(volume),
+    ...(volume.volumeUuid ? { volumeUuid: volume.volumeUuid } : {}),
+    ...(rootRelativePath && rootRelativePath !== "."
+      ? { volumeRelativePath: rootRelativePath }
+      : {}),
+    lastKnownAbsolutePath: directory,
+    caseSensitive: /case-sensitive/i.test(volume.fileSystem ?? ""),
+  });
+  return rootId;
+};
+
 const createReferenceImporter = ({ catalog, helper, toDiskSourceRef }) => ({
   /**
    * Never copies, moves or writes the original. The catalog learns where the
@@ -161,6 +183,7 @@ const createReferenceImporter = ({ catalog, helper, toDiskSourceRef }) => ({
 
 module.exports = {
   AUDIO_EXTENSIONS,
+  registerRootForFile,
   IMAGE_EXTENSIONS,
   VIDEO_EXTENSIONS,
   createReferenceImporter,
