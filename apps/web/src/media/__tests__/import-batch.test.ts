@@ -1,6 +1,6 @@
+import { collectMediaGarbage, isMediaKeyLeased, leaseMediaKey } from "@/persistence/media-gc";
 import type { ID, MediaAsset, Project } from "@movie-desk/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { collectMediaGarbage, isMediaKeyLeased, leaseMediaKey } from "@/persistence/media-gc";
 import { toMediaImportCandidate } from "../folder-import";
 import type { ImportResult } from "../import";
 import { type MediaImportBatchDependencies, runMediaImportBatch } from "../import-batch";
@@ -256,5 +256,45 @@ describe("runMediaImportBatch", () => {
       "add:other.mov",
       "release:other.mov",
     ]);
+  });
+});
+
+describe("previews for referenced originals", () => {
+  it("asks for previews of a referenced original after registering it, never for a copied file", async () => {
+    const h = harness({
+      importByReference: async (file) => {
+        h.events.push(`reference:${file.name}`);
+        return { ...assetFor(file), opfsPath: `ref/${file.name}` };
+      },
+      canReferenceInPlace: (file) => file.name.startsWith("ref"),
+      buildPreviews: (asset) => {
+        h.events.push(`previews:${asset.name}`);
+      },
+    });
+    const files = [videoFile("ref-a.mov"), videoFile("copy-b.mov")].map((file) =>
+      toMediaImportCandidate(file),
+    );
+    await runMediaImportBatch(files, h.deps);
+    expect(h.events).toEqual([
+      "reference:ref-a.mov",
+      "import:copy-b.mov",
+      "add:ref-a.mov",
+      "previews:ref-a.mov",
+      "add:copy-b.mov",
+      "release:copy-b.mov",
+    ]);
+  });
+
+  it("does not ask for previews of a referenced original the project already holds", async () => {
+    const h = harness({
+      importByReference: async (file) => assetFor(file),
+      canReferenceInPlace: () => true,
+      buildPreviews: (asset) => {
+        h.events.push(`previews:${asset.name}`);
+      },
+    });
+    h.library.push(assetFor(videoFile("ref-a.mov")));
+    await runMediaImportBatch([toMediaImportCandidate(videoFile("ref-a.mov"))], h.deps);
+    expect(h.events).toEqual([]);
   });
 });

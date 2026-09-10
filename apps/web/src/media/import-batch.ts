@@ -23,6 +23,12 @@ export interface MediaImportBatchDependencies {
    */
   readonly importByReference?: (file: File) => Promise<MediaAsset>;
   readonly canReferenceInPlace?: (file: File) => boolean;
+  /**
+   * A referenced original is not decoded on the way in, so its thumbnail,
+   * filmstrip and waveform are built after registration. Copied files
+   * already carry theirs.
+   */
+  readonly buildPreviews?: (asset: MediaAsset) => void;
   readonly hasAsset: (assetId: ID) => boolean;
   readonly addMediaAsset: (asset: MediaAsset) => void;
   readonly isCancelRequested: () => boolean;
@@ -42,6 +48,7 @@ interface ImportedEntry {
   readonly asset: MediaAsset;
   readonly candidateIndex: number;
   readonly releaseLease?: () => void;
+  readonly needsPreviews?: boolean;
 }
 
 export const runMediaImportBatch = async (
@@ -76,7 +83,8 @@ export const runMediaImportBatch = async (
         } else if (deps.importByReference && deps.canReferenceInPlace?.(file)) {
           // Referenced originals hold no app-store lease: nothing was copied.
           const asset = await deps.importByReference(file);
-          if (!deps.hasAsset(asset.id)) imported.push({ asset, candidateIndex });
+          if (!deps.hasAsset(asset.id))
+            imported.push({ asset, candidateIndex, needsPreviews: true });
         } else {
           const { asset, releaseLease } = await deps.importFile(file);
           heldLeases.add(releaseLease);
@@ -98,7 +106,9 @@ export const runMediaImportBatch = async (
       throw new Error("Live Photo linking must return one asset per imported file");
     }
     imported.forEach((entry, index) => {
-      deps.addMediaAsset(linked[index] as MediaAsset);
+      const asset = linked[index] as MediaAsset;
+      deps.addMediaAsset(asset);
+      if (entry.needsPreviews) deps.buildPreviews?.(asset);
       // The project references the file now; GC keeps it without the lease.
       release(entry.releaseLease);
     });

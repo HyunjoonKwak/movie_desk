@@ -1,17 +1,17 @@
 "use client";
 
+import { t } from "@/i18n/use-t";
+import { useProjectStore } from "@/stores/project-store";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
-import { useProjectStore } from "@/stores/project-store";
-import { t } from "@/i18n/use-t";
-import { importMediaFile } from "./import";
-import { runMediaImportBatch } from "./import-batch";
-import { canReferenceInPlace, importDesktopReferenceFile } from "./desktop-reference-import";
-import { useImportProgressStore } from "./import-progress-store";
-import { useImportFailureStore } from "./import-failure-store";
-import { createMediaImportFailure } from "./import-errors";
 import { DesktopHeicImportError, importDesktopHeicFile, isHeicFile } from "./desktop-heic-import";
+import { canReferenceInPlace, importDesktopReferenceFile } from "./desktop-reference-import";
 import { type MediaImportCandidate, toMediaImportCandidate } from "./folder-import";
+import { importMediaFile, regenerateAssetPreviews } from "./import";
+import { runMediaImportBatch } from "./import-batch";
+import { createMediaImportFailure } from "./import-errors";
+import { useImportFailureStore } from "./import-failure-store";
+import { useImportProgressStore } from "./import-progress-store";
 
 type MediaImportInput = FileList | readonly File[] | readonly MediaImportCandidate[];
 
@@ -48,6 +48,9 @@ export const useMediaImport = (): ImportState => {
           isHeicFile,
           importByReference: importDesktopReferenceFile,
           canReferenceInPlace: () => canReferenceInPlace(),
+          // Runs in the background through the regeneration queue; the card
+          // shows the build and keeps its rebuild action if it fails.
+          buildPreviews: (asset) => void regenerateAssetPreviews(asset).catch(() => undefined),
           hasAsset: (assetId) =>
             useProjectStore.getState().project.mediaLibrary.some((asset) => asset.id === assetId),
           addMediaAsset,
