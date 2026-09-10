@@ -2,15 +2,16 @@
 
 import { Compositor } from "@/renderer/compositor";
 import { captureScopes } from "@/scopes/frames";
-import { usePlaybackStore } from "@/stores/playback-store";
 import { selectPlayhead, useEditorStore as useProjectStore } from "@/stores/editor-store";
-import { type ID, clipTransform, isMediaClip } from "@movie-desk/core";
+import { usePlaybackStore } from "@/stores/playback-store";
+import type { ID } from "@movie-desk/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // Side-effect import: registers `window.__cutBench(frames)` in dev for
 // console-driven render benchmarks.
 import "@/renderer/bench";
 import { useT } from "@/i18n/use-t";
 import { GuidesOverlay } from "./guides-overlay";
+import { needsLinearColorMigrationHint } from "./linear-color-hint";
 import { MissingMediaNotice } from "./missing-media-notice";
 import { PreviewControls } from "./preview-controls";
 import { RegionOverlay } from "./region-overlay";
@@ -39,33 +40,11 @@ export function PreviewViewport() {
     window.addEventListener("color-processing-warning", warning);
     return () => window.removeEventListener("color-processing-warning", warning);
   }, [t]);
+  const { createdAt, mediaLibrary, resolution } = project;
+  const tracks = project.timeline.tracks;
   useEffect(() => {
+    if (!needsLinearColorMigrationHint({ createdAt, tracks, mediaLibrary, resolution })) return;
     const key = `cut.linear-color-notice.${project.id}`;
-    const clips = project.timeline.tracks.flatMap((track) => track.clips);
-    if (
-      !clips.some((clip) => {
-        const transform = clipTransform(clip);
-        const asset = isMediaClip(clip)
-          ? project.mediaLibrary.find((asset) => asset.id === clip.assetId)
-          : undefined;
-        return (
-          clip.effects.some((fx) => fx.enabled && !fx.type.startsWith("audio-")) ||
-          !!clip.mask ||
-          transform.opacity !== 1 ||
-          transform.scale !== 1 ||
-          transform.rotation !== 0 ||
-          transform.x !== 0 ||
-          transform.y !== 0 ||
-          (isMediaClip(clip) && !!clip.fit && clip.fit !== "stretch") ||
-          !!asset?.rotation ||
-          asset?.kind === "image" ||
-          (!!asset &&
-            (asset.width !== project.resolution.w || asset.height !== project.resolution.h))
-        );
-      }) &&
-      clips.length < 2
-    )
-      return;
     try {
       if (localStorage.getItem(key)) return;
       localStorage.setItem(key, "1");
@@ -73,13 +52,7 @@ export function PreviewViewport() {
     } catch {
       /* Storage can be unavailable in private browsing. */
     }
-  }, [
-    project.id,
-    project.timeline.tracks,
-    project.mediaLibrary,
-    project.resolution.w,
-    project.resolution.h,
-  ]);
+  }, [project.id, createdAt, tracks, mediaLibrary, resolution]);
 
   const [contextGeneration, setContextGeneration] = useState(0);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -142,9 +115,10 @@ export function PreviewViewport() {
   }, [drawLatest]);
 
   useEffect(
-    () => useTimelineUiStore.subscribe((state, before) => {
-      if (state.skimMs !== before.skimMs) drawLatest();
-    }),
+    () =>
+      useTimelineUiStore.subscribe((state, before) => {
+        if (state.skimMs !== before.skimMs) drawLatest();
+      }),
     [drawLatest],
   );
 

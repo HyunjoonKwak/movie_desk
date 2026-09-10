@@ -8,10 +8,10 @@ import {
   type Clip,
   type EffectInstance,
   type ID,
+  MAX_SEQUENCE_DEPTH,
   type MediaAsset,
   type MediaClip,
   type Project,
-  MAX_SEQUENCE_DEPTH,
   type ShapeClip,
   type TextClip,
   type TransitionFrame,
@@ -51,7 +51,12 @@ import { type TransferProbe, probeVideoTransfer, uploadedVideoDomain } from "./i
 import { disposeLutTextures, uploadLutTexture } from "./lut-texture";
 import { ManagedShaderContractError } from "./managed-shader";
 import { PingPong } from "./ping-pong";
-import { type RenderTarget, type TargetLease, preserveFramebuffer, screenTarget } from "./render-target";
+import {
+  type RenderTarget,
+  type TargetLease,
+  preserveFramebuffer,
+  screenTarget,
+} from "./render-target";
 import { RetryBackoff } from "./retry-backoff";
 import { ScratchPool } from "./scratch-pool";
 import { type Program, ShaderRegistry } from "./shader-registry";
@@ -195,9 +200,15 @@ export class Compositor {
   private async withSource<T>(work: () => Promise<T>): Promise<T> {
     const previous = this.sourceQueue;
     let release!: () => void;
-    this.sourceQueue = new Promise<void>((resolve) => { release = resolve; });
+    this.sourceQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     await previous;
-    try { return await work(); } finally { release(); }
+    try {
+      return await work();
+    } finally {
+      release();
+    }
   }
 
   get colorPrecision() {
@@ -321,7 +332,11 @@ export class Compositor {
     }
   }
 
-  private async renderInto(frame: FrameContext, project: Project, getAsset: (id: ID) => MediaAsset | undefined) {
+  private async renderInto(
+    frame: FrameContext,
+    project: Project,
+    getAsset: (id: ID) => MediaAsset | undefined,
+  ) {
     const gl = this.gl;
     if (this.invalidated || gl.isContextLost()) return;
     const assetIds = new Set<string>();
@@ -346,7 +361,8 @@ export class Compositor {
               if (getAsset(clip.assetId)?.kind === "video") videoIds.add(clip.assetId);
             }
             if (isTextClip(clip) || isShapeClip(clip)) {
-              for (const lane of this.colorPingPongs.keys()) graphicClipIds.add(`${lane}:${clip.id}`);
+              for (const lane of this.colorPingPongs.keys())
+                graphicClipIds.add(`${lane}:${clip.id}`);
             }
           }
         }
@@ -365,9 +381,10 @@ export class Compositor {
     frame.managed = visible.length > 0 && !this.canBypass(visible, project, getAsset, frame);
     // The sole bypass candidate is uploaded before scene initialization. Alpha
     // can promote this context here, but can never clear a partially drawn scene.
-    const prepared = !frame.managed && visible.length === 1
-      ? await this.uploadClip(visible[0]!, getAsset, project, frame)
-      : undefined;
+    const prepared =
+      !frame.managed && visible.length === 1
+        ? await this.uploadClip(visible[0]!, getAsset, project, frame)
+        : undefined;
     if (this.invalidated || gl.isContextLost()) return;
     if (frame.managed && !this.colorFormat) {
       this.warnColor("unsupported");
@@ -402,7 +419,10 @@ export class Compositor {
       const textAnim = isTextClip(clip)
         ? textAnimAt(clip, Math.max(0, frame.playhead - clip.start))
         : null;
-      let sourceTex = prepared !== undefined ? prepared : await this.uploadClip(clip, getAsset, project, frame, textAnim?.charFrac ?? 1);
+      let sourceTex =
+        prepared !== undefined
+          ? prepared
+          : await this.uploadClip(clip, getAsset, project, frame, textAnim?.charFrac ?? 1);
       if (this.invalidated || gl.isContextLost()) return;
       if (!sourceTex) {
         for (const release of frame.releaseClip.splice(0)) release();
@@ -415,7 +435,9 @@ export class Compositor {
         const asset = getAsset(clip.assetId);
         if (asset?.width && asset?.height) {
           const input = sourceTex;
-          sourceTex = this.withGpu(frame.restoreBindings, () => this.applyFit(input, asset.width! / asset.height!, clip.fit as "fill" | "fit", frame));
+          sourceTex = this.withGpu(frame.restoreBindings, () =>
+            this.applyFit(input, asset.width! / asset.height!, clip.fit as "fill" | "fit", frame),
+          );
         }
       }
 
@@ -423,8 +445,17 @@ export class Compositor {
       // time so animations actually move. Targets are dotted paths into the
       // params, e.g. "effects.<id>.amount".
       this.withGpu(frame.restoreBindings, () => {
-        const { effects: animatedEffects, kfValues } = animateEffects(clip, project, frame.playhead);
-        const finalTex = this.applyEffectChain(sourceTex, animatedEffects, frame.maskTexture, frame);
+        const { effects: animatedEffects, kfValues } = animateEffects(
+          clip,
+          project,
+          frame.playhead,
+        );
+        const finalTex = this.applyEffectChain(
+          sourceTex,
+          animatedEffects,
+          frame.maskTexture,
+          frame,
+        );
 
         // Final composite to screen with clip transform applied. Slides/fades
         // fold into the transform; wipes drive a GPU mask instead. Transform
@@ -516,7 +547,12 @@ export class Compositor {
 
   // Renders `src` into a frame-sized scratch slot, resampled to cover (fill)
   // or be contained (fit) at the source's aspect ratio instead of stretched.
-  private applyFit(src: WebGLTexture, sourceAspect: number, mode: "fill" | "fit", frame: FrameContext): WebGLTexture {
+  private applyFit(
+    src: WebGLTexture,
+    sourceAspect: number,
+    mode: "fill" | "fit",
+    frame: FrameContext,
+  ): WebGLTexture {
     const gl = this.gl;
     const w = frame.target.width;
     const h = frame.target.height;
@@ -555,7 +591,11 @@ export class Compositor {
 
   // Turns a decoded frame by the container's display rotation into a
   // frame-sized scratch slot. Only the WebCodecs path needs it.
-  private applySourceRotation(src: WebGLTexture, rotation: MediaAsset["rotation"], frame: FrameContext): WebGLTexture {
+  private applySourceRotation(
+    src: WebGLTexture,
+    rotation: MediaAsset["rotation"],
+    frame: FrameContext,
+  ): WebGLTexture {
     const turns = quarterTurns(rotation ?? 0);
     if (turns === 0) return src;
     const gl = this.gl;
@@ -610,7 +650,12 @@ export class Compositor {
     gl.uniform1i(prog.uniform("u_tex"), 0);
     const tf = clipTransform(clip);
     const opacity = kfValues["transform.opacity"] ?? tf.opacity;
-    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity }, frame.target.width / frame.target.height);
+    setTransformUniforms(
+      gl,
+      prog,
+      { x: 0, y: 0, scale: 1, rotation: 0, opacity },
+      frame.target.width / frame.target.height,
+    );
     setWipeUniforms(gl, prog, null);
     setMaskUniforms(gl, prog, clip.mask);
     this.quad.draw();
@@ -667,8 +712,18 @@ export class Compositor {
     gl.uniform1i(prog.uniform("u_straight"), straight ? 1 : 0);
     gl.uniform1i(prog.uniform("u_from"), domainIndex(from));
     gl.uniform1i(prog.uniform("u_to"), domainIndex(to));
-    setTransformUniforms(gl, prog, { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 }, frame.target.width / frame.target.height);
+    setTransformUniforms(
+      gl,
+      prog,
+      { x: 0, y: 0, scale: 1, rotation: 0, opacity: 1 },
+      frame.target.width / frame.target.height,
+    );
     this.quad.draw();
+  }
+
+  private decoderPendingFor(asset?: MediaAsset): boolean {
+    if (!asset) return false;
+    return this.decodePreparing.has(asset.id) || getFrameProvider().has(asset.id);
   }
 
   private warnColor(code: string, asset?: MediaAsset) {
@@ -742,7 +797,8 @@ export class Compositor {
   ): WebGLTexture {
     // Cache hits perform no GPU work. Avoid a GL-state roundtrip per immutable
     // layer in paused previews and repeated export frames.
-    const immutable = source instanceof HTMLImageElement ||
+    const immutable =
+      source instanceof HTMLImageElement ||
       (typeof ImageBitmap !== "undefined" && source instanceof ImageBitmap);
     if (frame.managed && immutable) {
       const url = source instanceof HTMLImageElement ? source.currentSrc : "";
@@ -761,7 +817,11 @@ export class Compositor {
         : { domain: "srgb" as const, approximate: source instanceof HTMLVideoElement };
       if (interpretation.approximate) {
         this.usesColorApproximation = true;
-        this.warnColor("approximation", asset);
+        // A <video> frame shown only while the WebCodecs window for this
+        // asset is still decoding is replaced by the verified frame moments
+        // later; the notice is for sources that stay on the browser path.
+        if (!(source instanceof HTMLVideoElement && this.decoderPendingFor(asset)))
+          this.warnColor("approximation", asset);
       }
       if (
         typeof VideoFrame !== "undefined" &&
@@ -776,7 +836,6 @@ export class Compositor {
           throw new Error("Linear alpha compositing is unsupported");
         }
         if (this.colorFormat.precision === "srgb8") this.warnColor("precision");
-
       }
       if (!frame.managed) {
         const cache = asset ? this.assetTextures : this.textTextures;
@@ -836,7 +895,9 @@ export class Compositor {
       }
       uploadSource(this.gl, tex, directSource ? source : canvas, false);
       const gl = this.gl;
-      const budget = immutableImage ? Compositor.IMAGE_TARGET_BYTES : Compositor.SOURCE_TARGET_BYTES;
+      const budget = immutableImage
+        ? Compositor.IMAGE_TARGET_BYTES
+        : Compositor.SOURCE_TARGET_BYTES;
       const bytesPerPixel = this.colorFormat!.precision === "half-float" ? 8 : 4;
       // Only oversized sources are resampled, preserving aspect and the selected precision.
       // Keep room for a project-sized target even when one input is oversized.
@@ -858,7 +919,9 @@ export class Compositor {
         if (immutableImage) this.imageTargets.set(imageKey!, { target, url: imageUrl, bytes });
         else this.sourceTargets.set(key, target);
       }
-      frame.releaseClip.push(immutableImage ? this.imageTargets.pin(imageKey!)! : this.sourceTargets.pin(key)!);
+      frame.releaseClip.push(
+        immutableImage ? this.imageTargets.pin(imageKey!)! : this.sourceTargets.pin(key)!,
+      );
       gl.disable(gl.BLEND);
       this.drawTransfer(
         tex,
@@ -893,8 +956,12 @@ export class Compositor {
       frame.sequenceGraph ??= analyzeSequenceGraph(project);
       const graph = frame.sequenceGraph;
       const child = graph.timelines.get(clip.timelineId);
-      if (!child || graph.cyclic.has(child.id) || frame.ancestry.includes(child.id) ||
-          frame.ancestry.length + (graph.depths.get(child.id) ?? 1) > MAX_SEQUENCE_DEPTH)
+      if (
+        !child ||
+        graph.cyclic.has(child.id) ||
+        frame.ancestry.includes(child.id) ||
+        frame.ancestry.length + (graph.depths.get(child.id) ?? 1) > MAX_SEQUENCE_DEPTH
+      )
         return null;
       const target = this.acquireChildTarget(frame.depth, frame.target.width, frame.target.height);
       frame.releaseClip.push(target.release);
@@ -933,7 +1000,12 @@ export class Compositor {
     return null;
   }
 
-  private uploadTextClip(clip: TextClip, project: Project, frame: FrameContext, charFrac = 1): WebGLTexture {
+  private uploadTextClip(
+    clip: TextClip,
+    project: Project,
+    frame: FrameContext,
+    charFrac = 1,
+  ): WebGLTexture {
     const w = project.resolution.w;
     const h = project.resolution.h;
     const canvas = renderTextToCanvas(clip, w, h, charFrac);
@@ -1108,7 +1180,11 @@ export class Compositor {
   // a changed asset record (relink, rebuilt proxy) retries at once.
   private readonly decodeRetry = new RetryBackoff();
 
-  private async uploadClipSource(clip: MediaClip, asset: MediaAsset, frame: FrameContext): Promise<WebGLTexture | null> {
+  private async uploadClipSource(
+    clip: MediaClip,
+    asset: MediaAsset,
+    frame: FrameContext,
+  ): Promise<WebGLTexture | null> {
     // Map timeline time → source time. A frozen clip always shows one source
     // frame; otherwise this is the speed-ramp integral (or constant-speed).
     const clipRel = frame.playhead - clip.start;
@@ -1159,7 +1235,11 @@ export class Compositor {
         tex = this.uploadVisualSource(tex, decodedFrame, frame, asset);
         // WebCodecs frames come back unrotated; the media element path below
         // already honours the container's display matrix.
-        return asset.rotation ? this.withGpu(frame.restoreBindings, () => this.applySourceRotation(tex!, asset.rotation, frame)) : tex;
+        return asset.rotation
+          ? this.withGpu(frame.restoreBindings, () =>
+              this.applySourceRotation(tex!, asset.rotation, frame),
+            )
+          : tex;
       }
     }
 
