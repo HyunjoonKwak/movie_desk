@@ -42,6 +42,9 @@ const importedAssetSchema = z
       })
       .passthrough(),
     sizeBytes: nonNegative,
+    // Required by the project schema on save. Refusing it here turns a silent
+    // save failure into an import error the user can see.
+    importedAt: nonNegative,
     capturedAt: nonNegative.optional(),
   })
   .passthrough();

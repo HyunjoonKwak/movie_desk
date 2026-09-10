@@ -142,10 +142,13 @@ export const getLiveDoc = (options: { recoverMissingLibrary?: boolean } = {}): L
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let retryDelay = 2000;
   let invalidEdit = false;
-  const saveFailed = (_error: unknown): void => {
+  const saveFailed = (error: unknown): void => {
     if (disposed) return;
     useSaveStateStore.getState().setDocumentError(true);
-    toast.error(t("project.saveFailed"), { id: `document-save-failed:${projectId}` });
+    toast.error(t("project.saveFailed"), {
+      id: `document-save-failed:${projectId}`,
+      description: error instanceof Error ? error.message : String(error),
+    });
     if (!retryTimer && !invalidEdit && !failed) {
       retryTimer = setTimeout(() => {
         retryTimer = null;

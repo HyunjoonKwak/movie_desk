@@ -18,10 +18,15 @@ export const startLibraryAutosave = (): (() => void) => {
       await upsertProject(project);
       if (write !== latestWrite) return;
       useSaveStateStore.getState().setLibraryError(false);
-    } catch {
+    } catch (error) {
       if (write !== latestWrite) return;
       useSaveStateStore.getState().setLibraryError(true);
-      toast.error(t("project.saveFailed"), { id: "library-save-failed" });
+      // The reason is the only thing that makes this actionable; a bare
+      // "save failed" once hid a schema rejection for days.
+      toast.error(t("project.saveFailed"), {
+        id: "library-save-failed",
+        description: error instanceof Error ? error.message : String(error),
+      });
     }
   };
   let timer: ReturnType<typeof setTimeout> | null = null;

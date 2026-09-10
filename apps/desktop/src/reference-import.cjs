@@ -176,6 +176,9 @@ const createReferenceImporter = ({ catalog, helper, toDiskSourceRef }) => ({
       opfsPath: `disk-v1/${id}`,
       sourceRef: { ...sourceRef, rootSnapshot: publicRootSnapshot },
       sizeBytes: Number(fileStat.size),
+      // The project schema requires this; without it every save that includes
+      // the asset is rejected, and the HEIC importer has always set it.
+      importedAt: Date.now(),
       ...(capturedAt ? { capturedAt } : {}),
     };
   },

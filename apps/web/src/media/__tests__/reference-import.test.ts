@@ -95,3 +95,29 @@ it("reports the desktop error rather than a generic failure", () => {
     }),
   ).toThrow(/no permission/);
 });
+
+it("refuses a response missing importedAt, which the project schema requires on save", () => {
+  expect(() =>
+    parseDesktopReferenceImportResult({
+      ok: true,
+      asset: {
+        id: "a",
+        name: "clip.mp4",
+        kind: "video",
+        mime: "video/mp4",
+        durationMs: 1000,
+        opfsPath: "disk-v1/a",
+        sizeBytes: 10,
+        sourceRef: {
+          kind: "disk",
+          version: 1,
+          rootId: "r",
+          rootSnapshot: { volumeUuid: "V" },
+          relativePath: "clip.mp4",
+          sizeBytes: 10,
+          modifiedAtMs: 1,
+        },
+      },
+    }),
+  ).toThrow();
+});

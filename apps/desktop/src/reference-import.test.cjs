@@ -88,6 +88,9 @@ describe("reference import", () => {
     assert.equal(asset.sizeBytes, 2048);
     assert.equal(asset.durationMs, 4200);
     assert.equal(catalog.roots.length, 1);
+    // The project schema on the renderer side requires importedAt; omitting
+    // it made every save containing a referenced asset fail silently.
+    assert.equal(Number.isSafeInteger(asset.importedAt) && asset.importedAt > 0, true);
 
     const after = fs.statSync(file);
     assert.equal(after.size, before.size);
