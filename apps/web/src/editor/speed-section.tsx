@@ -4,7 +4,7 @@ import { usePitchState } from "@/audio/pitch-state";
 import { pitchCacheKey } from "@/audio/pitch-renderer";
 import { Diamond, Gauge, Snowflake } from "lucide-react";
 import type { Clip, ID } from "@movie-desk/core";
-import { hasSpeedRamp, isMediaClip, pitchHasUnsupportedRange } from "@movie-desk/core";
+import { hasSpeedRamp, isMediaClip, isSequenceClip, pitchHasUnsupportedRange } from "@movie-desk/core";
 import { useEditorStore as useProjectStore, selectPlayhead } from "@/stores/editor-store";
 import { StateHint } from "@/components/state-hint";
 import { InspectorSection } from "@/components/inspector-section";
@@ -112,7 +112,7 @@ export function SpeedSection({ clipId, clip }: Props) {
           </button>
         ))}
       </div>
-      {isMediaClip(clip) && (
+      {(isMediaClip(clip) || isSequenceClip(clip)) && (
         <>
           <label className="flex items-center gap-2 text-2xs text-ink-3">
             <input
@@ -122,7 +122,8 @@ export function SpeedSection({ clipId, clip }: Props) {
             />
             {t("speed.preservePitch")}
           </label>
-          {clip.preservePitch &&
+          {isMediaClip(clip) &&
+            clip.preservePitch &&
             (pitchHasUnsupportedRange(clip) ||
               pitchState === "rendering" ||
               pitchState === "fallback") && (

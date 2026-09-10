@@ -98,6 +98,8 @@ const clipSchema = z.discriminatedUnion("kind", [
       trimIn: nonNegative,
       trimOut: nonNegative,
       volume: nonNegative.optional(),
+      // Optional so every document written before this field still parses.
+      preservePitch: z.boolean().optional(),
     })
     .passthrough(),
 ]);

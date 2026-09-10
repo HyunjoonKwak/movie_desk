@@ -666,7 +666,9 @@ export const useProjectStore = create<ProjectStoreState>()(
 
     setPreservePitch: (clipId, enabled) =>
       runWith(set, "Preserve pitch", (p) =>
-        updateClip(p, clipId, (c) => (c.kind === "media" ? { ...c, preservePitch: enabled } : c)),
+        updateClip(p, clipId, (c) =>
+          c.kind === "media" || c.kind === "sequence" ? { ...c, preservePitch: enabled } : c,
+        ),
       ),
     setClipSpeed: (clipId, speed) =>
       runWith(set, "Set speed", (p) =>

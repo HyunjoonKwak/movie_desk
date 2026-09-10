@@ -183,6 +183,9 @@ export interface AdjustmentClip extends ClipBase {
 
 export interface SequenceClip extends ClipBase {
   readonly kind: "sequence";
+  // Same contract as MediaClip: opt-in, and a document without the field keeps
+  // the varispeed a compound has always had.
+  readonly preservePitch?: boolean;
   readonly timelineId: ID;
   readonly trimIn: Ms;
   readonly trimOut: Ms;

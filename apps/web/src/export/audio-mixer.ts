@@ -424,8 +424,11 @@ export class ProjectAudioMixer {
               sourceStartSample,
             ),
           );
+        // A sequence reaches here with its child already mixed down, so the
+        // stretch composes with the child's own processing in order rather than
+        // multiplying rates. See docs/decisions/2026-09-08-sequence-audio.md.
         if (
-          clip.kind === "media" &&
+          (clip.kind === "media" || clip.kind === "sequence") &&
           clip.preservePitch === true &&
           clip.speed > 0 &&
           !this.pitchFallback

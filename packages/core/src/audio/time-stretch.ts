@@ -1,4 +1,4 @@
-import type { MediaClip } from "../model/clip";
+import type { MediaClip, SequenceClip } from "../model/clip";
 import { sampleKeyframeTrack } from "../timeline/keyframes";
 import { sourceOffsetForRamp } from "../timeline/speed";
 
@@ -32,7 +32,10 @@ export interface StretchRequest {
   sourceSampleRate: number;
   sourceStartSample?: number;
   outputSampleRate: number;
-  clip: MediaClip;
+  // Only the source window matters here: trims, speed, its ramp and the
+  // preservation flag. A compound reaches this with its child already mixed
+  // down, so it satisfies the same contract without being file-backed.
+  clip: MediaClip | SequenceClip;
   offsetMs: number;
   outputSamples: number;
 }
