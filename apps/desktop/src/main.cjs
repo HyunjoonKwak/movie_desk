@@ -13,6 +13,9 @@ const { createCatalogSnapshot, listCatalogSnapshots, restoreCatalogSnapshot } = 
 const { MediaCatalog } = require("./catalog.cjs");
 const { MediaHelperClient } = require("./helper-client.cjs");
 const { createDesktopImageImporter, isHeicMime } = require("./image-import.cjs");
+const { createReferenceImporter } = require("./reference-import.cjs");
+const { toDiskSourceRef } = require("./source-resolver.cjs");
+let referenceImporter;
 const { installMediaProtocol, MediaLeaseRegistry } = require("./media-protocol.cjs");
 const { VolumeRootResolver } = require("./volume-root-resolver.cjs");
 const { checkForUpdates, scheduleStartupCheck, runSmokeCheck } = require("./updater.cjs");
@@ -279,6 +282,11 @@ const initializeMediaInfrastructure = async () => {
       helper: mediaHelper,
       cacheDirectory: path.join(app.getPath("userData"), "cache", "image-previews"),
     });
+    referenceImporter = createReferenceImporter({
+      catalog: mediaCatalog,
+      helper: mediaHelper,
+      toDiskSourceRef,
+    });
   }
   installMediaProtocol(protocol, {
     catalog: { getAsset: (assetId) => mediaCatalog?.getAsset(assetId) ?? null },
@@ -330,6 +338,7 @@ const restoreCatalog = async (win) => {
     mediaCatalog = undefined;
     desktopRelinker = undefined;
     imageImporter = undefined;
+    referenceImporter = undefined;
     mediaLeases.releaseAll();
     if (previous) await previous.close();
     try {
@@ -403,6 +412,31 @@ ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
   }
   return { ...mediaLeases.acquire(asset.id, { asset, resolved }), state: resolved.state };
 });
+
+ipcMain.handle("movie-desk:media-import-file", async (event, sourcePath) => {
+  requireTrustedIpc(event);
+  if (!referenceImporter) {
+    return {
+      ok: false,
+      error: { code: "CATALOG_UNAVAILABLE", message: "The local media catalog is unavailable." },
+    };
+  }
+  try {
+    return { ok: true, asset: await referenceImporter.importFile(sourcePath) };
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code : "IMPORT_FAILED";
+    return { ok: false, error: { code, message: safeReferenceImportMessage(code) } };
+  }
+});
+
+const safeReferenceImportMessage = (code) => {
+  if (code === "PERMISSION_DENIED") return "Movie Desk does not have permission to read this file.";
+  if (code === "SOURCE_NOT_FOUND") return "The selected file is no longer available.";
+  if (code === "UNSUPPORTED_FORMAT") return "This file type is not referenced in place.";
+  if (code === "NOT_A_FILE") return "The selected item is not a file.";
+  if (code === "CATALOG_UNAVAILABLE") return "The local media catalog is unavailable.";
+  return "Movie Desk could not read this file.";
+};
 
 ipcMain.handle("movie-desk:media-import-heic", async (event, sourcePath) => {
   requireTrustedIpc(event);

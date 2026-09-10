@@ -50,5 +50,9 @@ contextBridge.exposeInMainWorld("cutDesktop", {
     // to main. The absolute path is never returned to page JavaScript.
     importHeicFile: async (file) =>
       ipcRenderer.invoke("movie-desk:media-import-heic", webUtils.getPathForFile(file)),
+    // Reference a file where it already lives. The path is resolved inside the
+    // isolated preload and sent straight to main; page JavaScript never sees it.
+    importFile: async (file) =>
+      ipcRenderer.invoke("movie-desk:media-import-file", webUtils.getPathForFile(file)),
   },
 });

@@ -17,6 +17,12 @@ export interface MediaImportBatchDependencies {
   // Desktop-side HEIC conversion; its output is not leased in this process.
   readonly importHeicFile: (file: File) => Promise<MediaAsset>;
   readonly isHeicFile: (file: File) => boolean;
+  /**
+   * Reference the original in place. Present only on desktop; when absent the
+   * file is copied into the app store as it always was.
+   */
+  readonly importByReference?: (file: File) => Promise<MediaAsset>;
+  readonly canReferenceInPlace?: (file: File) => boolean;
   readonly hasAsset: (assetId: ID) => boolean;
   readonly addMediaAsset: (asset: MediaAsset) => void;
   readonly isCancelRequested: () => boolean;
@@ -66,6 +72,10 @@ export const runMediaImportBatch = async (
         // Files are processed serially to keep memory bounded.
         if (deps.isHeicFile(file)) {
           const asset = await deps.importHeicFile(file);
+          if (!deps.hasAsset(asset.id)) imported.push({ asset, candidateIndex });
+        } else if (deps.importByReference && deps.canReferenceInPlace?.(file)) {
+          // Referenced originals hold no app-store lease: nothing was copied.
+          const asset = await deps.importByReference(file);
           if (!deps.hasAsset(asset.id)) imported.push({ asset, candidateIndex });
         } else {
           const { asset, releaseLease } = await deps.importFile(file);

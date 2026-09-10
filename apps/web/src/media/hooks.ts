@@ -6,6 +6,7 @@ import { useProjectStore } from "@/stores/project-store";
 import { t } from "@/i18n/use-t";
 import { importMediaFile } from "./import";
 import { runMediaImportBatch } from "./import-batch";
+import { canReferenceInPlace, importDesktopReferenceFile } from "./desktop-reference-import";
 import { useImportProgressStore } from "./import-progress-store";
 import { useImportFailureStore } from "./import-failure-store";
 import { createMediaImportFailure } from "./import-errors";
@@ -45,6 +46,8 @@ export const useMediaImport = (): ImportState => {
           importFile: importMediaFile,
           importHeicFile: importDesktopHeicFile,
           isHeicFile,
+          importByReference: importDesktopReferenceFile,
+          canReferenceInPlace: () => canReferenceInPlace(),
           hasAsset: (assetId) =>
             useProjectStore.getState().project.mediaLibrary.some((asset) => asset.id === assetId),
           addMediaAsset,

@@ -14,6 +14,8 @@ export interface DesktopMediaBridge {
   onRelinkProgress?: (callback: (value: unknown) => void) => () => void;
   commitRelink?: (token: string, confirmed: boolean) => Promise<unknown>;
   importHeicFile?: (file: File) => Promise<unknown>;
+  /** Reference a file where it lives instead of copying it into the app. */
+  importFile?: (file: File) => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {
