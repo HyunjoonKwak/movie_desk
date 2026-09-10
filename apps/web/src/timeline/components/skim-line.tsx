@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { formatTimecode } from "@movie-desk/core";
 import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 import { TRACK_HEADER_W } from "../constants";
 
 // FCP-style skimmer: hovering the timeline (no buttons pressed) shows a
-// translucent time cursor + timecode readout without moving the playhead.
+// translucent time cursor + timecode readout without moving the playhead,
+// and the viewer shows the frame under the cursor. The time is published to
+// the UI store (never the project) so it can never reach history or disk.
 // Listeners attach to the surrounding [data-tl-inner] element so only this
 // tiny component re-renders per pointer move.
 export function SkimLine() {
-  const [ms, setMs] = useState<number | null>(null);
+  const ms = useTimelineUiStore((s) => s.skimMs);
   const zoom = useProjectStore(selectZoom);
   const fps = useProjectStore((s) => s.project.framerate);
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -18,6 +21,21 @@ export function SkimLine() {
   useEffect(() => {
     const inner = anchorRef.current?.closest<HTMLElement>("[data-tl-inner]");
     if (!inner) return;
+    // Coalesce to one store write per animation frame; pointermove can fire
+    // far faster than the viewer can render.
+    let frame: number | null = null;
+    const setMs = (next: number | null) => {
+      if (frame !== null) cancelAnimationFrame(frame);
+      if (next === null) {
+        frame = null;
+        useTimelineUiStore.getState().setSkimMs(null);
+        return;
+      }
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        useTimelineUiStore.getState().setSkimMs(next);
+      });
+    };
     const onMove = (e: PointerEvent) => {
       // Active drags (seek, clip move/trim) hide the skimmer.
       if (e.buttons !== 0) {
@@ -33,6 +51,7 @@ export function SkimLine() {
     inner.addEventListener("pointerleave", onLeave);
     inner.addEventListener("pointerdown", onLeave);
     return () => {
+      setMs(null);
       inner.removeEventListener("pointermove", onMove);
       inner.removeEventListener("pointerleave", onLeave);
       inner.removeEventListener("pointerdown", onLeave);
@@ -45,6 +64,7 @@ export function SkimLine() {
         <div
           className="pointer-events-none absolute top-0 z-10 h-full w-px bg-ink-3/60"
           style={{ left: TRACK_HEADER_W + ms * zoom }}
+          data-testid="skim-line"
           aria-hidden
         >
           <span className="absolute left-1 top-0 rounded bg-panel-3 px-1 py-0.5 font-mono text-3xs text-ink-2 shadow">

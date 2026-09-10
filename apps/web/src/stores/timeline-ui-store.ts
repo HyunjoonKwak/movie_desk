@@ -13,7 +13,10 @@ interface TimelineUiState {
   readonly snapMs: number | null;
   readonly dragAssetId: string | null;
   readonly snapEnabled: boolean;
+  /** Hover time under the skimmer, or null when not skimming. */
+  readonly skimMs: number | null;
   setSnapMs: (ms: number | null) => void;
+  setSkimMs: (ms: number | null) => void;
   setDragAssetId: (id: string | null) => void;
   toggleSnap: () => void;
 }
@@ -24,7 +27,9 @@ export const useTimelineUiStore = create<TimelineUiState>((set) => ({
   snapMs: null,
   dragAssetId: null,
   snapEnabled: true,
+  skimMs: null,
   setSnapMs: (snapMs) => set({ snapMs }),
+  setSkimMs: (skimMs) => set((s) => (s.skimMs === skimMs ? s : { skimMs })),
   setDragAssetId: (dragAssetId) => set({ dragAssetId }),
   toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled, snapMs: null })),
 }));

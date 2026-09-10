@@ -16,6 +16,7 @@ import { PreviewControls } from "./preview-controls";
 import { RegionOverlay } from "./region-overlay";
 
 import { StateHint } from "@/components/state-hint";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
 
 // Phase 3 preview: WebGL2 compositor. Visible clips at the playhead are
 // stacked and drawn into a single canvas, replacing the phase-1 single
@@ -106,8 +107,18 @@ export function PreviewViewport() {
     }
     renderingRef.current = true;
     redrawPendingRef.current = false;
+    const project = useProjectStore.getState().project;
+    // Skimming shows the frame under the cursor without moving the playhead.
+    // It is ignored during playback (the transport owns the frame) and on a
+    // child tab, where the hover time is child-local but the viewer draws the
+    // root; a wrong frame is worse than the cursor line alone.
+    const ui = useTimelineUiStore.getState();
+    const onRoot = ui.activeTimelineId === null || ui.activeTimelineId === project.rootTimelineId;
+    const skim = !usePlaybackStore.getState().playing && onRoot ? ui.skimMs : null;
+    const playhead = skim ?? project.timeline.playhead;
+    canvasRef.current?.setAttribute("data-render-playhead", String(Math.round(playhead)));
     void compositor
-      .renderFrame(useProjectStore.getState().project, assetByIdRef.current)
+      .renderFrame(project, assetByIdRef.current, skim === null ? {} : { playhead: skim })
       .then(() => {
         if (canvasRef.current) captureScopes(canvasRef.current);
       })
@@ -129,6 +140,13 @@ export function PreviewViewport() {
     window.addEventListener("scopes-redraw", drawLatest);
     return () => window.removeEventListener("scopes-redraw", drawLatest);
   }, [drawLatest]);
+
+  useEffect(
+    () => useTimelineUiStore.subscribe((state, before) => {
+      if (state.skimMs !== before.skimMs) drawLatest();
+    }),
+    [drawLatest],
+  );
 
   // Lazily create the compositor, repeating capability probes after restoration.
   // biome-ignore lint/correctness/useExhaustiveDependencies: contextGeneration intentionally recreates invalidated GPU resources.
