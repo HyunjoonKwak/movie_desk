@@ -75,10 +75,9 @@ export const revealMediaCard = async (page: Page, name = "pix.png") => {
 
 export const clipCount = (page: Page): Promise<number> => page.locator("[data-clip]").count();
 
-// Imports one still image and appends it `presses` times. Returns the clip
-// count once it has settled: the import may place a clip itself and one
-// press can append more than one (known editor issue), so the number is
-// measured rather than assumed.
+// Imports one still image, views it (the click) and appends it `presses`
+// times. Returns the clip count once it has settled: the import may place a
+// clip itself, so the number is measured rather than assumed.
 export const seedTimeline = async (page: Page, presses: number): Promise<number> => {
   await page.goto("/editor");
   await importMediaFiles(page, { name: "pix.png", mimeType: "image/png", buffer: PNG });

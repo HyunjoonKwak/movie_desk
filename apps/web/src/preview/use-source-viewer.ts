@@ -91,16 +91,15 @@ export function useSourceViewer(): void {
     });
 
     // Browsing ends when the user goes back to the timeline: plays it, moves
-    // its playhead, or removes the asset being viewed. A playhead that moved
-    // together with an edit (placing a clip) does not count.
+    // its playhead, edits it (placing the source included, so the new clip is
+    // what the viewer shows next), or removes the asset being viewed.
     const offTimelinePlay = usePlaybackStore.subscribe((state, previous) => {
       if (state.playing && !previous.playing) source.getState().close();
     });
     const offPlayhead = useProjectStore.subscribe(
       (state) => [state.project.timeline.playhead, state.project.timeline.tracks] as const,
-      ([playhead, tracks], [before, tracksBefore]) => {
-        if (playhead !== before && tracks === tracksBefore && source.getState().assetId)
-          source.getState().close();
+      () => {
+        if (source.getState().assetId) source.getState().close();
       },
       { equalityFn: (a, b) => a[0] === b[0] && a[1] === b[1] },
     );

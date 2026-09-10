@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { type Page, expect, test } from "@playwright/test";
 import { importMediaFiles } from "./support";
 
 const PNG = Buffer.from(
@@ -96,7 +96,8 @@ test("keeps populated panels contained at compact desktop width", async ({ page 
     );
   expect(overflows).toEqual([]);
 
-  await page.getByTitle("Click to add to timeline").click();
+  await page.getByTitle("Click to view · E appends to the timeline").click();
+  await page.keyboard.press("e");
   const clip = page.locator("[data-clip]").first();
   await expect(clip).toBeVisible();
   await clip.click();

@@ -70,7 +70,7 @@ test("a card click views the source; I/O mark its range and E places just that r
   expect(asset?.useOutMs).toBeLessThan(duration * 0.65);
   await expect(page.getByTestId("source-range-clear")).toBeEnabled();
 
-  // E places only the marked range, and the viewer stays on the source.
+  // E places only the marked range and hands the viewer back to the timeline.
   await page.keyboard.press("e");
   await expect.poll(() => clipCount(page)).toBe(placed + 1);
   const clip = await page.evaluate(() => {
@@ -82,9 +82,11 @@ test("a card click views the source; I/O mark its range and E places just that r
   expect(clip?.trimIn).toBe(asset?.useInMs);
   expect(clip?.trimOut).toBe(asset?.useOutMs);
   expect(clip?.duration).toBe((asset?.useOutMs ?? 0) - (asset?.useInMs ?? 0));
-  await expect(page.locator('[data-viewer-mode="source"]')).toBeVisible();
+  await expect(page.locator('[data-viewer-mode="timeline"]')).toBeVisible();
 
-  // Esc hands the viewer back to the timeline.
+  // Esc also hands it back, without an edit.
+  await mediaCard(page).click();
+  await expect(page.locator('[data-viewer-mode="source"]')).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.locator('[data-viewer-mode="timeline"]')).toBeVisible();
   await expect(page.locator('[data-transport-mode="timeline"]')).toBeVisible();

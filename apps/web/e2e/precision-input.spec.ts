@@ -104,7 +104,7 @@ test("slider and scrub show live values, undo once and keep deletion shortcuts i
 test("clip selection preserves inspector sections and still images have no source trim UI", async ({
   page,
 }) => {
-  await seedTimeline(page, 1);
+  await seedTimeline(page, 2);
   const clips = page.locator("[data-clip]");
   await clips.first().click();
   const transform = page.getByRole("button", { name: "Transform", exact: true });
