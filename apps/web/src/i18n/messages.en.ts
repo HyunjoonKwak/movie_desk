@@ -1003,4 +1003,7 @@ export const en = {
     "roots.gatherPartial": "Moved {count} files; {failed} failed. Every original is untouched.",
     "roots.gatherNone": "Nothing was moved. Your originals are unchanged.",
     "roots.gatherFailed": "Gathering could not finish",
+    "roots.offline": "Not connected",
+    "roots.offlineHint": "{name} is not connected. Reconnect the drive and playback and export recover.",
+    "roots.rename": "Rename this location",
 } as const;

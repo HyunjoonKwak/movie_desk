@@ -21,6 +21,8 @@ export interface DesktopMediaBridge {
   /** Gather originals into a folder the user picks. */
   consolidate?: (assetIds: string[]) => Promise<unknown>;
   consolidateRoot?: (rootId: string) => Promise<unknown>;
+  /** Rename a location; an empty name clears the override. */
+  renameRoot?: (rootId: string, displayName: string) => Promise<boolean>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

@@ -1001,4 +1001,7 @@ export const ko = {
     "roots.gatherPartial": "{count}개를 옮겼고 {failed}개는 실패했습니다. 원본은 모두 그대로입니다.",
     "roots.gatherNone": "옮긴 파일이 없습니다. 원본은 그대로입니다.",
     "roots.gatherFailed": "모으기를 끝내지 못했습니다",
+    "roots.offline": "연결 안 됨",
+    "roots.offlineHint": "{name} 이(가) 연결되지 않았습니다. 드라이브를 연결하면 재생과 내보내기가 복구됩니다.",
+    "roots.rename": "이 위치의 이름 바꾸기",
 } as const;

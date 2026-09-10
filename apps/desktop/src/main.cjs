@@ -474,7 +474,19 @@ ipcMain.handle("movie-desk:media-source-roots", async (event) => {
     displayPath: root.lastKnownAbsolutePath,
     assetCount: root.assetCount,
     totalBytes: root.totalBytes,
+    state: root.state,
+    ...(root.displayName ? { displayName: root.displayName } : {}),
   }));
+});
+
+ipcMain.handle("movie-desk:media-rename-root", async (event, rootId, displayName) => {
+  requireTrustedIpc(event);
+  if (!mediaCatalog) return false;
+  if (typeof rootId !== "string") throw new Error("Invalid root");
+  // An empty name clears the override and falls back to the folder name.
+  const trimmed = typeof displayName === "string" ? displayName.trim().slice(0, 120) : "";
+  await mediaCatalog.renameRoot(rootId, trimmed || null);
+  return true;
 });
 
 ipcMain.handle("movie-desk:media-import-file", async (event, sourcePath) => {

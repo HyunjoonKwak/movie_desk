@@ -28,9 +28,9 @@ afterEach(async () => {
 });
 
 describe("MediaCatalog", () => {
-  it("opens WAL schema version 2 in its worker", async () => {
+  it("opens WAL schema version 3 in its worker", async () => {
     const catalog = await createCatalog();
-    assert.deepEqual(await catalog.ready(), { schemaVersion: 2, journalMode: "wal" });
+    assert.deepEqual(await catalog.ready(), { schemaVersion: 3, journalMode: "wal" });
   });
 
   it("refuses to overwrite a catalog created by a newer app", async () => {
@@ -160,7 +160,7 @@ it("migrates a populated v1 catalog idempotently without losing identity or meta
   db.close();
   for (let i = 0; i < 2; i++) {
     catalog = new MediaCatalog(file);
-    assert.equal((await catalog.ready()).schemaVersion, 2);
+    assert.equal((await catalog.ready()).schemaVersion, 3);
     assert.equal((await catalog.getAsset("a")).relativePath, "a.mov");
     assert.equal((await catalog.getUserMetadata("a")).note, "keep");
     await catalog.close();

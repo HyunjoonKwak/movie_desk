@@ -27,6 +27,7 @@ const root = (over: Partial<SourceRoot> = {}): SourceRoot => ({
   displayPath: "/Users/someone/Movies/Trip",
   assetCount: 12,
   totalBytes: 4096,
+  state: "online",
   ...over,
 });
 
@@ -58,4 +59,20 @@ it("names an external location by its volume so two Trips are distinguishable", 
 
 it("does not repeat the volume when the folder is the volume itself", () => {
   expect(rootDisplayName(root({ kind: "removable", displayPath: "/Volumes/T7" }))).toBe("T7");
+});
+
+it("prefers a name the user gave over the folder name", () => {
+  expect(rootDisplayName(root({ displayName: "2026 여행" }))).toBe("2026 여행");
+});
+
+it("treats a never-checked location as unknown rather than offline", async () => {
+  bridge(async () => [{ ...root(), state: undefined }]);
+  const roots = await readSourceRoots();
+  expect(roots[0]!.state).toBe("unknown");
+});
+
+it("carries an offline location through so the panel can say so", async () => {
+  bridge(async () => [{ ...root(), state: "offline" }]);
+  const roots = await readSourceRoots();
+  expect(roots[0]!.state).toBe("offline");
 });

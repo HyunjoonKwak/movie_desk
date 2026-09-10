@@ -75,6 +75,13 @@ class MediaCatalog {
     return this.#request("assetIdsForRoot", requiredText(rootId, "rootId"));
   }
 
+  renameRoot(rootId, displayName) {
+    return this.#request("renameRoot", {
+      rootId: requiredText(rootId, "rootId"),
+      displayName: displayName === null ? null : requiredText(displayName, "displayName"),
+    });
+  }
+
   getRoot(rootId) {
     return this.#request("getRoot", requiredText(rootId, "rootId"));
   }

@@ -1,9 +1,10 @@
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS source_roots (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL CHECK (kind IN ('local', 'removable', 'network')),
+  display_name TEXT,
   volume_uuid TEXT,
   volume_relative_path TEXT,
   last_known_absolute_path TEXT NOT NULL,

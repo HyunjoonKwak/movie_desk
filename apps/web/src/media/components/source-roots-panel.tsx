@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { HardDrive, Network, Usb } from "lucide-react";
 import { useT } from "@/i18n/use-t";
-import { readSourceRoots, rootDisplayName, type SourceRoot } from "../source-roots";
+import {
+  readSourceRoots,
+  renameSourceRoot,
+  rootDisplayName,
+  type SourceRoot,
+} from "../source-roots";
 import { canConsolidate, consolidateRoot, ConsolidateError } from "../consolidate";
 
 const ICONS = {
@@ -32,6 +37,11 @@ const readableSize = (bytes: number): string => {
 export function SourceRootsPanel() {
   const [roots, setRoots] = useState<readonly SourceRoot[] | null>(null);
   const [busyRoot, setBusyRoot] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  // Focus on open without autoFocus, which steals focus on mount and is
+  // disorienting for anyone navigating by keyboard.
+  const renameInput = useRef<HTMLInputElement | null>(null);
   const t = useT();
   const gatherable = canConsolidate();
 
@@ -98,8 +108,52 @@ export function SourceRootsPanel() {
             >
               <div className="flex items-center gap-2">
                 <Icon className="size-3.5 shrink-0 text-ink-3" />
-                <span className="truncate text-ink-1">{rootDisplayName(root)}</span>
+                {renaming === root.id ? (
+                  <input
+                    ref={(node) => {
+                      renameInput.current = node;
+                      node?.focus();
+                      node?.select();
+                    }}
+                    className="min-w-0 flex-1 rounded bg-white/5 px-1 text-ink-1 outline-none"
+                    aria-label={t("roots.rename")}
+                    value={draftName}
+                    onChange={(event) => setDraftName(event.target.value)}
+                    onBlur={() => setRenaming(null)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") setRenaming(null);
+                      if (event.key !== "Enter") return;
+                      const next = draftName;
+                      setRenaming(null);
+                      void renameSourceRoot(root.id, next).then(async (ok) => {
+                        if (ok) setRoots(await readSourceRoots());
+                      });
+                    }}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 truncate text-left text-ink-1"
+                    title={t("roots.rename")}
+                    onClick={() => {
+                      setDraftName(root.displayName ?? rootDisplayName(root));
+                      setRenaming(root.id);
+                    }}
+                  >
+                    {rootDisplayName(root)}
+                  </button>
+                )}
+                {root.state === "offline" && (
+                  <span className="shrink-0 rounded bg-amber-500/20 px-1.5 text-amber-200">
+                    {t("roots.offline")}
+                  </span>
+                )}
               </div>
+              {root.state === "offline" && (
+                <div className="mt-1 text-amber-200/80">
+                  {t("roots.offlineHint", { name: rootDisplayName(root) })}
+                </div>
+              )}
               <div className="mt-1 truncate text-ink-3" title={root.displayPath}>
                 {root.displayPath}
               </div>
@@ -109,7 +163,7 @@ export function SourceRootsPanel() {
                   size: readableSize(root.totalBytes),
                 })}
               </div>
-              {gatherable && root.assetCount > 0 && (
+              {gatherable && root.assetCount > 0 && root.state !== "offline" && (
                 <button
                   type="button"
                   className="mt-1.5 rounded bg-white/5 px-2 py-1 text-ink-2 disabled:opacity-50"

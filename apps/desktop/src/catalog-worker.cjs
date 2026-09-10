@@ -30,6 +30,15 @@ const open = () => {
     return;
   }
   database.exec(SCHEMA_SQL);
+  // CREATE TABLE IF NOT EXISTS leaves an existing table alone, so a column
+  // added later needs its own step. Adding a nullable column is safe to repeat
+  // and never touches existing rows.
+  if (currentVersion < 3) {
+    const columns = database.prepare("PRAGMA table_info(source_roots)").all();
+    if (!columns.some((column) => column.name === "display_name")) {
+      database.exec("ALTER TABLE source_roots ADD COLUMN display_name TEXT");
+    }
+  }
   if (currentVersion < SCHEMA_VERSION) {
     database.exec(`PRAGMA user_version = ${SCHEMA_VERSION}`);
   }
@@ -114,21 +123,40 @@ const handlers = {
   listRoots() {
     return requireDatabase()
       .prepare(`
-        SELECT r.id, r.kind, r.volume_uuid, r.volume_relative_path,
+        SELECT r.id, r.kind, r.display_name, r.volume_uuid, r.volume_relative_path,
           r.last_known_absolute_path, r.case_sensitive, r.created_at_ms, r.updated_at_ms,
           COUNT(a.id) AS asset_count,
-          COALESCE(SUM(a.size_bytes), 0) AS total_bytes
+          COALESCE(SUM(a.size_bytes), 0) AS total_bytes,
+          -- A location counts as reachable while any asset under it last
+          -- resolved. Never checked is not the same as offline.
+          SUM(CASE WHEN s.state = 'online' THEN 1 ELSE 0 END) AS online_count,
+          SUM(CASE WHEN s.state IS NULL THEN 1 ELSE 0 END) AS unknown_count
         FROM source_roots r
         LEFT JOIN media_assets a ON a.root_id = r.id
+        LEFT JOIN asset_source_state s ON s.asset_id = a.id
         GROUP BY r.id
         ORDER BY r.last_known_absolute_path
       `)
       .all()
-      .map((row) => ({
-        ...mapRoot(row),
-        assetCount: Number(row.asset_count),
-        totalBytes: Number(row.total_bytes),
-      }));
+      .map((row) => {
+        const assetCount = Number(row.asset_count);
+        const online = Number(row.online_count);
+        const unknown = Number(row.unknown_count);
+        return {
+          ...mapRoot(row),
+          displayName: row.display_name ?? undefined,
+          assetCount,
+          totalBytes: Number(row.total_bytes),
+          state: assetCount === 0 || unknown === assetCount ? "unknown" : online > 0 ? "online" : "offline",
+        };
+      });
+  },
+
+  renameRoot({ rootId, displayName }) {
+    requireDatabase()
+      .prepare("UPDATE source_roots SET display_name = ?, updated_at_ms = ? WHERE id = ?")
+      .run(displayName ?? null, Date.now(), rootId);
+    return null;
   },
 
   // Asset ids under one root, so consolidation can be scoped to a location the
