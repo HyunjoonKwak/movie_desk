@@ -1009,4 +1009,13 @@ export const en = {
     "roots.reconnect": "Find the folder and reconnect",
     "roots.reconnecting": "Reconnecting…",
     "roots.reconnectFailed": "Could not reconnect",
+    "media.clickToView": "Click to view · E appends to the timeline",
+    "media.addToTimeline": "Append to timeline (E)",
+    "source.viewing": "Source",
+    "source.close": "Back to the timeline (Esc)",
+    "source.scrub": "Source position",
+    "source.markIn": "In point (I)",
+    "source.markOut": "Out point (O)",
+    "source.rangeHint": "Only the range marked with I and O goes onto the timeline",
+    "source.add": "Add to timeline (E)",
 } as const;

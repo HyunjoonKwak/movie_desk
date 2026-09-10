@@ -86,6 +86,7 @@ test("marks a selection, filters by the marks, and keeps them across a reload", 
   // Usage follows the timeline: adding a card makes it "used".
   const placed = await clipCount(page);
   await mediaCard(page, "cafe.png").click();
+  await page.keyboard.press("e");
   await expect.poll(() => clipCount(page)).toBeGreaterThan(placed);
   await page.getByLabel("Usage").selectOption("used");
   await revealMediaCard(page, "cafe.png");

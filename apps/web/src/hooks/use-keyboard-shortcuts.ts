@@ -1,17 +1,18 @@
 "use client";
 
-import { type ClipboardEntry, nextEditPoint, prevEditPoint } from "@movie-desk/core";
-import { useEffect } from "react";
-import { useEditorStore as useProjectStore } from "@/stores/editor-store";
-import { usePlaybackStore } from "@/stores/playback-store";
-import { useSelectionStore } from "@/stores/selection-store";
-import { useViewStore } from "@/stores/view-store";
-import { useRangeStore } from "@/stores/range-store";
+import { handleSourceViewerKey } from "@/preview/source-viewer-keys";
 import { useClipboardStore } from "@/stores/clipboard-store";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import { useMediaUiStore } from "@/stores/media-ui-store";
+import { usePlaybackStore } from "@/stores/playback-store";
+import { useRangeStore } from "@/stores/range-store";
+import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
+import { useViewStore } from "@/stores/view-store";
 import { ZOOM_STEP, clampZoom } from "@/timeline/constants";
 import { zoomToFit } from "@/timeline/zoom-to-fit";
+import { type ClipboardEntry, nextEditPoint, prevEditPoint } from "@movie-desk/core";
+import { useEffect } from "react";
 
 const THREE_POINT_KEYS: Record<string, "append" | "insert" | "overwrite" | "connect"> = {
   KeyE: "append",
@@ -126,6 +127,9 @@ export const useKeyboardShortcuts = () => {
         if (pasted.length > 0) useSelectionStore.setState({ clipIds: new Set(pasted) });
         return;
       }
+
+      // A source in the viewer owns the transport, marking and stepping keys.
+      if (handleSourceViewerKey(e)) return;
 
       // playback
       if (e.code === "Space") {

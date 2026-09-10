@@ -1007,4 +1007,13 @@ export const ko = {
     "roots.reconnect": "폴더를 찾아 다시 연결",
     "roots.reconnecting": "연결하는 중…",
     "roots.reconnectFailed": "다시 연결하지 못했습니다",
+    "media.clickToView": "클릭하여 뷰어에서 보기 · E 로 타임라인 끝에 추가",
+    "media.addToTimeline": "타임라인 끝에 추가 (E)",
+    "source.viewing": "소스",
+    "source.close": "타임라인으로 돌아가기 (Esc)",
+    "source.scrub": "소스 위치",
+    "source.markIn": "시작점 (I)",
+    "source.markOut": "끝점 (O)",
+    "source.rangeHint": "I·O 로 정한 구간만 타임라인에 들어갑니다",
+    "source.add": "타임라인에 추가 (E)",
 } as const;

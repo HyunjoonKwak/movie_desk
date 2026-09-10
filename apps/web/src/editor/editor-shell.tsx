@@ -1,10 +1,8 @@
 "use client";
 import { ScopesPanel } from "@/preview/scopes-panel";
 
-import { MixerPanel } from "@/mixer/mixer-panel";
-import { mountFunnel, recordFunnel } from "@/lib/funnel/collector";
-import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
+import { useAutoAnalysis } from "@/autoedit/use-auto-analysis";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { useIsBelow } from "@/hooks/use-breakpoint";
 import { useGlobalFileDrop } from "@/hooks/use-global-file-drop";
@@ -12,21 +10,24 @@ import { useIsDesktopApp } from "@/hooks/use-is-desktop-app";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
+import { mountFunnel, recordFunnel } from "@/lib/funnel/collector";
 import { MediaBin } from "@/media/components/media-bin";
+import { MixerPanel } from "@/mixer/mixer-panel";
 import { collectMediaGarbage, scanStoredProjects } from "@/persistence/media-gc";
 import { collectPreviewGarbage } from "@/persistence/previews";
 import { useLocalPersistence } from "@/persistence/use-local-persistence";
 import { PreviewViewport } from "@/preview/preview-viewport";
 import { TransportBar } from "@/preview/transport-bar";
 import { useAudioPlayback } from "@/preview/use-audio-playback";
+import { useSourceViewer } from "@/preview/use-source-viewer";
 import { useProjectStore } from "@/stores/project-store";
 import { TimelineWorkspace } from "@/timeline/components/timeline-workspace";
-import { FolderOpen, Sliders, AudioLines, Wand2, X } from "lucide-react";
+import { AudioLines, FolderOpen, Sliders, Wand2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { CommandPalette } from "./command-palette";
 import { InspectorPanel } from "./inspector-panel";
-import { NewProjectStart, type NewProjectPath } from "./new-project-start";
+import { type NewProjectPath, NewProjectStart } from "./new-project-start";
 import {
   clearNewProjectStartPending,
   isNewProjectStartPending,
@@ -43,6 +44,7 @@ export function EditorShell() {
     if (persistenceReady) return mountFunnel();
   }, [persistenceReady]);
   useAudioPlayback();
+  useSourceViewer();
   useAutoAnalysis();
   const isMobile = useIsBelow(900);
   const isDesktopApp = useIsDesktopApp();

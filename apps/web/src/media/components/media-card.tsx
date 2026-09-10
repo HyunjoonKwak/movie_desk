@@ -1,29 +1,30 @@
 "use client";
 
-import { Heart, Layers, Link2, Loader2, Pin, Scissors, Star, Trash2, X } from "lucide-react";
-import { Music, Image as ImageIcon, Film } from "lucide-react";
-import { memo, useRef } from "react";
 import { useT } from "@/i18n/use-t";
 import { cn } from "@/lib/cn";
 import { fmtSec } from "@/media/format";
-import { canRelinkFromFile } from "@/media/relink";
-import type { SourceHealth } from "@/media/source/probe-source";
-import { useMediaUiStore } from "@/stores/media-ui-store";
-import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
-import { useTimelineUiStore } from "@/stores/timeline-ui-store";
-import type { MediaAsset } from "@movie-desk/core";
-import { toast } from "sonner";
 import {
+  PreviewRegenerationError,
   regenerateAssetPreviews,
   usePreviewRegenerationStore,
-  PreviewRegenerationError,
 } from "@/media/import";
+import { canRelinkFromFile } from "@/media/relink";
 import { MediaSourceError } from "@/media/source/media-source";
+import type { SourceHealth } from "@/media/source/probe-source";
 import { isSourceMissing } from "@/media/source/probe-source";
-import { useProjectStore } from "@/stores/project-store";
-import { RefreshCw } from "lucide-react";
-import { MissingBadge } from "./missing-badge";
 import { MEDIA_CARD_PADDING } from "@/media/virtual-layout";
+import { useMediaUiStore } from "@/stores/media-ui-store";
+import { useAssetThumb, usePreviewVisibility } from "@/stores/preview-store";
+import { useProjectStore } from "@/stores/project-store";
+import { useSourceViewerStore } from "@/stores/source-viewer-store";
+import { useTimelineUiStore } from "@/stores/timeline-ui-store";
+import type { MediaAsset } from "@movie-desk/core";
+import { Heart, Layers, Link2, Loader2, Pin, Plus, Scissors, Star, Trash2, X } from "lucide-react";
+import { Film, Image as ImageIcon, Music } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import { memo, useRef } from "react";
+import { toast } from "sonner";
+import { MissingBadge } from "./missing-badge";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
 
@@ -131,11 +132,13 @@ export const MediaCard = memo(function MediaCard({
           // Any interaction makes this the E/W/D/Q source asset.
           useMediaUiStore.getState().setActiveAssetId(asset.id);
           if (e.metaKey || e.ctrlKey || e.shiftKey || selectionMode) {
-            // 선택 모드 중에는 클릭이 선택 토글로 동작 (실수로 타임라인 추가 방지)
+            // 선택 모드 중에는 클릭이 선택 토글로 동작
             onToggleSelect(asset.id);
             return;
           }
-          onAdd(asset);
+          // A plain click views the source; placing it is explicit (E/W/D/Q,
+          // drag, or the add button on the card) so browsing never edits the cut.
+          useSourceViewerStore.getState().show(asset.id);
         }}
         draggable
         onDragStart={(e) => {
@@ -156,7 +159,7 @@ export const MediaCard = memo(function MediaCard({
               : "border-line hover:border-accent",
           isExcluded ? "opacity-45" : "bg-panel-2",
         )}
-        title={t("media.clickToAdd")}
+        title={t("media.clickToView")}
       >
         <div className="relative aspect-video bg-black">
           {thumb ? (
@@ -248,6 +251,19 @@ export const MediaCard = memo(function MediaCard({
         </div>
       </button>
       <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAdd(asset);
+          }}
+          className="rounded bg-black/60 p-1 text-ink-1 hover:bg-accent/40"
+          title={t("media.addToTimeline")}
+          aria-label={t("media.addToTimeline")}
+          data-testid="card-add"
+        >
+          <Plus className="size-3" />
+        </button>
         {!isSourceMissing(health) && (
           <button
             type="button"

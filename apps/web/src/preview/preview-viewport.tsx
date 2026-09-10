@@ -17,7 +17,10 @@ import { PreviewControls } from "./preview-controls";
 import { RegionOverlay } from "./region-overlay";
 
 import { StateHint } from "@/components/state-hint";
+import { useSourceViewerStore } from "@/stores/source-viewer-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
+import { sourceProjectFor } from "./source-project";
+import { SourceViewerBar } from "./source-viewer-bar";
 
 // Phase 3 preview: WebGL2 compositor. Visible clips at the playhead are
 // stacked and drawn into a single canvas, replacing the phase-1 single
@@ -29,6 +32,11 @@ export function PreviewViewport() {
   const playing = usePlaybackStore((s) => s.playing);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
   const t = useT();
+  const sourceAssetId = useSourceViewerStore((s) => s.assetId);
+  const sourceAsset = useMemo(
+    () => (sourceAssetId ? project.mediaLibrary.find((a) => a.id === sourceAssetId) : undefined),
+    [project.mediaLibrary, sourceAssetId],
+  );
 
   const [migrationProject, setMigrationProject] = useState<string | null>(null);
   const [colorNotice, setColorNotice] = useState<string | null>(null);
@@ -80,18 +88,26 @@ export function PreviewViewport() {
     }
     renderingRef.current = true;
     redrawPendingRef.current = false;
-    const project = useProjectStore.getState().project;
+    const editor = useProjectStore.getState().project;
+    const source = useSourceViewerStore.getState();
+    const sourceAsset = source.assetId
+      ? editor.mediaLibrary.find((asset) => asset.id === source.assetId)
+      : undefined;
     // Skimming shows the frame under the cursor without moving the playhead.
     // It is ignored during playback (the transport owns the frame) and on a
     // child tab, where the hover time is child-local but the viewer draws the
     // root; a wrong frame is worse than the cursor line alone.
     const ui = useTimelineUiStore.getState();
-    const onRoot = ui.activeTimelineId === null || ui.activeTimelineId === project.rootTimelineId;
+    const onRoot = ui.activeTimelineId === null || ui.activeTimelineId === editor.rootTimelineId;
     const skim = !usePlaybackStore.getState().playing && onRoot ? ui.skimMs : null;
-    const playhead = skim ?? project.timeline.playhead;
+    // While a source is shown the viewer draws its one-clip project at the
+    // source transport, through the same compositor as the timeline.
+    const project = sourceAsset ? sourceProjectFor(sourceAsset, editor) : editor;
+    const at = sourceAsset ? source.playheadMs : skim;
+    const playhead = at ?? project.timeline.playhead;
     canvasRef.current?.setAttribute("data-render-playhead", String(Math.round(playhead)));
     void compositor
-      .renderFrame(project, assetByIdRef.current, skim === null ? {} : { playhead: skim })
+      .renderFrame(project, assetByIdRef.current, at === null ? {} : { playhead: at })
       .then(() => {
         if (canvasRef.current) captureScopes(canvasRef.current);
       })
@@ -118,6 +134,14 @@ export function PreviewViewport() {
     () =>
       useTimelineUiStore.subscribe((state, before) => {
         if (state.skimMs !== before.skimMs) drawLatest();
+      }),
+    [drawLatest],
+  );
+  useEffect(
+    () =>
+      useSourceViewerStore.subscribe((state, before) => {
+        if (state.playheadMs !== before.playheadMs || state.assetId !== before.assetId)
+          drawLatest();
       }),
     [drawLatest],
   );
@@ -214,45 +238,52 @@ export function PreviewViewport() {
     if (!playing) drawLatest();
   }, [playing, playhead, project, assetById, drawLatest]);
 
-  const { w, h } = project.resolution;
+  const viewed = sourceAsset ? sourceProjectFor(sourceAsset, project) : project;
+  const { w, h } = viewed.resolution;
 
   return (
-    <div className="relative flex h-full w-full items-center justify-center p-4">
-      <PreviewControls />
-      <div
-        className="relative max-h-full max-w-full overflow-hidden rounded-md border border-line bg-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]"
-        style={{ aspectRatio: `${w} / ${h}` }}
-      >
-        <canvas ref={canvasRef} data-preview-canvas className="size-full" />
-        <RegionOverlay />
-        <GuidesOverlay />
-        <MissingMediaNotice />
-        {(colorNotice || migrationProject === project.id) && (
-          <div className="absolute inset-x-0 bottom-0 space-y-2 bg-black/90 p-2">
-            {migrationProject === project.id && (
-              <StateHint
-                testId="color-migration-hint"
-                tone="info"
-                text={t("color.migration")}
-                dismiss={{ label: t("state.dismiss"), onClick: () => setMigrationProject(null) }}
-              />
-            )}
-            {colorNotice && (
-              <StateHint
-                testId="color-processing-hint"
-                tone="warning"
-                text={colorNotice}
-                dismiss={{ label: t("state.dismiss"), onClick: () => setColorNotice(null) }}
-              />
-            )}
-          </div>
-        )}
-        {!project.timeline.tracks.some((track) => track.clips.length > 0) && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
-            <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />
-          </div>
-        )}
+    <div
+      className="relative flex h-full w-full flex-col items-center justify-center gap-2 p-4"
+      data-viewer-mode={sourceAsset ? "source" : "timeline"}
+    >
+      {!sourceAsset && <PreviewControls />}
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <div
+          className="relative max-h-full max-w-full overflow-hidden rounded-md border border-line bg-black shadow-[0_18px_50px_rgba(0,0,0,0.35)]"
+          style={{ aspectRatio: `${w} / ${h}` }}
+        >
+          <canvas ref={canvasRef} data-preview-canvas className="size-full" />
+          {!sourceAsset && <RegionOverlay />}
+          {!sourceAsset && <GuidesOverlay />}
+          {!sourceAsset && <MissingMediaNotice />}
+          {(colorNotice || migrationProject === project.id) && (
+            <div className="absolute inset-x-0 bottom-0 space-y-2 bg-black/90 p-2">
+              {migrationProject === project.id && (
+                <StateHint
+                  testId="color-migration-hint"
+                  tone="info"
+                  text={t("color.migration")}
+                  dismiss={{ label: t("state.dismiss"), onClick: () => setMigrationProject(null) }}
+                />
+              )}
+              {colorNotice && (
+                <StateHint
+                  testId="color-processing-hint"
+                  tone="warning"
+                  text={colorNotice}
+                  dismiss={{ label: t("state.dismiss"), onClick: () => setColorNotice(null) }}
+                />
+              )}
+            </div>
+          )}
+          {!sourceAsset && !project.timeline.tracks.some((track) => track.clips.length > 0) && (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-3">
+              <StateHint testId="preview-empty-hint" text={t("state.preview.empty")} />
+            </div>
+          )}
+        </div>
       </div>
+      {sourceAsset && <SourceViewerBar asset={sourceAsset} />}
     </div>
   );
 }

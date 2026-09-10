@@ -1,5 +1,3 @@
-import { ProjectAudioMixer } from "@/export/audio-mixer";
-import { MixerAudioGraph, loadMeterWorklet } from "@/mixer/audio-graph";
 import {
   PitchCache,
   pitchCacheKey,
@@ -8,8 +6,10 @@ import {
   renderPitchInWorker,
 } from "@/audio/pitch-renderer";
 import { setPitchState } from "@/audio/pitch-state";
-import { useEditorStore as useProjectStore } from "@/stores/editor-store";
+import { ProjectAudioMixer } from "@/export/audio-mixer";
 import { audioBlobFor } from "@/media/audio/audio-variant";
+import { MixerAudioGraph, loadMeterWorklet } from "@/mixer/audio-graph";
+import { useEditorStore as useProjectStore } from "@/stores/editor-store";
 import type { MediaAsset, MediaClip, Project } from "@movie-desk/core";
 import {
   buildAudioSequencePlan,
@@ -24,7 +24,7 @@ import { sampleVolumeCurve } from "./volume-curve";
 // scheduling every future asset at play(). At most two decoded source buffers
 // are retained, the next 30 seconds are scheduled initially, and another 15
 // seconds are appended halfway through the current window.
-class AudioEngine {
+export class AudioEngine {
   private static readonly MAX_CACHED_BUFFERS = 2;
   private static readonly INITIAL_LOOKAHEAD_MS = 30_000;
   private static readonly REFILL_MS = 15_000;
@@ -535,3 +535,7 @@ export const getAudioEngine = (): AudioEngine => {
   if (!singleton) singleton = new AudioEngine();
   return singleton;
 };
+
+// A second transport (the source viewer) gets its own engine and context so
+// its schedule never competes with the timeline monitor.
+export const createAudioEngine = (): AudioEngine => new AudioEngine();
