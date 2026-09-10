@@ -20,6 +20,7 @@ export interface DesktopMediaBridge {
   sourceRoots?: () => Promise<unknown>;
   /** Gather originals into a folder the user picks. */
   consolidate?: (assetIds: string[]) => Promise<unknown>;
+  consolidateRoot?: (rootId: string) => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

@@ -71,6 +71,10 @@ class MediaCatalog {
     return this.#request("listRoots");
   }
 
+  assetIdsForRoot(rootId) {
+    return this.#request("assetIdsForRoot", requiredText(rootId, "rootId"));
+  }
+
   getRoot(rootId) {
     return this.#request("getRoot", requiredText(rootId, "rootId"));
   }

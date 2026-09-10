@@ -425,6 +425,25 @@ ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
 
 // The destination is chosen through a native folder picker so the renderer
 // never names a path itself.
+ipcMain.handle("movie-desk:media-consolidate-root", async (event, rootId) => {
+  requireTrustedIpc(event);
+  if (!consolidator || !mediaCatalog) {
+    return { ok: false, error: { code: "CATALOG_UNAVAILABLE", message: "The local media catalog is unavailable." } };
+  }
+  if (typeof rootId !== "string") throw new Error("Invalid root");
+  const assetIds = await mediaCatalog.assetIdsForRoot(rootId);
+  const chosen = await dialog.showOpenDialog({ properties: ["openDirectory", "createDirectory"] });
+  if (chosen.canceled || !chosen.filePaths[0]) {
+    return { ok: false, error: { code: "CANCELLED", message: "No destination was chosen." } };
+  }
+  try {
+    return { ok: true, result: await consolidator.consolidate(assetIds, chosen.filePaths[0]) };
+  } catch (error) {
+    const code = typeof error?.code === "string" ? error.code : "CONSOLIDATE_FAILED";
+    return { ok: false, error: { code, message: "Movie Desk could not gather these files." } };
+  }
+});
+
 ipcMain.handle("movie-desk:media-consolidate", async (event, assetIds) => {
   requireTrustedIpc(event);
   if (!consolidator) {

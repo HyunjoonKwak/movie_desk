@@ -995,4 +995,10 @@ export const ko = {
     "roots.summary": "원본 위치 {count}곳을 참조하고 있습니다.",
     "roots.contents": "{count}개 · {size}",
     "roots.inPlaceNote": "Movie Desk는 원본을 복사하지 않고 이 위치에서 읽습니다. 원본은 그대로 유지됩니다.",
+    "roots.gather": "다른 폴더로 모으기",
+    "roots.gathering": "모으는 중…",
+    "roots.gathered": "{count}개를 새 위치로 옮겼습니다. 원본은 그대로 남아 있습니다.",
+    "roots.gatherPartial": "{count}개를 옮겼고 {failed}개는 실패했습니다. 원본은 모두 그대로입니다.",
+    "roots.gatherNone": "옮긴 파일이 없습니다. 원본은 그대로입니다.",
+    "roots.gatherFailed": "모으기를 끝내지 못했습니다",
 } as const;

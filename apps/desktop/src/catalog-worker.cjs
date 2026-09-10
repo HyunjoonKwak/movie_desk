@@ -131,6 +131,15 @@ const handlers = {
       }));
   },
 
+  // Asset ids under one root, so consolidation can be scoped to a location the
+  // user picked rather than the whole library.
+  assetIdsForRoot(rootId) {
+    return requireDatabase()
+      .prepare("SELECT id FROM media_assets WHERE root_id = ? ORDER BY relative_path")
+      .all(rootId)
+      .map((row) => row.id);
+  },
+
   upsertAsset(asset) {
     const db = requireDatabase();
     db.prepare(`

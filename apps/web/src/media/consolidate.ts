@@ -41,7 +41,8 @@ export class ConsolidateError extends Error {
   }
 }
 
-export const canConsolidate = (): boolean => Boolean(readDesktopMediaBridge()?.consolidate);
+export const canConsolidate = (): boolean =>
+  Boolean(readDesktopMediaBridge()?.consolidateRoot);
 
 export const parseConsolidateResult = (value: unknown): ConsolidateOutcome => {
   const parsed = resultSchema.safeParse(value);
@@ -50,6 +51,18 @@ export const parseConsolidateResult = (value: unknown): ConsolidateOutcome => {
   }
   if (!parsed.data.ok) throw new ConsolidateError(parsed.data.error.code, parsed.data.error.message);
   return parsed.data.result;
+};
+
+/** Gather everything under one referenced location. */
+export const consolidateRoot = async (rootId: string): Promise<ConsolidateOutcome> => {
+  const bridge = readDesktopMediaBridge();
+  if (!bridge?.consolidateRoot) {
+    throw new ConsolidateError(
+      "DESKTOP_REQUIRED",
+      "Gathering originals requires the Movie Desk macOS app.",
+    );
+  }
+  return parseConsolidateResult(await bridge.consolidateRoot(rootId));
 };
 
 export const consolidateAssets = async (

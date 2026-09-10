@@ -997,4 +997,10 @@ export const en = {
     "roots.summary": "Referencing {count} locations.",
     "roots.contents": "{count} files · {size}",
     "roots.inPlaceNote": "Movie Desk reads from these locations instead of copying. Your originals stay as they are.",
+    "roots.gather": "Gather into another folder",
+    "roots.gathering": "Gathering…",
+    "roots.gathered": "Moved {count} files to the new location. Your originals are still there.",
+    "roots.gatherPartial": "Moved {count} files; {failed} failed. Every original is untouched.",
+    "roots.gatherNone": "Nothing was moved. Your originals are unchanged.",
+    "roots.gatherFailed": "Gathering could not finish",
 } as const;

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { HardDrive, Network, Usb } from "lucide-react";
 import { useT } from "@/i18n/use-t";
 import { readSourceRoots, rootDisplayName, type SourceRoot } from "../source-roots";
+import { canConsolidate, consolidateRoot, ConsolidateError } from "../consolidate";
 
 const ICONS = {
   local: HardDrive,
@@ -29,7 +31,32 @@ const readableSize = (bytes: number): string => {
  */
 export function SourceRootsPanel() {
   const [roots, setRoots] = useState<readonly SourceRoot[] | null>(null);
+  const [busyRoot, setBusyRoot] = useState<string | null>(null);
   const t = useT();
+  const gatherable = canConsolidate();
+
+  const gather = async (root: SourceRoot) => {
+    setBusyRoot(root.id);
+    try {
+      const outcome = await consolidateRoot(root.id);
+      const moved = outcome.moved.length;
+      // Always say the originals survived: that is the part a user worries
+      // about when a tool starts copying their footage.
+      if (outcome.failed.length)
+        toast.warning(t("roots.gatherPartial", { count: moved, failed: outcome.failed.length }));
+      else if (moved) toast.success(t("roots.gathered", { count: moved }));
+      else toast.info(t("roots.gatherNone"));
+      setRoots(await readSourceRoots());
+    } catch (error) {
+      // Cancelling the folder picker is a choice, not a failure to report.
+      if (error instanceof ConsolidateError && error.code === "CANCELLED") return;
+      toast.error(
+        `${t("roots.gatherFailed")}: ${error instanceof Error ? error.message : error}`,
+      );
+    } finally {
+      setBusyRoot(null);
+    }
+  };
 
   useEffect(() => {
     let live = true;
@@ -82,6 +109,17 @@ export function SourceRootsPanel() {
                   size: readableSize(root.totalBytes),
                 })}
               </div>
+              {gatherable && root.assetCount > 0 && (
+                <button
+                  type="button"
+                  className="mt-1.5 rounded bg-white/5 px-2 py-1 text-ink-2 disabled:opacity-50"
+                  disabled={busyRoot !== null}
+                  onClick={() => void gather(root)}
+                  data-testid="roots-gather"
+                >
+                  {busyRoot === root.id ? t("roots.gathering") : t("roots.gather")}
+                </button>
+              )}
             </li>
           );
         })}

@@ -61,5 +61,7 @@ contextBridge.exposeInMainWorld("cutDesktop", {
     // verifies before re-pointing; never deletes an original.
     consolidate: async (assetIds) =>
       ipcRenderer.invoke("movie-desk:media-consolidate", assetIds),
+    consolidateRoot: async (rootId) =>
+      ipcRenderer.invoke("movie-desk:media-consolidate-root", rootId),
   },
 });
