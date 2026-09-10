@@ -2,16 +2,7 @@
 
 import { MixerPanel } from "@/mixer/mixer-panel";
 import { useState } from "react";
-import {
-  Activity,
-  Clapperboard,
-  FileText,
-  MapPin,
-  Music2,
-  ShieldCheck,
-  Sliders,
-  Wand2,
-} from "lucide-react";
+import { Activity, Archive, Clapperboard, FileText, HardDrive, MapPin, Music2, ShieldCheck, Sliders, Wand2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { AutoEditPanel } from "@/autoedit/components/autoedit-panel";
 import { InspectorPanel } from "./inspector-panel";
@@ -21,6 +12,8 @@ import { MulticamPanel } from "./multicam-panel";
 import { MarkerPanel } from "./marker-panel";
 import { MusicPanel } from "@/music/components/music-panel";
 import { ProjectInspectorPanel } from "./project-inspector-panel";
+import { SourceRootsPanel } from "@/media/components/source-roots-panel";
+import { PreservedClipsPanel } from "./preserved-clips-panel";
 import { useT } from "@/i18n/use-t";
 
 export type RightPanelTab =
@@ -32,7 +25,9 @@ export type RightPanelTab =
   | "scopes"
   | "multicam"
   | "markers"
-  | "inspect";
+  | "inspect"
+  | "roots"
+  | "preserved";
 
 export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPanelTab }) {
   const [tab, setTab] = useState<RightPanelTab>(initialTab);
@@ -95,6 +90,18 @@ export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPan
           icon={<ShieldCheck className="size-3.5" />}
           label={t("inspect.tab")}
         />
+        <TabButton
+          active={tab === "roots"}
+          onClick={() => setTab("roots")}
+          icon={<HardDrive className="size-3.5" />}
+          label={t("roots.title")}
+        />
+        <TabButton
+          active={tab === "preserved"}
+          onClick={() => setTab("preserved")}
+          icon={<Archive className="size-3.5" />}
+          label={t("preserved.title")}
+        />
       </div>
       <div className="flex-1 overflow-hidden">
         {tab === "inspector" && <InspectorPanel />}
@@ -106,6 +113,8 @@ export function RightPanel({ initialTab = "inspector" }: { initialTab?: RightPan
         {tab === "multicam" && <MulticamPanel />}
         {tab === "markers" && <MarkerPanel />}
         {tab === "inspect" && <ProjectInspectorPanel />}
+        {tab === "roots" && <SourceRootsPanel />}
+        {tab === "preserved" && <PreservedClipsPanel />}
       </div>
     </div>
   );

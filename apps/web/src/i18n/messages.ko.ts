@@ -989,4 +989,10 @@ export const ko = {
     "preserved.empty": "보존된 클립이 없습니다.",
     "preserved.restored": "클립을 타임라인에 되돌렸습니다.",
     "preserved.discarded": "보존된 클립을 삭제했습니다.",
+    "roots.title": "원본 위치",
+    "roots.loading": "원본 위치를 확인하는 중…",
+    "roots.empty": "참조 중인 원본 위치가 없습니다. 데스크톱 앱에서 가져오면 여기에 표시됩니다.",
+    "roots.summary": "원본 위치 {count}곳을 참조하고 있습니다.",
+    "roots.contents": "{count}개 · {size}",
+    "roots.inPlaceNote": "Movie Desk는 원본을 복사하지 않고 이 위치에서 읽습니다. 원본은 그대로 유지됩니다.",
 } as const;

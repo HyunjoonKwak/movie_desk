@@ -109,6 +109,28 @@ const handlers = {
     return row ? mapRoot(row) : null;
   },
 
+  // Every root the library references, with how many assets sit under it, so
+  // the user can answer "where are my originals?" without opening a database.
+  listRoots() {
+    return requireDatabase()
+      .prepare(`
+        SELECT r.id, r.kind, r.volume_uuid, r.volume_relative_path,
+          r.last_known_absolute_path, r.case_sensitive, r.created_at_ms, r.updated_at_ms,
+          COUNT(a.id) AS asset_count,
+          COALESCE(SUM(a.size_bytes), 0) AS total_bytes
+        FROM source_roots r
+        LEFT JOIN media_assets a ON a.root_id = r.id
+        GROUP BY r.id
+        ORDER BY r.last_known_absolute_path
+      `)
+      .all()
+      .map((row) => ({
+        ...mapRoot(row),
+        assetCount: Number(row.asset_count),
+        totalBytes: Number(row.total_bytes),
+      }));
+  },
+
   upsertAsset(asset) {
     const db = requireDatabase();
     db.prepare(`

@@ -54,5 +54,8 @@ contextBridge.exposeInMainWorld("cutDesktop", {
     // isolated preload and sent straight to main; page JavaScript never sees it.
     importFile: async (file) =>
       ipcRenderer.invoke("movie-desk:media-import-file", webUtils.getPathForFile(file)),
+    // The folders this library references, so the user can see where their
+    // originals actually are.
+    sourceRoots: async () => ipcRenderer.invoke("movie-desk:media-source-roots"),
   },
 });

@@ -67,6 +67,10 @@ class MediaCatalog {
     return this.#request("recordSourceState", { assetId: requiredText(assetId, "assetId"), state });
   }
 
+  listRoots() {
+    return this.#request("listRoots");
+  }
+
   getRoot(rootId) {
     return this.#request("getRoot", requiredText(rootId, "rootId"));
   }

@@ -991,4 +991,10 @@ export const en = {
     "preserved.empty": "No preserved clips.",
     "preserved.restored": "The clip is back on the timeline.",
     "preserved.discarded": "The preserved clip was deleted.",
+    "roots.title": "Original locations",
+    "roots.loading": "Checking where your originals are…",
+    "roots.empty": "No referenced locations yet. They appear here once you import in the desktop app.",
+    "roots.summary": "Referencing {count} locations.",
+    "roots.contents": "{count} files · {size}",
+    "roots.inPlaceNote": "Movie Desk reads from these locations instead of copying. Your originals stay as they are.",
 } as const;

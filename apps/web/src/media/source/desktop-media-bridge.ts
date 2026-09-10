@@ -16,6 +16,8 @@ export interface DesktopMediaBridge {
   importHeicFile?: (file: File) => Promise<unknown>;
   /** Reference a file where it lives instead of copying it into the app. */
   importFile?: (file: File) => Promise<unknown>;
+  /** The folders this library references. */
+  sourceRoots?: () => Promise<unknown>;
 }
 
 const SOURCE_STATE_FLAGS: Record<MediaSourceState, true> = {

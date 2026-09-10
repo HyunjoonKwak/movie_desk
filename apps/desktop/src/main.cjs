@@ -413,6 +413,21 @@ ipcMain.handle("movie-desk:media-acquire", async (event, assetId) => {
   return { ...mediaLeases.acquire(asset.id, { asset, resolved }), state: resolved.state };
 });
 
+ipcMain.handle("movie-desk:media-source-roots", async (event) => {
+  requireTrustedIpc(event);
+  if (!mediaCatalog) return [];
+  const roots = await mediaCatalog.listRoots();
+  // The absolute path is what makes a root recognisable to its owner, and this
+  // channel is the one place it is meant to be shown. Nothing else exposes it.
+  return roots.map((root) => ({
+    id: root.id,
+    kind: root.kind,
+    displayPath: root.lastKnownAbsolutePath,
+    assetCount: root.assetCount,
+    totalBytes: root.totalBytes,
+  }));
+});
+
 ipcMain.handle("movie-desk:media-import-file", async (event, sourcePath) => {
   requireTrustedIpc(event);
   if (!referenceImporter) {
