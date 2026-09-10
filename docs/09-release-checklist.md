@@ -77,6 +77,31 @@ v0.4.0 계열 릴리스 전에 확인하는 항목이다. **자동 항목**은 `
 2026-09-06 개발 검증은 승인된 임시 APFS 디스크 이미지와 격리 Electron 프로필로 수행했다.
 실제 물리 USB 및 서명된 RC DMG 확인은 위 수동 릴리스 항목으로 구분한다.
 
+### 로컬 DMG 빌드가 막힐 때
+
+`electron-builder` 의 네이티브 재빌드는 `node_modules/.pnpm/node_modules` 아래의
+**모든 심볼릭 링크를 따라간다.** pnpm 은 다른 OS·아키텍처용 선택적 의존성을
+매달린 링크로 남기는데, 이것 자체는 정상이고 pnpm 도 문제로 보지 않는다.
+그런데 재빌드는 첫 번째 매달린 링크에서 `ENOENT` 로 멈춘다.
+
+    ⨯ ENOENT: ... stat '.../node_modules/.pnpm/node_modules/@biomejs/cli-linux-arm64'
+
+하나를 지우면 다음 것이 걸리므로 한 번에 정리한다.
+
+```sh
+cd node_modules/.pnpm/node_modules
+find . -maxdepth 2 -type l ! -exec test -e {} \; -delete
+```
+
+2026-09-10 에 이 저장소에서 131개였고 전부 무해했다 —
+타 플랫폼 바이너리, 보안 권고 때문에 버전만 고정한 항목, 그리고
+mediabunny 로 교체된 뒤 남은 옛 미디어 패키지들이다.
+지운 뒤 `pnpm lint` 로 실제 도구가 여전히 도는지 확인한다.
+
+**CI 는 영향받지 않는다.** 릴리스 워크플로는 매번 깨끗한 러너에서
+`pnpm install --frozen-lockfile` 을 하므로 오래된 매달린 링크가 쌓이지 않는다.
+이 항목은 로컬 반복 빌드에만 해당한다.
+
 ## 4. 릴리스 절차
 
 1. `git fetch` 뒤 깨끗한 `origin/main`에서 시작한다. 열린 통합 대기 브랜치가 없어야 한다.
