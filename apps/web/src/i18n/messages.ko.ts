@@ -1020,4 +1020,5 @@ export const ko = {
     "media.rangeStrip": "사용 구간",
     "timeline.volumeHint": "끌어서 볼륨 조절 · 더블클릭하면 100%",
     "timeline.volumeKeyed": "볼륨 키프레임이 있는 클립 — 인스펙터에서 편집합니다",
+    "mixer.limitedCaught": "리미터가 잡은 과부하 샘플: {count} · 출력은 클리핑되지 않았습니다",
 } as const;

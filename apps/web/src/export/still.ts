@@ -1,6 +1,6 @@
-import type { ID, MediaAsset } from "@movie-desk/core";
 import { Compositor } from "@/renderer/compositor";
 import { useProjectStore } from "@/stores/project-store";
+import type { ID, MediaAsset } from "@movie-desk/core";
 
 // Renders the frame at the current playhead at full project resolution and
 // downloads it as a PNG. Uses a throwaway compositor so the still matches the
@@ -18,10 +18,7 @@ export const exportStillFrame = async (): Promise<void> => {
   try {
     compositor.resize(w, h);
     const at = project.timeline.playhead;
-    // Render twice: the first pass primes async media decoders, the second
-    // composites the now-available frame.
-    await compositor.renderFrame(project, getAsset);
-    await compositor.renderFrame(project, getAsset);
+    await compositor.renderFrame(project, getAsset, { exact: true });
 
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob((b) => resolve(b), "image/png"),

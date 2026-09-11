@@ -1,8 +1,8 @@
-import { syncRootTimeline } from "@movie-desk/core";
 import { waitForEncoderQueue } from "@/media/mux/encoder-backpressure";
 import { Mp4Writer } from "@/media/mux/mp4-writer";
 import { Compositor } from "@/renderer/compositor";
 import { useRangeStore } from "@/stores/range-store";
+import { syncRootTimeline } from "@movie-desk/core";
 import type { AudioPeakResult } from "@movie-desk/core";
 import { type Project, framesToMs, msToFrames } from "@movie-desk/core";
 import { AAC_PREROLL_SAMPLES, measureAacPriming } from "./aac-priming";
@@ -11,6 +11,7 @@ import { hasConflictingBt709Output, isBt709Output } from "./bt709-frame";
 import { Bt709FramePipeline } from "./bt709-pipeline";
 import { useDuckingStore } from "./ducking-store";
 import { LoudnessMeter } from "./loudness";
+import { muxedColorIsBt709 } from "./muxed-color";
 import { useNormalizeStore } from "./normalize-store";
 import { MissingMediaError, findMissingMedia } from "./preflight";
 import type { ExportPreset, ExportProgress, ExportRequest, ExportResult, Exporter } from "./types";
@@ -184,6 +185,7 @@ export class WebCodecsExporter implements Exporter {
           timeline: { ...project.timeline, playhead: virtualPlayheadMs },
         }),
         getAsset,
+        { exact: true },
       );
       if (this.cancelled) throw new ExportCancelledError();
       const firstFrame = await colorPipeline.capture(0, Math.round(1_000_000 / preset.fps));
@@ -227,7 +229,7 @@ export class WebCodecsExporter implements Exporter {
           ...project,
           timeline: { ...project.timeline, playhead: virtualPlayheadMs },
         });
-        await compositor.renderFrame(frameProject, getAsset);
+        await compositor.renderFrame(frameProject, getAsset, { exact: true });
         if (colorOutputError) throw colorOutputError;
         pendingFrames.push({
           index: f,
@@ -366,6 +368,10 @@ export class WebCodecsExporter implements Exporter {
       await encoder.flush();
       if (colorOutputError) throw colorOutputError;
       const buffer = await muxer.finalize();
+      // The encoder callback is the first signal; the container is the last
+      // word. Electron's encoder can omit colorSpace from its decoderConfig
+      // while the muxer still writes a correct colr atom.
+      if (colorMetadataMissing && (await muxedColorIsBt709(buffer))) colorMetadataMissing = false;
 
       onProgress({ stage: "finalizing", progress: 1 });
 

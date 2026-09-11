@@ -69,6 +69,9 @@ import { getFrameProvider } from "./webcodecs-decoder";
 export interface RenderFrameOptions {
   readonly target?: RenderTarget;
   readonly playhead?: number;
+  // Wait for decoded frames instead of bridging with the <video> element:
+  // export and stills must show the real frame, never an approximation.
+  readonly exact?: boolean;
 }
 
 interface FrameContext {
@@ -77,6 +80,7 @@ interface FrameContext {
   sequenceGraph: ReturnType<typeof analyzeSequenceGraph> | undefined;
   readonly target: RenderTarget;
   readonly playhead: number;
+  readonly exact: boolean;
   readonly pingPong: PingPong;
   readonly slots: Map<number, TargetLease>;
   readonly releaseClip: (() => void)[];
@@ -305,6 +309,7 @@ export class Compositor {
       sequenceGraph,
       target,
       playhead: options.playhead ?? project.timeline.playhead,
+      exact: options.exact === true,
       pingPong,
       slots: new Map(),
       releaseClip: [],
@@ -1175,7 +1180,7 @@ export class Compositor {
     return current;
   }
 
-  private readonly decodePreparing = new Set<string>();
+  private readonly decodePreparing = new Map<string, Promise<void>>();
   // Missing or unreadable sources retry with a growing delay (1 s → 30 s);
   // a changed asset record (relink, rebuilt proxy) retries at once.
   private readonly decodeRetry = new RetryBackoff();
@@ -1204,8 +1209,7 @@ export class Compositor {
         !this.decodePreparing.has(asset.id) &&
         this.decodeRetry.shouldTry(asset.id, asset)
       ) {
-        this.decodePreparing.add(asset.id);
-        void (async () => {
+        const preparing = (async () => {
           try {
             // Offline/missing sources resolve to null and retry later with
             // backoff, like a missing OPFS copy did before D1.
@@ -1223,8 +1227,14 @@ export class Compositor {
             this.decodePreparing.delete(asset.id);
           }
         })();
+        this.decodePreparing.set(asset.id, preparing);
       }
-      const decodedFrame = provider.framesFor(asset.id, Math.max(0, relativeMs));
+      let decodedFrame = provider.framesFor(asset.id, Math.max(0, relativeMs));
+      if (!decodedFrame && frame.exact) {
+        await this.decodePreparing.get(asset.id);
+        decodedFrame = await provider.ensure(asset.id, Math.max(0, relativeMs));
+        if (this.invalidated || this.gl.isContextLost()) return null;
+      }
       if (decodedFrame) {
         let tex = this.assetTextures.get(`${frame.depth}:${asset.id}`);
         if (!tex) {

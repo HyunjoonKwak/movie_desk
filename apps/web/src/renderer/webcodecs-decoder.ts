@@ -22,6 +22,9 @@ const MAX_DECODER_HANDLES = 8;
 
 export interface FrameProvider {
   framesFor(assetId: string, atMs: number): VideoFrame | null;
+  // Waits for the decoder and its window instead of falling back; null only
+  // when the asset cannot be decoded here at all.
+  ensure(assetId: string, atMs: number): Promise<VideoFrame | null>;
   prepare(assetId: string, source: Blob | RandomAccessMediaSource): Promise<boolean>;
   // Whether frames can currently be served or are being prepared.
   has(assetId: string): boolean;
@@ -50,6 +53,18 @@ class CachingFrameProvider implements FrameProvider {
 
   has(assetId: string): boolean {
     return this.handles.has(assetId) || this.pending.has(assetId);
+  }
+
+  async ensure(assetId: string, atMs: number): Promise<VideoFrame | null> {
+    const pending = this.pending.get(assetId);
+    if (pending) await pending;
+    const handle = this.touch(assetId);
+    if (!handle || this.disposed) return null;
+    const timestampUs = Math.round(atMs * 1000);
+    const hit = this.cache.nearest(assetId, timestampUs, FRAME_TOLERANCE_US);
+    if (hit) return hit.frame;
+    await handle.request(timestampUs).catch(() => undefined);
+    return this.cache.nearest(assetId, timestampUs, FRAME_TOLERANCE_US)?.frame ?? null;
   }
 
   private touch(assetId: string): DecoderHandle | undefined {

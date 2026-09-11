@@ -73,3 +73,20 @@ describe("CachingFrameProvider handle bound", () => {
     expect(closed).toEqual(["a"]);
   });
 });
+
+describe("CachingFrameProvider.ensure", () => {
+  it("waits for a pending prepare and the decode window before answering", async () => {
+    const provider = createFrameProviderForTests(2);
+    const preparing = provider.prepare("a", source);
+    // Nothing is cached in this harness, so the answer is null — but only
+    // after the prepare and the request have both run.
+    const frame = await provider.ensure("a", 40);
+    expect(await preparing).toBe(true);
+    expect(frame).toBeNull();
+    expect(opened).toEqual(["a"]);
+  });
+  it("is null for an asset that was never prepared", async () => {
+    const provider = createFrameProviderForTests(2);
+    expect(await provider.ensure("zzz", 0)).toBeNull();
+  });
+});

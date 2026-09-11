@@ -1022,4 +1022,5 @@ export const en = {
     "media.rangeStrip": "Use range",
     "timeline.volumeHint": "Drag to set volume · double-click for 100%",
     "timeline.volumeKeyed": "This clip has volume keyframes — edit them in the inspector",
+    "mixer.limitedCaught": "Overs caught by the limiter: {count} · the output is not clipped",
 } as const;

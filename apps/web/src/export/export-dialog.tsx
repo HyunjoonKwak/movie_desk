@@ -288,7 +288,7 @@ export function ExportDialog({ open, onOpenChange }: Props) {
                     {file.audioPeaks && file.audioPeaks.limitedSamples > 0 && (
                       <StateHint
                         tone="warning"
-                        text={t("mixer.limited", { count: file.audioPeaks.limitedSamples })}
+                        text={t("mixer.limitedCaught", { count: file.audioPeaks.limitedSamples })}
                       />
                     )}
                     {file.colorApproximation && (
