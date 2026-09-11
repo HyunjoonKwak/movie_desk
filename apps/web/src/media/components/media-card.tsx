@@ -24,6 +24,7 @@ import { Film, Image as ImageIcon, Music } from "lucide-react";
 import { RefreshCw } from "lucide-react";
 import { memo, useRef } from "react";
 import { toast } from "sonner";
+import { MediaCardPreview, isRangeDragActive } from "./media-card-preview";
 import { MissingBadge } from "./missing-badge";
 
 const KIND_ICON = { video: Film, audio: Music, image: ImageIcon } as const;
@@ -142,6 +143,10 @@ export const MediaCard = memo(function MediaCard({
         }}
         draggable
         onDragStart={(e) => {
+          if (isRangeDragActive()) {
+            e.preventDefault();
+            return;
+          }
           // Tracks read the dragged asset from the UI store —
           // dataTransfer is set too for completeness.
           e.dataTransfer.setData("application/x-cut-asset", asset.id);
@@ -159,24 +164,22 @@ export const MediaCard = memo(function MediaCard({
               : "border-line hover:border-accent",
           isExcluded ? "opacity-45" : "bg-panel-2",
         )}
-        title={t("media.clickToView")}
+        title={t("media.cardHint")}
       >
         <div className="relative aspect-video bg-black">
-          {thumb ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={thumb} alt={asset.name} className="size-full object-cover" />
-          ) : (
-            <div className="flex size-full items-center justify-center text-ink-3">
-              <Icon className="size-6" />
-            </div>
-          )}
+          <MediaCardPreview
+            asset={asset}
+            thumb={thumb}
+            Icon={Icon}
+            previewVisible={previewVisible}
+          />
           {asset.width && asset.height && (
-            <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
+            <span className="pointer-events-none absolute bottom-3.5 right-1 rounded bg-black/60 px-1 py-0.5 text-3xs font-mono text-white">
               {asset.width}×{asset.height}
             </span>
           )}
           {asset.proxyPath && (
-            <span className="absolute bottom-1 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
+            <span className="pointer-events-none absolute bottom-3.5 left-1 rounded bg-accent/80 px-1 py-0.5 text-3xs font-medium text-white">
               PROXY
             </span>
           )}

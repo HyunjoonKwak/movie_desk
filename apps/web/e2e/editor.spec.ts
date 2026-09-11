@@ -96,7 +96,7 @@ test("keeps populated panels contained at compact desktop width", async ({ page 
     );
   expect(overflows).toEqual([]);
 
-  await page.getByTitle("Click to view · E appends to the timeline").click();
+  await page.getByTitle(/^Click to view/).click();
   await page.keyboard.press("e");
   const clip = page.locator("[data-clip]").first();
   await expect(clip).toBeVisible();

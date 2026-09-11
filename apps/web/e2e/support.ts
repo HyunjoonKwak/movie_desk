@@ -75,6 +75,28 @@ export const revealMediaCard = async (page: Page, name = "pix.png") => {
 
 export const clipCount = (page: Page): Promise<number> => page.locator("[data-clip]").count();
 
+// A mono 16-bit 1 kHz tone, `seconds` long, for tests that need an audio clip.
+export const toneWav = (seconds = 2): Buffer => {
+  const rate = 48_000;
+  const frames = rate * seconds;
+  const out = Buffer.alloc(44 + frames * 2);
+  out.write("RIFF");
+  out.writeUInt32LE(out.length - 8, 4);
+  out.write("WAVEfmt ", 8);
+  out.writeUInt32LE(16, 16);
+  out.writeUInt16LE(1, 20);
+  out.writeUInt16LE(1, 22);
+  out.writeUInt32LE(rate, 24);
+  out.writeUInt32LE(rate * 2, 28);
+  out.writeUInt16LE(2, 32);
+  out.writeUInt16LE(16, 34);
+  out.write("data", 36);
+  out.writeUInt32LE(frames * 2, 40);
+  for (let i = 0; i < frames; i++)
+    out.writeInt16LE(Math.round(6000 * Math.sin((2 * Math.PI * 1000 * i) / rate)), 44 + i * 2);
+  return out;
+};
+
 // Imports one still image, views it (the click) and appends it `presses`
 // times. Returns the clip count once it has settled: the import may place a
 // clip itself, so the number is measured rather than assumed.

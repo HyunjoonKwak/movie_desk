@@ -32,11 +32,18 @@ export function PreviewViewport() {
   const playing = usePlaybackStore((s) => s.playing);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
   const t = useT();
-  const sourceAssetId = useSourceViewerStore((s) => s.assetId);
-  const sourceAsset = useMemo(
-    () => (sourceAssetId ? project.mediaLibrary.find((a) => a.id === sourceAssetId) : undefined),
-    [project.mediaLibrary, sourceAssetId],
+  const shownAssetId = useSourceViewerStore((s) => s.assetId);
+  const skimAssetId = useSourceViewerStore((s) => s.skimAssetId);
+  const shownAsset = useMemo(
+    () => (shownAssetId ? project.mediaLibrary.find((a) => a.id === shownAssetId) : undefined),
+    [project.mediaLibrary, shownAssetId],
   );
+  const skimAsset = useMemo(
+    () => (skimAssetId ? project.mediaLibrary.find((a) => a.id === skimAssetId) : undefined),
+    [project.mediaLibrary, skimAssetId],
+  );
+  // What the canvas is showing: the skimmed card, else the shown source.
+  const sourceAsset = skimAsset ?? shownAsset;
 
   const [migrationProject, setMigrationProject] = useState<string | null>(null);
   const [colorNotice, setColorNotice] = useState<string | null>(null);
@@ -90,9 +97,15 @@ export function PreviewViewport() {
     redrawPendingRef.current = false;
     const editor = useProjectStore.getState().project;
     const source = useSourceViewerStore.getState();
-    const sourceAsset = source.assetId
-      ? editor.mediaLibrary.find((asset) => asset.id === source.assetId)
+    // A card being skimmed wins over the shown source, which wins over the timeline.
+    const skimAsset = source.skimAssetId
+      ? editor.mediaLibrary.find((asset) => asset.id === source.skimAssetId)
       : undefined;
+    const sourceAsset =
+      skimAsset ??
+      (source.assetId
+        ? editor.mediaLibrary.find((asset) => asset.id === source.assetId)
+        : undefined);
     // Skimming shows the frame under the cursor without moving the playhead.
     // It is ignored during playback (the transport owns the frame) and on a
     // child tab, where the hover time is child-local but the viewer draws the
@@ -103,7 +116,7 @@ export function PreviewViewport() {
     // While a source is shown the viewer draws its one-clip project at the
     // source transport, through the same compositor as the timeline.
     const project = sourceAsset ? sourceProjectFor(sourceAsset, editor) : editor;
-    const at = sourceAsset ? source.playheadMs : skim;
+    const at = skimAsset ? source.skimMs : sourceAsset ? source.playheadMs : skim;
     const playhead = at ?? project.timeline.playhead;
     canvasRef.current?.setAttribute("data-render-playhead", String(Math.round(playhead)));
     void compositor
@@ -140,7 +153,12 @@ export function PreviewViewport() {
   useEffect(
     () =>
       useSourceViewerStore.subscribe((state, before) => {
-        if (state.playheadMs !== before.playheadMs || state.assetId !== before.assetId)
+        if (
+          state.playheadMs !== before.playheadMs ||
+          state.assetId !== before.assetId ||
+          state.skimAssetId !== before.skimAssetId ||
+          state.skimMs !== before.skimMs
+        )
           drawLatest();
       }),
     [drawLatest],
@@ -283,7 +301,15 @@ export function PreviewViewport() {
           )}
         </div>
       </div>
-      {sourceAsset && <SourceViewerBar asset={sourceAsset} />}
+      {shownAsset && <SourceViewerBar asset={shownAsset} />}
+      {!shownAsset && skimAsset && (
+        <div
+          className="w-full truncate rounded-md border border-line bg-panel-2 px-3 py-1.5 text-2xs text-ink-2"
+          data-testid="skim-name"
+        >
+          {skimAsset.name}
+        </div>
+      )}
     </div>
   );
 }

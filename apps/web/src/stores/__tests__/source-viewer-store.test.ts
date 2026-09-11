@@ -54,3 +54,25 @@ describe("source viewer store", () => {
     expect(useSourceViewerStore.getState().playheadMs).toBe(11);
   });
 });
+
+describe("skimming", () => {
+  it("is transient: it names the asset under the pointer and clears without touching the shown source", () => {
+    const s = useSourceViewerStore.getState();
+    s.show(A);
+    s.setPlayhead(700);
+    s.skim(B, 1234.4);
+    expect(useSourceViewerStore.getState()).toMatchObject({
+      assetId: A,
+      playheadMs: 700,
+      skimAssetId: B,
+      skimMs: 1234,
+    });
+    s.clearSkim();
+    expect(useSourceViewerStore.getState()).toMatchObject({ assetId: A, skimAssetId: null });
+  });
+  it("closing also clears the skim", () => {
+    useSourceViewerStore.getState().skim(B, 10);
+    useSourceViewerStore.getState().close();
+    expect(useSourceViewerStore.getState().skimAssetId).toBeNull();
+  });
+});

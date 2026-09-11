@@ -1,19 +1,20 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import type { Clip } from "@movie-desk/core";
-import { isMediaClip, isAdjustmentClip, isSequenceClip } from "@movie-desk/core";
+import { cn } from "@/lib/cn";
+import { selectZoom, useEditorStore as useProjectStore } from "@/stores/editor-store";
 import {
   useAssetFilmstrip,
   useAssetThumb,
   useAssetWaveform,
   usePreviewVisibility,
 } from "@/stores/preview-store";
-import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
 import { useSelectionStore } from "@/stores/selection-store";
 import { useTimelineUiStore } from "@/stores/timeline-ui-store";
-import { cn } from "@/lib/cn";
+import type { Clip } from "@movie-desk/core";
+import { isAdjustmentClip, isMediaClip, isSequenceClip } from "@movie-desk/core";
+import { useMemo, useRef } from "react";
 import { ClipContextMenu } from "./clip-context-menu";
+import { ClipVolumeLine } from "./clip-volume-line";
 import { ClipWaveform } from "./clip-waveform";
 
 interface Props {
@@ -211,6 +212,9 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
             {clip.label ?? asset?.name ?? clip.kind}
           </span>
         </div>
+        {isMediaClip(clip) && asset && asset.kind !== "image" && width > 24 && (
+          <ClipVolumeLine clip={clip} width={width} height={trackHeight - 8} />
+        )}
         <div
           className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
           onPointerDown={onPointerDown("trim-start")}

@@ -1018,4 +1018,8 @@ export const en = {
     "source.markOut": "Out point (O)",
     "source.rangeHint": "Only the range marked with I and O goes onto the timeline",
     "source.add": "Add to timeline (E)",
+    "media.cardHint": "Click to view · move across to skim · drag the bottom strip to set the use range · E appends to the timeline",
+    "media.rangeStrip": "Use range",
+    "timeline.volumeHint": "Drag to set volume · double-click for 100%",
+    "timeline.volumeKeyed": "This clip has volume keyframes — edit them in the inspector",
 } as const;

@@ -1016,4 +1016,8 @@ export const ko = {
     "source.markOut": "끝점 (O)",
     "source.rangeHint": "I·O 로 정한 구간만 타임라인에 들어갑니다",
     "source.add": "타임라인에 추가 (E)",
+    "media.cardHint": "클릭하여 보기 · 위에서 움직여 훑어보기 · 아래 띠를 끌어 사용 구간 지정 · E 로 타임라인 끝에 추가",
+    "media.rangeStrip": "사용 구간",
+    "timeline.volumeHint": "끌어서 볼륨 조절 · 더블클릭하면 100%",
+    "timeline.volumeKeyed": "볼륨 키프레임이 있는 클립 — 인스펙터에서 편집합니다",
 } as const;

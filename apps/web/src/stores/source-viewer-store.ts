@@ -13,7 +13,12 @@ interface SourceViewerState {
   readonly playheadMs: number;
   readonly playing: boolean;
   readonly rate: number;
+  // Transient: the asset and time under the pointer while skimming a card.
+  readonly skimAssetId: ID | null;
+  readonly skimMs: number;
   show: (assetId: ID, atMs?: number) => void;
+  skim: (assetId: ID, ms: number) => void;
+  clearSkim: () => void;
   close: () => void;
   setPlayhead: (ms: number) => void;
   setPlaying: (playing: boolean) => void;
@@ -26,6 +31,16 @@ export const useSourceViewerStore = create<SourceViewerState>((set, get) => ({
   playheadMs: 0,
   playing: false,
   rate: 1,
+  skimAssetId: null,
+  skimMs: 0,
+  skim: (assetId, ms) =>
+    set((s) => {
+      const skimMs = Math.max(0, Math.round(ms));
+      return s.skimAssetId === assetId && s.skimMs === skimMs
+        ? s
+        : { skimAssetId: assetId, skimMs };
+    }),
+  clearSkim: () => set((s) => (s.skimAssetId === null ? s : { skimAssetId: null, skimMs: 0 })),
   show: (assetId, atMs) => {
     // The shown source is also what E/W/D/Q place.
     useMediaUiStore.getState().setActiveAssetId(assetId);
@@ -35,7 +50,7 @@ export const useSourceViewerStore = create<SourceViewerState>((set, get) => ({
         : { assetId, playheadMs: Math.max(0, Math.round(atMs ?? 0)), playing: false, rate: 1 },
     );
   },
-  close: () => set({ assetId: null, playing: false, rate: 1 }),
+  close: () => set({ assetId: null, playing: false, rate: 1, skimAssetId: null, skimMs: 0 }),
   setPlayhead: (ms) =>
     set((s) => {
       const playheadMs = Math.max(0, Math.round(ms));

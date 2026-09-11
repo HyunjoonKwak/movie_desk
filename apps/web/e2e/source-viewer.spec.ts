@@ -84,9 +84,11 @@ test("a card click views the source; I/O mark its range and E places just that r
   expect(clip?.duration).toBe((asset?.useOutMs ?? 0) - (asset?.useInMs ?? 0));
   await expect(page.locator('[data-viewer-mode="timeline"]')).toBeVisible();
 
-  // Esc also hands it back, without an edit.
+  // Esc also hands it back, without an edit. The pointer leaves the card
+  // first: hovering a card skims it into the viewer on its own.
   await mediaCard(page).click();
   await expect(page.locator('[data-viewer-mode="source"]')).toBeVisible();
+  await page.mouse.move(700, 300);
   await page.keyboard.press("Escape");
   await expect(page.locator('[data-viewer-mode="timeline"]')).toBeVisible();
   await expect(page.locator('[data-transport-mode="timeline"]')).toBeVisible();
