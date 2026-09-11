@@ -1,30 +1,39 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
-import { clipIdsInMarquee, type ID } from "@movie-desk/core";
-import { useEditorStore as useProjectStore, selectZoom } from "@/stores/editor-store";
-import { useSelectionStore } from "@/stores/selection-store";
-import { useRangeStore } from "@/stores/range-store";
 import { usePinchZoom } from "@/hooks/use-pinch-zoom";
 import { useT } from "@/i18n/use-t";
+import { selectZoom, useEditorStore as useProjectStore } from "@/stores/editor-store";
+import { useRangeStore } from "@/stores/range-store";
+import { useSelectionStore } from "@/stores/selection-store";
+import { type ID, clipIdsInMarquee } from "@movie-desk/core";
+import { Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { TRACK_HEADER_W, clampZoom } from "../constants";
+import { CutSwitcher } from "./cut-switcher";
+import { MarkerStrip } from "./marker-strip";
+import { Playhead } from "./playhead";
+import { RangeBand } from "./range-band";
+import { SkimLine } from "./skim-line";
+import { SnapGuide } from "./snap-guide";
 import { TimelineRuler } from "./timeline-ruler";
 import { TimelineTrack } from "./timeline-track";
-import { Playhead } from "./playhead";
 import { TimelineZoom } from "./timeline-zoom";
-import { MarkerStrip } from "./marker-strip";
-import { RangeBand } from "./range-band";
-import { SnapGuide } from "./snap-guide";
-import { SkimLine } from "./skim-line";
-import { TRACK_HEADER_W, clampZoom } from "../constants";
 
-import { TIMELINE_HINT_KEYS, timelineGuidance } from "@/timeline/state-guidance";
 import { StateHint } from "@/components/state-hint";
+import { TIMELINE_HINT_KEYS, timelineGuidance } from "@/timeline/state-guidance";
 
 export function TimelinePanel({ timelineId }: { timelineId: ID }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const tracks = useProjectStore((s) => (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline).tracks);
-  const duration = useProjectStore((s) => (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline).duration);
+  const tracks = useProjectStore(
+    (s) =>
+      (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline)
+        .tracks,
+  );
+  const duration = useProjectStore(
+    (s) =>
+      (s.project.timelines.find((timeline) => timeline.id === timelineId) ?? s.project.timeline)
+        .duration,
+  );
   const zoom = useProjectStore(selectZoom);
   const setZoom = useProjectStore((s) => s.setZoomLevel);
   const setPlayhead = useProjectStore((s) => s.setPlayheadMs);
@@ -233,6 +242,7 @@ export function TimelinePanel({ timelineId }: { timelineId: ID }) {
           <span className="mr-1 shrink-0 text-2xs font-medium uppercase tracking-[0.14em] text-ink-3">
             {t("timeline.title")}
           </span>
+          <CutSwitcher />
           <div className="mr-1 h-4 w-px shrink-0 bg-line" />
           <button
             type="button"
@@ -280,14 +290,16 @@ export function TimelinePanel({ timelineId }: { timelineId: ID }) {
               <Plus className="size-3" /> {t("timeline.titleTpl")}
             </summary>
             <div className="absolute left-0 z-30 mt-1 w-44 rounded-md border border-white/10 bg-panel-3 p-1 shadow-lg">
-              {([
-                "title",
-                "subtitle",
-                "lowerThird",
-                "travelTitle",
-                "chapterCard",
-                "growthTitle",
-              ] as const).map((k) => (
+              {(
+                [
+                  "title",
+                  "subtitle",
+                  "lowerThird",
+                  "travelTitle",
+                  "chapterCard",
+                  "growthTitle",
+                ] as const
+              ).map((k) => (
                 <button
                   key={k}
                   type="button"

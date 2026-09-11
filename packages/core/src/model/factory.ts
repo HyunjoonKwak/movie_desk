@@ -1,10 +1,10 @@
-import { hydrateProjectTimelines, syncRootTimeline } from "./project-timelines";
-import type { Project } from "./project";
-import type { Track } from "./track";
 import { newId } from "../utils/id";
+import type { Project } from "./project";
+import { hydrateProjectTimelines, syncRootTimeline } from "./project-timelines";
+import type { Track } from "./track";
 
-export const createEmptyProject = (overrides?: Partial<Project>): Project => {
-  const now = Date.now();
+// The two tracks every new timeline starts with.
+export const createDefaultTracks = (): Track[] => {
   const videoTrack: Track = {
     id: newId(),
     kind: "video",
@@ -25,6 +25,11 @@ export const createEmptyProject = (overrides?: Partial<Project>): Project => {
     locked: false,
     clips: [],
   };
+  return [videoTrack, audioTrack];
+};
+
+export const createEmptyProject = (overrides?: Partial<Project>): Project => {
+  const now = Date.now();
   const base = hydrateProjectTimelines({
     id: overrides?.id ?? newId(),
     name: "Untitled",
@@ -33,7 +38,7 @@ export const createEmptyProject = (overrides?: Partial<Project>): Project => {
     framerate: 30,
     resolution: { w: 1920, h: 1080 },
     timeline: {
-      tracks: [videoTrack, audioTrack],
+      tracks: createDefaultTracks(),
       playhead: 0,
       zoom: 0.05, // 50 px per second by default
       duration: 0,

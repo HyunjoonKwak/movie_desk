@@ -13,4 +13,5 @@ export * from "./text-anim";
 export * from "./inspect";
 export * from "./marquee";
 export * from "./sequence-graph";
+export * from "./cuts";
 export { createCompound, unpackCompound, type CompoundRefusal, type CompoundResult } from "./compound";

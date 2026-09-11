@@ -1021,4 +1021,10 @@ export const ko = {
     "timeline.volumeHint": "끌어서 볼륨 조절 · 더블클릭하면 100%",
     "timeline.volumeKeyed": "볼륨 키프레임이 있는 클립 — 인스펙터에서 편집합니다",
     "mixer.limitedCaught": "리미터가 잡은 과부하 샘플: {count} · 출력은 클리핑되지 않았습니다",
+    "cuts.title": "컷",
+    "cuts.untitled": "컷 {n}",
+    "cuts.rename": "컷 이름",
+    "cuts.new": "새 컷 — 같은 보관소로 빈 타임라인에서 시작",
+    "cuts.duplicate": "이 컷 복제",
+    "cuts.delete": "이 컷 삭제 (되돌리기 가능)",
 } as const;

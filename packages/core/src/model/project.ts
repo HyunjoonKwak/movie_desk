@@ -1,6 +1,6 @@
-import type { Clip } from "./clip";
 import type { ID } from "../utils/id";
 import type { Fps, Ms } from "../utils/time";
+import type { Clip } from "./clip";
 import type { MediaCollection } from "./collection";
 import type { Marker } from "./marker";
 import type { MediaAsset } from "./media";
@@ -13,6 +13,14 @@ export interface Resolution {
 
 export interface Timeline {
   readonly id: ID;
+  /** Shown for a cut; a compound child is named by the clip that holds it. */
+  readonly name?: string;
+  /**
+   * A cut is a top-level edit of this project's library. The root timeline
+   * is always a cut; other cuts carry this role so they are never mistaken
+   * for an orphaned compound child.
+   */
+  readonly role?: "cut";
   readonly tracks: readonly Track[];
   readonly playhead: Ms;
   readonly zoom: number; // pixels per ms

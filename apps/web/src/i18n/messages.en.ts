@@ -1023,4 +1023,10 @@ export const en = {
     "timeline.volumeHint": "Drag to set volume · double-click for 100%",
     "timeline.volumeKeyed": "This clip has volume keyframes — edit them in the inspector",
     "mixer.limitedCaught": "Overs caught by the limiter: {count} · the output is not clipped",
+    "cuts.title": "Cut",
+    "cuts.untitled": "Cut {n}",
+    "cuts.rename": "Cut name",
+    "cuts.new": "New cut — an empty timeline over the same library",
+    "cuts.duplicate": "Duplicate this cut",
+    "cuts.delete": "Delete this cut (undoable)",
 } as const;

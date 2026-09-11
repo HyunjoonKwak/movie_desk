@@ -10,6 +10,7 @@ import { ProjectAudioMixer, packStereoPlanar } from "./audio-mixer";
 import { hasConflictingBt709Output, isBt709Output } from "./bt709-frame";
 import { Bt709FramePipeline } from "./bt709-pipeline";
 import { useDuckingStore } from "./ducking-store";
+import { exportBaseName, sanitizeName } from "./export-name";
 import { LoudnessMeter } from "./loudness";
 import { muxedColorIsBt709 } from "./muxed-color";
 import { useNormalizeStore } from "./normalize-store";
@@ -375,7 +376,7 @@ export class WebCodecsExporter implements Exporter {
 
       onProgress({ stage: "finalizing", progress: 1 });
 
-      const name = sanitizeName(project.name) || "export";
+      const name = sanitizeName(exportBaseName(project)) || "export";
       return {
         colorApproximation: compositor.usesColorApproximation || colorMetadataMissing,
         pitchFallback,
@@ -441,8 +442,6 @@ const codecForMuxer = (codec: ExportPreset["videoCodec"]): "avc" | "vp9" | "av1"
       return "av1";
   }
 };
-
-const sanitizeName = (s: string): string => s.replace(/[^a-z0-9_\-]+/gi, "_").slice(0, 60);
 
 // Saves the encoded blob. In the desktop bundle we route through the
 // Electron preload bridge (native Save panel + filesystem write); on the

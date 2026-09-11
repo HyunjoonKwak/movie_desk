@@ -1,8 +1,8 @@
 import type { Project } from "@movie-desk/core";
 import {
-  assertCanonicalProject,
   NestedTimelineError,
   PROJECT_VERSION,
+  assertCanonicalProject,
   hydrateProjectTimelines,
   isSafeRelativePath,
   syncRootTimeline,
@@ -254,6 +254,8 @@ const timelineSchema = z
     zoom: positive,
     duration: nonNegative,
     markers: z.array(markerSchema).optional(),
+    name: z.string().optional(),
+    role: z.literal("cut").optional(),
     magnetic: z.boolean().optional(),
   })
   .passthrough()
@@ -276,6 +278,8 @@ const projectSchema = z
         magnetic: z.boolean().optional(),
         duration: nonNegative,
         markers: z.array(markerSchema).optional(),
+        name: z.string().optional(),
+        role: z.literal("cut").optional(),
       })
       .passthrough()
       .transform(({ magnetic: _legacy, ...rest }) => rest),
@@ -350,7 +354,13 @@ export const parseCurrentProject = (raw: unknown): Project => {
     return rememberRestoredProject(
       rememberAudioRecovery(raw, {
         ...parsed,
-        ...(nested.preservedClips ? { preservedClips: nested.preservedClips as unknown as NonNullable<Project["preservedClips"]> } : {}),
+        ...(nested.preservedClips
+          ? {
+              preservedClips: nested.preservedClips as unknown as NonNullable<
+                Project["preservedClips"]
+              >,
+            }
+          : {}),
         timelines,
         rootTimelineId: root.id,
         timeline: root,
