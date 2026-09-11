@@ -4,6 +4,7 @@ import { usePrecisionGesture } from "@/components/use-precision-gesture";
 import { useT } from "@/i18n/use-t";
 import { sampleVolumeCurve } from "@/preview/volume-curve";
 import { useEditorStore as useProjectStore } from "@/stores/editor-store";
+import { useSelectionStore } from "@/stores/selection-store";
 import type { MediaClip } from "@movie-desk/core";
 import { useMemo, useRef, useState } from "react";
 import { formatGain, gainAtY, yForGain } from "../clip-volume";
@@ -11,16 +12,19 @@ import { formatGain, gainAtY, yForGain } from "../clip-volume";
 // The horizontal gain line across an audio-bearing clip: drag it up or down
 // to set the clip volume (one undo per drag), double-click for 100 %. A
 // clip with volume keyframes shows its curve instead; the inspector edits it.
-const HIT_PX = 10;
+// The line sits at mid-height at 100 %, where a plain click selects the
+// clip — so a press here selects too and the band stays thin.
+const HIT_PX = 6;
 const INSET_PX = 6;
 
 interface Props {
   readonly clip: MediaClip;
   readonly width: number;
   readonly height: number;
+  readonly locked?: boolean;
 }
 
-export function ClipVolumeLine({ clip, width, height }: Props) {
+export function ClipVolumeLine({ clip, width, height, locked = false }: Props) {
   const t = useT();
   const setVolume = useProjectStore((s) => s.setClipVolume);
   const gain = clip.volume ?? 1;
@@ -73,6 +77,8 @@ export function ClipVolumeLine({ clip, width, height }: Props) {
       onPointerDown={(e) => {
         e.stopPropagation();
         e.preventDefault();
+        useSelectionStore.getState().select(clip.id, e.shiftKey);
+        if (locked) return;
         e.currentTarget.setPointerCapture(e.pointerId);
         dragRef.current = { startY: e.clientY, startGain: gain };
         setLive(gain);

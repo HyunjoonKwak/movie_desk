@@ -214,7 +214,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
           </span>
         </div>
         {isMediaClip(clip) && asset && asset.kind !== "image" && width > 24 && (
-          <ClipVolumeLine clip={clip} width={width} height={trackHeight - 8} />
+          <ClipVolumeLine clip={clip} width={width} height={trackHeight - 8} locked={trackLocked} />
         )}
         <div
           className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize bg-white/0 hover:bg-white/30"
