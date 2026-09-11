@@ -205,6 +205,7 @@ export function TimelineClip({ clip, trackHeight, trackLocked }: Props) {
             height={trackHeight - 8}
             durationMs={asset?.durationMs ?? 0}
             peaks={waveform ?? []}
+            band={filmstrip || showThumb ? 0.4 : 1}
           />
         )}
         <div className="pointer-events-none relative flex h-full items-center px-2">

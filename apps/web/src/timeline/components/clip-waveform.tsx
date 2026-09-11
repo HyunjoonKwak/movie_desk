@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
 import type { MediaClip } from "@movie-desk/core";
+import { useMemo } from "react";
+import { waveformPath } from "../waveform-path";
 
 interface Props {
   clip: MediaClip;
@@ -9,33 +10,24 @@ interface Props {
   height: number;
   durationMs: number;
   peaks: readonly number[];
+  // Share of the clip height the waveform occupies, anchored at the bottom.
+  band?: number;
 }
 
 // Draws the asset's peak envelope clipped to the clip's trim window. Peaks
 // are normalized [0,1] across the whole asset; we slice the visible portion
 // using trimIn/trimOut relative to the asset duration.
-export function ClipWaveform({ clip, width, height, durationMs, peaks }: Props) {
+export function ClipWaveform({ clip, width, height, durationMs, peaks, band }: Props) {
   const points = useMemo(() => {
-    if (peaks.length === 0) return null;
     const dur = durationMs || 1;
-    const startFrac = Math.max(0, Math.min(1, clip.trimIn / dur));
-    const endFrac = Math.max(startFrac, Math.min(1, clip.trimOut / dur));
-    const from = Math.floor(startFrac * peaks.length);
-    const to = Math.max(from + 1, Math.floor(endFrac * peaks.length));
-    const slice = peaks.slice(from, to);
-    // Build a mirrored polyline path centered vertically.
-    const n = slice.length;
-    const mid = height / 2;
-    const top: string[] = [];
-    const bottom: string[] = [];
-    for (let i = 0; i < n; i++) {
-      const x = (i / Math.max(1, n - 1)) * width;
-      const amp = (slice[i]! * height) / 2;
-      top.push(`${x.toFixed(1)},${(mid - amp).toFixed(1)}`);
-      bottom.push(`${x.toFixed(1)},${(mid + amp).toFixed(1)}`);
-    }
-    return `M${top.join(" L")} L${bottom.reverse().join(" L")} Z`;
-  }, [durationMs, peaks, clip.trimIn, clip.trimOut, width, height]);
+    return waveformPath(peaks, {
+      width,
+      height,
+      ...(band === undefined ? {} : { band }),
+      from: clip.trimIn / dur,
+      to: clip.trimOut / dur,
+    });
+  }, [durationMs, peaks, clip.trimIn, clip.trimOut, width, height, band]);
 
   if (!points) return null;
   return (
